@@ -17,7 +17,7 @@ class BudgetController extends Controller
         $currentMonth = date('n');
 
         // Calculate dynamic year range based on actual data
-        $minYear = Transaction::min(DB::raw('YEAR(date)'));
+        $minYear = Transaction::min(DB::raw('YEAR(COALESCE(period_date, date))'));
         $minYear = $minYear ?? date('Y'); // Fallback if no transactions
         $maxYear = date('Y') + 1; // Allow planning for next year
 
@@ -36,11 +36,11 @@ class BudgetController extends Controller
             ->get()
             ->keyBy(function($b) { return $b->category_id . '-' . $b->month; });
 
-        // Compute actual totals grouped by category & month for that year
-        // Exclude loan-related and adjustment categories
+        // Compute actual totals grouped by category & month using period_date
+        // This ensures Jan salary received in Dec counts toward January budget
         $actualsQuery = Transaction::query()
-            ->selectRaw('category_id, MONTH(date) as month, SUM(amount) as total')
-            ->whereYear('date', $year)
+            ->selectRaw('category_id, MONTH(COALESCE(period_date, date)) as month, SUM(amount) as total')
+            ->whereYear(DB::raw('COALESCE(period_date, date)'), $year)
             ->whereHas('category', function($q) {
                 $q->whereIn('type', ['income', 'expense'])
                     ->whereNotIn('name', [
@@ -50,7 +50,7 @@ class BudgetController extends Controller
                         'Excise Duty'
                     ]);
             })
-            ->groupBy('category_id', DB::raw('MONTH(date)'))
+            ->groupBy('category_id', DB::raw('MONTH(COALESCE(period_date, date))'))
             ->get();
 
         // Convert to lookup: [category_id][month] => total

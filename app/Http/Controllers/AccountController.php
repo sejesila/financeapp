@@ -84,7 +84,6 @@ class AccountController extends Controller
         return redirect()->route('accounts.index')->with('success', 'Account deleted successfully!');
     }
 
-    // Adjust initial balance
     public function adjustBalance(Request $request, Account $account)
     {
         $request->validate([
@@ -106,6 +105,7 @@ class AccountController extends Controller
 
         Transaction::create([
             'date' => now()->toDateString(),
+            'period_date' => now()->toDateString(),
             'description' => "Balance adjustment for {$account->name}",
             'amount' => abs($difference),
             'category_id' => $category->id,
@@ -126,7 +126,6 @@ class AccountController extends Controller
             ->with('success', 'Balance adjusted successfully.');
     }
 
-    // Transfer between accounts
     public function transferForm()
     {
         $accounts = Account::where('is_active', true)->get();
@@ -164,31 +163,24 @@ class AccountController extends Controller
         return redirect()->route('accounts.index')->with('success', 'Transfer completed successfully!');
     }
 
-    // Show top-up form
     public function topUpForm(Account $account)
     {
-        // Filter categories based on account type
         $categories = $this->getTopUpCategories($account->type);
-
         return view('accounts.topup', compact('account', 'categories'));
     }
 
-    // Get appropriate categories based on account type
     private function getTopUpCategories($accountType)
     {
         if ($accountType === 'bank') {
-            // For bank accounts, only show Salary income
             return Category::where('type', 'income')
                 ->where('name', 'Salary')
                 ->get();
         } elseif ($accountType === 'airtel_money') {
-            // For Airtel Money accounts, show only non-Salary income (no liabilities)
             return Category::where('type', 'income')
                 ->where('name', '!=', 'Salary')
                 ->where('name', '!=', 'Loan Disbursement')
                 ->get();
         } elseif ($accountType === 'mpesa') {
-            // For M-Pesa accounts, show all income except Salary and Loan Disbursement, plus liabilities
             return Category::where(function($query) {
                 $query->where(function($q) {
                     $q->where('type', 'income')
@@ -199,39 +191,39 @@ class AccountController extends Controller
                 ->where('name', '!=', 'Loan Disbursement')
                 ->get();
         } else {
-            // For other accounts (cash, etc.), show all income and liability categories, excluding Loan Disbursement
             return Category::whereIn('type', ['income', 'liability'])
                 ->where('name', '!=', 'Loan Disbursement')
                 ->get();
         }
     }
 
-    // Process top-up
     public function topUp(Request $request, Account $account)
     {
         $request->validate([
             'amount' => 'required|numeric|min:0.01',
             'category_id' => 'required|exists:categories,id',
             'date' => 'required|date',
+            'period_date' => 'nullable|date',
             'description' => 'nullable|string',
         ]);
 
-        // Validate that selected category is allowed for this account type
         $category = Category::find($request->category_id);
 
         if (!$category) {
             return redirect()->back()->with('error', 'Please select a valid category.');
         }
 
-        // Extra validation for bank accounts
         if ($account->type === 'bank' && $category->type === 'income' && $category->name !== 'Salary') {
             return redirect()->back()->with('error', 'Only Salary income is allowed for bank accounts.');
         }
 
-        // Create transaction
+        // Use period_date if provided, otherwise use transaction date
+        $periodDate = $request->period_date ?? $request->date;
+
         $transaction = $account->transactions()->create([
             'amount'         => $request->amount,
             'date'           => $request->date,
+            'period_date'    => $periodDate,
             'description'    => $request->description ?: "Top-up to {$account->name}",
             'category_id'    => $category->id,
             'payment_method' => $category->name,
@@ -241,7 +233,6 @@ class AccountController extends Controller
             return redirect()->back()->with('error', 'Failed to create transaction.');
         }
 
-        // Recalculate account balance
         $account->updateBalance();
 
         return redirect()

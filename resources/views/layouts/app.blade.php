@@ -69,8 +69,8 @@
                 </li>
 
                 <!-- User Dropdown -->
-                <li class="relative group">
-                    <button class="text-gray-700 hover:text-blue-600 transition flex items-center space-x-2 px-3 py-2">
+                <li class="relative">
+                    <button id="userMenuBtn" class="text-gray-700 hover:text-blue-600 transition flex items-center space-x-2 px-3 py-2">
                         <span>{{ Auth::user()->name }}</span>
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
@@ -78,18 +78,34 @@
                     </button>
 
                     <!-- Dropdown Menu -->
-                    <div class="absolute right-0 mt-0 w-48 bg-white rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition duration-200 z-50">
-                        <a href="{{ route('profile.edit') }}" class="block px-4 py-3 text-gray-700 hover:bg-gray-100 text-sm border-b first:rounded-t-lg">
+                    <div id="userMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-50">
+                        <a href="{{ route('profile.edit') }}" class="block px-4 py-3 text-gray-700 hover:bg-gray-100 text-sm border-b rounded-t-lg">
                             Profile
                         </a>
                         <form method="POST" action="{{ route('logout') }}" class="block">
                             @csrf
-                            <button type="submit" class="w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-100 text-sm last:rounded-b-lg">
+                            <button type="submit" class="w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-100 text-sm rounded-b-lg">
                                 Logout
                             </button>
                         </form>
                     </div>
                 </li>
+
+                <script>
+                    document.getElementById('userMenuBtn').addEventListener('click', function() {
+                        const menu = document.getElementById('userMenu');
+                        menu.classList.toggle('hidden');
+                    });
+
+                    // Close menu when clicking outside
+                    document.addEventListener('click', function(event) {
+                        const menu = document.getElementById('userMenu');
+                        const btn = document.getElementById('userMenuBtn');
+                        if (!event.target.closest('li:has(#userMenuBtn)')) {
+                            menu.classList.add('hidden');
+                        }
+                    });
+                </script>
             </ul>
         </div>
     </nav>
