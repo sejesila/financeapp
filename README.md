@@ -1,2 +1,2 @@
 Personal Finance App 
-Deployed
+Desktop version is okay
