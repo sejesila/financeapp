@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 
 class Budget extends Model
 {
@@ -11,7 +12,19 @@ class Budget extends Model
         'year',
         'month',
         'amount',
+        'user_id',
     ];
+    public function user() {
+        return $this->belongsTo(User::class);
+    }
+    protected static function booted()
+    {
+        static::addGlobalScope('ownedByUser', function ($builder) {
+            if (Auth::check()) {
+                $builder->where('user_id', Auth::id());
+            }
+        });
+    }
     public function category()
     {
         return $this->belongsTo(Category::class);

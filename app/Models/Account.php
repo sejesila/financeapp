@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 
 class Account extends Model
 {
@@ -13,7 +15,8 @@ class Account extends Model
         'current_balance',
         'currency',
         'notes',
-        'is_active'
+        'is_active',
+        'user_id',
     ];
 
     protected $casts = [
@@ -21,6 +24,18 @@ class Account extends Model
         'current_balance' => 'decimal:2',
         'is_active' => 'boolean',
     ];
+    public function user() {
+        return $this->belongsTo(User::class);
+    }
+
+    protected static function booted()
+    {
+        static::addGlobalScope('ownedByUser', function (Builder $builder) {
+            if (Auth::check()) {
+                $builder->where('user_id', Auth::id());
+            }
+        });
+    }
 
     public function transactions()
     {

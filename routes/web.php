@@ -10,6 +10,8 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ReportsController;
 use Illuminate\Support\Facades\Route;
 
+// Authenticated routes
+Route::middleware(['auth'])->group(function () {
 // Home page - redirect to dashboard or login
 Route::get('/', function () {
     return redirect('/dashboard');
@@ -55,5 +57,5 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
-
+});
 require __DIR__.'/auth.php';

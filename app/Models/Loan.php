@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 
 class Loan extends Model
 {
     protected $fillable = [
+        'user_id',
         'account_id',
         'source',
         'principal_amount',
@@ -20,7 +22,8 @@ class Loan extends Model
         'repaid_date',
         'status',
         'notes',
-        'loan_type', // Added
+        'loan_type',
+
     ];
 
     protected $casts = [
@@ -34,6 +37,17 @@ class Loan extends Model
         'due_date' => 'date',
         'repaid_date' => 'date',
     ];
+    public function user() {
+        return $this->belongsTo(User::class);
+    }
+    protected static function booted()
+    {
+        static::addGlobalScope('ownedByUser', function ($builder) {
+            if (Auth::check()) {
+                $builder->where('user_id', Auth::id());
+            }
+        });
+    }
 
     /**
      * Relationship: Loan belongs to Account

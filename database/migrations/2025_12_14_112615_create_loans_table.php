@@ -10,18 +10,19 @@ return new class extends Migration
     {
         Schema::create('loans', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade'); // 👈 link to users
             $table->foreignId('account_id')->constrained()->onDelete('cascade');
             $table->string('source'); // M-Shwari, KCB-Mpesa, Fuliza, Branch, etc.
 
             // Principal & Interest
-            $table->decimal('principal_amount', 10, 2); // Original loan amount
-            $table->decimal('interest_rate', 5, 2)->nullable(); // % if using rate
-            $table->decimal('interest_amount', 10, 2)->nullable(); // Fixed amount if using fixed interest
-            $table->decimal('total_amount', 10, 2); // Principal + Interest (total repayment)
+            $table->decimal('principal_amount', 10, 2);
+            $table->decimal('interest_rate', 5, 2)->nullable();
+            $table->decimal('interest_amount', 10, 2)->nullable();
+            $table->decimal('total_amount', 10, 2);
 
             // Payment tracking
-            $table->decimal('amount_paid', 10, 2)->default(0); // Total paid so far
-            $table->decimal('balance', 10, 2); // Remaining balance
+            $table->decimal('amount_paid', 10, 2)->default(0);
+            $table->decimal('balance', 10, 2);
 
             // Dates
             $table->date('disbursed_date');
@@ -33,23 +34,25 @@ return new class extends Migration
 
             // Additional info
             $table->text('notes')->nullable();
+            $table->string('loan_type')->default('mshwari');
+
             $table->timestamps();
 
-            // Indexes for faster queries
+            // Indexes
             $table->index('account_id');
             $table->index('status');
-            $table->string('loan_type')->default('mshwari');
             $table->index('disbursed_date');
         });
 
         Schema::create('loan_payments', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade'); // 👈 link to users
             $table->foreignId('loan_id')->constrained()->onDelete('cascade');
             $table->foreignId('account_id')->constrained()->onDelete('cascade');
 
-            $table->decimal('amount', 10, 2); // Total payment amount
-            $table->decimal('principal_portion', 10, 2)->default(0); // How much goes to principal
-            $table->decimal('interest_portion', 10, 2)->default(0); // How much goes to interest
+            $table->decimal('amount', 10, 2);
+            $table->decimal('principal_portion', 10, 2)->default(0);
+            $table->decimal('interest_portion', 10, 2)->default(0);
 
             $table->date('payment_date');
             $table->foreignId('transaction_id')->nullable()->constrained()->onDelete('set null');
@@ -61,6 +64,7 @@ return new class extends Migration
             $table->index('loan_id');
             $table->index('payment_date');
         });
+
     }
 
     public function down(): void

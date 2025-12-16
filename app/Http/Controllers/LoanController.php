@@ -8,10 +8,26 @@ use App\Models\LoanPayment;
 use App\Models\Transaction;
 use App\Models\Category;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
-class LoanController extends Controller
+class LoanController extends Controller implements HasMiddleware
 {
+    use AuthorizesRequests;
+
+    /**
+     * Get the middleware that should be assigned to the controller.
+     */
+    public static function middleware(): array
+    {
+        return [
+            'auth',
+        ];
+    }
+
     /**
      * Loan type configurations
      */
@@ -20,15 +36,15 @@ class LoanController extends Controller
         return [
             'mshwari' => [
                 'name' => 'M-Shwari',
-                'excise_duty_rate' => 0.015, // 1.5%
-                'facilitation_fee_rate' => 0.075, // 7.5%
+                'excise_duty_rate' => 0.015,
+                'facilitation_fee_rate' => 0.075,
                 'early_repayment_days' => 10,
-                'early_repayment_refund_rate' => 0.24, // 24% of facilitation fee
+                'early_repayment_refund_rate' => 0.24,
                 'has_early_repayment' => true,
             ],
             'kcb_mpesa' => [
                 'name' => 'KCB M-Pesa',
-                'interest_rate' => 8.93, // 8.93%
+                'interest_rate' => 8.93,
                 'has_early_repayment' => false,
             ],
         ];
@@ -49,7 +65,6 @@ class LoanController extends Controller
             return 'mshwari';
         }
 
-        // Default to M-Shwari for other sources
         return 'mshwari';
     }
 
@@ -82,33 +97,29 @@ class LoanController extends Controller
      */
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Loan::class);
+
         $filter = $request->get('filter', 'active');
         $year = $request->get('year');
 
-        // Calculate dynamic year range based on actual loan data
         $minYear = Loan::min(DB::raw('YEAR(disbursed_date)'));
         $minYear = $minYear ?? date('Y');
         $maxYear = date('Y');
 
-        // Active loans query
         $activeLoansQuery = Loan::with('account')->where('status', 'active');
 
-        // Apply year filter to active loans if specified
         if ($year && $filter === 'active') {
             $activeLoansQuery->whereYear('disbursed_date', $year);
         }
 
         $activeLoans = $activeLoansQuery->orderBy('disbursed_date', 'desc')->get();
 
-        // Paid loans query with filtering
         $paidLoansQuery = Loan::with('account')->where('status', 'paid');
 
-        // Apply filters to paid loans
         if ($year) {
             $paidLoansQuery->whereYear('repaid_date', $year);
         }
 
-        // Determine limit based on filter
         $limit = ($filter === 'all_paid' || $year) ? null : 10;
 
         if ($limit) {
@@ -135,16 +146,17 @@ class LoanController extends Controller
      */
     public function create(Request $request)
     {
-        // Show all mobile money accounts (mpesa, airtel_money)
-        $accounts = Account::where('is_active', true)
+        $this->authorize('create', Loan::class);
+
+        // Only show user's own accounts
+        $accounts = Account::where('user_id', Auth::id())
+            ->where('is_active', true)
             ->whereIn('type', ['mpesa', 'airtel_money'])
             ->orderBy('name')
             ->get();
 
-        // Check if this is a redirect from top-up (has from_topup flag)
         $fromTopup = $request->has('account_id') && $request->has('amount') && $request->has('source');
 
-        // Pre-fill data from query parameters
         $prefillData = [
             'account_id' => $request->query('account_id'),
             'amount' => $request->query('amount'),
@@ -153,7 +165,6 @@ class LoanController extends Controller
             'notes' => $request->query('notes'),
         ];
 
-        // Detect loan type
         $loanType = $this->detectLoanType($prefillData['source'] ?? '');
         $loanTypes = $this->getLoanTypes();
 
@@ -203,7 +214,7 @@ class LoanController extends Controller
             'interest_rate' => $config['interest_rate'],
             'interest_amount' => round($interest, 2),
             'total_repayment' => round($totalRepayment, 2),
-            'deposit_amount' => $principalAmount, // Full amount deposited
+            'deposit_amount' => $principalAmount,
         ];
     }
 
@@ -224,7 +235,8 @@ class LoanController extends Controller
      */
     public function store(Request $request)
     {
-        // Check if this is from top-up redirect (immutable fields)
+        $this->authorize('create', Loan::class);
+
         $fromTopup = $request->input('from_topup') === '1';
 
         $rules = [
@@ -237,14 +249,12 @@ class LoanController extends Controller
             'loan_type' => 'required|in:mshwari,kcb_mpesa',
         ];
 
-        // If from top-up, add additional validation to ensure fields weren't tampered with
         if ($fromTopup) {
             $rules['from_topup'] = 'required|in:1';
             $rules['original_source'] = 'required|string';
             $rules['original_account_id'] = 'required|exists:accounts,id';
             $rules['original_amount'] = 'required|numeric|min:1';
 
-            // Validate that the values match the originals
             $request->validate([
                 'source' => 'required|in:' . $request->input('original_source'),
                 'account_id' => 'required|in:' . $request->input('original_account_id'),
@@ -258,18 +268,21 @@ class LoanController extends Controller
 
         $validated = $request->validate($rules);
 
+        // Verify account ownership
+        $account = Account::findOrFail($validated['account_id']);
+        $this->authorize('view', $account);
+
         DB::beginTransaction();
 
         try {
             $principalAmount = (float) $validated['principal_amount'];
             $loanType = $validated['loan_type'];
 
-            // Calculate breakdown based on loan type
             $breakdown = $this->calculateBreakdown($principalAmount, $loanType);
 
-            // Create loan record with calculated amounts
             if ($loanType === 'kcb_mpesa') {
                 $loan = Loan::create([
+                    'user_id' => Auth::id(),
                     'account_id' => $validated['account_id'],
                     'source' => $validated['source'],
                     'principal_amount' => $principalAmount,
@@ -285,6 +298,7 @@ class LoanController extends Controller
                 ]);
             } else {
                 $loan = Loan::create([
+                    'user_id' => Auth::id(),
                     'account_id' => $validated['account_id'],
                     'source' => $validated['source'],
                     'principal_amount' => $principalAmount,
@@ -300,16 +314,14 @@ class LoanController extends Controller
                 ]);
             }
 
-            // Get or create loan receipt category
             $loanCategory = Category::firstOrCreate(
+                ['name' => 'Loan Receipt', 'type' => 'income', 'user_id' => Auth::id()],
                 ['name' => 'Loan Receipt', 'type' => 'income']
             );
 
-            $account = Account::find($validated['account_id']);
-
             if ($loanType === 'kcb_mpesa') {
-                // KCB M-Pesa: Full amount deposited
                 Transaction::create([
+                    'user_id' => Auth::id(),
                     'account_id' => $validated['account_id'],
                     'category_id' => $loanCategory->id,
                     'description' => "Loan disbursement from {$validated['source']}",
@@ -322,10 +334,10 @@ class LoanController extends Controller
                 $account->current_balance += $principalAmount;
 
             } else {
-                // M-Shwari: Deposit after excise duty deduction
                 $depositAfterExcise = $breakdown['deposit_amount'];
 
                 Transaction::create([
+                    'user_id' => Auth::id(),
                     'account_id' => $validated['account_id'],
                     'category_id' => $loanCategory->id,
                     'description' => "Loan disbursement from {$validated['source']}",
@@ -335,12 +347,13 @@ class LoanController extends Controller
                     'loan_id' => $loan->id,
                 ]);
 
-                // Record excise duty as expense
                 $exciseCategory = Category::firstOrCreate(
+                    ['name' => 'Excise Duty', 'type' => 'expense', 'user_id' => Auth::id()],
                     ['name' => 'Excise Duty', 'type' => 'expense']
                 );
 
                 Transaction::create([
+                    'user_id' => Auth::id(),
                     'account_id' => $validated['account_id'],
                     'category_id' => $exciseCategory->id,
                     'description' => "Excise duty (1.5%) on loan from {$validated['source']}",
@@ -374,6 +387,8 @@ class LoanController extends Controller
      */
     public function show(Loan $loan)
     {
+        $this->authorize('view', $loan);
+
         $loan->load(['account', 'payments']);
 
         $repayment = $this->calculateTotalRepayment(
@@ -394,6 +409,8 @@ class LoanController extends Controller
      */
     public function paymentForm(Loan $loan)
     {
+        $this->authorize('makePayment', $loan);
+
         if ($loan->status !== 'active') {
             return back()->with('error', 'Only active loans can be repaid');
         }
@@ -412,6 +429,8 @@ class LoanController extends Controller
      */
     public function recordPayment(Request $request, Loan $loan)
     {
+        $this->authorize('makePayment', $loan);
+
         if ($loan->status !== 'active') {
             return back()->with('error', 'Only active loans can be repaid');
         }
@@ -431,12 +450,10 @@ class LoanController extends Controller
             $paymentDate = $validated['payment_date'];
             $account = Account::find($loan->account_id);
 
-            // Check account balance
             if ($account->current_balance < $paymentAmount) {
                 throw new \Exception("Insufficient balance. Required: KES " . number_format($paymentAmount, 0) . ", Available: KES " . number_format($account->current_balance, 0));
             }
 
-            // Calculate principal and interest portions
             $repayment = $this->calculateTotalRepayment(
                 $loan->principal_amount,
                 $loan->interest_rate,
@@ -446,20 +463,19 @@ class LoanController extends Controller
             $principalPortion = $validated['principal_portion'] ? (float) $validated['principal_portion'] : 0;
             $interestPortion = $validated['interest_portion'] ? (float) $validated['interest_portion'] : 0;
 
-            // If portions not specified, allocate: interest first, then principal
             if ($principalPortion == 0 && $interestPortion == 0) {
                 $remainingInterest = $repayment['interest'] - (LoanPayment::where('loan_id', $loan->id)->sum('interest_portion') ?? 0);
                 $interestPortion = min($paymentAmount, $remainingInterest);
                 $principalPortion = $paymentAmount - $interestPortion;
             }
 
-            // Get or create loan repayment category
             $repaymentCategory = Category::firstOrCreate(
+                ['name' => 'Loan Repayment', 'type' => 'expense', 'user_id' => Auth::id()],
                 ['name' => 'Loan Repayment', 'type' => 'expense']
             );
 
-            // Record payment transaction
             $transaction = Transaction::create([
+                'user_id' => Auth::id(),
                 'account_id' => $loan->account_id,
                 'category_id' => $repaymentCategory->id,
                 'description' => "Loan repayment to {$loan->source}",
@@ -469,7 +485,6 @@ class LoanController extends Controller
                 'loan_id' => $loan->id,
             ]);
 
-            // Create loan payment record
             LoanPayment::create([
                 'loan_id' => $loan->id,
                 'account_id' => $loan->account_id,
@@ -481,7 +496,6 @@ class LoanController extends Controller
                 'notes' => $validated['notes'],
             ]);
 
-            // Update loan balance and status
             $loan->amount_paid += $paymentAmount;
             $loan->balance = $loan->total_amount - $loan->amount_paid;
 
@@ -492,10 +506,8 @@ class LoanController extends Controller
 
             $loan->save();
 
-            // Update account balance (deduct payment)
             $account->current_balance -= $paymentAmount;
 
-            // Handle early repayment credit ONLY for M-Shwari loans
             $earlyRepaymentCredit = 0;
             $loanType = $loan->loan_type ?? $this->detectLoanType($loan->source);
 
@@ -508,10 +520,12 @@ class LoanController extends Controller
                     $earlyRepaymentCredit = $totalLoanFees * 0.20;
 
                     $loanFeesCategory = Category::firstOrCreate(
+                        ['name' => 'Loan Fees', 'type' => 'income', 'user_id' => Auth::id()],
                         ['name' => 'Loan Fees', 'type' => 'income']
                     );
 
                     Transaction::create([
+                        'user_id' => Auth::id(),
                         'account_id' => $loan->account_id,
                         'category_id' => $loanFeesCategory->id,
                         'description' => "Early repayment credit - 20% of loan fees waived (Loan from {$loan->source})",
@@ -549,11 +563,14 @@ class LoanController extends Controller
      */
     public function edit(Loan $loan)
     {
+        $this->authorize('update', $loan);
+
         if ($loan->status !== 'active') {
             return back()->with('error', 'Cannot edit non-active loans');
         }
 
-        $accounts = Account::where('is_active', true)
+        $accounts = Account::where('user_id', Auth::id())
+            ->where('is_active', true)
             ->whereIn('type', ['cash', 'mobile_money'])
             ->get();
 
@@ -565,6 +582,8 @@ class LoanController extends Controller
      */
     public function update(Request $request, Loan $loan)
     {
+        $this->authorize('update', $loan);
+
         if ($loan->status !== 'active') {
             return back()->with('error', 'Cannot edit non-active loans');
         }
@@ -586,6 +605,8 @@ class LoanController extends Controller
      */
     public function destroy(Loan $loan)
     {
+        $this->authorize('delete', $loan);
+
         if ($loan->status !== 'active') {
             return back()->with('error', 'Cannot delete non-active loans');
         }
@@ -597,10 +618,8 @@ class LoanController extends Controller
         DB::beginTransaction();
 
         try {
-            // Delete related transactions
             Transaction::where('loan_id', $loan->id)->delete();
 
-            // Update account balance to remove the loan amount
             $account = Account::find($loan->account_id);
             $loanType = $loan->loan_type ?? $this->detectLoanType($loan->source);
 
@@ -613,7 +632,6 @@ class LoanController extends Controller
 
             $account->save();
 
-            // Delete loan
             $loan->delete();
 
             DB::commit();

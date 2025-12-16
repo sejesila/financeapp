@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Category;
 use App\Models\Transaction;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -148,6 +149,8 @@ class TransactionController extends Controller
     /**
      * Store a newly created resource in storage.
      */
+
+
     public function store(Request $request)
     {
         $request->validate([
@@ -163,12 +166,12 @@ class TransactionController extends Controller
         $category = \App\Models\Category::find($request->category_id);
 
         // Check if it's an expense and if account has sufficient balance
-        if ($category->type === 'expense') {
-            if ($account->current_balance < $request->amount) {
-                return redirect()->back()
-                    ->withInput()
-                    ->with('error', "Insufficient balance in {$account->name}. Current balance: " . number_format($account->current_balance, 0, '.', ',') . ", Required: " . number_format($request->amount, 0, '.', ','));
-            }
+        if ($category->type === 'expense' && $account->current_balance < $request->amount) {
+            return redirect()->back()
+                ->withInput()
+                ->with('error', "Insufficient balance in {$account->name}. Current balance: "
+                    . number_format($account->current_balance, 0, '.', ',')
+                    . ", Required: " . number_format($request->amount, 0, '.', ','));
         }
 
         // Auto-set payment method based on account type
@@ -177,17 +180,20 @@ class TransactionController extends Controller
             'mpesa' => 'Mpesa',
             'airtel_money' => 'Airtel Money',
             'bank' => 'Bank Transfer',
-            default => 'Cash'
+            default => 'Mpesa'
         };
 
+        // ✅ Attach user_id when creating the transaction
         $transaction = Transaction::create([
-            'date' => $request->date,
-            'description' => $request->description,
-            'amount' => $request->amount,
-            'category_id' => $request->category_id,
-            'account_id' => $request->account_id,
-            'payment_method' => $paymentMethod
+            'user_id'       => Auth::id(),   // 👈 required
+            'date'          => $request->date,
+            'description'   => $request->description,
+            'amount'        => $request->amount,
+            'category_id'   => $request->category_id,
+            'account_id'    => $request->account_id,
+            'payment_method'=> $paymentMethod
         ]);
+
 
         // Update account balance
         if ($transaction->account) {
@@ -196,6 +202,7 @@ class TransactionController extends Controller
 
         return redirect()->route('transactions.index')->with('success', 'Transaction recorded successfully');
     }
+
 
     /**
      * Display the specified resource (read-only view).

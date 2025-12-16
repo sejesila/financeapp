@@ -11,13 +11,25 @@ class Transfer extends Model
         'to_account_id',
         'amount',
         'date',
-        'description'
+        'description',
+        'user_id',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
         'date' => 'date',
     ];
+    public function user() {
+        return $this->belongsTo(User::class);
+    }
+    protected static function booted()
+    {
+        static::addGlobalScope('ownedByUser', function ($builder) {
+            if (Auth::check()) {
+                $builder->where('user_id', Auth::id());
+            }
+        });
+    }
 
     public function fromAccount()
     {

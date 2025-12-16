@@ -10,6 +10,7 @@ return new class extends Migration
     {
         Schema::create('accounts', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade'); // 👈 link to users table
             $table->string('name');
             $table->enum('type', ['cash', 'mpesa', 'airtel_money', 'bank'])->default('cash');
             $table->decimal('initial_balance', 15, 2)->default(0);
@@ -20,9 +21,9 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // Create transfers table for account-to-account transfers
         Schema::create('transfers', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade'); // 👈 link to users table
             $table->foreignId('from_account_id')->constrained('accounts')->onDelete('cascade');
             $table->foreignId('to_account_id')->constrained('accounts')->onDelete('cascade');
             $table->decimal('amount', 15, 2);
@@ -30,6 +31,7 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->timestamps();
         });
+
     }
 
     public function down(): void

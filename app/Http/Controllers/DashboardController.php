@@ -6,130 +6,124 @@ use App\Models\Account;
 use App\Models\Loan;
 use App\Models\Transaction;
 use App\Models\Category;
+use App\Models\Budget;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
     public function index()
     {
+        $userId = Auth::id();
+        $currentMonth = now()->month;
+        $currentYear = now()->year;
+
         // ============ FINANCIAL DASHBOARD DATA ============
 
-        // ASSETS & LIABILITIES
-        $totalAssets = Account::where('is_active', true)->sum('current_balance');
-        $totalLiabilities = Loan::where('status', 'active')->sum('balance');
+        $totalAssets = Account::where('is_active', true)
+            ->where('user_id', $userId)
+            ->sum('current_balance');
+
+        $totalLiabilities = Loan::where('status', 'active')
+            ->where('user_id', $userId)
+            ->sum('balance');
+
         $netWorth = $totalAssets - $totalLiabilities;
         $debtToAssetRatio = $totalAssets > 0 ? ($totalLiabilities / $totalAssets) * 100 : 0;
 
-        // ACCOUNTS & LOANS
-        $accounts = Account::where('is_active', true)->get();
+        $accounts = Account::where('is_active', true)
+            ->where('user_id', $userId)
+            ->get();
+
         $activeLoans = Loan::where('status', 'active')
+            ->where('user_id', $userId)
             ->with('account')
             ->orderBy('due_date', 'asc')
             ->get();
 
         // ============ QUICK DASHBOARD DATA ============
 
-        $currentMonth = now()->month;
-        $currentYear = now()->year;
-
-        // Quick Stats
-        $totalToday = Transaction::whereDate('date', today())
-            ->whereHas('category', function($q) {
-                $q->where('type', 'expense');
-            })
+        $totalToday = Transaction::where('user_id', $userId)
+            ->whereDate('date', today())
+            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
             ->sum('amount');
 
-        $totalThisWeek = Transaction::whereBetween('date', [
-            now()->startOfWeek(),
-            now()->endOfWeek()
-        ])
-            ->whereHas('category', function($q) {
-                $q->where('type', 'expense');
-            })
+        $totalThisWeek = Transaction::where('user_id', $userId)
+            ->whereBetween('date', [now()->startOfWeek(), now()->endOfWeek()])
+            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
             ->sum('amount');
 
-        // FIXED: Only sum EXPENSES for totalThisMonth
-        $totalThisMonth = Transaction::whereMonth('date', $currentMonth)
+        $totalThisMonth = Transaction::where('user_id', $userId)
+            ->whereMonth('date', $currentMonth)
             ->whereYear('date', $currentYear)
-            ->whereHas('category', function($q) {
-                $q->where('type', 'expense');
-            })
+            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
             ->sum('amount');
 
-        // Monthly Income (exclude loan disbursements)
-        $monthlyIncome = Transaction::whereMonth('date', $currentMonth)
+        $monthlyIncome = Transaction::where('user_id', $userId)
+            ->whereMonth('date', $currentMonth)
             ->whereYear('date', $currentYear)
-            ->whereHas('category', function($q) {
-                $q->where('type', 'income')
-                    ->whereNotIn('name', ['Loan Disbursement', 'Balance Adjustment']);
-            })
+            ->whereHas('category', fn($q) =>
+            $q->where('type', 'income')
+                ->whereNotIn('name', ['Loan Disbursement', 'Balance Adjustment'])
+            )
             ->sum('amount');
 
         $remainingThisMonth = $monthlyIncome - $totalThisMonth;
 
         // ============ MONTHLY & YEARLY DATA ============
 
-        // Monthly Expenses
-        $monthlyExpenses = Transaction::whereYear('date', $currentYear)
+        $monthlyExpenses = Transaction::where('user_id', $userId)
+            ->whereYear('date', $currentYear)
             ->whereMonth('date', $currentMonth)
-            ->whereHas('category', function($q) {
-                $q->where('type', 'expense');
-            })
+            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
             ->sum('amount');
 
         $monthlyNet = $monthlyIncome - $monthlyExpenses;
 
-        // Yearly Totals
-        $yearlyIncome = Transaction::whereYear('date', $currentYear)
-            ->whereHas('category', function($q) {
-                $q->where('type', 'income')
-                    ->whereNotIn('name', ['Loan Disbursement', 'Balance Adjustment']);
-            })
+        $yearlyIncome = Transaction::where('user_id', $userId)
+            ->whereYear('date', $currentYear)
+            ->whereHas('category', fn($q) =>
+            $q->where('type', 'income')
+                ->whereNotIn('name', ['Loan Disbursement', 'Balance Adjustment'])
+            )
             ->sum('amount');
 
-        $yearlyExpenses = Transaction::whereYear('date', $currentYear)
-            ->whereHas('category', function($q) {
-                $q->where('type', 'expense');
-            })
+        $yearlyExpenses = Transaction::where('user_id', $userId)
+            ->whereYear('date', $currentYear)
+            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
             ->sum('amount');
 
         $yearlyNet = $yearlyIncome - $yearlyExpenses;
 
         // ============ SPENDING ANALYSIS ============
 
-        // Top Expenses This Month
-        $topExpenses = Transaction::select('category_id', DB::raw('SUM(amount) as total'))
+        $topExpenses = Transaction::where('user_id', $userId)
+            ->select('category_id', DB::raw('SUM(amount) as total'))
             ->whereYear('date', $currentYear)
             ->whereMonth('date', $currentMonth)
-            ->whereHas('category', function($q) {
-                $q->where('type', 'expense');
-            })
+            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
             ->groupBy('category_id')
             ->orderByDesc('total')
             ->with('category')
             ->limit(5)
             ->get();
 
-        // Daily Spending This Month
-        $dailySpending = Transaction::query()
+        $dailySpending = Transaction::where('user_id', $userId)
             ->select(DB::raw('DATE(date) as date'), DB::raw('SUM(amount) as total'))
             ->whereMonth('date', $currentMonth)
             ->whereYear('date', $currentYear)
-            ->whereHas('category', function($q) {
-                $q->where('type', 'expense');
-            })
+            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
             ->groupBy(DB::raw('DATE(date)'))
             ->orderBy('date')
             ->get();
 
         // ============ MONTH COMPARISON ============
 
-        $lastMonthTotal = Transaction::whereMonth('date', now()->subMonth()->month)
+        $lastMonthTotal = Transaction::where('user_id', $userId)
+            ->whereMonth('date', now()->subMonth()->month)
             ->whereYear('date', now()->subMonth()->year)
-            ->whereHas('category', function($q) {
-                $q->where('type', 'expense');
-            })
+            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
             ->sum('amount');
 
         $monthlyComparison = $totalThisMonth - $lastMonthTotal;
@@ -140,45 +134,44 @@ class DashboardController extends Controller
         // ============ RECENT TRANSACTIONS ============
 
         $recentTransactions = Transaction::with(['category', 'account'])
+            ->where('user_id', $userId)
             ->orderBy('date', 'desc')
             ->orderBy('created_at', 'desc')
             ->limit(10)
             ->get();
 
+        // ============ BUDGETS ============
+
+        $budgets = Budget::where('user_id', $userId)
+            ->where('year', $currentYear)
+            ->where('month', $currentMonth)
+            ->with('category')
+            ->get();
+
         return view('dashboard.index', compact(
-        // Financial Dashboard Data
             'totalAssets',
             'totalLiabilities',
             'netWorth',
             'debtToAssetRatio',
             'accounts',
             'activeLoans',
-
-            // Quick Stats
             'totalToday',
             'totalThisWeek',
             'totalThisMonth',
             'monthlyIncome',
             'remainingThisMonth',
-
-            // Monthly & Yearly
             'monthlyExpenses',
             'monthlyNet',
             'yearlyIncome',
             'yearlyExpenses',
             'yearlyNet',
-
-            // Spending Analysis
             'topExpenses',
             'dailySpending',
-
-            // Comparison
             'lastMonthTotal',
             'monthlyComparison',
             'monthlyComparisonPercent',
-
-            // Transactions
-            'recentTransactions'
+            'recentTransactions',
+            'budgets'
         ));
     }
 }

@@ -7,6 +7,7 @@ use App\Models\Transaction;
 use App\Models\Transfer;
 use Illuminate\Http\Request;
 use App\Models\Category;
+use Illuminate\Support\Facades\Auth;
 
 class AccountController extends Controller
 {
@@ -41,6 +42,7 @@ class AccountController extends Controller
         ]);
 
         $account = Account::create([
+            'user_id' => Auth::id(), // 👈 attach the logged-in user
             'name' => $request->name,
             'type' => $request->type,
             'initial_balance' => $request->initial_balance,
@@ -221,6 +223,7 @@ class AccountController extends Controller
         $periodDate = $request->period_date ?? $request->date;
 
         $transaction = $account->transactions()->create([
+            'user_id'       => Auth::id(),
             'amount'         => $request->amount,
             'date'           => $request->date,
             'period_date'    => $periodDate,
