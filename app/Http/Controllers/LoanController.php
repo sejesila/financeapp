@@ -237,6 +237,7 @@ class LoanController extends Controller implements HasMiddleware
     {
         $this->authorize('create', Loan::class);
 
+
         $fromTopup = $request->input('from_topup') === '1';
 
         $rules = [

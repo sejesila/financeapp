@@ -21,10 +21,12 @@ class Budget extends Model
     {
         static::addGlobalScope('ownedByUser', function ($builder) {
             if (Auth::check()) {
-                $builder->where('user_id', Auth::id());
+                $table = $builder->getModel()->getTable();
+                $builder->where("{$table}.user_id", Auth::id());
             }
         });
     }
+
     public function category()
     {
         return $this->belongsTo(Category::class);

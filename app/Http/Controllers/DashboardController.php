@@ -104,10 +104,11 @@ class DashboardController extends Controller
             ->whereMonth('date', $currentMonth)
             ->whereHas('category', fn($q) => $q->where('type', 'expense'))
             ->groupBy('category_id')
+            ->with('category') // eager load category
             ->orderByDesc('total')
-            ->with('category')
             ->limit(5)
             ->get();
+
 
         $dailySpending = Transaction::where('user_id', $userId)
             ->select(DB::raw('DATE(date) as date'), DB::raw('SUM(amount) as total'))

@@ -1,331 +1,297 @@
+{{-- resources/views/dashboard.blade.php --}}
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-            {{ __('Financial Dashboard') }}
-        </h2>
-    </x-slot>
-
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto px-4">
-            <!-- Header -->
-            <div class="mb-10">
-                <h1 class="text-5xl font-bold text-gray-900">Financial Dashboard</h1>
-                <p class="text-gray-600 mt-2 text-base">Welcome back! Here's your complete financial overview.</p>
-            </div>
-
-            <!-- NET WORTH SECTION -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-                <!-- Total Cash -->
-                <div class="bg-gradient-to-br from-green-50 to-green-100 border-l-4 border-green-500 p-6 rounded-lg shadow">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-xs font-bold text-green-700 mb-2 uppercase tracking-wide">Total Cash</p>
-                            <p class="text-4xl font-bold text-green-900 mb-1">
-                                KES {{ number_format($totalAssets, 0, '.', ',') }}
-                            </p>
-                            <p class="text-xs text-green-700">Cash across all accounts</p>
-                        </div>
-                        <div class="text-green-500">
-                            <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Total Liabilities -->
-                <div class="bg-gradient-to-br from-red-50 to-red-100 border-l-4 border-red-500 p-6 rounded-lg shadow">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-xs font-bold text-red-700 mb-2 uppercase tracking-wide">Total Liabilities</p>
-                            <p class="text-4xl font-bold text-red-900 mb-1">
-                                KES {{ number_format($totalLiabilities, 0, '.', ',') }}
-                            </p>
-                            <p class="text-xs text-red-700">Outstanding loan balances</p>
-                        </div>
-                        <div class="text-red-500">
-                            <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Net Balance -->
-                <div class="bg-gradient-to-br {{ $netWorth >= 0 ? 'from-blue-50 to-blue-100 border-blue-500' : 'from-orange-50 to-orange-100 border-orange-500' }} border-l-4 p-6 rounded-lg shadow">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-xs font-bold {{ $netWorth >= 0 ? 'text-blue-700' : 'text-orange-700' }} mb-2 uppercase tracking-wide">Net Balance</p>
-                            <p class="text-4xl font-bold {{ $netWorth >= 0 ? 'text-blue-900' : 'text-orange-900' }} mb-1">
-                                KES {{ number_format($netWorth, 0, '.', ',') }}
-                            </p>
-                            <p class="text-xs {{ $netWorth >= 0 ? 'text-blue-700' : 'text-orange-700' }}">
-                                Cash - Liabilities
-                            </p>
-                        </div>
-                        <div class="{{ $netWorth >= 0 ? 'text-blue-500' : 'text-orange-500' }}">
-                            <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- FINANCIAL HEALTH INDICATOR -->
-            @if($totalLiabilities > 0)
-                <div class="mb-10 p-6 rounded-lg {{ $debtToAssetRatio > 50 ? 'bg-red-50 border-l-4 border-red-500' : ($debtToAssetRatio > 30 ? 'bg-yellow-50 border-l-4 border-yellow-500' : 'bg-green-50 border-l-4 border-green-500') }}">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-sm font-semibold {{ $debtToAssetRatio > 50 ? 'text-red-900' : ($debtToAssetRatio > 30 ? 'text-yellow-900' : 'text-green-900') }} mb-2">
-                                Debt-to-Cash Ratio: {{ number_format($debtToAssetRatio, 1) }}%
-                            </p>
-                            <p class="text-sm {{ $debtToAssetRatio > 50 ? 'text-red-700' : ($debtToAssetRatio > 30 ? 'text-yellow-700' : 'text-green-700') }}">
-                                @if($debtToAssetRatio > 50)
-                                    ⚠️ High debt level - consider prioritizing loan repayments
-                                @elseif($debtToAssetRatio > 30)
-                                    ⚡ Moderate debt level - monitor closely
-                                @else
-                                    ✅ Healthy debt level - well managed
-                                @endif
-                            </p>
-                        </div>
-                        <div class="w-48">
-                            <div class="w-full bg-gray-300 rounded-full h-2">
-                                <div class="{{ $debtToAssetRatio > 50 ? 'bg-red-500' : ($debtToAssetRatio > 30 ? 'bg-yellow-500' : 'bg-green-500') }} h-2 rounded-full"
-                                     style="width: {{ min($debtToAssetRatio, 100) }}%">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            @endif
-
-            <!-- QUICK STATS -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-                <!-- Today -->
-                <div class="bg-white p-6 rounded-lg shadow border-l-4 border-blue-500">
-                    <p class="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wide">Today</p>
-                    <p class="text-3xl font-bold text-gray-900 mb-1">{{ number_format($totalToday, 0, '.', ',') }}</p>
-                    <div class="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
-                        <span class="text-xs text-gray-500">KES</span>
-                        <div class="bg-blue-100 p-2 rounded-full">
-                            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- This Week -->
-                <div class="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
-                    <p class="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wide">This Week</p>
-                    <p class="text-3xl font-bold text-gray-900 mb-1">{{ number_format($totalThisWeek, 0, '.', ',') }}</p>
-                    <div class="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
-                        <span class="text-xs text-gray-500">KES</span>
-                        <div class="bg-green-100 p-2 rounded-full">
-                            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- This Month -->
-                <div class="bg-white p-6 rounded-lg shadow border-l-4 border-purple-500">
-                    <p class="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wide">This Month</p>
-                    <p class="text-3xl font-bold text-gray-900 mb-1">{{ number_format($totalThisMonth, 0, '.', ',') }}</p>
-                    <div class="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
-                        <span class="text-xs text-gray-500">of {{ number_format($monthlyIncome, 0, '.', ',') }}</span>
-                        <div class="bg-purple-100 p-2 rounded-full">
-                            <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Remaining -->
-                <div class="bg-white p-6 rounded-lg shadow border-l-4 {{ $remainingThisMonth >= 0 ? 'border-teal-500' : 'border-red-500' }}">
-                    <p class="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wide">Remaining</p>
-                    <p class="text-3xl font-bold {{ $remainingThisMonth >= 0 ? 'text-teal-600' : 'text-red-600' }} mb-1">
-                        {{ number_format($remainingThisMonth, 0, '.', ',') }}
-                    </p>
-                    <div class="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
-                        <span class="text-xs text-gray-500">{{ $monthlyIncome > 0 ? round(($remainingThisMonth / $monthlyIncome) * 100) : 0 }}% left</span>
-                        <div class="{{ $remainingThisMonth >= 0 ? 'bg-teal-100' : 'bg-red-100' }} p-2 rounded-full">
-                            <svg class="w-5 h-5 {{ $remainingThisMonth >= 0 ? 'text-teal-600' : 'text-red-600' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- INCOME VS EXPENSES -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-                <!-- This Month -->
-                <div class="bg-white shadow rounded-lg p-6">
-                    <h2 class="text-xl font-semibold text-gray-900 mb-6">This Month <span class="text-sm font-normal text-gray-500">({{ now()->format('F Y') }})</span></h2>
-                    <div class="space-y-4">
-                        <div class="flex justify-between items-center pb-4 border-b border-gray-100">
-                            <span class="text-gray-600">Income</span>
-                            <span class="text-lg font-semibold text-green-600">+{{ number_format($monthlyIncome, 0, '.', ',') }}</span>
-                        </div>
-                        <div class="flex justify-between items-center pb-4 border-b border-gray-100">
-                            <span class="text-gray-600">Expenses</span>
-                            <span class="text-lg font-semibold text-red-600">-{{ number_format($monthlyExpenses, 0, '.', ',') }}</span>
-                        </div>
-                        <div class="flex justify-between items-center pt-2">
-                            <span class="text-gray-900 font-semibold">Net</span>
-                            <span class="text-2xl font-bold {{ $monthlyNet >= 0 ? 'text-blue-600' : 'text-orange-600' }}">
-                                {{ $monthlyNet >= 0 ? '+' : '' }}{{ number_format($monthlyNet, 0, '.', ',') }}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Year to Date -->
-                <div class="bg-white shadow rounded-lg p-6">
-                    <h2 class="text-xl font-semibold text-gray-900 mb-6">Year to Date <span class="text-sm font-normal text-gray-500">({{ now()->year }})</span></h2>
-                    <div class="space-y-4">
-                        <div class="flex justify-between items-center pb-4 border-b border-gray-100">
-                            <span class="text-gray-600">Income</span>
-                            <span class="text-lg font-semibold text-green-600">+{{ number_format($yearlyIncome, 0, '.', ',') }}</span>
-                        </div>
-                        <div class="flex justify-between items-center pb-4 border-b border-gray-100">
-                            <span class="text-gray-600">Expenses</span>
-                            <span class="text-lg font-semibold text-red-600">-{{ number_format($yearlyExpenses, 0, '.', ',') }}</span>
-                        </div>
-                        <div class="flex justify-between items-center pt-2">
-                            <span class="text-gray-900 font-semibold">Net</span>
-                            <span class="text-2xl font-bold {{ $yearlyNet >= 0 ? 'text-blue-600' : 'text-orange-600' }}">
-                                {{ $yearlyNet >= 0 ? '+' : '' }}{{ number_format($yearlyNet, 0, '.', ',') }}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- MONTH COMPARISON -->
-            <div class="bg-white p-6 rounded-lg shadow mb-10">
-                <h3 class="text-xl font-semibold text-gray-900 mb-6">Monthly Comparison</h3>
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm text-gray-600 mb-1">This Month</p>
-                        <p class="text-3xl font-bold text-gray-900">{{ number_format($totalThisMonth, 0, '.', ',') }}</p>
-                    </div>
-                    <div class="text-center">
-                        @if($monthlyComparison > 0)
-                            <p class="text-red-600 font-bold text-lg mb-1">
-                                ↑ {{ number_format(abs($monthlyComparison), 0, '.', ',') }}
-                            </p>
-                            <p class="text-sm text-red-600">+{{ $monthlyComparisonPercent }}% vs last month</p>
-                        @elseif($monthlyComparison < 0)
-                            <p class="text-green-600 font-bold text-lg mb-1">
-                                ↓ {{ number_format(abs($monthlyComparison), 0, '.', ',') }}
-                            </p>
-                            <p class="text-sm text-green-600">{{ $monthlyComparisonPercent }}% vs last month</p>
-                        @else
-                            <p class="text-gray-600 font-semibold">No change</p>
-                            <p class="text-sm text-gray-500">Same as last month</p>
-                        @endif
-                    </div>
-                    <div>
-                        <p class="text-sm text-gray-600 mb-1">Last Month</p>
-                        <p class="text-3xl font-bold text-gray-900">{{ number_format($lastMonthTotal, 0, '.', ',') }}</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ACCOUNTS & LOANS -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-                <!-- Accounts -->
-                <div class="bg-white shadow rounded-lg p-6">
-                    <div class="flex items-center justify-between mb-6">
-                        <h2 class="text-xl font-semibold text-gray-900">Accounts</h2>
-                        <a href="{{ route('accounts.index') }}" class="text-sm font-semibold text-blue-600 hover:text-blue-800">View All →</a>
-                    </div>
-                    <div class="space-y-3">
-                        @forelse($accounts as $account)
-                            <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
-                                <p class="font-semibold text-gray-900">{{ $account->name }}</p>
-                                <span class="font-bold text-lg {{ $account->current_balance >= 0 ? 'text-green-600' : 'text-red-600' }}">
-                                    {{ number_format($account->current_balance, 0, '.', ',') }}
-                                </span>
-                            </div>
-                        @empty
-                            <p class="text-gray-500 text-center py-4">No accounts yet</p>
-                        @endforelse
-                    </div>
-                </div>
-
-                <!-- Active Loans -->
-                <div class="bg-white shadow rounded-lg p-6">
-                    <div class="flex items-center justify-between mb-6">
-                        <h2 class="text-xl font-semibold text-gray-900">Active Loans</h2>
-                        <a href="{{ route('loans.index') }}" class="text-sm font-semibold text-blue-600 hover:text-blue-800">View All →</a>
-                    </div>
-                    <div class="space-y-3">
-                        @forelse($activeLoans as $loan)
-                            <div class="flex justify-between items-center p-4 bg-red-50 rounded-lg">
-                                <div>
-                                    <p class="font-semibold text-gray-900">{{ $loan->source ?? 'Loan' }}</p>
-                                    <p class="text-xs text-gray-600 mt-1">
-                                        {{ $loan->account->name ?? 'N/A' }}
-                                        @if($loan->due_date)
-                                            • Due {{ $loan->due_date->format('M d') }}
-                                        @endif
-                                    </p>
-                                </div>
-                                <span class="font-bold text-lg text-red-600">
-                                    {{ number_format($loan->balance, 0, '.', ',') }}
-                                </span>
-                            </div>
-                        @empty
-                            <p class="text-gray-500 text-center py-4">No active loans</p>
-                        @endforelse
-                    </div>
-                </div>
-            </div>
-
-            <!-- TOP EXPENSES & RECENT TRANSACTIONS -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Top Expenses This Month -->
-                <div class="bg-white shadow rounded-lg p-6">
-                    <h2 class="text-xl font-semibold text-gray-900 mb-6">Top Expenses <span class="text-sm font-normal text-gray-500">({{ now()->format('F') }})</span></h2>
-                    <div class="space-y-3">
-                        @forelse($topExpenses->take(3) as $expense)
-                            <div class="flex justify-between items-center pb-3 border-b border-gray-100 last:border-0">
-                                <span class="text-sm text-gray-700">{{ $expense->category->name }}</span>
-                                <span class="font-bold text-sm text-red-600">{{ number_format($expense->total, 0, '.', ',') }}</span>
-                            </div>
-                        @empty
-                            <p class="text-gray-500 text-center py-4">No expenses this month</p>
-                        @endforelse
-                    </div>
-                </div>
-
-                <!-- Recent Transactions -->
-                <div class="bg-white shadow rounded-lg p-6">
-                    <h2 class="text-xl font-semibold text-gray-900 mb-6">Recent Transactions</h2>
-                    <div class="space-y-3">
-                        @forelse($recentTransactions->take(3) as $transaction)
-                            <div class="flex justify-between items-start pb-3 border-b border-gray-100 last:border-0">
-                                <div class="flex-1">
-                                    <p class="font-semibold text-gray-800 text-sm">{{ $transaction->description }}</p>
-                                    <p class="text-xs text-gray-500 mt-1">{{ $transaction->date->format('M d') }} • {{ $transaction->category->name }}</p>
-                                </div>
-                                <span class="font-bold text-sm ml-3 {{ $transaction->category->type === 'income' ? 'text-green-600' : 'text-red-600' }}">
-                                    {{ $transaction->category->type === 'income' ? '+' : '-' }}{{ number_format($transaction->amount, 0, '.', ',') }}
-                                </span>
-                            </div>
-                        @empty
-                            <p class="text-gray-500 text-center py-4">No transactions yet</p>
-                        @endforelse
-                    </div>
-                </div>
+        <div class="flex items-center justify-between">
+            <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+                {{ __('Financial Dashboard') }}
+            </h2>
+            <div class="flex items-center space-x-3">
+                <span class="text-sm text-gray-600 dark:text-gray-400">{{ now()->format('l, F j, Y') }}</span>
             </div>
         </div>
+    </x-slot>
+
+    <div class="py-12 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 min-h-screen">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+            {{-- Welcome Message --}}
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-1">
+                    Welcome back, {{ Auth::user()->name }}! 👋
+                </h1>
+                <p class="text-gray-600 dark:text-gray-400">
+                    Here's your complete financial overview.
+                </p>
+            </div>
+
+            {{-- NET WORTH CARDS --}}
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                {{-- Total Cash Card --}}
+                <a href="#accounts-section" class="block transform transition-all duration-300 hover:scale-105">
+                    <x-card
+                        title="Total Cash"
+                        value="KES {{ number_format($totalAssets, 0, '.', ',') }}"
+                        subtitle="Cash across all accounts"
+                        color="green"
+                        border="green-500"
+                        textColor="green-900"
+                        icon='<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>'
+                    />
+                </a>
+
+                {{-- Total Liabilities Card --}}
+                <a href="#loans-section" class="block transform transition-all duration-300 hover:scale-105">
+                    <x-card
+                        title="Total Liabilities"
+                        value="KES {{ number_format($totalLiabilities, 0, '.', ',') }}"
+                        subtitle="Outstanding loan balances"
+                        color="red"
+                        border="red-500"
+                        textColor="red-900"
+                        icon='<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>'
+                    />
+                </a>
+
+                {{-- Net Balance Card --}}
+                <a href="#income-expenses-section" class="block transform transition-all duration-300 hover:scale-105">
+                    <x-card
+                        title="Net Balance"
+                        value="KES {{ number_format($netWorth, 0, '.', ',') }}"
+                        subtitle="Cash - Liabilities"
+                        color="{{ $netWorth >= 0 ? 'blue' : 'orange' }}"
+                        border="{{ $netWorth >= 0 ? 'blue-500' : 'orange-500' }}"
+                        textColor="{{ $netWorth >= 0 ? 'blue-900' : 'orange-900' }}"
+                        icon='<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>'
+                    />
+                </a>
+            </div>
+
+            {{-- QUICK STATS --}}
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                {{-- Today's Spending --}}
+                <x-quick-stat
+                    label="Today"
+                    value="{{ number_format($totalToday, 0, '.', ',') }}"
+                    subtext="KES"
+                    color="blue"
+                    :positive="true"
+                />
+
+                {{-- This Week --}}
+                <x-quick-stat
+                    label="This Week"
+                    value="{{ number_format($totalThisWeek, 0, '.', ',') }}"
+                    subtext="KES"
+                    color="green"
+                    :positive="true"
+                />
+
+                {{-- This Month --}}
+                <x-quick-stat
+                    label="This Month"
+                    value="{{ number_format($totalThisMonth, 0, '.', ',') }}"
+                    subtext="of {{ number_format($monthlyIncome, 0, '.', ',') }}"
+                    color="purple"
+                    :positive="true"
+                />
+
+                {{-- Remaining --}}
+                <x-quick-stat
+                    label="Remaining"
+                    value="{{ number_format($remainingThisMonth, 0, '.', ',') }}"
+                    subtext="{{ $monthlyIncome > 0 ? round(($remainingThisMonth / $monthlyIncome) * 100) . '% left' : '0%' }}"
+                    color="{{ $remainingThisMonth >= 0 ? 'teal' : 'red' }}"
+                    :positive="$remainingThisMonth >= 0"
+                />
+            </div>
+
+            {{-- INCOME VS EXPENSES CARD --}}
+            <div class="grid grid-cols-1 gap-6 mb-8">
+                <x-income-expense
+                    period="{{ now()->format('F Y') }}"
+                    :income="$monthlyIncome"
+                    :expenses="$monthlyExpenses"
+                    :net="$monthlyNet"
+                    href="#income-expenses-section"
+                />
+            </div>
+
+            {{-- Compact Stats Row --}}
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                {{-- Budget Progress Card --}}
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+                    <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                        </svg>
+                        Budget Progress
+                    </h3>
+                    @php
+                        $budgetUsed = $monthlyIncome > 0 ? round(($monthlyExpenses / $monthlyIncome) * 100) : 0;
+                    @endphp
+                    <div class="flex justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Used</span>
+                        <span class="text-sm font-bold text-gray-900 dark:text-white">{{ $budgetUsed }}%</span>
+                    </div>
+                    <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-3">
+                        <div class="h-full bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full transition-all duration-1000"
+                             style="width: {{ min($budgetUsed, 100) }}%"></div>
+                    </div>
+                    <div class="text-center pt-2 border-t border-gray-200 dark:border-gray-700">
+                        <span class="text-xs text-gray-600 dark:text-gray-400">Available</span>
+                        <p class="text-xl font-bold text-{{ $remainingThisMonth >= 0 ? 'green' : 'red' }}-600">
+                            KES {{ number_format(abs($remainingThisMonth), 0, '.', ',') }}
+                        </p>
+                    </div>
+                </div>
+
+                {{-- Financial Health Score Card --}}
+                <div class="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg p-6">
+                    <h3 class="text-lg font-bold text-white mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Health Score
+                    </h3>
+                    @php
+                        $debtToAssetRatio = $totalAssets > 0 ? ($totalLiabilities / $totalAssets) * 100 : 0;
+                        $savingsRate = $monthlyIncome > 0 ? (($monthlyIncome - $monthlyExpenses) / $monthlyIncome) * 100 : 0;
+                        $healthScore = max(0, min(100, 100 - $debtToAssetRatio + $savingsRate));
+                        $healthScore = round($healthScore);
+                    @endphp
+                    <div class="text-center mb-3">
+                        <div class="text-5xl font-bold text-white mb-1">{{ $healthScore }}</div>
+                        <div class="text-sm text-white">
+                            @if($healthScore >= 80)
+                                Excellent! 🎉
+                            @elseif($healthScore >= 60)
+                                Good 👍
+                            @elseif($healthScore >= 40)
+                                Fair 📊
+                            @else
+                                Needs Attention 💡
+                            @endif
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-white text-sm">
+                        <div class="flex justify-between">
+                            <span class="opacity-90">Debt Ratio:</span>
+                            <span class="font-semibold">{{ number_format($debtToAssetRatio, 1) }}%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="opacity-90">Savings:</span>
+                            <span class="font-semibold">{{ number_format($savingsRate, 1) }}%</span>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Monthly Summary Card --}}
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+                    <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                        This Month
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600 dark:text-gray-400">Income</span>
+                            <span class="text-lg font-bold text-green-600">{{ number_format($monthlyIncome, 0, '.', ',') }}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600 dark:text-gray-400">Expenses</span>
+                            <span class="text-lg font-bold text-red-600">{{ number_format($monthlyExpenses, 0, '.', ',') }}</span>
+                        </div>
+                        <div class="pt-2 border-t border-gray-200 dark:border-gray-700">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Net</span>
+                                <span class="text-xl font-bold text-{{ $monthlyNet >= 0 ? 'blue' : 'orange' }}-600">
+                                    {{ number_format($monthlyNet, 0, '.', ',') }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- DETAILED SECTIONS --}}
+
+            {{-- Accounts Section --}}
+            <div id="accounts-section" class="mb-8 scroll-mt-20">
+                <x-accounts :accounts="$accounts" href="#accounts-section"/>
+            </div>
+
+            {{-- Loans Section --}}
+            <div id="loans-section" class="mb-8 scroll-mt-20">
+                <x-active-loans :loans="$activeLoans" href="#loans-section"/>
+            </div>
+
+            {{-- Top Expenses Section --}}
+            <div id="top-expenses-section" class="mb-8 scroll-mt-20">
+                <x-top-expenses :expenses="$topExpenses" href="#top-expenses-section"/>
+            </div>
+
+            {{-- Recent Transactions Section --}}
+            <div id="recent-transactions-section" class="mb-8 scroll-mt-20">
+                <x-recent-transactions :transactions="$recentTransactions" href="#recent-transactions-section"/>
+            </div>
+
+            {{-- Quick Actions Footer --}}
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+                <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4">Quick Actions</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <a href="{{ route('transactions.create') }}" class="flex flex-col items-center justify-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900 dark:to-blue-800 rounded-xl hover:shadow-lg transition-all duration-300 group">
+                        <svg class="w-6 h-6 text-blue-600 dark:text-blue-300 mb-1 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        <span class="text-xs font-semibold text-blue-900 dark:text-blue-100">Add Transaction</span>
+                    </a>
+
+                    <a href="{{ route('accounts.create') }}" class="flex flex-col items-center justify-center p-4 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900 dark:to-green-800 rounded-xl hover:shadow-lg transition-all duration-300 group">
+                        <svg class="w-6 h-6 text-green-600 dark:text-green-300 mb-1 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                        </svg>
+                        <span class="text-xs font-semibold text-green-900 dark:text-green-100">New Account</span>
+                    </a>
+
+                    <a href="{{ route('loans.create') }}" class="flex flex-col items-center justify-center p-4 bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900 dark:to-red-800 rounded-xl hover:shadow-lg transition-all duration-300 group">
+                        <svg class="w-6 h-6 text-red-600 dark:text-red-300 mb-1 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span class="text-xs font-semibold text-red-900 dark:text-red-100">Add Loan</span>
+                    </a>
+
+                    <a href="{{ route('reports.index') }}" class="flex flex-col items-center justify-center p-4 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900 dark:to-purple-800 rounded-xl hover:shadow-lg transition-all duration-300 group">
+                        <svg class="w-6 h-6 text-purple-600 dark:text-purple-300 mb-1 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <span class="text-xs font-semibold text-purple-900 dark:text-purple-100">View Reports</span>
+                    </a>
+                </div>
+            </div>
+
+        </div>
     </div>
+
+    {{-- Add smooth scroll behavior --}}
+    <style>
+        html {
+            scroll-behavior: smooth;
+        }
+
+        @keyframes fade-in {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-fade-in {
+            animation: fade-in 0.6s ease-out;
+        }
+    </style>
 </x-app-layout>

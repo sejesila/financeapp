@@ -13,6 +13,7 @@ class AccountController extends Controller
 {
     public function index()
     {
+
         $accounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
             ->get();

@@ -48,9 +48,11 @@ class ReportsController extends Controller
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->select('categories.name', 'categories.type', DB::raw('SUM(transactions.amount) as total'))
             ->whereBetween('transactions.date', [$startDate, $endDate])
+            ->where('transactions.user_id', auth()->id()) // ✅ only one, qualified
             ->groupBy('categories.id', 'categories.name', 'categories.type')
             ->orderByDesc('total')
             ->get();
+
 
         $expensesByCategory = $spendingByCategory->where('type', 'expense');
         $incomeByCategory = $spendingByCategory->where('type', 'income');
@@ -89,8 +91,10 @@ class ReportsController extends Controller
                 ->join('categories', 'transactions.category_id', '=', 'categories.id')
                 ->where('categories.type', 'expense')
                 ->whereBetween('transactions.date', [$previousStartDate, $previousEndDate])
+                ->where('transactions.user_id', auth()->id()) // ✅ qualify user_id
                 ->sum('transactions.amount');
         }
+
 
         $expenseChange = $previousExpenses > 0
             ? round((($totalExpenses - $previousExpenses) / $previousExpenses) * 100, 1)

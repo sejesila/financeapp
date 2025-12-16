@@ -24,15 +24,17 @@ class Account extends Model
         'current_balance' => 'decimal:2',
         'is_active' => 'boolean',
     ];
-    public function user() {
+    public function user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
         return $this->belongsTo(User::class);
     }
 
     protected static function booted()
     {
-        static::addGlobalScope('ownedByUser', function (Builder $builder) {
+        static::addGlobalScope('ownedByUser', function ($builder) {
             if (Auth::check()) {
-                $builder->where('user_id', Auth::id());
+                $table = $builder->getModel()->getTable();
+                $builder->where("{$table}.user_id", Auth::id());
             }
         });
     }
