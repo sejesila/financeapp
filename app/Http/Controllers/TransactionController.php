@@ -24,11 +24,12 @@ class TransactionController extends Controller
         $accountId = $request->get('account_id');
 
         // Calculate dynamic year/month ranges
-        $minYear = Transaction::min(DB::raw('YEAR(date)'));
+        $minYear = Transaction::where('user_id', Auth::id())->min(DB::raw('YEAR(date)'));
         $minYear = $minYear ?? date('Y');
         $maxYear = date('Y');
 
-        $query = Transaction::with(['category', 'account']);
+        $query = Transaction::with(['category', 'account'])
+            ->where('user_id', Auth::id()); // Only show user's own transactions
 
         // Apply search filter
         if ($search) {
@@ -91,28 +92,36 @@ class TransactionController extends Controller
 
         $transactions = $query->latest('date')->latest('id')->paginate(50)->withQueryString();
 
-        // Calculate totals
-        $totalToday = Transaction::whereDate('date', today())->sum('amount');
-        $totalYesterday = Transaction::whereDate('date', today()->subDay())->sum('amount');
-        $totalThisWeek = Transaction::whereBetween('date', [
+        // Calculate totals (only for user's transactions)
+        $userTransactions = Transaction::where('user_id', Auth::id());
+
+        $totalToday = (clone $userTransactions)->whereDate('date', today())->sum('amount');
+        $totalYesterday = (clone $userTransactions)->whereDate('date', today()->subDay())->sum('amount');
+        $totalThisWeek = (clone $userTransactions)->whereBetween('date', [
             now()->startOfWeek(),
             now()->endOfWeek()
         ])->sum('amount');
-        $totalLastWeek = Transaction::whereBetween('date', [
+        $totalLastWeek = (clone $userTransactions)->whereBetween('date', [
             now()->subWeek()->startOfWeek(),
             now()->subWeek()->endOfWeek()
         ])->sum('amount');
-        $totalThisMonth = Transaction::whereMonth('date', now()->month)
+        $totalThisMonth = (clone $userTransactions)->whereMonth('date', now()->month)
             ->whereYear('date', now()->year)
             ->sum('amount');
-        $totalLastMonth = Transaction::whereMonth('date', now()->subMonth()->month)
+        $totalLastMonth = (clone $userTransactions)->whereMonth('date', now()->subMonth()->month)
             ->whereYear('date', now()->subMonth()->year)
             ->sum('amount');
-        $totalAll = Transaction::sum('amount');
+        $totalAll = Transaction::where('user_id', Auth::id())->sum('amount');
 
-        // Get categories and accounts for filters
-        $categories = Category::orderBy('type')->orderBy('name')->get();
-        $accounts = \App\Models\Account::where('is_active', true)->orderBy('name')->get();
+        // Get categories and accounts for filters (only user's own)
+        $categories = Category::where('user_id', Auth::id())
+            ->orderBy('type')
+            ->orderBy('name')
+            ->get();
+        $accounts = \App\Models\Account::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
 
         return view('transactions.index', compact(
             'transactions',
@@ -141,19 +150,25 @@ class TransactionController extends Controller
      */
     public function create()
     {
-        $categories = Category::all();
-        $accounts = \App\Models\Account::where('is_active', true)->get();
+        $this->authorize('create', Transaction::class);
+
+        $categories = Category::where('user_id', Auth::id())->orderBy('name')->get();
+        $accounts = \App\Models\Account::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
         return view('transactions.create', compact('categories', 'accounts'));
     }
 
     /**
      * Store a newly created resource in storage.
      */
-
-
     public function store(Request $request)
     {
-        $request->validate([
+        $this->authorize('create', Transaction::class);
+
+        $validated = $request->validate([
             'date' => 'required|date',
             'description' => 'required|string',
             'amount' => 'required|numeric|min:0.01',
@@ -161,17 +176,25 @@ class TransactionController extends Controller
             'account_id' => 'required|exists:accounts,id'
         ]);
 
-        // Get account and category
-        $account = \App\Models\Account::find($request->account_id);
-        $category = \App\Models\Category::find($request->category_id);
+        // Verify account ownership FIRST
+        $account = \App\Models\Account::findOrFail($validated['account_id']);
+        if ($account->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized access to this account.');
+        }
+
+        // Verify category ownership
+        $category = Category::findOrFail($validated['category_id']);
+        if ($category->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized access to this category.');
+        }
 
         // Check if it's an expense and if account has sufficient balance
-        if ($category->type === 'expense' && $account->current_balance < $request->amount) {
+        if ($category->type === 'expense' && $account->current_balance < $validated['amount']) {
             return redirect()->back()
                 ->withInput()
                 ->with('error', "Insufficient balance in {$account->name}. Current balance: "
                     . number_format($account->current_balance, 0, '.', ',')
-                    . ", Required: " . number_format($request->amount, 0, '.', ','));
+                    . ", Required: " . number_format($validated['amount'], 0, '.', ','));
         }
 
         // Auto-set payment method based on account type
@@ -183,32 +206,44 @@ class TransactionController extends Controller
             default => 'Mpesa'
         };
 
-        // ✅ Attach user_id when creating the transaction
-        $transaction = Transaction::create([
-            'user_id'       => Auth::id(),   // 👈 required
-            'date'          => $request->date,
-            'description'   => $request->description,
-            'amount'        => $request->amount,
-            'category_id'   => $request->category_id,
-            'account_id'    => $request->account_id,
-            'payment_method'=> $paymentMethod
-        ]);
+        DB::beginTransaction();
 
+        try {
+            // Create transaction with user_id
+            $transaction = Transaction::create([
+                'user_id'        => Auth::id(),
+                'date'           => $validated['date'],
+                'description'    => $validated['description'],
+                'amount'         => $validated['amount'],
+                'category_id'    => $validated['category_id'],
+                'account_id'     => $validated['account_id'],
+                'payment_method' => $paymentMethod
+            ]);
 
-        // Update account balance
-        if ($transaction->account) {
-            $transaction->account->updateBalance();
+            // Update account balance
+            if ($transaction->account) {
+                $transaction->account->updateBalance();
+            }
+
+            DB::commit();
+
+            return redirect()->route('transactions.index')
+                ->with('success', 'Transaction recorded successfully');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to create transaction: ' . $e->getMessage())
+                ->withInput();
         }
-
-        return redirect()->route('transactions.index')->with('success', 'Transaction recorded successfully');
     }
-
 
     /**
      * Display the specified resource (read-only view).
      */
     public function show(Transaction $transaction)
     {
+        $this->authorize('view', $transaction);
+
         $transaction->load(['account', 'category']);
         return view('transactions.show', compact('transaction'));
     }

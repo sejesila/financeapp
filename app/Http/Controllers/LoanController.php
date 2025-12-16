@@ -254,7 +254,16 @@ class LoanController extends Controller implements HasMiddleware
             $rules['original_source'] = 'required|string';
             $rules['original_account_id'] = 'required|exists:accounts,id';
             $rules['original_amount'] = 'required|numeric|min:1';
+        }
 
+        $validated = $request->validate($rules);
+
+        // Verify account ownership BEFORE any additional validation
+        $account = Account::findOrFail($validated['account_id']);
+        $this->authorize('view', $account);
+
+        // Additional validation for topup constraints (after account ownership is verified)
+        if ($fromTopup) {
             $request->validate([
                 'source' => 'required|in:' . $request->input('original_source'),
                 'account_id' => 'required|in:' . $request->input('original_account_id'),
@@ -266,12 +275,6 @@ class LoanController extends Controller implements HasMiddleware
             ]);
         }
 
-        $validated = $request->validate($rules);
-
-        // Verify account ownership
-        $account = Account::findOrFail($validated['account_id']);
-        $this->authorize('view', $account);
-
         DB::beginTransaction();
 
         try {
@@ -280,46 +283,43 @@ class LoanController extends Controller implements HasMiddleware
 
             $breakdown = $this->calculateBreakdown($principalAmount, $loanType);
 
+            // Create loan record with common attributes
+            $loanData = [
+                'user_id' => Auth::id(),
+                'account_id' => $validated['account_id'],
+                'source' => $validated['source'],
+                'principal_amount' => $principalAmount,
+                'disbursed_date' => $validated['disbursed_date'],
+                'due_date' => $validated['due_date'],
+                'status' => 'active',
+                'notes' => $validated['notes'],
+                'loan_type' => $loanType,
+            ];
+
+            // Add loan-type-specific attributes
             if ($loanType === 'kcb_mpesa') {
-                $loan = Loan::create([
-                    'user_id' => Auth::id(),
-                    'account_id' => $validated['account_id'],
-                    'source' => $validated['source'],
-                    'principal_amount' => $principalAmount,
-                    'interest_rate' => $breakdown['interest_rate'],
-                    'interest_amount' => $breakdown['interest_amount'],
-                    'total_amount' => $breakdown['total_repayment'],
-                    'balance' => $breakdown['total_repayment'],
-                    'disbursed_date' => $validated['disbursed_date'],
-                    'due_date' => $validated['due_date'],
-                    'status' => 'active',
-                    'notes' => $validated['notes'],
-                    'loan_type' => 'kcb_mpesa',
-                ]);
+                $loanData['interest_rate'] = $breakdown['interest_rate'];
+                $loanData['interest_amount'] = $breakdown['interest_amount'];
+                $loanData['total_amount'] = $breakdown['total_repayment'];
+                $loanData['balance'] = $breakdown['total_repayment'];
             } else {
-                $loan = Loan::create([
-                    'user_id' => Auth::id(),
-                    'account_id' => $validated['account_id'],
-                    'source' => $validated['source'],
-                    'principal_amount' => $principalAmount,
-                    'interest_rate' => null,
-                    'interest_amount' => null,
-                    'total_amount' => $breakdown['standard_repayment'],
-                    'balance' => $breakdown['standard_repayment'],
-                    'disbursed_date' => $validated['disbursed_date'],
-                    'due_date' => $validated['due_date'],
-                    'status' => 'active',
-                    'notes' => $validated['notes'],
-                    'loan_type' => 'mshwari',
-                ]);
+                $loanData['interest_rate'] = null;
+                $loanData['interest_amount'] = null;
+                $loanData['total_amount'] = $breakdown['standard_repayment'];
+                $loanData['balance'] = $breakdown['standard_repayment'];
             }
 
+            $loan = Loan::create($loanData);
+
+            // Get or create loan categories
             $loanCategory = Category::firstOrCreate(
                 ['name' => 'Loan Receipt', 'type' => 'income', 'user_id' => Auth::id()],
                 ['name' => 'Loan Receipt', 'type' => 'income']
             );
 
+            // Process transactions based on loan type
             if ($loanType === 'kcb_mpesa') {
+                // KCB M-Pesa: Simple disbursement
                 Transaction::create([
                     'user_id' => Auth::id(),
                     'account_id' => $validated['account_id'],
@@ -334,6 +334,7 @@ class LoanController extends Controller implements HasMiddleware
                 $account->current_balance += $principalAmount;
 
             } else {
+                // M-Shwari: Disbursement with excise duty deduction
                 $depositAfterExcise = $breakdown['deposit_amount'];
 
                 Transaction::create([
@@ -347,6 +348,7 @@ class LoanController extends Controller implements HasMiddleware
                     'loan_id' => $loan->id,
                 ]);
 
+                // Record excise duty as separate transaction
                 $exciseCategory = Category::firstOrCreate(
                     ['name' => 'Excise Duty', 'type' => 'expense', 'user_id' => Auth::id()],
                     ['name' => 'Excise Duty', 'type' => 'expense']
@@ -370,6 +372,7 @@ class LoanController extends Controller implements HasMiddleware
 
             DB::commit();
 
+            // Prepare success message
             $depositAmount = $breakdown['deposit_amount'];
             $totalRepayment = $loanType === 'kcb_mpesa' ? $breakdown['total_repayment'] : $breakdown['standard_repayment'];
 

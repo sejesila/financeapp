@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class CategoryController extends Controller
 {
@@ -12,7 +13,10 @@ class CategoryController extends Controller
      */
     public function index()
     {
-        $categories = Category::orderBy('name')->get();
+        $categories = Category::where('user_id', Auth::id())
+            ->orderBy('type')
+            ->orderBy('name')
+            ->get();
 
         return view('categories.index', compact('categories'));
     }
@@ -31,10 +35,25 @@ class CategoryController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|unique:categories,name',
+            'name' => 'required|string|max:255',
+            'type' => 'required|in:income,expense,liability',
         ]);
 
-        Category::create($validated);
+        // Check if category name already exists for this user
+        $exists = Category::where('user_id', Auth::id())
+            ->where('name', $validated['name'])
+            ->exists();
+
+        if ($exists) {
+            return back()->withInput()
+                ->with('error', 'A category with this name already exists.');
+        }
+
+        Category::create([
+            'user_id' => Auth::id(),
+            'name' => $validated['name'],
+            'type' => $validated['type'],
+        ]);
 
         return redirect()->route('categories.index')
             ->with('success', 'Category created successfully.');
@@ -53,6 +72,11 @@ class CategoryController extends Controller
      */
     public function edit(Category $category)
     {
+        // Verify ownership
+        if ($category->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized access to this category.');
+        }
+
         return view('categories.edit', compact('category'));
     }
 
@@ -61,9 +85,26 @@ class CategoryController extends Controller
      */
     public function update(Request $request, Category $category)
     {
+        // Verify ownership
+        if ($category->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized access to this category.');
+        }
+
         $validated = $request->validate([
-            'name' => "required|unique:categories,name,{$category->id}",
+            'name' => 'required|string|max:255',
+            'type' => 'required|in:income,expense,liability',
         ]);
+
+        // Check if category name already exists for this user (excluding current category)
+        $exists = Category::where('user_id', Auth::id())
+            ->where('name', $validated['name'])
+            ->where('id', '!=', $category->id)
+            ->exists();
+
+        if ($exists) {
+            return back()->withInput()
+                ->with('error', 'A category with this name already exists.');
+        }
 
         $category->update($validated);
 
@@ -76,9 +117,19 @@ class CategoryController extends Controller
      */
     public function destroy(Category $category)
     {
+        // Verify ownership
+        if ($category->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized access to this category.');
+        }
+
+        // Check if category is being used
+        if ($category->transactions()->exists()) {
+            return back()->with('error', 'Cannot delete category that has transactions.');
+        }
+
         $category->delete();
 
         return redirect()->route('categories.index')
-            ->with('success', 'Category deleted.');
+            ->with('success', 'Category deleted successfully.');
     }
 }

@@ -41,6 +41,7 @@ return new class extends Migration
 
             $table->text('reversal_reason')->nullable();
             $table->boolean('is_reversal')->default(false);
+            $table->date('period_date')->nullable()->index();
 
             $table->timestamps();
         });

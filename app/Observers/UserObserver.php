@@ -1,20 +1,17 @@
 <?php
 
-namespace Database\Seeders;
+namespace App\Observers;
 
+use App\Models\User;
 use App\Models\Category;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-use Illuminate\Database\Seeder;
 
-class CategorySeeder extends Seeder
+class UserObserver
 {
     /**
-     * Run the database seeds.
+     * Handle the User "created" event.
      */
-    public function run(): void
+    public function created(User $user): void
     {
-
-
         $incomeCategories = [
             'Salary',
             'Side Income',
@@ -43,16 +40,27 @@ class CategorySeeder extends Seeder
         ];
 
         foreach ($incomeCategories as $name) {
-            Category::firstOrCreate(['name' => $name, 'type' => 'income']);
+            Category::create([
+                'user_id' => $user->id,
+                'name'    => $name,
+                'type'    => 'income',
+            ]);
         }
 
         foreach ($expenseCategories as $name) {
-            Category::firstOrCreate(['name' => $name, 'type' => 'expense']);
+            Category::create([
+                'user_id' => $user->id,
+                'name'    => $name,
+                'type'    => 'expense',
+            ]);
         }
 
         foreach ($liabilityCategories as $name) {
-            Category::firstOrCreate(['name' => $name, 'type' => 'liability']);
+            Category::create([
+                'user_id' => $user->id,
+                'name'    => $name,
+                'type'    => 'liability',
+            ]);
         }
-
     }
 }

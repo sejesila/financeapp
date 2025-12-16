@@ -13,13 +13,18 @@ class AccountController extends Controller
 {
     public function index()
     {
-        $accounts = Account::where('is_active', true)->get();
+        $accounts = Account::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->get();
 
         // Calculate total net worth
         $totalBalance = $accounts->sum('current_balance');
 
-        // Recent transfers
+        // Recent transfers (only user's own)
         $recentTransfers = Transfer::with(['fromAccount', 'toAccount'])
+            ->whereHas('fromAccount', function($query) {
+                $query->where('user_id', Auth::id());
+            })
             ->latest()
             ->limit(10)
             ->get();
@@ -42,7 +47,7 @@ class AccountController extends Controller
         ]);
 
         $account = Account::create([
-            'user_id' => Auth::id(), // 👈 attach the logged-in user
+            'user_id' => Auth::id(),
             'name' => $request->name,
             'type' => $request->type,
             'initial_balance' => $request->initial_balance,
@@ -55,16 +60,31 @@ class AccountController extends Controller
 
     public function show(Account $account)
     {
+        // Verify ownership
+        if ($account->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized access to this account.');
+        }
+
         return view('accounts.show', compact('account'));
     }
 
     public function edit(Account $account)
     {
+        // Verify ownership
+        if ($account->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized access to this account.');
+        }
+
         return view('accounts.show', compact('account'));
     }
 
     public function update(Request $request, Account $account)
     {
+        // Verify ownership
+        if ($account->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized access to this account.');
+        }
+
         $request->validate([
             'name' => 'required|string|max:255',
             'type' => 'required|string',
@@ -78,6 +98,11 @@ class AccountController extends Controller
 
     public function destroy(Account $account)
     {
+        // Verify ownership
+        if ($account->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized access to this account.');
+        }
+
         if ($account->transactions()->count() > 0) {
             return redirect()->back()->with('error', 'Cannot delete account with existing transactions.');
         }
@@ -88,6 +113,11 @@ class AccountController extends Controller
 
     public function adjustBalance(Request $request, Account $account)
     {
+        // Verify ownership
+        if ($account->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized access to this account.');
+        }
+
         $request->validate([
             'initial_balance' => 'required|numeric',
         ]);
@@ -101,11 +131,17 @@ class AccountController extends Controller
         }
 
         $category = Category::firstOrCreate(
-            ['name' => 'Balance Adjustment'],
-            ['type' => $difference > 0 ? 'income' : 'expense']
+            [
+                'name' => 'Balance Adjustment',
+                'user_id' => Auth::id()
+            ],
+            [
+                'type' => $difference > 0 ? 'income' : 'expense'
+            ]
         );
 
         Transaction::create([
+            'user_id' => Auth::id(),
             'date' => now()->toDateString(),
             'period_date' => now()->toDateString(),
             'description' => "Balance adjustment for {$account->name}",
@@ -130,7 +166,10 @@ class AccountController extends Controller
 
     public function transferForm()
     {
-        $accounts = Account::where('is_active', true)->get();
+        $accounts = Account::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->get();
+
         return view('accounts.transfer', compact('accounts'));
     }
 
@@ -144,21 +183,27 @@ class AccountController extends Controller
             'description' => 'nullable|string',
         ]);
 
-        // Check if source account has sufficient balance
-        $fromAccount = Account::find($request->from_account_id);
+        // Verify both accounts belong to the user
+        $fromAccount = Account::findOrFail($request->from_account_id);
+        $toAccount = Account::findOrFail($request->to_account_id);
 
+        if ($fromAccount->user_id !== Auth::id() || $toAccount->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized access to one or both accounts.');
+        }
+
+        // Check if source account has sufficient balance
         if ($fromAccount->current_balance < $request->amount) {
             return redirect()->back()
                 ->withInput()
-                ->with('error', "Insufficient balance in {$fromAccount->name}. Current balance: " . number_format($fromAccount->current_balance, 0, '.', ',') . ", Transfer amount: " . number_format($request->amount, 0, '.', ','));
+                ->with('error', "Insufficient balance in {$fromAccount->name}. Current balance: "
+                    . number_format($fromAccount->current_balance, 0, '.', ',')
+                    . ", Transfer amount: " . number_format($request->amount, 0, '.', ','));
         }
 
         // Create transfer record
         $transfer = Transfer::create($request->all());
 
         // Update account balances
-        $toAccount = Account::find($request->to_account_id);
-
         $fromAccount->updateBalance();
         $toAccount->updateBalance();
 
@@ -167,40 +212,52 @@ class AccountController extends Controller
 
     public function topUpForm(Account $account)
     {
+        // Verify ownership
+        if ($account->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized access to this account.');
+        }
+
         $categories = $this->getTopUpCategories($account->type);
         return view('accounts.topup', compact('account', 'categories'));
     }
 
     private function getTopUpCategories($accountType)
     {
+        $query = Category::where('user_id', Auth::id());
+
         if ($accountType === 'bank') {
-            return Category::where('type', 'income')
+            return $query->where('type', 'income')
                 ->where('name', 'Salary')
                 ->get();
         } elseif ($accountType === 'airtel_money') {
-            return Category::where('type', 'income')
+            return $query->where('type', 'income')
                 ->where('name', '!=', 'Salary')
-                ->where('name', '!=', 'Loan Disbursement')
+                ->where('name', '!=', 'Loan Receipt')
                 ->get();
         } elseif ($accountType === 'mpesa') {
-            return Category::where(function($query) {
-                $query->where(function($q) {
-                    $q->where('type', 'income')
-                        ->whereNotIn('name', ['Salary', 'Loan Disbursement']);
+            return $query->where(function($q) {
+                $q->where(function($subQ) {
+                    $subQ->where('type', 'income')
+                        ->whereNotIn('name', ['Salary', 'Loan Receipt']);
                 })
                     ->orWhere('type', 'liability');
             })
-                ->where('name', '!=', 'Loan Disbursement')
+                ->where('name', '!=', 'Loan Receipt')
                 ->get();
         } else {
-            return Category::whereIn('type', ['income', 'liability'])
-                ->where('name', '!=', 'Loan Disbursement')
+            return $query->whereIn('type', ['income', 'liability'])
+                ->where('name', '!=', 'Loan Receipt')
                 ->get();
         }
     }
 
     public function topUp(Request $request, Account $account)
     {
+        // Verify ownership
+        if ($account->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized access to this account.');
+        }
+
         $request->validate([
             'amount' => 'required|numeric|min:0.01',
             'category_id' => 'required|exists:categories,id',
@@ -209,7 +266,9 @@ class AccountController extends Controller
             'description' => 'nullable|string',
         ]);
 
-        $category = Category::find($request->category_id);
+        $category = Category::where('id', $request->category_id)
+            ->where('user_id', Auth::id())
+            ->first();
 
         if (!$category) {
             return redirect()->back()->with('error', 'Please select a valid category.');
@@ -223,7 +282,7 @@ class AccountController extends Controller
         $periodDate = $request->period_date ?? $request->date;
 
         $transaction = $account->transactions()->create([
-            'user_id'       => Auth::id(),
+            'user_id'        => Auth::id(),
             'amount'         => $request->amount,
             'date'           => $request->date,
             'period_date'    => $periodDate,

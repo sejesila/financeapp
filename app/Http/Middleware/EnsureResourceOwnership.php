@@ -16,6 +16,13 @@ class EnsureResourceOwnership
      */
     public function handle(Request $request, Closure $next): Response
     {
+
+        // Skip validation for POST requests (creation endpoints)
+        // The controller policies will handle authorization for new resources
+        if ($request->isMethod('POST')) {
+            return $next($request);
+        }
+
         // Check if loan_id is in the request
         if ($request->has('loan_id')) {
             $loan = \App\Models\Loan::find($request->input('loan_id'));
