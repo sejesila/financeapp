@@ -1,1 +1,2 @@
-Personal Finance App
+Personal Finance App 
+Deployed
