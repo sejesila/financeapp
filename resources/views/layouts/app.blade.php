@@ -9,7 +9,6 @@
 
     <!-- Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-    <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
 <body class="font-sans antialiased bg-gray-100 min-h-screen">
@@ -71,7 +70,7 @@
 
                 <!-- User Dropdown -->
                 <li class="relative group">
-                    <button class="text-gray-700 hover:text-blue-600 transition flex items-center space-x-2">
+                    <button class="text-gray-700 hover:text-blue-600 transition flex items-center space-x-2 px-3 py-2">
                         <span>{{ Auth::user()->name }}</span>
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
@@ -79,13 +78,13 @@
                     </button>
 
                     <!-- Dropdown Menu -->
-                    <div class="absolute right-0 mt-0 w-48 bg-white rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition duration-200 z-50 group-hover:mt-2">
-                        <a href="{{ route('profile.edit') }}" class="block px-4 py-3 text-gray-700 hover:bg-gray-100 text-sm border-b">
+                    <div class="absolute right-0 mt-0 w-48 bg-white rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition duration-200 z-50">
+                        <a href="{{ route('profile.edit') }}" class="block px-4 py-3 text-gray-700 hover:bg-gray-100 text-sm border-b first:rounded-t-lg">
                             Profile
                         </a>
                         <form method="POST" action="{{ route('logout') }}" class="block">
                             @csrf
-                            <button type="submit" class="w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-100 text-sm">
+                            <button type="submit" class="w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-100 text-sm last:rounded-b-lg">
                                 Logout
                             </button>
                         </form>
