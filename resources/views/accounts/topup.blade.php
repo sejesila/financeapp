@@ -1,14 +1,18 @@
-@extends('layout')
+<x-app-layout>
+<x-slot name="header">
+    <div class="flex items-center justify-between">
+        <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+            {{ __('Top-Up Account') }}
+        </h2>
+        <a href="{{ route('accounts.show',$account) }}" class="text-indigo-600 hover:text-indigo-800">
+            ← Back to Account
+        </a>
+    </div>
+</x-slot>
 
-@section('content')
     <div class="max-w-2xl mx-auto">
 
-        <div class="flex items-center justify-between mb-6">
-            <h1 class="text-3xl font-bold">Top-Up Account</h1>
-            <a href="{{ route('accounts.show', $account) }}" class="text-indigo-600 hover:text-indigo-800">
-                ← Back to Account
-            </a>
-        </div>
+
 
         @if(session('success'))
             <div class="bg-green-100 text-green-700 p-4 rounded mb-6">
@@ -216,4 +220,4 @@
             }
         });
     </script>
-@endsection
+</x-app-layout>
