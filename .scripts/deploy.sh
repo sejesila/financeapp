@@ -16,11 +16,8 @@ composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 # Clear the old cache
 php artisan clear-compiled
 
-# Recreate cache
-php artisan optimize
-
 # Compile npm assets
-npm run prod
+npm run build
 
 # Run database migrations
 php artisan migrate --force
