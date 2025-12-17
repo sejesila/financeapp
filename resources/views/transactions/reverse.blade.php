@@ -28,7 +28,8 @@
             </div>
         </div>
 
-        <form method="POST" action="{{ route('transactions.reverse.store', $transaction) }}" class="bg-white shadow rounded-lg p-6">
+        <form method="POST" action="{{ route('transactions.reverse.store', $transaction) }}"
+              class="bg-white shadow rounded-lg p-6">
             @csrf
 
             <div class="mb-4">

@@ -46,7 +46,8 @@
                     <option value="">Select Type</option>
                     <option value="cash" {{ old('type') == 'cash' ? 'selected' : '' }}>💵 Cash</option>
                     <option value="mpesa" {{ old('type') == 'mpesa' ? 'selected' : '' }}>📱 M-Pesa</option>
-                    <option value="airtel_money" {{ old('type') == 'airtel_money' ? 'selected' : '' }}>📱 Airtel Money</option>
+                    <option value="airtel_money" {{ old('type') == 'airtel_money' ? 'selected' : '' }}>📱 Airtel Money
+                    </option>
                     <option value="bank" {{ old('type') == 'bank' ? 'selected' : '' }}>🏦 Bank Account</option>
                 </select>
             </div>

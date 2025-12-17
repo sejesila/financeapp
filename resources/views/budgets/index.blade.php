@@ -31,64 +31,6 @@
             </div>
         @endif
 
-        {{-- Budget Usage Summary --}}
-        <section class="space-y-4">
-            <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                Budget Usage Summary
-            </h3>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                @foreach($expenseCategories as $category)
-                    @php
-                        $p = $category->budget_percentage;
-                        $state = $p >= 100 ? 'red' : ($p >= 80 ? 'yellow' : ($p >= 60 ? 'blue' : 'green'));
-                    @endphp
-
-                    <div class="rounded-lg border-l-4 p-4
-                        {{ $state === 'red' ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : '' }}
-                        {{ $state === 'yellow' ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20' : '' }}
-                        {{ $state === 'blue' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : '' }}
-                        {{ $state === 'green' ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : '' }}
-                    ">
-                        <div class="flex justify-between items-center mb-2">
-                            <h4 class="font-medium text-gray-800 dark:text-gray-200">
-                                {{ $category->name }}
-                            </h4>
-                            <span class="text-xs font-semibold
-                                {{ $state === 'red' ? 'text-red-600' : '' }}
-                                {{ $state === 'yellow' ? 'text-yellow-600' : '' }}
-                                {{ $state === 'blue' ? 'text-blue-600' : '' }}
-                                {{ $state === 'green' ? 'text-green-600' : '' }}
-                            ">
-                                {{ $p }}%
-                            </span>
-                        </div>
-
-                        <div class="text-xs text-gray-500 mb-1 flex justify-between">
-                            <span>Actual: {{ number_format($category->yearly_total) }}</span>
-                            <span>Budget: {{ number_format($category->yearly_budget) }}</span>
-                        </div>
-
-                        <div class="h-2 rounded bg-gray-200 dark:bg-gray-700">
-                            <div class="h-2 rounded
-                                {{ $state === 'red' ? 'bg-red-500' : '' }}
-                                {{ $state === 'yellow' ? 'bg-yellow-500' : '' }}
-                                {{ $state === 'blue' ? 'bg-blue-500' : '' }}
-                                {{ $state === 'green' ? 'bg-green-500' : '' }}
-                            "
-                                 style="width: {{ min($p, 100) }}%"></div>
-                        </div>
-
-                        @if($p >= 100)
-                            <p class="mt-1 text-xs font-semibold text-red-600">
-                                Over budget
-                            </p>
-                        @endif
-                    </div>
-                @endforeach
-            </div>
-        </section>
-
         {{-- Budget Table (Read-Only) --}}
         <div class="space-y-4">
             <div class="flex justify-between items-center">

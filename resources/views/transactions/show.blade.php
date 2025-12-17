@@ -29,7 +29,8 @@
             <div class="text-center mb-6 pb-6 border-b">
                 <p class="text-sm text-gray-500 mb-2">{{ $transaction->date->format('D, d M Y') }}</p>
                 <p class="font-bold text-4xl {{ $transaction->category->type === 'income' ? 'text-green-600' : 'text-red-600' }}">
-                    {{ $transaction->category->type === 'income' ? '+' : '-' }} KES {{ number_format($transaction->amount, 0, '.', ',') }}
+                    {{ $transaction->category->type === 'income' ? '+' : '-' }}
+                    KES {{ number_format($transaction->amount, 0, '.', ',') }}
                 </p>
                 <p class="text-gray-600 mt-2">{{ $transaction->description }}</p>
             </div>

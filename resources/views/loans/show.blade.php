@@ -5,11 +5,13 @@
         <div class="flex items-center justify-between mb-6">
             <div>
                 <h1 class="text-3xl font-bold">{{ $loan->source }}</h1>
-                <p class="text-gray-600 text-sm mt-1">Loan ID: #{{ $loan->id }} • Created {{ $loan->created_at->format('M d, Y') }}</p>
+                <p class="text-gray-600 text-sm mt-1">Loan ID: #{{ $loan->id }} •
+                    Created {{ $loan->created_at->format('M d, Y') }}</p>
             </div>
             <div class="space-x-2">
                 @if($loan->status === 'active')
-                    <a href="{{ route('loans.payment', $loan) }}" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 font-semibold">
+                    <a href="{{ route('loans.payment', $loan) }}"
+                       class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 font-semibold">
                         Make Payment
                     </a>
                 @endif
@@ -141,7 +143,8 @@
                     <div class="pt-4 space-y-2 bg-white bg-opacity-50 -mx-6 -mb-6 px-6 py-4 rounded-b-lg">
                         <div class="flex justify-between">
                             <span class="text-gray-700">Paid</span>
-                            <span class="font-semibold text-green-600">KES {{ number_format($loan->amount_paid, 0, '.', ',') }}</span>
+                            <span
+                                class="font-semibold text-green-600">KES {{ number_format($loan->amount_paid, 0, '.', ',') }}</span>
                         </div>
                         <div class="flex justify-between font-bold text-lg">
                             <span class="text-gray-700">Balance</span>
@@ -161,7 +164,8 @@
                             <span class="text-sm font-bold text-gray-900">{{ number_format($percentage, 1) }}%</span>
                         </div>
                         <div class="w-full bg-gray-300 rounded-full h-3">
-                            <div class="bg-green-500 h-3 rounded-full transition-all" style="width: {{ min($percentage, 100) }}%"></div>
+                            <div class="bg-green-500 h-3 rounded-full transition-all"
+                                 style="width: {{ min($percentage, 100) }}%"></div>
                         </div>
                     </div>
                 @endif
@@ -178,7 +182,8 @@
                         <thead class="bg-gray-100 border-b-2 border-gray-300">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Date</th>
-                            <th class="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Principal</th>
+                            <th class="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Principal
+                            </th>
                             <th class="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Interest</th>
                             <th class="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Total</th>
                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Notes</th>
@@ -226,7 +231,8 @@
                 <div class="bg-gray-50 border border-gray-200 rounded p-6 text-center">
                     <p class="text-gray-500">No payments recorded yet</p>
                     @if($loan->status === 'active')
-                        <a href="{{ route('loans.payment', $loan) }}" class="text-blue-600 hover:text-blue-800 text-sm mt-2">
+                        <a href="{{ route('loans.payment', $loan) }}"
+                           class="text-blue-600 hover:text-blue-800 text-sm mt-2">
                             Make the first payment →
                         </a>
                     @endif

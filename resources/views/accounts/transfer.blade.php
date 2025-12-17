@@ -32,7 +32,8 @@
                 >
                     <option value="">Select source account</option>
                     @foreach($accounts as $account)
-                        <option value="{{ $account->id }}" {{ old('from_account_id') == $account->id ? 'selected' : '' }}>
+                        <option
+                            value="{{ $account->id }}" {{ old('from_account_id') == $account->id ? 'selected' : '' }}>
                             {{ $account->name }} ({{ number_format($account->current_balance, 0, '.', ',') }})
                         </option>
                     @endforeach
@@ -114,7 +115,8 @@
         <!-- Quick Info -->
         <div class="mt-6 p-4 bg-blue-50 rounded-lg">
             <p class="text-sm text-blue-800">
-                <strong>💡 Tip:</strong> Transfers don't affect your budget categories. They simply move money between your accounts.
+                <strong>💡 Tip:</strong> Transfers don't affect your budget categories. They simply move money between
+                your accounts.
             </p>
         </div>
     </div>

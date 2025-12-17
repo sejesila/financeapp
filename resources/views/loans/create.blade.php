@@ -21,12 +21,16 @@
                 <div class="flex">
                     <div class="flex-shrink-0">
                         <svg class="h-5 w-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                            <path fill-rule="evenodd"
+                                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                  clip-rule="evenodd"/>
                         </svg>
                     </div>
                     <div class="ml-3">
                         <p class="text-sm text-blue-800">
-                            <strong>Redirected from Account Top-Up:</strong> The loan source, receiving account, and amount have been pre-filled and cannot be changed. You can still modify the due date and notes.
+                            <strong>Redirected from Account Top-Up:</strong> The loan source, receiving account, and
+                            amount have been pre-filled and cannot be changed. You can still modify the due date and
+                            notes.
                         </p>
                     </div>
                 </div>
@@ -58,8 +62,12 @@
                             class="w-full border border-gray-300 rounded px-4 py-2 @error('loan_type') border-red-500 @enderror"
                             required
                         >
-                            <option value="mshwari" {{ $loanType === 'mshwari' ? 'selected' : '' }}>M-Shwari (7.5% facilitation fee, early repayment bonus)</option>
-                            <option value="kcb_mpesa" {{ $loanType === 'kcb_mpesa' ? 'selected' : '' }}>KCB M-Pesa (8.93% interest)</option>
+                            <option value="mshwari" {{ $loanType === 'mshwari' ? 'selected' : '' }}>M-Shwari (7.5%
+                                facilitation fee, early repayment bonus)
+                            </option>
+                            <option value="kcb_mpesa" {{ $loanType === 'kcb_mpesa' ? 'selected' : '' }}>KCB M-Pesa
+                                (8.93% interest)
+                            </option>
                         </select>
                         @error('loan_type')
                         <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
@@ -90,7 +98,9 @@
                         @if($fromTopup)
                             <p class="text-xs text-gray-500 mt-1">
                                 <svg class="inline w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                                    <path fill-rule="evenodd"
+                                          d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                                          clip-rule="evenodd"/>
                                 </svg>
                                 This field is locked because you came from the top-up form
                             </p>
@@ -118,7 +128,8 @@
                                     value="{{ $account->id }}"
                                     {{ ($prefillData['account_id'] ?? old('account_id')) == $account->id ? 'selected' : '' }}
                                 >
-                                    {{ $account->name }} (Balance: KES {{ number_format($account->current_balance, 0) }})
+                                    {{ $account->name }} (Balance: KES {{ number_format($account->current_balance, 0) }}
+                                    )
                                 </option>
                             @empty
                                 <option disabled>No active MPesa accounts available</option>
@@ -134,12 +145,15 @@
                         @if($fromTopup)
                             <p class="text-xs text-gray-500 mt-1">
                                 <svg class="inline w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                                    <path fill-rule="evenodd"
+                                          d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                                          clip-rule="evenodd"/>
                                 </svg>
                                 This field is locked because you came from the top-up form
                             </p>
                         @else
-                            <p class="text-xs text-gray-500 mt-1">The loan amount will be deposited to this MPesa account</p>
+                            <p class="text-xs text-gray-500 mt-1">The loan amount will be deposited to this MPesa
+                                account</p>
                         @endif
                     </div>
 
@@ -172,7 +186,9 @@
                         @if($fromTopup)
                             <p class="text-xs text-gray-500 mt-1">
                                 <svg class="inline w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                                    <path fill-rule="evenodd"
+                                          d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                                          clip-rule="evenodd"/>
                                 </svg>
                                 This field is locked because you came from the top-up form
                             </p>
@@ -234,7 +250,8 @@
 
                     <!-- Submit Buttons -->
                     <div class="flex gap-4">
-                        <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 font-semibold">
+                        <button type="submit"
+                                class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 font-semibold">
                             Record Loan
                         </button>
                         <a href="{{ $fromTopup && $prefillData['account_id'] ? route('accounts.show', $prefillData['account_id']) : route('loans.index') }}"
@@ -248,7 +265,8 @@
             <!-- Breakdown Summary (Sticky) -->
             <div class="lg:sticky lg:top-4 lg:h-fit">
                 <!-- M-Shwari Breakdown -->
-                <div id="breakdown-mshwari" class="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-indigo-200 rounded-lg p-6 hidden">
+                <div id="breakdown-mshwari"
+                     class="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-indigo-200 rounded-lg p-6 hidden">
                     <h3 class="text-lg font-bold text-gray-900 mb-4">M-Shwari Loan Breakdown</h3>
 
                     <div class="space-y-3 text-sm">
@@ -290,7 +308,8 @@
                         </div>
 
                         <div class="mt-4 pt-4 border-t-2 border-indigo-300">
-                            <p class="text-xs font-semibold text-gray-600 mb-3 uppercase">Early Repayment (Within 10 Days)</p>
+                            <p class="text-xs font-semibold text-gray-600 mb-3 uppercase">Early Repayment (Within 10
+                                Days)</p>
 
                             <div class="flex justify-between pb-2 text-xs">
                                 <span class="text-gray-700">Facilitation Refund (24%)</span>
@@ -313,7 +332,8 @@
                 </div>
 
                 <!-- KCB M-Pesa Breakdown -->
-                <div id="breakdown-kcb" class="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-6 hidden">
+                <div id="breakdown-kcb"
+                     class="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-6 hidden">
                     <h3 class="text-lg font-bold text-gray-900 mb-4">KCB M-Pesa Loan Breakdown</h3>
 
                     <div class="space-y-3 text-sm">

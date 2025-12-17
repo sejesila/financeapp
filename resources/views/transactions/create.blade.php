@@ -87,14 +87,23 @@
             <!-- Account -->
             <div>
                 <label class="block font-semibold mb-1">Account</label>
-                <select name="account_id" class="w-full border p-2 rounded focus:outline-none focus:border-indigo-500" required>
+                <select name="account_id" class="w-full border p-2 rounded focus:outline-none focus:border-indigo-500"
+                        required>
                     <option value="">-- Select Account --</option>
                     @foreach($accounts as $account)
                         <option value="{{ $account->id }}" {{ old('account_id') == $account->id ? 'selected' : '' }}>
-                            @if($account->type == 'cash') 💵 @endif
-                            @if($account->type == 'mpesa') 📱 @endif
-                            @if($account->type == 'airtel_money') 📲 @endif
-                            @if($account->type == 'bank') 🏦 @endif
+                            @if($account->type == 'cash')
+                                💵
+                            @endif
+                            @if($account->type == 'mpesa')
+                                📱
+                            @endif
+                            @if($account->type == 'airtel_money')
+                                📲
+                            @endif
+                            @if($account->type == 'bank')
+                                🏦
+                            @endif
                             {{ $account->name }} ({{ number_format($account->current_balance, 0, '.', ',') }})
                         </option>
                     @endforeach

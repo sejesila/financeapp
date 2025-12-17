@@ -19,7 +19,8 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ route('transactions.update', $transaction) }}" class="bg-white shadow rounded-lg p-6">
+        <form method="POST" action="{{ route('transactions.update', $transaction) }}"
+              class="bg-white shadow rounded-lg p-6">
             @csrf
             @method('PUT')
 
@@ -69,9 +70,18 @@
                     required
                 >
                     <option value="">Select Method</option>
-                    <option value="Cash" {{ old('payment_method', $transaction->payment_method) == 'Cash' ? 'selected' : '' }}>Cash</option>
-                    <option value="Mpesa" {{ old('payment_method', $transaction->payment_method) == 'Mpesa' ? 'selected' : '' }}>Mpesa</option>
-                    <option value="Bank to Mpesa" {{ old('payment_method', $transaction->payment_method) == 'Bank to Mpesa' ? 'selected' : '' }}>Bank to Mpesa</option>
+                    <option
+                        value="Cash" {{ old('payment_method', $transaction->payment_method) == 'Cash' ? 'selected' : '' }}>
+                        Cash
+                    </option>
+                    <option
+                        value="Mpesa" {{ old('payment_method', $transaction->payment_method) == 'Mpesa' ? 'selected' : '' }}>
+                        Mpesa
+                    </option>
+                    <option
+                        value="Bank to Mpesa" {{ old('payment_method', $transaction->payment_method) == 'Bank to Mpesa' ? 'selected' : '' }}>
+                        Bank to Mpesa
+                    </option>
                 </select>
             </div>
 
@@ -85,11 +95,20 @@
                 >
                     <option value="">Select Account</option>
                     @foreach($accounts as $account)
-                        <option value="{{ $account->id }}" {{ old('account_id', $transaction->account_id) == $account->id ? 'selected' : '' }}>
-                            @if($account->type == 'cash') 💵 @endif
-                            @if($account->type == 'mpesa') 📱 @endif
-                            @if($account->type == 'airtel_money') 📲 @endif
-                            @if($account->type == 'bank') 🏦 @endif
+                        <option
+                            value="{{ $account->id }}" {{ old('account_id', $transaction->account_id) == $account->id ? 'selected' : '' }}>
+                            @if($account->type == 'cash')
+                                💵
+                            @endif
+                            @if($account->type == 'mpesa')
+                                📱
+                            @endif
+                            @if($account->type == 'airtel_money')
+                                📲
+                            @endif
+                            @if($account->type == 'bank')
+                                🏦
+                            @endif
                             {{ $account->name }} ({{ number_format($account->current_balance, 0, '.', ',') }})
                         </option>
                     @endforeach
@@ -107,7 +126,8 @@
                 >
                     <option value="">Select Category</option>
                     @foreach($categories as $category)
-                        <option value="{{ $category->id }}" {{ old('category_id', $transaction->category_id) == $category->id ? 'selected' : '' }}>
+                        <option
+                            value="{{ $category->id }}" {{ old('category_id', $transaction->category_id) == $category->id ? 'selected' : '' }}>
                             {{ $category->name }}
                         </option>
                     @endforeach

@@ -24,11 +24,13 @@
                 </div>
                 <div>
                     <p class="text-sm text-gray-600 uppercase">Total Due</p>
-                    <p class="text-lg font-bold text-gray-900">KES {{ number_format($loan->total_amount, 0, '.', ',') }}</p>
+                    <p class="text-lg font-bold text-gray-900">
+                        KES {{ number_format($loan->total_amount, 0, '.', ',') }}</p>
                 </div>
                 <div>
                     <p class="text-sm text-gray-600 uppercase">Amount Paid</p>
-                    <p class="text-lg font-bold text-green-600">KES {{ number_format($loan->amount_paid, 0, '.', ',') }}</p>
+                    <p class="text-lg font-bold text-green-600">
+                        KES {{ number_format($loan->amount_paid, 0, '.', ',') }}</p>
                 </div>
                 <div>
                     <p class="text-sm text-gray-600 uppercase">Balance</p>
@@ -55,11 +57,13 @@
             <div class="grid grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                 <div>
                     <p class="text-xs text-gray-600 uppercase">Remaining Principal</p>
-                    <p class="text-base font-bold text-gray-900">KES {{ number_format($remainingPrincipal, 0, '.', ',') }}</p>
+                    <p class="text-base font-bold text-gray-900">
+                        KES {{ number_format($remainingPrincipal, 0, '.', ',') }}</p>
                 </div>
                 <div>
                     <p class="text-xs text-gray-600 uppercase">Remaining Interest/Fees</p>
-                    <p class="text-base font-bold text-gray-900">KES {{ number_format(max(0, $remainingInterest), 0, '.', ',') }}</p>
+                    <p class="text-base font-bold text-gray-900">
+                        KES {{ number_format(max(0, $remainingInterest), 0, '.', ',') }}</p>
                 </div>
             </div>
 
@@ -148,7 +152,8 @@
                                 readonly
                             >
                         </div>
-                        <p class="text-xs text-gray-500 mt-1">Remaining interest/fees: KES {{ number_format(max(0, $remainingInterest), 0) }}</p>
+                        <p class="text-xs text-gray-500 mt-1">Remaining interest/fees:
+                            KES {{ number_format(max(0, $remainingInterest), 0) }}</p>
                         @error('interest_portion')
                         <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                         @enderror
@@ -172,7 +177,8 @@
                                 readonly
                             >
                         </div>
-                        <p class="text-xs text-gray-500 mt-1">Remaining principal: KES {{ number_format($remainingPrincipal, 0) }}</p>
+                        <p class="text-xs text-gray-500 mt-1">Remaining principal:
+                            KES {{ number_format($remainingPrincipal, 0) }}</p>
                         @error('principal_portion')
                         <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                         @enderror
@@ -240,10 +246,12 @@
 
             <!-- Submit Buttons -->
             <div class="flex gap-4">
-                <button type="submit" class="flex-1 bg-green-600 text-white px-6 py-3 rounded hover:bg-green-700 font-semibold text-lg">
+                <button type="submit"
+                        class="flex-1 bg-green-600 text-white px-6 py-3 rounded hover:bg-green-700 font-semibold text-lg">
                     Record Payment
                 </button>
-                <a href="{{ route('loans.show', $loan) }}" class="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded hover:bg-gray-400 font-semibold text-center">
+                <a href="{{ route('loans.show', $loan) }}"
+                   class="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded hover:bg-gray-400 font-semibold text-center">
                     Cancel
                 </a>
             </div>
@@ -307,7 +315,7 @@
         }
 
         // Toggle manual override
-        manualOverride.addEventListener('change', function() {
+        manualOverride.addEventListener('change', function () {
             if (this.checked) {
                 principalInput.removeAttribute('readonly');
                 interestInput.removeAttribute('readonly');
@@ -327,19 +335,19 @@
         });
 
         // Event listeners
-        amountInput.addEventListener('input', function() {
+        amountInput.addEventListener('input', function () {
             if (!manualOverride.checked) {
                 autoAllocatePayment();
             }
         });
 
-        principalInput.addEventListener('input', function() {
+        principalInput.addEventListener('input', function () {
             if (manualOverride.checked) {
                 updateTotalDisplay();
             }
         });
 
-        interestInput.addEventListener('input', function() {
+        interestInput.addEventListener('input', function () {
             if (manualOverride.checked) {
                 updateTotalDisplay();
             }
