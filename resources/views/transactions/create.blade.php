@@ -1,14 +1,17 @@
 <!-- resources/views/transactions/create.blade.php -->
-@extends('layout')
-
-@section('content')
-    <div class="max-w-2xl mx-auto mt-10 p-6 bg-white shadow-xl rounded-2xl">
+<x-app-layout>
+    <x-slot name="header">
         <div class="flex items-center justify-between mb-6">
-            <h2 class="text-2xl font-bold">Add New Transaction</h2>
+            <h2 class="font-semibold text-lg sm:text-xl text-gray-800 dark:text-gray-200 leading-tight">
+                {{ __('Add New Transaction') }}
+            </h2>
             <a href="{{ route('transactions.index') }}" class="text-indigo-600 hover:text-indigo-800">
                 ← Back to Transactions
             </a>
         </div>
+    </x-slot>
+    <div class="max-w-2xl mx-auto mt-10 p-6 bg-white shadow-xl rounded-2xl">
+
 
         @if($errors->any())
             <div class="bg-red-100 text-red-700 p-4 rounded mb-6">
@@ -128,4 +131,4 @@
             </div>
         </form>
     </div>
-@endsection
+</x-app-layout>

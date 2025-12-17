@@ -1,15 +1,15 @@
-@extends('layout')
-
-@section('content')
-    <div class="max-w-4xl mx-auto px-4">
-        <!-- Header -->
+<x-app-layout>
+    <x-slot name="header">
         <div class="flex items-center justify-between mb-6">
-            <h1 class="text-3xl font-bold">Transaction Details</h1>
+            <h2 class="font-semibold text-lg sm:text-xl text-gray-800 dark:text-gray-200 leading-tight">
+                {{ __('Transaction Details') }}
+            </h2>
             <a href="{{ route('transactions.index') }}" class="text-indigo-600 hover:text-indigo-800">
                 ← Back to Transactions
             </a>
         </div>
-
+    </x-slot>
+    <div class="max-w-4xl mx-auto px-4">
         <!-- Flash Messages -->
         @if(session('success'))
             <div class="bg-green-100 text-green-700 p-4 rounded mb-6">
@@ -93,4 +93,4 @@
             </p>
         </div>
     </div>
-@endsection
+</x-app-layout>

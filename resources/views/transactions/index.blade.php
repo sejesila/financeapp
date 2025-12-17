@@ -1,77 +1,65 @@
 <x-app-layout>
     {{-- Header --}}
     <x-slot name="header">
-        <div class="flex items-center justify-between">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-                <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200">
+                <h2 class="text-lg sm:text-xl font-semibold text-gray-800 dark:text-gray-200">
                     Transactions
                 </h2>
-                <p class="text-sm text-gray-500">
+                <p class="text-xs sm:text-sm text-gray-500">
                     View and manage all income & expenses
                 </p>
             </div>
 
             <a href="{{ route('transactions.create') }}"
-               class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+               class="inline-flex w-full sm:w-auto items-center justify-center gap-2
+                      rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white
+                      hover:bg-indigo-700">
                 + New Transaction
             </a>
         </div>
     </x-slot>
 
-    <div class="mx-auto max-w-7xl py-8 space-y-6">
+    <div class="mx-auto max-w-7xl px-3 sm:px-6 py-6 space-y-6">
 
         {{-- Flash Messages --}}
         @foreach (['success' => 'green', 'error' => 'red'] as $key => $color)
             @if(session($key))
-                <div class="rounded-md bg-{{ $color }}-100 px-4 py-3 text-{{ $color }}-700">
+                <div class="rounded-md bg-{{ $color }}-100 px-4 py-3 text-{{ $color }}-700 text-sm">
                     {{ session($key) }}
                 </div>
             @endif
         @endforeach
 
-        {{-- Summary Cards (colored as original) --}}
-        <div class="grid grid-cols-1 md:grid-cols-7 gap-3 mb-6">
-            <div class="bg-blue-100 p-3 rounded-lg border border-blue-300">
-                <h3 class="text-xs font-semibold text-blue-800 mb-1">Today</h3>
-                <p class="text-xl font-bold text-blue-900">{{ number_format($totalToday, 0, '.', ',') }}</p>
-            </div>
+        {{-- Summary Cards --}}
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+            @php
+                $stats = [
+                    ['Today', $totalToday, 'blue'],
+                    ['Yesterday', $totalYesterday, 'orange'],
+                    ['This Week', $totalThisWeek, 'green'],
+                    ['Last Week', $totalLastWeek, 'yellow'],
+                    ['This Month', $totalThisMonth, 'teal'],
+                    ['Last Month', $totalLastMonth, 'pink'],
+                    ['All Time', $totalAll, 'purple'],
+                ];
+            @endphp
 
-            <div class="bg-orange-100 p-3 rounded-lg border border-orange-300">
-                <h3 class="text-xs font-semibold text-orange-800 mb-1">Yesterday</h3>
-                <p class="text-xl font-bold text-orange-900">{{ number_format($totalYesterday, 0, '.', ',') }}</p>
-            </div>
-
-            <div class="bg-green-100 p-3 rounded-lg border border-green-300">
-                <h3 class="text-xs font-semibold text-green-800 mb-1">This Week</h3>
-                <p class="text-xl font-bold text-green-900">{{ number_format($totalThisWeek, 0, '.', ',') }}</p>
-            </div>
-
-            <div class="bg-yellow-100 p-3 rounded-lg border border-yellow-300">
-                <h3 class="text-xs font-semibold text-yellow-800 mb-1">Last Week</h3>
-                <p class="text-xl font-bold text-yellow-900">{{ number_format($totalLastWeek, 0, '.', ',') }}</p>
-            </div>
-
-            <div class="bg-teal-100 p-3 rounded-lg border border-teal-300">
-                <h3 class="text-xs font-semibold text-teal-800 mb-1">This Month</h3>
-                <p class="text-xl font-bold text-teal-900">{{ number_format($totalThisMonth, 0, '.', ',') }}</p>
-            </div>
-
-            <div class="bg-pink-100 p-3 rounded-lg border border-pink-300">
-                <h3 class="text-xs font-semibold text-pink-800 mb-1">Last Month</h3>
-                <p class="text-xl font-bold text-pink-900">{{ number_format($totalLastMonth, 0, '.', ',') }}</p>
-            </div>
-
-            <div class="bg-purple-100 p-3 rounded-lg border border-purple-300">
-                <h3 class="text-xs font-semibold text-purple-800 mb-1">All Time</h3>
-                <p class="text-xl font-bold text-purple-900">{{ number_format($totalAll, 0, '.', ',') }}</p>
-            </div>
+            @foreach($stats as [$label, $value, $color])
+                <div class="bg-{{ $color }}-100 p-3 rounded-lg border border-{{ $color }}-300">
+                    <h3 class="text-xs font-semibold text-{{ $color }}-800 mb-1">{{ $label }}</h3>
+                    <p class="text-lg sm:text-xl font-bold text-{{ $color }}-900">
+                        {{ number_format($value, 0, '.', ',') }}
+                    </p>
+                </div>
+            @endforeach
         </div>
 
         {{-- Filters --}}
         <div class="rounded-lg border bg-white p-4 shadow-sm space-y-4">
 
             {{-- Quick Filters --}}
-            <div class="flex flex-wrap gap-2">
+            <div class="flex flex-wrap gap-2 text-xs sm:text-sm">
                 @foreach([
                     'all' => 'All',
                     'today' => 'Today',
@@ -83,7 +71,7 @@
                     'this_year' => 'This Year',
                 ] as $key => $label)
                     <a href="{{ route('transactions.index', ['filter' => $key]) }}"
-                       class="px-4 py-2 rounded-md text-sm
+                       class="px-3 py-1.5 sm:px-4 sm:py-2 rounded-md
                        {{ $filter === $key
                             ? 'bg-indigo-600 text-white'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
@@ -100,7 +88,7 @@
 
                 <form method="GET"
                       action="{{ route('transactions.index') }}"
-                      class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      class="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
                     <input type="hidden" name="filter" value="custom">
 
@@ -146,7 +134,7 @@
                         </div>
                     </div>
 
-                    <div class="col-span-full flex gap-2">
+                    <div class="col-span-full flex flex-wrap gap-2">
                         <button class="rounded-md bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700">
                             Apply
                         </button>
@@ -167,8 +155,8 @@
                     <th class="px-3 py-2 text-left">Date</th>
                     <th class="px-3 py-2 text-left">Description</th>
                     <th class="px-3 py-2 text-right">Amount</th>
-                    <th class="px-3 py-2 text-left">Account</th>
-                    <th class="px-3 py-2 text-left">Category</th>
+                    <th class="px-3 py-2 text-left hidden sm:table-cell">Account</th>
+                    <th class="px-3 py-2 text-left hidden md:table-cell">Category</th>
                     <th class="px-3 py-2 text-center">Action</th>
                 </tr>
                 </thead>
@@ -176,27 +164,29 @@
                 <tbody class="divide-y">
                 @forelse($transactions as $t)
                     <tr class="hover:bg-gray-50">
-                        <td class="px-3 py-2">
+                        <td class="px-3 py-2 whitespace-nowrap">
                             {{ \Carbon\Carbon::parse($t->date)->format('M d, Y') }}
                         </td>
 
                         <td class="px-3 py-2">{{ $t->description }}</td>
 
                         <td class="px-3 py-2 text-right font-semibold
-                                {{ $t->category->type === 'income' ? 'text-green-600' : 'text-red-600' }}">
+                            {{ $t->category->type === 'income' ? 'text-green-600' : 'text-red-600' }}">
                             {{ $t->category->type === 'income' ? '+' : '-' }}
                             {{ number_format($t->amount) }}
                         </td>
 
-                        <td class="px-3 py-2">{{ $t->account->name ?? '—' }}</td>
+                        <td class="px-3 py-2 hidden sm:table-cell">
+                            {{ $t->account->name ?? '—' }}
+                        </td>
 
-                        <td class="px-3 py-2">
-                                <span class="inline-flex rounded-full px-2 py-1 text-xs
-                                    {{ $t->category->type === 'income'
-                                        ? 'bg-green-100 text-green-800'
-                                        : 'bg-red-100 text-red-800' }}">
-                                    {{ $t->category->name }}
-                                </span>
+                        <td class="px-3 py-2 hidden md:table-cell">
+                            <span class="inline-flex rounded-full px-2 py-1 text-xs
+                                {{ $t->category->type === 'income'
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-red-100 text-red-800' }}">
+                                {{ $t->category->name }}
+                            </span>
                         </td>
 
                         <td class="px-3 py-2 text-center">
@@ -234,7 +224,7 @@
         @endif
 
         {{-- Pagination --}}
-        <div class="pt-4 border-t">
+        <div class="pt-4 border-t overflow-x-auto">
             {{ $transactions->links() }}
         </div>
 
