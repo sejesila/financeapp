@@ -102,11 +102,13 @@ class LoanController extends Controller implements HasMiddleware
         $filter = $request->get('filter', 'active');
         $year = $request->get('year');
 
-        $minYear = Loan::min(DB::raw('YEAR(disbursed_date)'));
+        $minYear = Loan::where('user_id', Auth::id())->min(DB::raw('YEAR(disbursed_date)'));
         $minYear = $minYear ?? date('Y');
         $maxYear = date('Y');
 
-        $activeLoansQuery = Loan::with('account')->where('status', 'active');
+        $activeLoansQuery = Loan::with('account')
+            ->where('user_id', Auth::id())
+            ->where('status', 'active');
 
         if ($year && $filter === 'active') {
             $activeLoansQuery->whereYear('disbursed_date', $year);
@@ -114,7 +116,9 @@ class LoanController extends Controller implements HasMiddleware
 
         $activeLoans = $activeLoansQuery->orderBy('disbursed_date', 'desc')->get();
 
-        $paidLoansQuery = Loan::with('account')->where('status', 'paid');
+        $paidLoansQuery = Loan::with('account')
+            ->where('user_id', Auth::id())
+            ->where('status', 'paid');
 
         if ($year) {
             $paidLoansQuery->whereYear('repaid_date', $year);
@@ -237,7 +241,6 @@ class LoanController extends Controller implements HasMiddleware
     {
         $this->authorize('create', Loan::class);
 
-
         $fromTopup = $request->input('from_topup') === '1';
 
         $rules = [
@@ -314,8 +317,8 @@ class LoanController extends Controller implements HasMiddleware
 
             // Get or create loan categories
             $loanCategory = Category::firstOrCreate(
-                ['name' => 'Loan Receipt', 'type' => 'income', 'user_id' => Auth::id()],
-                ['name' => 'Loan Receipt', 'type' => 'income']
+                ['name' => 'Loan Receipt', 'type' => 'liability', 'user_id' => Auth::id()],
+                ['name' => 'Loan Receipt', 'type' => 'liability']
             );
 
             // Process transactions based on loan type
@@ -489,7 +492,9 @@ class LoanController extends Controller implements HasMiddleware
                 'loan_id' => $loan->id,
             ]);
 
+            // FIX: Add user_id to LoanPayment creation
             LoanPayment::create([
+                'user_id' => Auth::id(), // ✅ Added this line
                 'loan_id' => $loan->id,
                 'account_id' => $loan->account_id,
                 'amount' => $paymentAmount,

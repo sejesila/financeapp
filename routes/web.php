@@ -33,7 +33,7 @@ Route::middleware(['auth'])->group(function () {
 
         // Budgets
         Route::get('budgets/{year?}', [BudgetController::class, 'index'])->name('budgets.index');
-        Route::post('budgets/update', [BudgetController::class, 'updateBulk'])->name('budgets.update');
+       // Route::post('budgets/update', [BudgetController::class, 'updateBulk'])->name('budgets.update');
 
         // Accounts
         Route::resource('accounts', AccountController::class);

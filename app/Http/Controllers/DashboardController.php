@@ -99,15 +99,20 @@ class DashboardController extends Controller
         // ============ SPENDING ANALYSIS ============
 
         $topExpenses = Transaction::where('user_id', $userId)
-            ->select('category_id', DB::raw('SUM(amount) as total'))
             ->whereYear('date', $currentYear)
             ->whereMonth('date', $currentMonth)
             ->whereHas('category', fn($q) => $q->where('type', 'expense'))
+            ->with('category')
+            ->get()
             ->groupBy('category_id')
-            ->with('category') // eager load category
-            ->orderByDesc('total')
-            ->limit(5)
-            ->get();
+            ->map(function($group) {
+                $first = $group->first(); // take the first transaction for the category
+                $first->total = $group->sum('amount'); // sum total
+                return $first;
+            })
+            ->sortByDesc('total')
+            ->take(5);
+
 
 
         $dailySpending = Transaction::where('user_id', $userId)

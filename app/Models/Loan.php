@@ -165,6 +165,7 @@ class Loan extends Model
 class LoanPayment extends Model
 {
     protected $fillable = [
+        'user_id',
         'loan_id',
         'account_id',
         'amount',
@@ -172,7 +173,8 @@ class LoanPayment extends Model
         'interest_portion',
         'payment_date',
         'transaction_id',
-        'notes'
+        'notes',
+
     ];
 
     protected $casts = [
@@ -189,6 +191,10 @@ class LoanPayment extends Model
     {
         return $this->belongsTo(Loan::class);
     }
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 
     /**
      * Relationship: Payment belongs to Account
@@ -204,5 +210,14 @@ class LoanPayment extends Model
     public function transaction()
     {
         return $this->belongsTo(Transaction::class);
+    }
+    protected static function booted()
+    {
+        static::addGlobalScope('ownedByUser', function ($builder) {
+            if (Auth::check()) {
+                $table = $builder->getModel()->getTable();
+                $builder->where("{$table}.user_id", Auth::id());
+            }
+        });
     }
 }

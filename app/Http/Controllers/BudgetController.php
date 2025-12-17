@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Transaction;
 use App\Models\Loan;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class BudgetController extends Controller
@@ -17,37 +18,43 @@ class BudgetController extends Controller
         $currentMonth = date('n');
 
         // Calculate dynamic year range based on actual data
-        $minYear = Transaction::min(DB::raw('YEAR(COALESCE(period_date, date))'));
-        $minYear = $minYear ?? date('Y'); // Fallback if no transactions
-        $maxYear = date('Y') + 1; // Allow planning for next year
+        $minYear = Transaction::where('user_id', Auth::id())
+            ->min(DB::raw('YEAR(COALESCE(period_date, date))'));
+        $minYear = $minYear ?? date('Y');
+        $maxYear = date('Y') + 1;
 
         // Load ONLY true income categories (exclude loans and adjustments)
-        $incomeCategories = Category::where('type', 'income')
+        $incomeCategories = Category::where('user_id', Auth::id())
+            ->where('type', 'income')
             ->whereNotIn('name', ['Loan Disbursement', 'Loan Receipt', 'Balance Adjustment'])
             ->orderBy('name')
             ->get();
 
         // Load expense categories (include loan repayments)
-        $expenseCategories = Category::where('type', 'expense')
+        $expenseCategories = Category::where('user_id', Auth::id())
+            ->where('type', 'expense')
+            ->orderBy('name')
             ->get();
 
-        // Load budgets for the year
-        $budgets = Budget::where('year', $year)
+        // Load budgets for the year (auto-generated from transactions)
+        $budgets = Budget::where('user_id', Auth::id())
+            ->where('year', $year)
             ->get()
-            ->keyBy(function($b) { return $b->category_id . '-' . $b->month; });
+            ->keyBy(function($b) {
+                return $b->category_id . '-' . $b->month;
+            });
 
         // Compute actual totals grouped by category & month using period_date
-        // This ensures Jan salary received in Dec counts toward January budget
         $actualsQuery = Transaction::query()
             ->selectRaw('category_id, MONTH(COALESCE(period_date, date)) as month, SUM(amount) as total')
+            ->where('user_id', Auth::id())
             ->whereYear(DB::raw('COALESCE(period_date, date)'), $year)
             ->whereHas('category', function($q) {
                 $q->whereIn('type', ['income', 'expense'])
                     ->whereNotIn('name', [
                         'Loan Disbursement',
                         'Loan Receipt',
-                        'Balance Adjustment',
-                        'Excise Duty'
+                        'Balance Adjustment'
                     ]);
             })
             ->groupBy('category_id', DB::raw('MONTH(COALESCE(period_date, date))'))
@@ -111,21 +118,24 @@ class BudgetController extends Controller
 
     /**
      * Get loan statistics for display in budget
-     * Shows loans disbursed, repayments made, and active balances
      */
     private function getLoanStats($year)
     {
         // Loans disbursed this year (principal amount)
-        $loansDisbursed = Loan::whereYear('disbursed_date', $year)
+        $loansDisbursed = Loan::where('user_id', Auth::id())
+            ->whereYear('disbursed_date', $year)
             ->sum('principal_amount');
 
-        // Loan repayments made this year (from LoanPayment records)
+        // Loan repayments made this year
         $loanPayments = DB::table('loan_payments')
-            ->whereYear('payment_date', $year)
-            ->sum('amount');
+            ->join('loans', 'loan_payments.loan_id', '=', 'loans.id')
+            ->where('loans.user_id', Auth::id())
+            ->whereYear('loan_payments.payment_date', $year)
+            ->sum('loan_payments.amount');
 
-        // Active loan balance (remaining to repay)
-        $activeLoanBalance = Loan::where('status', 'active')
+        // Active loan balance
+        $activeLoanBalance = Loan::where('user_id', Auth::id())
+            ->where('status', 'active')
             ->sum('balance');
 
         return [
@@ -133,41 +143,5 @@ class BudgetController extends Controller
             'payments' => $loanPayments,
             'active_balance' => $activeLoanBalance,
         ];
-    }
-
-    public function updateBulk(Request $request)
-    {
-        $data = $request->validate([
-            'year' => 'required|integer|min:2000|max:2099',
-            'budgets' => 'required|array',
-        ]);
-
-        $year = $data['year'];
-        $upsertRows = [];
-        $now = now();
-
-        foreach ($data['budgets'] as $compositeKey => $vals) {
-            $categoryId = $vals['category_id'] ?? null;
-            $month = $vals['month'] ?? null;
-            $amount = $vals['amount'] ?? 0;
-
-            if (!$categoryId || !$month) continue;
-
-            $amount = str_replace(',', '', $amount);
-            $amount = $amount === '' ? 0 : $amount;
-
-            $upsertRows[] = [
-                'category_id' => $categoryId,
-                'year' => $year,
-                'month' => $month,
-                'amount' => $amount,
-                'updated_at' => $now,
-                'created_at' => $now,
-            ];
-        }
-
-        Budget::upsert($upsertRows, ['category_id','year','month'], ['amount','updated_at']);
-
-        return redirect()->back()->with('success','Budgets saved.');
     }
 }

@@ -4,13 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\Transaction;
+use App\Models\Budget;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class TransactionController extends Controller
 {
+    use AuthorizesRequests;
+
     /**
      * Display a listing of the resource.
      */
@@ -29,7 +33,7 @@ class TransactionController extends Controller
         $maxYear = date('Y');
 
         $query = Transaction::with(['category', 'account'])
-            ->where('user_id', Auth::id()); // Only show user's own transactions
+            ->where('user_id', Auth::id());
 
         // Apply search filter
         if ($search) {
@@ -85,14 +89,13 @@ class TransactionController extends Controller
                     break;
                 case 'all':
                 default:
-                    // No filter, show all
                     break;
             }
         }
 
         $transactions = $query->latest('date')->latest('id')->paginate(50)->withQueryString();
 
-        // Calculate totals (only for user's transactions)
+        // Calculate totals
         $userTransactions = Transaction::where('user_id', Auth::id());
 
         $totalToday = (clone $userTransactions)->whereDate('date', today())->sum('amount');
@@ -113,7 +116,7 @@ class TransactionController extends Controller
             ->sum('amount');
         $totalAll = Transaction::where('user_id', Auth::id())->sum('amount');
 
-        // Get categories and accounts for filters (only user's own)
+        // Get categories and accounts for filters
         $categories = Category::where('user_id', Auth::id())
             ->orderBy('type')
             ->orderBy('name')
@@ -150,8 +153,6 @@ class TransactionController extends Controller
      */
     public function create()
     {
-        $this->authorize('create', Transaction::class);
-
         $categories = Category::where('user_id', Auth::id())->orderBy('name')->get();
         $accounts = \App\Models\Account::where('user_id', Auth::id())
             ->where('is_active', true)
@@ -176,7 +177,7 @@ class TransactionController extends Controller
             'account_id' => 'required|exists:accounts,id'
         ]);
 
-        // Verify account ownership FIRST
+        // Verify account ownership
         $account = \App\Models\Account::findOrFail($validated['account_id']);
         if ($account->user_id !== Auth::id()) {
             abort(403, 'Unauthorized access to this account.');
@@ -209,7 +210,7 @@ class TransactionController extends Controller
         DB::beginTransaction();
 
         try {
-            // Create transaction with user_id
+            // Create transaction
             $transaction = Transaction::create([
                 'user_id'        => Auth::id(),
                 'date'           => $validated['date'],
@@ -225,6 +226,9 @@ class TransactionController extends Controller
                 $transaction->account->updateBalance();
             }
 
+            // Auto-create or update budget entry
+            $this->updateBudgetFromTransaction($transaction);
+
             DB::commit();
 
             return redirect()->route('transactions.index')
@@ -235,6 +239,35 @@ class TransactionController extends Controller
             return back()->with('error', 'Failed to create transaction: ' . $e->getMessage())
                 ->withInput();
         }
+    }
+
+    /**
+     * Automatically create or update budget based on transaction
+     */
+    private function updateBudgetFromTransaction(Transaction $transaction)
+    {
+        // Use period_date if available, otherwise use transaction date
+        $date = $transaction->period_date ?? $transaction->date;
+        $year = Carbon::parse($date)->year;
+        $month = Carbon::parse($date)->month;
+
+        // Find or create budget entry
+        $budget = Budget::firstOrCreate(
+            [
+                'category_id' => $transaction->category_id,
+                'year' => $year,
+                'month' => $month,
+                'user_id' => $transaction->user_id
+            ],
+            [
+                'amount' => 0
+            ]
+        );
+
+        // Update budget amount by adding this transaction
+        // This creates a running total budget based on actual spending
+        $budget->amount += $transaction->amount;
+        $budget->save();
     }
 
     /**
