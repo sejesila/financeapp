@@ -11,6 +11,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->web(append: [
+            \App\Http\Middleware\CheckInactivity::class,
+            \App\Http\Middleware\EnsureResourceOwnership::class,
+
+        ]);
 
     })
     ->withExceptions(function (Exceptions $exceptions): void {

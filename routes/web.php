@@ -12,12 +12,12 @@ use Illuminate\Support\Facades\Route;
 
 // Authenticated routes
 Route::middleware(['auth'])->group(function () {
-// Home page - redirect to dashboard or login
+    // Home page - redirect to dashboard or login
     Route::get('/', function () {
         return redirect('/dashboard');
     });
 
-// Protected routes (require authentication)
+    // Protected routes (require authentication)
     Route::middleware('auth')->group(function () {
         // Dashboard
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
@@ -33,7 +33,7 @@ Route::middleware(['auth'])->group(function () {
 
         // Budgets
         Route::get('budgets/{year?}', [BudgetController::class, 'index'])->name('budgets.index');
-       // Route::post('budgets/update', [BudgetController::class, 'updateBulk'])->name('budgets.update');
+        // Route::post('budgets/update', [BudgetController::class, 'updateBulk'])->name('budgets.update');
 
         // Accounts
         Route::resource('accounts', AccountController::class);
@@ -56,6 +56,22 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
         Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
         Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+        // Session keep-alive endpoint (for session timeout management)
+        Route::post('/ping', function () {
+            if (auth()->check()) {
+                session(['last_activity_time' => time()]);
+                return response()->json(['status' => 'ok']);
+            }
+            return response()->json(['status' => 'unauthorized'], 401);
+        })->name('session.ping');
     });
 });
+
+// Optional: Session expired redirect route
+Route::get('/session-expired', function () {
+    return redirect()->route('login')
+        ->with('message', 'Your session has expired due to inactivity. Please login again.');
+})->name('session.expired');
+
 require __DIR__.'/auth.php';
