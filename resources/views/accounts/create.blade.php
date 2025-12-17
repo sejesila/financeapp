@@ -1,13 +1,15 @@
-@extends('layout')
-
-@section('content')
-    <div class="max-w-2xl mx-auto">
+<x-app-layout>
+    <x-slot name="header">
         <div class="flex items-center justify-between mb-6">
-            <h1 class="text-3xl font-bold">Create New Account</h1>
-            <a href="{{ route('accounts.index') }}" class="text-indigo-600 hover:text-indigo-800">
-                ← Back to Accounts
-            </a>
+        <h2 class="font-semibold text-lg sm:text-xl text-gray-800 dark:text-gray-200 leading-tight">
+            {{ __('Create New Account') }}
+        </h2>
+        <a href="{{ route('accounts.index') }}" class="text-indigo-600 hover:text-indigo-800">
+            ← Back to Accounts
+        </a>
         </div>
+    </x-slot>
+    <div class="max-w-2xl mx-auto">
 
         @if($errors->any())
             <div class="bg-red-100 text-red-700 p-4 rounded mb-6">
@@ -91,4 +93,4 @@
             </div>
         </form>
     </div>
-@endsection
+    </x-app-layout>
