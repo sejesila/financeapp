@@ -4,93 +4,131 @@
             <h2 class="font-semibold text-lg sm:text-xl text-gray-800 dark:text-gray-200 leading-tight">
                 {{ __('Transaction Details') }}
             </h2>
-            <a href="{{ route('transactions.index') }}" class="text-indigo-600 hover:text-indigo-800">
-                ← Back to Transactions
+            <a href="{{ route('transactions.index') }}"
+               class="inline-flex items-center text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors">
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+                {{ __('Back to Transactions') }}
             </a>
         </div>
     </x-slot>
-    <div class="max-w-4xl mx-auto px-4">
+
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <!-- Flash Messages -->
         @if(session('success'))
-            <div class="bg-green-100 text-green-700 p-4 rounded mb-6">
-                {{ session('success') }}
+            <div class="bg-green-50 border-l-4 border-green-400 text-green-800 p-4 rounded-lg mb-6 flex items-start" role="alert">
+                <svg class="w-5 h-5 mr-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                </svg>
+                <span>{{ session('success') }}</span>
             </div>
         @endif
 
         @if(session('error'))
-            <div class="bg-red-100 text-red-700 p-4 rounded mb-6">
-                {{ session('error') }}
+            <div class="bg-red-50 border-l-4 border-red-400 text-red-800 p-4 rounded-lg mb-6 flex items-start" role="alert">
+                <svg class="w-5 h-5 mr-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                </svg>
+                <span>{{ session('error') }}</span>
             </div>
         @endif
 
         <!-- Transaction Details Card -->
-        <div class="bg-white shadow rounded-lg p-6">
-            <!-- Amount (Featured) -->
-            <div class="text-center mb-6 pb-6 border-b">
-                <p class="text-sm text-gray-500 mb-2">{{ $transaction->date->format('D, d M Y') }}</p>
-                <p class="font-bold text-4xl {{ $transaction->category->type === 'income' ? 'text-green-600' : 'text-red-600' }}">
-                    {{ $transaction->category->type === 'income' ? '+' : '-' }}
-                    KES {{ number_format($transaction->amount, 0, '.', ',') }}
+        <div class="bg-white dark:bg-gray-800 shadow-lg rounded-xl overflow-hidden">
+            <!-- Amount Header (Featured) -->
+            <div class="text-center px-6 pt-8 pb-6 bg-gradient-to-br {{ $transaction->category->type === 'income' ? 'from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20' : 'from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20' }}">
+                <time datetime="{{ $transaction->date->format('Y-m-d') }}" class="block text-sm text-gray-600 dark:text-gray-400 mb-3 font-medium">
+                    {{ $transaction->date->format('l, F j, Y') }}
+                </time>
+
+                <p class="font-bold text-4xl sm:text-5xl {{ $transaction->category->type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }} mb-3">
+                    {{ $transaction->category->type === 'income' ? '+' : '−' }}
+                    <span class="tracking-tight">KES {{ number_format($transaction->amount, 0, '.', ',') }}</span>
                 </p>
-                <p class="text-gray-600 mt-2">{{ $transaction->description }}</p>
+
+                @if($transaction->description)
+                    <p class="text-gray-700 dark:text-gray-300 text-lg max-w-2xl mx-auto">
+                        {{ $transaction->description }}
+                    </p>
+                @endif
             </div>
 
-            <!-- Details Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-                @php
-                    $details = [
-                        'Account' => [
-                            'value' => $transaction->account->name,
-                            'link' => route('accounts.show', $transaction->account),
-                            'class' => 'text-blue-600 hover:text-blue-800 font-semibold'
-                        ],
-                        'Category' => [
-                            'badge' => $transaction->category->name,
-                            'badgeClass' => $transaction->category->type === 'income'
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-red-100 text-red-800'
-                        ],
-                        'Payment Method' => [
-                            'value' => $transaction->payment_method ?? 'N/A',
-                            'show' => $transaction->payment_method
-                        ],
-                        'Recorded' => [
-                            'value' => $transaction->created_at->format('D, d M Y \a\t H:i'),
-                            'class' => 'text-gray-600'
-                        ]
-                    ];
-                @endphp
+            <!-- Details Section -->
+            <div class="px-6 py-6">
+                <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">
+                    {{ __('Transaction Information') }}
+                </h3>
 
-                @foreach($details as $label => $item)
-                    @if(!isset($item['show']) || $item['show'])
-                        <div class="flex justify-between items-center py-2 border-b">
-                            <span class="text-sm text-gray-500">{{ $label }}</span>
+                <dl class="space-y-4">
+                    <!-- Account -->
+                    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center py-3 border-b border-gray-200 dark:border-gray-700">
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1 sm:mb-0">
+                            {{ __('Account') }}
+                        </dt>
+                        <dd class="text-sm sm:text-right">
+                            <a href="{{ route('accounts.show', $transaction->account) }}"
+                               class="inline-flex items-center text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-semibold transition-colors">
+                                {{ $transaction->account->name }}
+                                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </a>
+                        </dd>
+                    </div>
 
-                            @if(isset($item['badge']))
-                                <span class="px-3 py-1 rounded-full text-sm font-semibold {{ $item['badgeClass'] }}">
-                                    {{ $item['badge'] }}
-                                </span>
-                            @elseif(isset($item['link']))
-                                <a href="{{ $item['link'] }}" class="{{ $item['class'] }}">
-                                    {{ $item['value'] }}
-                                </a>
-                            @else
-                                <span class="{{ $item['class'] ?? 'font-semibold' }}">
-                                    {{ $item['value'] }}
-                                </span>
-                            @endif
-                        </div>
-                    @endif
-                @endforeach
+                    <!-- Category -->
+                    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center py-3 border-b border-gray-200 dark:border-gray-700">
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1 sm:mb-0">
+                            {{ __('Category') }}
+                        </dt>
+                        <dd class="text-sm">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold {{ $transaction->category->type === 'income' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300' }}">
+                                {{ $transaction->category->name }}
+                            </span>
+                        </dd>
+                    </div>
+
+                    <!-- Transaction ID -->
+                    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center py-3 border-b border-gray-200 dark:border-gray-700">
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1 sm:mb-0">
+                            {{ __('Transaction ID') }}
+                        </dt>
+                        <dd class="text-sm font-mono text-gray-700 dark:text-gray-300">
+                            #{{ str_pad($transaction->id, 6, '0', STR_PAD_LEFT) }}
+                        </dd>
+                    </div>
+
+                    <!-- Recorded -->
+                    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center py-3">
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1 sm:mb-0">
+                            {{ __('Recorded') }}
+                        </dt>
+                        <dd class="text-sm text-gray-600 dark:text-gray-400">
+                            <time datetime="{{ $transaction->created_at->toIso8601String() }}">
+                                {{ $transaction->created_at->format('F j, Y \a\t g:i A') }}
+                            </time>
+                        </dd>
+                    </div>
+                </dl>
             </div>
         </div>
 
         <!-- Info Note -->
-        <div class="mt-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
-            <p class="text-sm text-blue-800">
-                <strong>📝 Note:</strong> Transactions are permanent records and cannot be edited or deleted.
-                If you made a mistake, create a new correcting transaction with the opposite amount.
-            </p>
+        <div class="mt-6 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 dark:border-blue-400 p-4 rounded-lg">
+            <div class="flex items-start">
+                <svg class="w-5 h-5 text-blue-500 dark:text-blue-400 mr-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                    <p class="text-sm font-medium text-blue-900 dark:text-blue-200 mb-1">
+                        {{ __('Important Information') }}
+                    </p>
+                    <p class="text-sm text-blue-800 dark:text-blue-300">
+                        {{ __('Transactions are permanent records and cannot be edited or deleted. If you made a mistake, create a new correcting transaction with the opposite amount.') }}
+                    </p>
+                </div>
+            </div>
         </div>
     </div>
 </x-app-layout>

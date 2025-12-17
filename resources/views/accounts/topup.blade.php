@@ -26,39 +26,7 @@
             </div>
         @endif
 
-        <!-- Info Box -->
-        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
-            <p class="text-sm text-blue-800">
-                <strong>Note:</strong> If you're receiving a loan (M-Shwari, KCB M-Pesa, Fuliza, etc.), it's better to use the
-                <a href="{{ route('loans.create') }}?account_id={{ $account->id }}" class="underline font-semibold">
-                    Create Loan
-                </a> form to properly track repayments and interest.
-            </p>
-        </div>
 
-        <!-- Account Type Info -->
-        @if($account->type === 'bank')
-            <div class="bg-purple-50 border-l-4 border-purple-500 p-4 mb-6">
-                <p class="text-sm text-purple-800">
-                    <strong>Bank Account:</strong> Only salary income can be recorded for this account type.
-                    Other income types should be recorded on cash accounts.
-                </p>
-            </div>
-        @elseif($account->type === 'airtel_money')
-            <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
-                <p class="text-sm text-red-800">
-                    <strong>Airtel Money Account:</strong> Only income transactions can be recorded.
-                    Loans should be recorded on your M-Pesa account.
-                </p>
-            </div>
-        @elseif($account->type === 'mpesa')
-            <div class="bg-orange-50 border-l-4 border-orange-500 p-4 mb-6">
-                <p class="text-sm text-orange-800">
-                    <strong>M-Pesa Account:</strong> Salary income should be recorded on your bank account.
-                    Other income types and liabilities can be recorded here.
-                </p>
-            </div>
-        @endif
 
         <form method="POST" action="{{ route('accounts.topup.store', $account) }}" class="bg-white shadow rounded-lg p-6" id="topupForm">
             @csrf

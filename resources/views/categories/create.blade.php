@@ -1,6 +1,14 @@
-@extends('layout')
-
-@section('content')
+<x-app-layout>
+    <x-slot name="header">
+        <div class="flex items-center justify-between">
+            <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+                {{ __('Record New Loan') }}
+            </h2>
+            <a href="{{ route('categories.index') }}" class="text-indigo-600 hover:text-indigo-800">
+                ← Back to Categories
+            </a>
+        </div>
+    </x-slot>
     <div class="max-w-xl mx-auto mt-10">
 
         <h1 class="text-2xl font-bold mb-6">New Category</h1>
@@ -20,4 +28,4 @@
             <button class="bg-blue-600 text-white px-4 py-2 rounded">Save</button>
         </form>
     </div>
-@endsection
+    </x-app-layout>

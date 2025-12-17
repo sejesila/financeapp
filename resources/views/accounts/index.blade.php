@@ -85,9 +85,7 @@
                                 <p class="text-xl font-bold {{ $account->current_balance >= 0 ? 'text-green-600' : 'text-red-600' }}">
                                     KES {{ number_format($account->current_balance, 0, '.', ',') }}
                                 </p>
-                                <p class="text-xs text-gray-500 mt-1">
-                                    Opening: KES {{ number_format($account->initial_balance, 0, '.', ',') }}
-                                </p>
+
                             </div>
 
                             @if($account->notes)

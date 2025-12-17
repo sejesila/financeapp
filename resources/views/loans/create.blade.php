@@ -1,15 +1,16 @@
-@extends('layout')
-
-@section('content')
-    <div class="max-w-4xl mx-auto px-4">
-        <div class="flex items-center justify-between mb-6">
-            <h1 class="text-3xl font-bold">Record New Loan</h1>
+<x-app-layout>
+    <x-slot name="header">
+        <div class="flex items-center justify-between">
+            <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+                {{ __('Record New Loan') }}
+            </h2>
             <a href="{{ route('loans.index') }}" class="text-indigo-600 hover:text-indigo-800">
                 ← Back to Loans
             </a>
         </div>
-
-        @if(session('error'))
+    </x-slot>
+    <div class="max-w-4xl mx-auto px-4">
+                @if(session('error'))
             <div class="bg-red-100 text-red-700 p-4 rounded mb-6">
                 {{ session('error') }}
             </div>
@@ -479,4 +480,4 @@
         loanTypeSelect.addEventListener('change', updateBreakdown);
         window.addEventListener('load', updateBreakdown);
     </script>
-@endsection
+</x-app-layout>

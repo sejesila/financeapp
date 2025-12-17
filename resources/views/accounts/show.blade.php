@@ -43,7 +43,7 @@
                 </h2>
 
                 <div class="space-y-3">
-                   
+
                     @if($account->notes)
                         <div>
                             <p class="text-sm text-gray-600">Notes</p>
