@@ -25,19 +25,25 @@
 
             <!-- Account Info -->
             <div class="bg-white shadow rounded-lg p-6 mb-6">
-                <h2 class="text-xl font-semibold mb-4">Account Information</h2>
+                <h2 class="text-xl font-semibold mb-4 flex items-center gap-3">
+                    <!-- Logo based on account type -->
+                    <div class="w-10 h-10 rounded-full flex items-center justify-center bg-gray-100">
+                        @if(strtolower($account->type) === 'bank')
+                            <img src="{{ asset('images/imbank.jpeg') }}" alt="I&M Bank" class="w-8 h-8 object-contain">
+                        @elseif(strtolower($account->type) === 'mpesa')
+                            <img src="{{ asset('images/mpesa.png') }}" alt="M-Pesa" class="w-8 h-8 object-contain">
+                        @elseif(strtolower($account->type) === 'airtel_money')
+                            <img src="{{ asset('images/airtel-money.png') }}" alt="Airtel Money" class="w-8 h-8 object-contain">
+                        @else
+                            <span class="font-bold text-gray-700">{{ substr($account->name, 0, 1) }}</span>
+                        @endif
+                    </div>
+
+                    <p class="text-lg font-semibold">{{ $account->name }}</p>
+                </h2>
 
                 <div class="space-y-3">
-                    <div>
-                        <p class="text-sm text-gray-600">Account Name</p>
-                        <p class="text-lg font-semibold">{{ $account->name }}</p>
-                    </div>
-
-                    <div>
-                        <p class="text-sm text-gray-600">Account Type</p>
-                        <p class="text-lg font-semibold capitalize">{{ str_replace('_', ' ', $account->type) }}</p>
-                    </div>
-
+                   
                     @if($account->notes)
                         <div>
                             <p class="text-sm text-gray-600">Notes</p>
@@ -46,6 +52,7 @@
                     @endif
                 </div>
             </div>
+
 
             <!-- Balances (Read-only) -->
             <div class="mb-6 p-5 bg-blue-50 rounded-lg border border-blue-200">

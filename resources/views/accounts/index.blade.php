@@ -56,17 +56,26 @@
 
                             <!-- Header -->
                             <div class="flex items-center gap-3 mb-3">
-                                <div class="w-10 h-10 rounded-full flex items-center justify-center {{ $bgColor ?? 'bg-gray-100' }}">
-                                    {!! $icon ?? 'M' !!}
+                                <div class="w-10 h-10 rounded-full flex items-center justify-center bg-gray-100">
+                                    @if(strtolower($account->type) === 'bank')
+                                        <img src="{{ asset('images/imbank.jpeg') }}" alt="I&M Bank" class="w-8 h-8 object-contain">
+                                    @elseif(strtolower($account->type) === 'mpesa')
+                                        <img src="{{ asset('images/mpesa.png') }}" alt="M-Pesa" class="w-8 h-8 object-contain">
+                                    @elseif(strtolower($account->type) === 'airtel_money')
+                                        <img src="{{ asset('images/airtel-money.png') }}" alt="Airtel Money" class="w-8 h-8 object-contain">
+                                    @else
+                                        <span class="font-bold text-gray-700">{{ substr($account->name, 0, 1) }}</span>
+                                    @endif
                                 </div>
+
 
                                 <div class="min-w-0">
                                     <h3 class="font-semibold text-sm text-gray-800 dark:text-gray-200 truncate">
                                         {{ $account->name }}
                                     </h3>
-                                    <p class="text-xs text-gray-500 dark:text-gray-400 capitalize">
-                                        {{ str_replace('_', ' ', $account->type) }}
-                                    </p>
+{{--                                    <p class="text-xs text-gray-500 dark:text-gray-400 capitalize">--}}
+{{--                                        {{ str_replace('_', ' ', $account->type) }}--}}
+{{--                                    </p>--}}
                                 </div>
                             </div>
 
@@ -99,6 +108,7 @@
                                     Top Up
                                 </a>
 
+                                {{--
                                 <form method="POST"
                                       action="{{ route('accounts.destroy', $account) }}"
                                       onsubmit="return confirm('Are you sure? This action cannot be undone.');"
@@ -110,6 +120,7 @@
                                         Delete
                                     </button>
                                 </form>
+                                --}}
                             </div>
 
                         </div>
