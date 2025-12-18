@@ -25,6 +25,19 @@
                 </p>
             </div>
 
+            {{-- Toggle Button --}}
+            <div class="flex justify-end mb-4">
+                <button
+                    id="toggleBalance"
+                    class="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                >
+                    <svg id="eyeIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                    </svg>
+                    <span id="toggleText">Show Balance</span>
+                </button>
+            </div>
+
             {{-- NET WORTH OVERVIEW - 3 Main Cards --}}
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
                 {{-- Total Cash Card --}}
@@ -38,7 +51,13 @@
                         <span class="text-xs sm:text-sm font-medium" style="opacity: 0.9;">Total Cash</span>
                     </div>
                     <div class="space-y-1">
-                        <h3 class="text-2xl sm:text-3xl font-bold">KES {{ number_format($totalAssets, 0, '.', ',') }}</h3>
+                        <h3 class="text-2xl sm:text-3xl font-bold balance-amount hidden">KES {{ number_format($totalAssets, 0, '.', ',') }}</h3>
+                        <div class="flex items-center gap-2 balance-hidden">
+                            <h3 class="text-2xl sm:text-3xl font-bold">KES</h3>
+                            <svg class="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                            </svg>
+                        </div>
                         <p class="text-xs sm:text-sm" style="opacity: 0.8;">Across {{ $accounts->count() }} account{{ $accounts->count() != 1 ? 's' : '' }}</p>
                     </div>
                 </div>
@@ -54,7 +73,13 @@
                         <span class="text-xs sm:text-sm font-medium" style="opacity: 0.9;">Total Liabilities</span>
                     </div>
                     <div class="space-y-1">
-                        <h3 class="text-2xl sm:text-3xl font-bold">KES {{ number_format($totalLiabilities, 0, '.', ',') }}</h3>
+                        <h3 class="text-2xl sm:text-3xl font-bold balance-amount hidden">KES {{ number_format($totalLiabilities, 0, '.', ',') }}</h3>
+                        <div class="flex items-center gap-2 balance-hidden">
+                            <h3 class="text-2xl sm:text-3xl font-bold">KES</h3>
+                            <svg class="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                            </svg>
+                        </div>
                         <p class="text-xs sm:text-sm" style="opacity: 0.8;">{{ $activeLoans->count() }} active loan{{ $activeLoans->count() != 1 ? 's' : '' }}</p>
                     </div>
                 </div>
@@ -71,15 +96,21 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
                                         </svg>
                                     </div>
-                                    <span class="text-xs sm:text-sm font-medium" style="opacity: 0.9;">Net Worth</span>
+                                    <span class="text-xs sm:text-sm font-medium" style="opacity: 0.9;">Net Balance/span>
                                 </div>
                                 <div class="space-y-1">
-                                    <h3 class="text-2xl sm:text-3xl font-bold">KES {{ number_format($netWorth, 0, '.', ',') }}</h3>
-                                    <p class="text-xs sm:text-sm" style="opacity: 0.8;">Debt ratio: {{ number_format($debtToAssetRatio, 1) }}%</p>
+                                    <h3 class="text-2xl sm:text-3xl font-bold balance-amount hidden">KES {{ number_format($netWorth, 0, '.', ',') }}</h3>
+                                    <div class="flex items-center gap-2 balance-hidden">
+                                        <h3 class="text-2xl sm:text-3xl font-bold">KES</h3>
+                                        <svg class="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                                        </svg>
+                                    </div>
+                                    <p class="text-xs sm:text-sm balance-amount hidden" style="opacity: 0.8;">Debt ratio: {{ number_format($debtToAssetRatio, 1) }}%</p>
+                                    <p class="text-xs sm:text-sm balance-hidden" style="opacity: 0.8;">Debt ratio: Hidden</p>
                                 </div>
                             </div>
                     </div>
-
                     {{-- QUICK STATS - 4 Cards --}}
                     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
                         {{-- Today --}}
@@ -403,5 +434,42 @@
             </div>
         </div>
     </div>
+    {{-- JavaScript for Toggle --}}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggleBtn = document.getElementById('toggleBalance');
+            const toggleText = document.getElementById('toggleText');
+            const eyeIcon = document.getElementById('eyeIcon');
+            const balanceAmounts = document.querySelectorAll('.balance-amount');
+            const balanceHidden = document.querySelectorAll('.balance-hidden');
+
+            // Check localStorage for saved preference (default is hidden)
+            let isVisible = localStorage.getItem('balanceVisible') === 'true';
+
+            // Set initial state
+            updateVisibility();
+
+            toggleBtn.addEventListener('click', function() {
+                isVisible = !isVisible;
+                localStorage.setItem('balanceVisible', isVisible);
+                updateVisibility();
+            });
+
+            function updateVisibility() {
+                if (isVisible) {
+                    balanceAmounts.forEach(el => el.classList.remove('hidden'));
+                    balanceHidden.forEach(el => el.classList.add('hidden'));
+                    toggleText.textContent = 'Hide Balance';
+                    eyeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>';
+                } else {
+                    balanceAmounts.forEach(el => el.classList.add('hidden'));
+                    balanceHidden.forEach(el => el.classList.remove('hidden'));
+                    toggleText.textContent = 'Show Balance';
+                    eyeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>';
+                }
+            }
+        });
+    </script>
+
 
 </x-app-layout>
