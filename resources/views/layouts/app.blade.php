@@ -277,12 +277,16 @@
     // Session Timeout Management
     (function() {
         const sessionLifetime = {{ config('session.lifetime') }} * 60 * 1000; // Convert to milliseconds
-        const warningTime = 2 * 60 * 1000; // Show warning 2 minutes before expiry
+        const warningTime = 5 * 60 * 1000; // Show warning 5 minutes before expiry
+        const pingInterval = 5 * 60 * 1000; // Ping every 5 minutes
         let timeoutWarning;
         let sessionTimeout;
         let countdownInterval;
+        let pingTimer;
+        let lastActivity = Date.now();
 
         function resetTimer() {
+            lastActivity = Date.now();
             clearTimeout(timeoutWarning);
             clearTimeout(sessionTimeout);
 
@@ -297,7 +301,7 @@
             const modal = document.getElementById('timeoutWarning');
             modal.classList.remove('hidden');
 
-            let secondsLeft = 120; // 2 minutes
+            let secondsLeft = 300; // 5 minutes
             updateCountdown(secondsLeft);
 
             countdownInterval = setInterval(() => {
@@ -306,6 +310,7 @@
 
                 if (secondsLeft <= 0) {
                     clearInterval(countdownInterval);
+                    logout();
                 }
             }, 1000);
         }
@@ -323,36 +328,80 @@
         }
 
         function logout() {
-            window.location.href = '{{ route('logout') }}';
+            clearTimeout(timeoutWarning);
+            clearTimeout(sessionTimeout);
+            clearInterval(countdownInterval);
+            clearInterval(pingTimer);
+            window.location.href = '{{ route('session.expired') }}';
         }
 
         function stayLoggedIn() {
             hideWarning();
+            pingServer(true);
+        }
 
-            // Ping server to refresh session
-            fetch('{{ url('/ping') }}', {
+        function pingServer(userInitiated = false) {
+            fetch('{{ route('session.ping') }}', {
                 method: 'POST',
                 headers: {
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                    'Content-Type': 'application/json'
-                }
-            }).then(() => {
-                resetTimer();
-            });
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            })
+                .then(response => {
+                    if (response.status === 401) {
+                        logout();
+                    } else if (userInitiated) {
+                        resetTimer();
+                    }
+                })
+                .catch(error => {
+                    console.error('Session ping failed:', error);
+                });
         }
 
         // Event listeners for user activity
-        const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+        const events = ['mousedown', 'keypress', 'scroll', 'touchstart', 'click'];
         events.forEach(event => {
-            document.addEventListener(event, resetTimer, true);
+            document.addEventListener(event, () => {
+                const now = Date.now();
+                // Only reset if it's been more than 10 seconds since last activity
+                if (now - lastActivity > 10000) {
+                    resetTimer();
+                }
+            }, { passive: true });
         });
 
         // Button handlers
-        document.getElementById('stayLoggedIn').addEventListener('click', stayLoggedIn);
-        document.getElementById('logoutNow').addEventListener('click', logout);
+        document.getElementById('stayLoggedIn')?.addEventListener('click', stayLoggedIn);
+        document.getElementById('logoutNow')?.addEventListener('click', logout);
 
-        // Initialize timer
+        // Start periodic ping to keep session alive
+        pingTimer = setInterval(() => {
+            pingServer(false);
+        }, pingInterval);
+
+        // Initialize timer and do initial ping
         resetTimer();
+        pingServer(false);
+
+        // Handle 419 CSRF errors globally
+        const originalFetch = window.fetch;
+        window.fetch = function(...args) {
+            return originalFetch.apply(this, args).then(response => {
+                if (response.status === 419) {
+                    // CSRF token mismatch
+                    if (confirm('Your session has expired. Reload the page to continue?')) {
+                        window.location.reload();
+                    } else {
+                        window.location.href = '{{ route('login') }}';
+                    }
+                }
+                return response;
+            });
+        };
     })();
 </script>
 </body>
