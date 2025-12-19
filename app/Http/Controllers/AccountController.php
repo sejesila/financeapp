@@ -182,6 +182,7 @@ class AccountController extends Controller
             'amount' => 'required|numeric|min:0.01',
             'date' => 'required|date',
             'description' => 'nullable|string',
+
         ]);
 
         // Verify both accounts belong to the user
@@ -201,8 +202,18 @@ class AccountController extends Controller
                     . ", Transfer amount: " . number_format($request->amount, 0, '.', ','));
         }
 
+
         // Create transfer record
-        $transfer = Transfer::create($request->all());
+        $transfer = Transfer::create([
+
+            'from_account_id' => $request->from_account_id,
+            'to_account_id' => $request->to_account_id,
+            'amount' => $request->amount,
+            'date' => $request->date,
+            'description' => $request->description,
+            'user_id' => auth()->id(),
+
+        ]);
 
         // Update account balances
         $fromAccount->updateBalance();

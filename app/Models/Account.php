@@ -97,6 +97,7 @@ class Account extends Model
 class Transfer extends Model
 {
     protected $fillable = [
+        'user_id',
         'from_account_id',
         'to_account_id',
         'amount',
@@ -118,4 +119,14 @@ class Transfer extends Model
     {
         return $this->belongsTo(Account::class, 'to_account_id');
     }
+    protected static function booted()
+    {
+        static::addGlobalScope('ownedByUser', function ($builder) {
+            if (Auth::check()) {
+                $table = $builder->getModel()->getTable();
+                $builder->where("{$table}.user_id", Auth::id());
+            }
+        });
+    }
+
 }
