@@ -219,4 +219,5 @@
 
         </div>
     </div>
+    <x-floating-action-button :quickAccount="$accounts->first()" />
 </x-app-layout>

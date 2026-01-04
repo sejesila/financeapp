@@ -2,14 +2,15 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class Account extends Model
 {
     protected $fillable = [
         'name',
+        'slug',
         'type',
         'initial_balance',
         'current_balance',
@@ -24,6 +25,15 @@ class Account extends Model
         'current_balance' => 'decimal:2',
         'is_active' => 'boolean',
     ];
+
+    /**
+     * Get the route key for the model.
+     */
+    public function getRouteKeyName()
+    {
+        return 'slug';
+    }
+
     public function user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -35,6 +45,38 @@ class Account extends Model
             if (Auth::check()) {
                 $table = $builder->getModel()->getTable();
                 $builder->where("{$table}.user_id", Auth::id());
+            }
+        });
+
+        // Auto-generate slug when creating account
+        static::creating(function ($account) {
+            if (empty($account->slug)) {
+                $account->slug = Str::slug($account->name);
+
+                // Ensure uniqueness for the user
+                $originalSlug = $account->slug;
+                $count = 1;
+                while (static::withoutGlobalScopes()->where('slug', $account->slug)
+                    ->where('user_id', $account->user_id)
+                    ->exists()) {
+                    $account->slug = $originalSlug . '-' . $count++;
+                }
+            }
+        });
+
+        // Auto-update slug when name changes
+        static::updating(function ($account) {
+            if ($account->isDirty('name')) {
+                $account->slug = Str::slug($account->name);
+
+                $originalSlug = $account->slug;
+                $count = 1;
+                while (static::withoutGlobalScopes()->where('slug', $account->slug)
+                    ->where('user_id', $account->user_id)
+                    ->where('id', '!=', $account->id)
+                    ->exists()) {
+                    $account->slug = $originalSlug . '-' . $count++;
+                }
             }
         });
     }
@@ -59,7 +101,6 @@ class Account extends Model
         return $this->hasMany(Loan::class);
     }
 
-    // Update balance based on ACTIVE transactions only
     // Update balance based on ACTIVE transactions only
     public function updateBalance()
     {
@@ -91,42 +132,4 @@ class Account extends Model
 
         $this->save();
     }
-
-}
-
-class Transfer extends Model
-{
-    protected $fillable = [
-        'user_id',
-        'from_account_id',
-        'to_account_id',
-        'amount',
-        'date',
-        'description'
-    ];
-
-    protected $casts = [
-        'amount' => 'decimal:2',
-        'date' => 'date',
-    ];
-
-    public function fromAccount()
-    {
-        return $this->belongsTo(Account::class, 'from_account_id');
-    }
-
-    public function toAccount()
-    {
-        return $this->belongsTo(Account::class, 'to_account_id');
-    }
-    protected static function booted()
-    {
-        static::addGlobalScope('ownedByUser', function ($builder) {
-            if (Auth::check()) {
-                $table = $builder->getModel()->getTable();
-                $builder->where("{$table}.user_id", Auth::id());
-            }
-        });
-    }
-
 }

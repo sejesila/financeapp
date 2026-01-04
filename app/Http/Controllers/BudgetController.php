@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Budget;
 use App\Models\Category;
-use App\Models\Transaction;
 use App\Models\Loan;
+use App\Models\Transaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -102,6 +102,11 @@ class BudgetController extends Controller
 
         // Get loan statistics for the year
         $loanStats = $this->getLoanStats($year);
+        // Get accounts for the FAB component
+        $accounts = \App\Models\Account::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
 
         return view('budgets.index', compact(
             'incomeCategories',
@@ -112,7 +117,8 @@ class BudgetController extends Controller
             'currentMonth',
             'loanStats',
             'minYear',
-            'maxYear'
+            'maxYear',
+            'accounts'
         ));
     }
 

@@ -24,12 +24,123 @@
 
         {{-- Flash Messages --}}
         @foreach (['success' => 'green', 'error' => 'red'] as $key => $color)
-            @if(session($key))
+            @if(session($key) && !session('show_balance_modal'))
                 <div class="rounded-md bg-{{ $color }}-100 px-4 py-3 text-{{ $color }}-700 text-sm">
                     {{ session($key) }}
                 </div>
             @endif
         @endforeach
+
+        {{-- Balance Modal --}}
+        @if(session('show_balance_modal'))
+            <div id="balanceModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+                <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-auto animate-fade-in">
+                    <div class="p-6">
+                        {{-- Icon --}}
+                        <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full
+                        {{ session('transaction_type') === 'expense' ? 'bg-red-100' : (session('transaction_type') === 'liability' ? 'bg-yellow-100' : 'bg-green-100') }}">
+                            @if(session('transaction_type') === 'expense')
+                                <svg class="h-8 w-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+                                </svg>
+                            @elseif(session('transaction_type') === 'liability')
+                                <svg class="h-8 w-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            @else
+                                <svg class="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+                                </svg>
+                            @endif
+                        </div>
+
+                        {{-- Title --}}
+                        <h3 class="text-xl font-bold text-gray-900 text-center mt-4">
+                            Transaction Successful!
+                        </h3>
+
+                        {{-- Account Name --}}
+                        <p class="text-center text-gray-600 mt-2 font-medium">
+                            {{ session('account_name') }}
+                        </p>
+
+                        {{-- Balance Details --}}
+                        <div class="mt-6 space-y-3 bg-gray-50 p-4 rounded-lg">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-600">Previous Balance:</span>
+                                <span class="font-semibold text-gray-900">KES {{ session('old_balance') }}</span>
+                            </div>
+
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-600">Transaction:</span>
+                                <span class="font-semibold {{ session('transaction_type') === 'expense' ? 'text-red-600' : 'text-green-600' }}">
+                                {{ session('transaction_type') === 'expense' ? '−' : '+' }} KES {{ session('transaction_amount') }}
+                            </span>
+                            </div>
+
+                            <div class="border-t border-gray-200 pt-3 flex justify-between items-center">
+                                <span class="text-base font-bold text-gray-900">New Balance:</span>
+                                <span class="font-bold text-2xl {{ floatval(str_replace(',', '', session('new_balance'))) < 0 ? 'text-red-600' : 'text-green-600' }}">
+                                KES {{ session('new_balance') }}
+                            </span>
+                            </div>
+                        </div>
+
+                        {{-- Close Button --}}
+                        <div class="mt-6">
+                            <button id="closeModal"
+                                    class="w-full px-4 py-3 bg-indigo-600 text-white text-base font-medium rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <style>
+                @keyframes fadeIn {
+                    from {
+                        opacity: 0;
+                        transform: scale(0.95);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: scale(1);
+                    }
+                }
+                .animate-fade-in {
+                    animation: fadeIn 0.2s ease-out;
+                }
+            </style>
+
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    const modal = document.getElementById('balanceModal');
+                    const closeBtn = document.getElementById('closeModal');
+
+                    if (modal && closeBtn) {
+                        // Close on button click
+                        closeBtn.addEventListener('click', function() {
+                            modal.style.display = 'none';
+                        });
+
+                        // Close on outside click
+                        modal.addEventListener('click', function(e) {
+                            if (e.target === modal) {
+                                modal.style.display = 'none';
+                            }
+                        });
+
+                        // Close on Escape key
+                        document.addEventListener('keydown', function(e) {
+                            if (e.key === 'Escape') {
+                                modal.style.display = 'none';
+                            }
+                        });
+                    }
+                });
+            </script>
+        @endif
 
         {{-- Summary Cards --}}
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
@@ -229,4 +340,5 @@
         </div>
 
     </div>
+    <x-floating-action-button :quickAccount="$accounts->first()" />
 </x-app-layout>

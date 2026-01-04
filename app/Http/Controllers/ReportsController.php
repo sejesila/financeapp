@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Category;
 use App\Models\Transaction;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class ReportsController extends Controller
 {
@@ -99,6 +99,11 @@ class ReportsController extends Controller
         $expenseChange = $previousExpenses > 0
             ? round((($totalExpenses - $previousExpenses) / $previousExpenses) * 100, 1)
             : 0;
+        // Get accounts for the FAB component
+        $accounts = \App\Models\Account::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
 
         return view('reports.index', compact(
             'filter',
@@ -111,7 +116,8 @@ class ReportsController extends Controller
             'netCashFlow',
             'topCategories',
             'previousExpenses',
-            'expenseChange'
+            'expenseChange',
+            'accounts'
         ));
     }
 }

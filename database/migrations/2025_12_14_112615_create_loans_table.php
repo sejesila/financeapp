@@ -12,12 +12,13 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade'); // 👈 link to users
             $table->foreignId('account_id')->constrained()->onDelete('cascade');
-            $table->string('source'); // M-Shwari, KCB-Mpesa, Fuliza, Branch, etc.
+            $table->string('source'); // M-Shwari, KCB-Mpesa, Fuliza, etc.
 
             // Principal & Interest
             $table->decimal('principal_amount', 10, 2);
             $table->decimal('interest_rate', 5, 2)->nullable();
             $table->decimal('interest_amount', 10, 2)->nullable();
+            $table->decimal('facility_fee', 10, 2)->nullable();
             $table->decimal('total_amount', 10, 2);
 
             // Payment tracking
@@ -35,6 +36,8 @@ return new class extends Migration
             // Additional info
             $table->text('notes')->nullable();
             $table->string('loan_type')->default('mshwari');
+            $table->boolean('is_custom')->default(false);
+            $table->decimal('custom_interest_amount', 10, 2)->nullable();
 
             $table->timestamps();
 
@@ -44,26 +47,7 @@ return new class extends Migration
             $table->index('disbursed_date');
         });
 
-        Schema::create('loan_payments', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade'); // 👈 link to users
-            $table->foreignId('loan_id')->constrained()->onDelete('cascade');
-            $table->foreignId('account_id')->constrained()->onDelete('cascade');
 
-            $table->decimal('amount', 10, 2);
-            $table->decimal('principal_portion', 10, 2)->default(0);
-            $table->decimal('interest_portion', 10, 2)->default(0);
-
-            $table->date('payment_date');
-            $table->foreignId('transaction_id')->nullable()->constrained()->onDelete('set null');
-
-            $table->text('notes')->nullable();
-            $table->timestamps();
-
-            // Indexes
-            $table->index('loan_id');
-            $table->index('payment_date');
-        });
 
     }
 

@@ -3,13 +3,13 @@
 namespace App\Providers;
 
 use App\Models\Account;
+use App\Models\Category;
 use App\Models\Loan;
 use App\Models\Transaction;
-use App\Models\Category;
 use App\Policies\AccountPolicy;
+use App\Policies\CategoryPolicy;
 use App\Policies\LoanPolicy;
 use App\Policies\TransactionPolicy;
-use App\Policies\CategoryPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 
 class AuthServiceProvider extends ServiceProvider

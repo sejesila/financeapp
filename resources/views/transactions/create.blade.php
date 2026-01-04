@@ -93,18 +93,21 @@
                 <select name="account_id" class="w-full border p-2 rounded focus:outline-none focus:border-indigo-500"
                         required>
                     <option value="">-- Select Account --</option>
+                    @php
+                        // Find Mpesa account for preselection
+                        $mpesaAccount = $accounts->where('type', 'mpesa')->first();
+                        $defaultAccountId = old('account_id') ?: ($mpesaAccount ? $mpesaAccount->id : null);
+                    @endphp
                     @foreach($accounts as $account)
-                        <option value="{{ $account->id }}" {{ old('account_id') == $account->id ? 'selected' : '' }}>
+                        <option value="{{ $account->id }}"
+                            {{ $defaultAccountId == $account->id ? 'selected' : '' }}>
                             @if($account->type == 'cash')
                                 💵
-                            @endif
-                            @if($account->type == 'mpesa')
+                            @elseif($account->type == 'mpesa')
                                 📱
-                            @endif
-                            @if($account->type == 'airtel_money')
+                            @elseif($account->type == 'airtel_money')
                                 📲
-                            @endif
-                            @if($account->type == 'bank')
+                            @elseif($account->type == 'bank')
                                 🏦
                             @endif
                             {{ $account->name }} ({{ number_format($account->current_balance, 0, '.', ',') }})
@@ -116,11 +119,9 @@
 
             <!-- Submit -->
             <div class="flex items-center justify-between">
-                <a
-                    href="{{ route('transactions.index') }}"
-                    class="text-gray-600 hover:text-gray-800"
+                <a href="{{ route('transactions.index') }}"    class="text-gray-600 hover:text-gray-800"
                 >
-                    Cancel
+                Cancel
                 </a>
                 <button
                     type="submit"

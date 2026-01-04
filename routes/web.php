@@ -16,11 +16,6 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 |--------------------------------------------------------------------------
 | Web Routes
 |--------------------------------------------------------------------------
-|
-| Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider within a group which
-| contains the "web" middleware group. Now ensure sessions and auth work.
-|
 */
 
 // -------------------------
@@ -63,14 +58,16 @@ Route::middleware(['web', 'auth'])->group(function () {
 
     // Budgets
     Route::get('budgets/{year?}', [BudgetController::class, 'index'])->name('budgets.index');
-    // Route::post('budgets/update', [BudgetController::class, 'updateBulk'])->name('budgets.update');
 
-    // Accounts
-    Route::resource('accounts', AccountController::class);
+    // Accounts - IMPORTANT: Specific routes MUST come BEFORE resource routes
     Route::get('accounts/transfer/form', [AccountController::class, 'transferForm'])->name('accounts.transfer');
     Route::post('accounts/transfer', [AccountController::class, 'transfer'])->name('accounts.transferPost');
     Route::get('/accounts/{account}/topup', [AccountController::class, 'topUpForm'])->name('accounts.topup');
     Route::post('/accounts/{account}/topup', [AccountController::class, 'topUp'])->name('accounts.topup.store');
+    Route::post('/accounts/{account}/adjust-balance', [AccountController::class, 'adjustBalance'])->name('accounts.adjustBalance');
+
+    // Accounts resource routes (these use slug automatically)
+    Route::resource('accounts', AccountController::class);
 
     // Loans
     Route::get('/loans', [LoanController::class, 'index'])->name('loans.index');
@@ -87,7 +84,7 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    // Session keep-alive endpoint (for session timeout management)
+    // Session keep-alive endpoint
     Route::post('/ping', function () {
         if (auth()->check()) {
             session(['last_activity_time' => time()]);

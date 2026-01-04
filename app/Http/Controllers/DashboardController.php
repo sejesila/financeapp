@@ -3,11 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Account;
+use App\Models\Budget;
 use App\Models\Loan;
 use App\Models\Transaction;
-use App\Models\Category;
-use App\Models\Budget;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -177,7 +175,8 @@ class DashboardController extends Controller
             'monthlyComparison',
             'monthlyComparisonPercent',
             'recentTransactions',
-            'budgets'
+            'budgets',
+            'accounts'
         ));
     }
 }

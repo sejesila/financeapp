@@ -2,8 +2,8 @@
 
 namespace App\Observers;
 
-use App\Models\User;
 use App\Models\Category;
+use App\Models\User;
 
 class UserObserver
 {

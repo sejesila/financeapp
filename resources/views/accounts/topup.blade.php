@@ -154,9 +154,12 @@
             if (name.includes('mshwari') || name.includes('m-shwari')) {
                 return 'mshwari';
             }
+            if (name.includes('other') || name.includes('mother')) {
+                return 'other';
+            }
 
             // Default to mshwari for other loan types
-            return 'mshwari';
+            return 'other';
         }
 
         // Check on form submit if liability category is selected

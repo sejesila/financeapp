@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Budget;
 use App\Models\Category;
 use App\Models\Transaction;
-use App\Models\Budget;
+use Carbon\Carbon;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class TransactionController extends Controller
 {
@@ -198,6 +198,9 @@ class TransactionController extends Controller
                     . ", Required: " . number_format($validated['amount'], 0, '.', ','));
         }
 
+        // Store old balance before transaction
+        $oldBalance = $account->current_balance;
+
         // Auto-set payment method based on account type
         $paymentMethod = match($account->type) {
             'cash' => 'Cash',
@@ -224,6 +227,8 @@ class TransactionController extends Controller
             // Update account balance
             if ($transaction->account) {
                 $transaction->account->updateBalance();
+                // Refresh to get updated balance
+                $transaction->account->refresh();
             }
 
             // Auto-create or update budget entry
@@ -231,8 +236,15 @@ class TransactionController extends Controller
 
             DB::commit();
 
+            // Pass balance information to the view
             return redirect()->route('transactions.index')
-                ->with('success', 'Transaction recorded successfully');
+                ->with('success', 'Transaction recorded successfully')
+                ->with('show_balance_modal', true)
+                ->with('account_name', $account->name)
+                ->with('old_balance', number_format($oldBalance, 2))
+                ->with('new_balance', number_format($transaction->account->current_balance, 2))
+                ->with('transaction_amount', number_format($validated['amount'], 2))
+                ->with('transaction_type', $category->type);
 
         } catch (\Exception $e) {
             DB::rollBack();

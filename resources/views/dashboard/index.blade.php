@@ -470,6 +470,8 @@
             }
         });
     </script>
+    {{-- Add FAB at the end, before closing x-app-layout --}}
+    <x-floating-action-button :quickAccount="$accounts->first()" />
 
 
 </x-app-layout>

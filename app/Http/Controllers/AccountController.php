@@ -3,10 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Account;
+use App\Models\Category;
 use App\Models\Transaction;
 use App\Models\Transfer;
 use Illuminate\Http\Request;
-use App\Models\Category;
 use Illuminate\Support\Facades\Auth;
 
 class AccountController extends Controller
@@ -29,8 +29,13 @@ class AccountController extends Controller
             ->latest()
             ->limit(10)
             ->get();
+        // Get accounts for the FAB component
+        $accounts = \App\Models\Account::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
 
-        return view('accounts.index', compact('accounts', 'totalBalance', 'recentTransfers'));
+        return view('accounts.index', compact('accounts', 'totalBalance', 'recentTransfers','accounts'));
     }
 
     public function create()

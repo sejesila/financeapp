@@ -19,7 +19,7 @@
                        class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded text-sm text-center w-full sm:w-auto">
                         ↔ Transfer Money
                     </a>
-                    @if ($accounts->count() < 3)
+                    @if ($accounts->count() < 4)
                         <a href="{{ route('accounts.create') }}"
                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm text-center w-full sm:w-auto">
                             + Add Account
@@ -165,4 +165,5 @@
 
         </div>
     </div>
+    <x-floating-action-button :quickAccount="$accounts->first()" />
 </x-app-layout>
