@@ -172,60 +172,89 @@ class AccountController extends Controller
 
     public function transferForm()
     {
-        $accounts = Account::where('user_id', Auth::id())
+        if (auth()->user()->accounts()->count() < 2) {
+            return redirect()
+                ->route('accounts.index')
+                ->with('error', 'You need at least two accounts to transfer money.');
+        }
+
+        // Accounts that CAN be a source (balance >= 1)
+        $sourceAccounts = Account::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->where('current_balance', '>=', 1)
+            ->get();
+
+        // All active accounts can be destinations
+        $destinationAccounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
             ->get();
 
-        return view('accounts.transfer', compact('accounts'));
+        return view('accounts.transfer', compact('sourceAccounts', 'destinationAccounts'));
     }
+
+
 
     public function transfer(Request $request)
     {
+        if (auth()->user()->accounts()->count() < 2) {
+            return redirect()
+                ->route('accounts.index')
+                ->with('error', 'You need at least two accounts to transfer money.');
+        }
+
         $request->validate([
             'from_account_id' => 'required|exists:accounts,id|different:to_account_id',
-            'to_account_id' => 'required|exists:accounts,id',
-            'amount' => 'required|numeric|min:0.01',
-            'date' => 'required|date',
-            'description' => 'nullable|string',
-
+            'to_account_id'   => 'required|exists:accounts,id',
+            'amount'          => 'required|numeric|min:0.01',
+            'date'            => 'required|date',
+            'description'     => 'nullable|string',
         ]);
 
-        // Verify both accounts belong to the user
+        // 🔹 Fetch accounts ONCE
         $fromAccount = Account::findOrFail($request->from_account_id);
-        $toAccount = Account::findOrFail($request->to_account_id);
+        $toAccount   = Account::findOrFail($request->to_account_id);
 
+        // 🔐 Ownership check
         if ($fromAccount->user_id !== Auth::id() || $toAccount->user_id !== Auth::id()) {
             abort(403, 'Unauthorized access to one or both accounts.');
         }
 
-        // Check if source account has sufficient balance
+        // 🚫 Block low-balance source accounts
+        if ($fromAccount->current_balance < 1) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with('error', 'The selected source account does not have sufficient balance.');
+        }
+
+        // Check if the source account has sufficient balance
         if ($fromAccount->current_balance < $request->amount) {
             return redirect()->back()
                 ->withInput()
-                ->with('error', "Insufficient balance in {$fromAccount->name}. Current balance: "
+                ->withErrors(['amount' => "Insufficient balance in {$fromAccount->name}. Current balance: "
                     . number_format($fromAccount->current_balance, 0, '.', ',')
-                    . ", Transfer amount: " . number_format($request->amount, 0, '.', ','));
+                    . ", Transfer amount: " . number_format($request->amount, 0, '.', ',')]);
         }
 
-
-        // Create transfer record
-        $transfer = Transfer::create([
-
-            'from_account_id' => $request->from_account_id,
-            'to_account_id' => $request->to_account_id,
-            'amount' => $request->amount,
-            'date' => $request->date,
-            'description' => $request->description,
-            'user_id' => auth()->id(),
-
+        // ✅ Create transfer
+        Transfer::create([
+            'from_account_id' => $fromAccount->id,
+            'to_account_id'   => $toAccount->id,
+            'amount'          => $request->amount,
+            'date'            => $request->date,
+            'description'     => $request->description,
+            'user_id'         => auth()->id(),
         ]);
 
-        // Update account balances
+        // 🔄 Update balances
         $fromAccount->updateBalance();
         $toAccount->updateBalance();
 
-        return redirect()->route('accounts.index')->with('success', 'Transfer completed successfully!');
+        return redirect()
+            ->route('accounts.index')
+            ->with('success', 'Transfer completed successfully!');
     }
+
 
     public function topUpForm(Account $account)
     {

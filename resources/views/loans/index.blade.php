@@ -109,10 +109,24 @@
                                     <td class="px-4 py-3 text-gray-900 dark:text-gray-100 font-medium">{{ $loan->source }}</td>
                                     <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ $loan->account->name ?? 'N/A' }}</td>
                                     <td class="px-4 py-3">
-                                        <span class="px-2 py-1 text-xs rounded-full
-                                            {{ $loan->loan_type === 'kcb_mpesa' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300' }}">
-                                            {{ $loan->loan_type === 'kcb_mpesa' ? 'KCB M-Pesa' : 'M-Shwari' }}
-                                        </span>
+                                        @php
+                                            $loanStyles = match($loan->loan_type) {
+                                                'kcb_mpesa' => 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300',
+                                                'other'     => 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300',
+                                                default     => 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300', // M-Shwari
+                                            };
+
+                                            $loanLabel = match($loan->loan_type) {
+                                                'kcb_mpesa' => 'KCB M-Pesa',
+                                                'other'     => 'Other',
+                                                default     => 'M-Shwari',
+                                            };
+                                        @endphp
+
+                                        <span class="px-2 py-1 text-xs rounded-full {{ $loanStyles }}">
+    {{ $loanLabel }}
+</span>
+
                                     </td>
                                     <td class="px-4 py-3 text-right text-gray-900 dark:text-gray-100 font-medium">{{ number_format($loan->principal_amount, 0, '.', ',') }}</td>
                                     <td class="px-4 py-3 text-right text-gray-900 dark:text-gray-100">{{ number_format($loan->total_amount, 0, '.', ',') }}</td>
