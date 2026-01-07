@@ -49,7 +49,6 @@ class MonthlyReportMail extends Mailable
             ]);
 
             $filename = 'monthly-report-' . now()->format('M-d-Y') . '.pdf';
-            // Result: weekly-report-Jan-07-2026.pdf
 
             $attachments[] = Attachment::fromData(fn () => $pdf->output(), $filename)
                 ->withMime('application/pdf');
