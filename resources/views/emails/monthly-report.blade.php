@@ -6,7 +6,7 @@
     <title>Monthly Financial Report</title>
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: Arial, sans-serif;
             line-height: 1.6;
             color: #333;
             max-width: 600px;
@@ -16,442 +16,125 @@
         }
         .container {
             background: white;
-            border-radius: 10px;
             padding: 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 5px;
         }
         .header {
-            text-align: center;
-            padding-bottom: 20px;
-            border-bottom: 3px solid #8B5CF6;
+            border-bottom: 2px solid #8B5CF6;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
         }
         .header h1 {
             color: #8B5CF6;
             margin: 0;
-            font-size: 28px;
+            font-size: 22px;
         }
-        .period {
-            color: #666;
+        .content {
             font-size: 14px;
-            margin-top: 5px;
+            line-height: 1.8;
         }
-        .summary {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-            margin: 30px 0;
-        }
-        .summary-card {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            text-align: center;
-            border-left: 4px solid #8B5CF6;
-        }
-        .summary-card.positive {
-            border-left-color: #10B981;
-        }
-        .summary-card.negative {
-            border-left-color: #EF4444;
-        }
-        .summary-card h3 {
-            margin: 0 0 10px 0;
-            font-size: 14px;
-            color: #666;
-            text-transform: uppercase;
-        }
-        .summary-card .amount {
-            font-size: 24px;
-            font-weight: bold;
-            color: #333;
-        }
-        .net-worth-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 25px;
-            border-radius: 10px;
-            text-align: center;
-            margin: 30px 0;
-        }
-        .net-worth-card h3 {
-            margin: 0 0 15px 0;
-            font-size: 16px;
-            opacity: 0.9;
-        }
-        .net-worth-card .amount {
-            font-size: 36px;
-            font-weight: bold;
-            margin-bottom: 10px;
-        }
-        .net-worth-card .subtext {
-            font-size: 14px;
-            opacity: 0.8;
-        }
-        .section {
-            margin: 30px 0;
-        }
-        .section-title {
-            font-size: 18px;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #e5e7eb;
-        }
-        .table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 15px 0;
-        }
-        .table th {
-            background: #f8f9fa;
-            padding: 12px;
-            text-align: left;
-            font-size: 12px;
-            color: #666;
-            text-transform: uppercase;
-        }
-        .table td {
-            padding: 12px;
-            border-bottom: 1px solid #e5e7eb;
-        }
-        .budget-item {
+        .info-box {
             background: #f8f9fa;
             padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            border-left: 4px solid #8B5CF6;
-        }
-        .budget-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .budget-name {
-            font-weight: 600;
-            font-size: 16px;
-        }
-        .budget-amounts {
-            display: flex;
-            justify-content: space-between;
-            font-size: 14px;
-            margin-bottom: 8px;
-        }
-        .progress-bar {
-            height: 8px;
-            background: #e5e7eb;
-            border-radius: 4px;
-            overflow: hidden;
-        }
-        .progress-fill {
-            height: 100%;
-            background: #10B981;
-            transition: width 0.3s ease;
-        }
-        .progress-fill.warning {
-            background: #F59E0B;
-        }
-        .progress-fill.danger {
-            background: #EF4444;
-        }
-        .category-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px;
-            background: #f8f9fa;
-            border-radius: 6px;
-            margin-bottom: 10px;
-        }
-        .category-name {
-            font-weight: 500;
-        }
-        .category-amount {
-            font-weight: bold;
-            color: #EF4444;
-        }
-        .insight-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-        }
-        .insight-card h4 {
-            margin: 0 0 10px 0;
-            font-size: 16px;
-        }
-        .insight-card p {
-            margin: 5px 0;
-            opacity: 0.9;
-        }
-        .stat-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
+            border-radius: 5px;
             margin: 20px 0;
+            border-left: 4px solid #8B5CF6;
         }
-        .stat-box {
-            background: #f8f9fa;
+        .info-box p {
+            margin: 5px 0;
+        }
+        .password-notice {
+            background: #FEF3C7;
             padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-        }
-        .stat-box .label {
-            font-size: 12px;
-            color: #666;
-            text-transform: uppercase;
-            margin-bottom: 8px;
-        }
-        .stat-box .value {
-            font-size: 20px;
-            font-weight: bold;
-            color: #333;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #F59E0B;
         }
         .footer {
-            text-align: center;
             margin-top: 30px;
             padding-top: 20px;
-            border-top: 2px solid #e5e7eb;
-            color: #666;
+            border-top: 1px solid #e5e7eb;
             font-size: 12px;
+            color: #666;
         }
-        .button {
-            display: inline-block;
-            background: #8B5CF6;
-            color: white;
-            padding: 12px 30px;
+        a {
+            color: #8B5CF6;
             text-decoration: none;
-            border-radius: 6px;
-            margin: 20px 0;
-            font-weight: 500;
-        }
-        @media (max-width: 600px) {
-            .summary {
-                grid-template-columns: 1fr;
-            }
-            .stat-grid {
-                grid-template-columns: 1fr;
-            }
         }
     </style>
 </head>
 <body>
 <div class="container">
-    <!-- Header -->
     <div class="header">
-        <h1>📊 Monthly Financial Report</h1>
-        <p class="period">{{ $data['start_date'] }} - {{ $data['end_date'] }}</p>
+        <h1>{{ config('app.name') }}</h1>
     </div>
 
-    <!-- Greeting -->
-    <div style="margin: 30px 0;">
-        <h2>Hello {{ $user->name }}! 👋</h2>
-        <p>Here's your complete financial overview for the past month.</p>
-    </div>
+    <div class="content">
+        <p>Dear {{ $user->name }},</p>
 
-    <!-- Net Worth Card -->
-    <div class="net-worth-card">
-        <h3>💎 Your Net Worth</h3>
-        <div class="amount">KES {{ number_format($data['net_worth'], 0) }}</div>
-        <div class="subtext">
-            Assets: KES {{ number_format($data['total_balance'], 0) }} |
-            Liabilities: KES {{ number_format($data['total_loans'], 0) }}
-        </div>
-    </div>
+        <p>Attached, please find your <strong>Monthly Financial Report</strong>.</p>
 
-    <!-- Summary Cards -->
-    <div class="summary">
-        <div class="summary-card positive">
-            <h3>Income</h3>
-            <div class="amount">KES {{ number_format($data['income'], 0) }}</div>
-        </div>
-        <div class="summary-card negative">
-            <h3>Expenses</h3>
-            <div class="amount">KES {{ number_format($data['expenses'], 0) }}</div>
-        </div>
-        <div class="summary-card {{ $data['net_flow'] >= 0 ? 'positive' : 'negative' }}">
-            <h3>Net Savings</h3>
-            <div class="amount">KES {{ number_format($data['net_flow'], 0) }}</div>
-        </div>
-    </div>
-
-    <!-- Quick Stats -->
-    <div class="stat-grid">
-        <div class="stat-box">
-            <div class="label">Total Transactions</div>
-            <div class="value">{{ $data['transaction_count'] }}</div>
-        </div>
-        <div class="stat-box">
-            <div class="label">Savings Rate</div>
-            <div class="value">
-                {{ $data['income'] > 0 ? number_format((($data['income'] - $data['expenses']) / $data['income']) * 100, 1) : 0 }}%
-            </div>
-        </div>
-    </div>
-
-    <!-- Budget Performance -->
-    @if(count($data['budget_performance']) > 0)
-        <div class="section">
-            <div class="section-title">🎯 Budget Performance</div>
-            @foreach($data['budget_performance'] as $budget)
-                @php
-                    $percentage = $budget['percentage'];
-                    $status = $percentage > 100 ? 'danger' : ($percentage > 80 ? 'warning' : '');
-                @endphp
-                <div class="budget-item" style="border-left-color: {{ $percentage > 100 ? '#EF4444' : ($percentage > 80 ? '#F59E0B' : '#10B981') }};">
-                    <div class="budget-header">
-                        <div class="budget-name">{{ $budget['category'] }}</div>
-                        <div style="font-weight: bold; color: {{ $percentage > 100 ? '#EF4444' : '#10B981' }};">
-                            {{ number_format($percentage, 0) }}%
-                        </div>
-                    </div>
-                    <div class="budget-amounts">
-                        <span>Spent: KES {{ number_format($budget['spent'], 0) }}</span>
-                        <span>Budget: KES {{ number_format($budget['budgeted'], 0) }}</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill {{ $status }}" style="width: {{ min($percentage, 100) }}%;"></div>
-                    </div>
-                    @if($budget['remaining'] < 0)
-                        <div style="margin-top: 8px; color: #EF4444; font-size: 12px; font-weight: 500;">
-                            ⚠️ Over budget by KES {{ number_format(abs($budget['remaining']), 0) }}
-                        </div>
-                    @else
-                        <div style="margin-top: 8px; color: #10B981; font-size: 12px;">
-                            Remaining: KES {{ number_format($budget['remaining'], 0) }}
-                        </div>
-                    @endif
-                </div>
-            @endforeach
-        </div>
-    @endif
-
-    <!-- Account Balances -->
-    <div class="section">
-        <div class="section-title">💰 Account Balances</div>
-        <table class="table">
-            <thead>
-            <tr>
-                <th>Account</th>
-                <th style="text-align: right;">Balance</th>
-            </tr>
-            </thead>
-            <tbody>
-            @foreach($data['accounts'] as $account)
-                <tr>
-                    <td>{{ $account->name }}</td>
-                    <td style="text-align: right; font-weight: bold;">
-                        KES {{ number_format($account->current_balance, 0) }}
-                    </td>
-                </tr>
-            @endforeach
-            <tr style="background: #f8f9fa; font-weight: bold;">
-                <td>Total Balance</td>
-                <td style="text-align: right; color: #10B981;">
-                    KES {{ number_format($data['total_balance'], 0) }}
-                </td>
-            </tr>
-            </tbody>
-        </table>
-    </div>
-
-    <!-- Top Spending Categories -->
-    @if($data['top_categories']->count() > 0)
-        <div class="section">
-            <div class="section-title">📈 Top Spending Categories</div>
-            @foreach($data['top_categories'] as $category)
-                <div class="category-item">
-                    <div>
-                        <div class="category-name">{{ $category['category'] }}</div>
-                        <div style="font-size: 12px; color: #666;">{{ $category['count'] }} transaction(s)</div>
-                    </div>
-                    <div class="category-amount">KES {{ number_format($category['amount'], 0) }}</div>
-                </div>
-            @endforeach
-        </div>
-    @endif
-
-    <!-- Active Loans -->
-    @if($data['active_loans']->count() > 0)
-        <div class="section">
-            <div class="section-title">💳 Active Loans</div>
-            @foreach($data['active_loans'] as $loan)
-                <div class="category-item">
-                    <div>
-                        <div class="category-name">{{ $loan->source }}</div>
-                        <div style="font-size: 12px; color: #666;">Due: {{ $loan->due_date ? $loan->due_date->format('M d, Y') : 'No due date' }}</div>
-                    </div>
-                    <div class="category-amount" style="color: #EF4444;">KES {{ number_format($loan->balance, 0) }}</div>
-                </div>
-            @endforeach
-            <div style="margin-top: 15px; padding: 15px; background: #FEF3C7; border-left: 4px solid #F59E0B; border-radius: 6px;">
-                <strong>Total Loan Balance:</strong> KES {{ number_format($data['total_loans'], 0) }}
-            </div>
-        </div>
-    @endif
-
-    <!-- Insights -->
-    @if(count($data['insights']) > 0)
-        <div class="section">
-            <div class="section-title">💡 Insights & Recommendations</div>
-            @foreach($data['insights'] as $insight)
-                <div class="insight-card">
-                    <h4>{{ $insight['icon'] }} {{ $insight['title'] }}</h4>
-                    <p style="font-size: 18px; font-weight: bold;">{{ $insight['value'] }}</p>
-                    <p>{{ $insight['description'] }}</p>
-                </div>
-            @endforeach
-        </div>
-    @endif
-
-    <!-- Recent Transactions -->
-    @if($data['transactions']->count() > 0)
-        <div class="section">
-            <div class="section-title">📝 Recent Transactions</div>
-            <table class="table">
-                <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Description</th>
-                    <th>Category</th>
-                    <th style="text-align: right;">Amount</th>
-                </tr>
-                </thead>
-                <tbody>
-                @foreach($data['transactions']->take(15) as $transaction)
-                    <tr>
-                        <td style="white-space: nowrap;">{{ $transaction->date->format('M d') }}</td>
-                        <td>{{ Str::limit($transaction->description, 30) }}</td>
-                        <td><span style="background: #e5e7eb; padding: 3px 8px; border-radius: 4px; font-size: 11px;">{{ $transaction->category->name }}</span></td>
-                        <td style="text-align: right; font-weight: 500; color: {{ $transaction->category->type === 'expense' ? '#EF4444' : '#10B981' }};">
-                            {{ $transaction->category->type === 'expense' ? '-' : '+' }}KES {{ number_format($transaction->amount, 0) }}
-                        </td>
-                    </tr>
-                @endforeach
-                </tbody>
-            </table>
-            @if($data['transaction_count'] > 15)
-                <p style="text-align: center; color: #666; font-size: 12px; margin-top: 10px;">
-                    Showing 15 of {{ $data['transaction_count'] }} transactions
-                </p>
+        <div class="info-box">
+            <p><strong>Report Period:</strong> {{ $data['start_date'] }} - {{ $data['end_date'] }}</p>
+            <p><strong>Account Name:</strong> {{ $user->name }}</p>
+            <p><strong>Total Accounts:</strong> {{ $data['accounts']->count() }}</p>
+            @if(isset($data['budgets']) && count($data['budget_performance']) > 0)
+                <p><strong>Active Budgets:</strong> {{ count($data['budget_performance']) }}</p>
             @endif
         </div>
-    @endif
 
-    <!-- CTA Button -->
-    <div style="text-align: center; margin: 30px 0;">
-        <a href="{{ url('/dashboard') }}" class="button">View Full Dashboard</a>
+        <div class="password-notice">
+            <p><strong>📌 For your security, the PDF file is password protected.</strong></p>
+            <p>Your password is: <strong>{{ substr(str_pad($user->id, 6, '0', STR_PAD_LEFT), -4) }}</strong></p>
+            <p style="font-size: 12px; color: #666; margin-top: 10px;">
+                This is the last 4 digits of your user ID number. Please keep this password confidential.
+            </p>
+            <p style="font-size: 12px; color: #666;">
+                Please use Adobe Acrobat Reader version 6.0 or above to open the attachment.
+            </p>
+        </div>
+
+        <p>This comprehensive monthly report includes:</p>
+        <ul>
+            <li>Monthly income and expense summary</li>
+            <li>Net worth calculation</li>
+            @if(count($data['budget_performance']) > 0)
+                <li>Budget performance analysis</li>
+            @endif
+            <li>Account balances and trends</li>
+            <li>Detailed transaction breakdown</li>
+            <li>Category-wise spending analysis</li>
+            <li>Financial insights and recommendations</li>
+            @if($data['active_loans']->count() > 0)
+                <li>Active loan status and payment information</li>
+            @endif
+        </ul>
+
+        <p>Thank you for using {{ config('app.name') }} to manage your finances. We're committed to helping you achieve your financial goals.</p>
+
+        <p>
+            <a href="{{ route('email-preferences.edit') }}">Manage your email preferences</a> |
+            <a href="{{ url('/dashboard') }}">View Dashboard</a>
+        </p>
     </div>
 
-    <!-- Footer -->
     <div class="footer">
-        <p>This is an automated monthly report from {{ config('app.name') }}.</p>
-        <p>
-            <a href="{{ route('email-preferences.edit') }}" style="color: #8B5CF6; text-decoration: none;">Manage Email Preferences</a>
+        <p><strong>Should you have any concerns, please contact our support team:</strong></p>
+        <p>Email: {{ config('mail.from.address') }}</p>
+
+        <p style="margin-top: 15px;">
+            <em>This is an auto-generated email. Please do not reply to this email.</em>
         </p>
-        <p style="margin-top: 10px;">© {{ date('Y') }} {{ config('app.name') }}. All rights reserved.</p>
+
+        <p style="margin-top: 15px;">
+            Regards,<br>
+            <strong>{{ config('app.name') }} Team</strong><br>
+            Your Partner in Financial Management
+        </p>
+
+        <p style="margin-top: 20px; font-size: 11px;">
+            © {{ date('Y') }} {{ config('app.name') }}. All rights reserved.
+        </p>
     </div>
 </div>
 </body>

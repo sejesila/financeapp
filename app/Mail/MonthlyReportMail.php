@@ -9,7 +9,6 @@ use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Queue\SerializesModels;
-use Barryvdh\DomPDF\Facade\Pdf;
 
 class MonthlyReportMail extends Mailable
 {
@@ -43,18 +42,62 @@ class MonthlyReportMail extends Mailable
         $attachments = [];
 
         if ($this->user->emailPreference->include_pdf) {
-            $pdf = Pdf::loadView('emails.pdf.monthly-report', [
-                'user' => $this->user,
-                'data' => $this->reportData,
-            ]);
+            // Generate 4-digit password from user ID (last 4 digits)
+            $password = $this->generatePDFPassword();
 
-            $filename = 'monthly-report-' . now()->format('M-d-Y') . '.pdf';
-            // Result: weekly-report-Jan-07-2026.pdf
+            // Generate filename with timestamp
+            $filename = 'monthly-report-' . now()->format('Y-m') . '.pdf';
+            // Result: monthly-report-2026-01.pdf
 
-            $attachments[] = Attachment::fromData(fn () => $pdf->output(), $filename)
+            // Generate PDF content
+            $pdfContent = $this->generatePasswordProtectedPDF($password);
+
+            $attachments[] = Attachment::fromData(fn () => $pdfContent, $filename)
                 ->withMime('application/pdf');
         }
 
         return $attachments;
+    }
+
+    /**
+     * Generate 4-digit password from user ID
+     */
+    protected function generatePDFPassword(): string
+    {
+        // Last 4 digits of padded user ID
+        return substr(str_pad($this->user->id, 6, '0', STR_PAD_LEFT), -4);
+    }
+
+    /**
+     * Generate password-protected PDF using mPDF
+     */
+    protected function generatePasswordProtectedPDF(string $password): string
+    {
+        $html = view('emails.pdf.monthly-report', [
+            'user' => $this->user,
+            'data' => $this->reportData,
+        ])->render();
+
+        $mpdf = new \Mpdf\Mpdf([
+            'mode' => 'utf-8',
+            'format' => 'A4',
+            'margin_left' => 15,
+            'margin_right' => 15,
+            'margin_top' => 15,
+            'margin_bottom' => 15,
+        ]);
+
+        // Set password protection
+        $mpdf->SetProtection(
+            ['print', 'copy'],  // Allow printing and copying
+            $password,          // User password (required to open)
+            null,              // Owner password (optional)
+            128                // Encryption strength (128-bit)
+        );
+
+        $mpdf->WriteHTML($html);
+
+        // Return PDF as string
+        return $mpdf->Output('', 'S');
     }
 }
