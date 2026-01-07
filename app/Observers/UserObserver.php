@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Observers;
 
 use App\Models\Category;
@@ -7,58 +6,90 @@ use App\Models\User;
 
 class UserObserver
 {
-    /**
-     * Handle the User "created" event.
-     */
     public function created(User $user): void
     {
-        $incomeCategories = [
-            'Salary',
-            'Side Income',
+        $categoryStructure = [
+            [
+                'name' => 'Housing',
+                'type' => 'expense',
+                'icon' => '🏠',
+                'children' => [
+                    ['name' => 'Rent', 'icon' => '🏠'],
+                    ['name' => 'Utilities', 'icon' => '💡'],
+                    ['name' => 'Internet', 'icon' => '📶'],
+                    ['name' => 'Maintenance', 'icon' => '🔧'],
+                ],
+            ],
+            [
+                'name' => 'Transportation',
+                'type' => 'expense',
+                'icon' => '🚗',
+                'children' => [
+                    ['name' => 'Fuel', 'icon' => '⛽'],
+                    ['name' => 'Taxi/Bus', 'icon' => '🚕'],
+                    ['name' => 'Parking', 'icon' => '🅿️'],
+                ],
+            ],
+            [
+                'name' => 'Food & Dining',
+                'type' => 'expense',
+                'icon' => '🍽️',
+                'children' => [
+                    ['name' => 'Groceries', 'icon' => '🛒'],
+                    ['name' => 'Restaurants', 'icon' => '🍴'],
+                    ['name' => 'Fast Food', 'icon' => '🍔'],
+                ],
+            ],
+            [
+                'name' => 'Health',
+                'type' => 'expense',
+                'icon' => '⚕️',
+                'children' => [
+                    ['name' => 'Doctor', 'icon' => '👨‍⚕️'],
+                    ['name' => 'Pharmacy', 'icon' => '💊'],
+                    ['name' => 'Insurance', 'icon' => '🏥'],
+                ],
+            ],
+            [
+                'name' => 'Income',
+                'type' => 'income',
+                'icon' => '💰',
+                'children' => [
+                    ['name' => 'Salary', 'icon' => '💼'],
+                    ['name' => 'Freelance', 'icon' => '💻'],
+                    ['name' => 'Business', 'icon' => '🏢'],
+                    ['name' => 'Investments', 'icon' => '📈'],
+                ],
+            ],
+            [
+                'name' => 'Loans',
+                'type' => 'liability',
+                'icon' => '💳',
+                'children' => [
+                    ['name' => 'M-Shwari', 'icon' => '📱'],
+                    ['name' => 'KCB Mpesa', 'icon' => '🏦'],
+                    ['name' => 'Other Loan', 'icon' => '💵'],
+                ],
+            ],
         ];
 
-        $expenseCategories = [
-            'Transport',
-            'Cooking Gas',
-            'Rent',
-            'Savings',
-            'Groceries',
-            'Electricity',
-            'Water',
-            'School',
-            'Family Support',
-            'Internet and Communication',
-            'Miscellaneous',
-        ];
-
-        $liabilityCategories = [
-            'M-Shwari',
-            'KCB MPESA',
-            'Other Loan Source',
-        ];
-
-        foreach ($incomeCategories as $name) {
-            Category::create([
+        foreach ($categoryStructure as $parentData) {
+            $parent = Category::create([
                 'user_id' => $user->id,
-                'name'    => $name,
-                'type'    => 'income',
+                'name'    => $parentData['name'],
+                'icon'    => $parentData['icon'],
+                'type'    => $parentData['type'],
             ]);
-        }
 
-        foreach ($expenseCategories as $name) {
-            Category::create([
-                'user_id' => $user->id,
-                'name'    => $name,
-                'type'    => 'expense',
-            ]);
-        }
-
-        foreach ($liabilityCategories as $name) {
-            Category::create([
-                'user_id' => $user->id,
-                'name'    => $name,
-                'type'    => 'liability',
-            ]);
+            foreach ($parentData['children'] as $childData) {
+                Category::create([
+                    'user_id'   => $user->id,
+                    'name'      => $childData['name'],
+                    'icon'      => $childData['icon'] ?? null,
+                    'type'      => $parentData['type'], // ✅ inherit
+                    'parent_id' => $parent->id,
+                ]);
+            }
         }
     }
 }

@@ -25,6 +25,7 @@ services:
             - mysql
             - redis
             - meilisearch
+            - mailpit
 
     mysql:
         image: 'mysql:8.4'
@@ -87,6 +88,14 @@ services:
                 - 'http://127.0.0.1:7700/health'
             retries: 3
             timeout: 5s
+    mailpit:
+        image: axllent/mailpit
+        ports:
+            - "1025:1025"  # SMTP server
+            - "8025:8025"  # Web UI for Mailpit
+        restart: always
+        networks:
+            - sail
 
 networks:
     sail:

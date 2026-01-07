@@ -13,21 +13,31 @@ class Category extends Model
         'user_id',
         'name',
         'type',
+        'icon',
+        'parent_id',
+        'is_active',
+        'usage_count',
     ];
 
-    /**
-     * Get the user that owns the category.
-     */
     public function user()
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * Get the transactions for the category.
-     */
     public function transactions()
     {
         return $this->hasMany(Transaction::class);
     }
+
+    // ✅ REQUIRED for hierarchy
+    public function children()
+    {
+        return $this->hasMany(Category::class, 'parent_id');
+    }
+
+    public function parent()
+    {
+        return $this->belongsTo(Category::class, 'parent_id');
+    }
 }
+

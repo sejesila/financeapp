@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -51,6 +52,39 @@ class User extends Authenticatable
     {
         return $this->hasMany(Account::class);
     }
+    public function emailPreference(): HasOne
+    {
+        return $this->hasOne(UserEmailPreference::class);
+    }
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(Transaction::class);
+    }
+
+    public function budgets(): HasMany
+    {
+        return $this->hasMany(Budget::class);
+    }
+
+    public function loans(): HasMany
+    {
+        return $this->hasMany(Loan::class);
+    }
+    protected static function booted()
+    {
+        static::created(function ($user) {
+            $user->emailPreference()->create([
+                'weekly_reports' => true,
+                'monthly_reports' => true,
+                'weekly_day' => 'monday',
+                'monthly_day' => 1,
+                'preferred_time' => '08:00:00',
+                'include_pdf' => true,
+                'include_charts' => true,
+            ]);
+        });
+    }
+
 
 
 }

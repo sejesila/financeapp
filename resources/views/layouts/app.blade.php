@@ -9,8 +9,8 @@
 
     <!-- Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-    {{-- In the <head> section --}}
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
 
     <!-- Dark mode script (must run before page renders) -->
     <script>
@@ -56,26 +56,12 @@
                     </svg>
                 </a>
 
-                <div class="flex items-center space-x-4">
-                    <!-- Dark Mode Toggle -->
-                    <button id="themeToggle" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition" title="Toggle dark mode">
-                        <!-- Sun icon (shows in dark mode) -->
-                        <svg id="sunIcon" class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
-                        </svg>
-                        <!-- Moon icon (shows in light mode) -->
-                        <svg id="moonIcon" class="w-5 h-5 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
-                        </svg>
-                    </button>
-
-                    <!-- Mobile Menu Button -->
-                    <button id="mobileMenuBtn" class="lg:hidden text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                        </svg>
-                    </button>
-                </div>
+                <!-- Mobile Menu Button -->
+                <button id="mobileMenuBtn" class="lg:hidden text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
 
                 <!-- Desktop Menu -->
                 <ul class="hidden lg:flex space-x-8 items-center">
@@ -128,6 +114,20 @@
                         </a>
                     </li>
 
+                    <!-- Dark Mode Toggle (Desktop) -->
+                    <li>
+                        <button id="themeToggle" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition" title="Toggle dark mode">
+                            <!-- Sun icon (shows in dark mode) -->
+                            <svg id="sunIcon" class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                            </svg>
+                            <!-- Moon icon (shows in light mode) -->
+                            <svg id="moonIcon" class="w-5 h-5 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                            </svg>
+                        </button>
+                    </li>
+
                     <!-- User Dropdown (Desktop) -->
                     <li class="relative">
                         <button id="userMenuBtn" class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition flex items-center space-x-2 px-3 py-2">
@@ -141,6 +141,12 @@
                         <div id="userMenu" class="hidden absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg z-50">
                             <a href="{{ route('profile.edit') }}" class="block px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm border-b dark:border-gray-700 rounded-t-lg transition">
                                 Profile
+                            </a>
+                            <a href="{{ route('email-preferences.edit') }}" class="flex items-center gap-2 px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                </svg>
+                                Email Reports
                             </a>
                             <form method="POST" action="{{ route('logout') }}" class="block">
                                 @csrf
@@ -210,6 +216,29 @@
                         <div class="px-4 py-2 text-gray-900 dark:text-white font-semibold">
                             {{ Auth::user()->name }}
                         </div>
+                        <div class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">
+                            {{ Auth::user()->email }}
+                        </div>
+
+                        <!-- Dark Mode Toggle (Mobile) -->
+                        <button id="themeToggleMobile" class="w-full flex items-center justify-between px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 rounded transition">
+                            <span>Theme</span>
+                            <div class="flex items-center space-x-2">
+                                <span id="themeLabel" class="text-sm text-gray-500 dark:text-gray-400">
+                                    <span class="dark:hidden">Light</span>
+                                    <span class="hidden dark:inline">Dark</span>
+                                </span>
+                                <div class="p-1.5 rounded bg-gray-100 dark:bg-gray-700">
+                                    <svg id="sunIconMobile" class="w-4 h-4 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                                    </svg>
+                                    <svg id="moonIconMobile" class="w-4 h-4 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                        </button>
+
                         <a href="{{ route('profile.edit') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition">
                             Profile
                         </a>
@@ -241,11 +270,9 @@
 </div>
 
 <script>
-    // Dark Mode Toggle
-    const themeToggle = document.getElementById('themeToggle');
-    const html = document.documentElement;
-
-    themeToggle.addEventListener('click', function() {
+    // Dark Mode Toggle Function
+    function toggleTheme() {
+        const html = document.documentElement;
         if (html.classList.contains('dark')) {
             html.classList.remove('dark');
             localStorage.setItem('theme', 'light');
@@ -253,7 +280,13 @@
             html.classList.add('dark');
             localStorage.setItem('theme', 'dark');
         }
-    });
+    }
+
+    // Desktop theme toggle
+    document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
+    // Mobile theme toggle
+    document.getElementById('themeToggleMobile').addEventListener('click', toggleTheme);
 
     // Mobile menu toggle
     document.getElementById('mobileMenuBtn').addEventListener('click', function() {

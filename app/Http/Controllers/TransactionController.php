@@ -16,6 +16,55 @@ class TransactionController extends Controller
     use AuthorizesRequests;
 
     /**
+     * M-Pesa transaction costs (Kenya)
+     */
+    private function getMpesaTransactionCosts()
+    {
+        return [
+            ['min' => 1, 'max' => 100, 'cost' => 0],
+            ['min' => 101, 'max' => 500, 'cost' => 7],
+            ['min' => 501, 'max' => 1000, 'cost' => 13],
+            ['min' => 1001, 'max' => 1500, 'cost' => 23],
+            ['min' => 1501, 'max' => 2500, 'cost' => 33],
+            ['min' => 2501, 'max' => 3500, 'cost' => 53],
+            ['min' => 3501, 'max' => 5000, 'cost' => 57],
+            ['min' => 5001, 'max' => 7500, 'cost' => 78],
+            ['min' => 7501, 'max' => 10000, 'cost' => 90],
+            ['min' => 10001, 'max' => 15000, 'cost' => 100],
+            ['min' => 15001, 'max' => 20000, 'cost' => 105],
+            ['min' => 20001, 'max' => 35000, 'cost' => 108],
+            ['min' => 35001, 'max' => 50000, 'cost' => 110],
+            ['min' => 50001, 'max' => 150000, 'cost' => 112],
+            ['min' => 150001, 'max' => 250000, 'cost' => 115],
+            ['min' => 250001, 'max' => 500000, 'cost' => 117],
+        ];
+    }
+
+    /**
+     * Airtel Money transaction costs (Kenya)
+     */
+    private function getAirtelMoneyTransactionCosts()
+    {
+        return [
+            ['min' => 10, 'max' => 100, 'cost' => 0],
+            ['min' => 101, 'max' => 500, 'cost' => 7],
+            ['min' => 501, 'max' => 1000, 'cost' => 15],
+            ['min' => 1001, 'max' => 1500, 'cost' => 25],
+            ['min' => 1501, 'max' => 2500, 'cost' => 35],
+            ['min' => 2501, 'max' => 3500, 'cost' => 55],
+            ['min' => 3501, 'max' => 5000, 'cost' => 65],
+            ['min' => 5001, 'max' => 7500, 'cost' => 80],
+            ['min' => 7501, 'max' => 10000, 'cost' => 95],
+            ['min' => 10001, 'max' => 15000, 'cost' => 105],
+            ['min' => 15001, 'max' => 20000, 'cost' => 110],
+            ['min' => 20001, 'max' => 35000, 'cost' => 115],
+            ['min' => 35001, 'max' => 50000, 'cost' => 120],
+            ['min' => 50001, 'max' => 70000, 'cost' => 125],
+            ['min' => 70001, 'max' => 150000, 'cost' => 130],
+        ];
+    }
+
+    /**
      * Display a listing of the resource.
      */
     public function index(Request $request)
@@ -26,14 +75,20 @@ class TransactionController extends Controller
         $search = $request->get('search');
         $categoryId = $request->get('category_id');
         $accountId = $request->get('account_id');
+        $showFees = $request->get('show_fees', false); // Option to show/hide transaction fees
 
         // Calculate dynamic year/month ranges
         $minYear = Transaction::where('user_id', Auth::id())->min(DB::raw('YEAR(date)'));
         $minYear = $minYear ?? date('Y');
         $maxYear = date('Y');
 
-        $query = Transaction::with(['category', 'account'])
+        $query = Transaction::with(['category', 'account', 'feeTransaction'])
             ->where('user_id', Auth::id());
+
+        // By default, exclude transaction fees from the main listing
+        if (!$showFees) {
+            $query->where('is_transaction_fee', false);
+        }
 
         // Apply search filter
         if ($search) {
@@ -95,8 +150,8 @@ class TransactionController extends Controller
 
         $transactions = $query->latest('date')->latest('id')->paginate(50)->withQueryString();
 
-        // Calculate totals
-        $userTransactions = Transaction::where('user_id', Auth::id());
+        // Calculate totals (excluding fees by default)
+        $userTransactions = Transaction::where('user_id', Auth::id())->where('is_transaction_fee', false);
 
         $totalToday = (clone $userTransactions)->whereDate('date', today())->sum('amount');
         $totalYesterday = (clone $userTransactions)->whereDate('date', today()->subDay())->sum('amount');
@@ -114,7 +169,21 @@ class TransactionController extends Controller
         $totalLastMonth = (clone $userTransactions)->whereMonth('date', now()->subMonth()->month)
             ->whereYear('date', now()->subMonth()->year)
             ->sum('amount');
-        $totalAll = Transaction::where('user_id', Auth::id())->sum('amount');
+        $totalAll = Transaction::where('user_id', Auth::id())->where('is_transaction_fee', false)->sum('amount');
+
+        // Calculate total transaction fees
+        $totalFeesToday = Transaction::where('user_id', Auth::id())
+            ->where('is_transaction_fee', true)
+            ->whereDate('date', today())
+            ->sum('amount');
+        $totalFeesThisMonth = Transaction::where('user_id', Auth::id())
+            ->where('is_transaction_fee', true)
+            ->whereMonth('date', now()->month)
+            ->whereYear('date', now()->year)
+            ->sum('amount');
+        $totalFeesAll = Transaction::where('user_id', Auth::id())
+            ->where('is_transaction_fee', true)
+            ->sum('amount');
 
         // Get categories and accounts for filters
         $categories = Category::where('user_id', Auth::id())
@@ -136,6 +205,9 @@ class TransactionController extends Controller
             'totalThisMonth',
             'totalLastMonth',
             'totalAll',
+            'totalFeesToday',
+            'totalFeesThisMonth',
+            'totalFeesAll',
             'minYear',
             'maxYear',
             'categories',
@@ -144,7 +216,8 @@ class TransactionController extends Controller
             'categoryId',
             'accountId',
             'startDate',
-            'endDate'
+            'endDate',
+            'showFees'
         ));
     }
 
@@ -153,13 +226,94 @@ class TransactionController extends Controller
      */
     public function create()
     {
-        $categories = Category::where('user_id', Auth::id())->orderBy('name')->get();
+        // Special system categories to exclude from manual transaction creation
+        $excludedCategories = [
+            'Income',
+            'Loans',
+            'Loan Receipt',
+            'Loan Repayment',
+            'Excise Duty',
+            'Loan Fees Refund',
+            'Facility Fee Refund',
+        ];
+
+        // Get parent categories with their children (hierarchical structure)
+        $categoryGroups = Category::where('user_id', Auth::id())
+            ->whereNull('parent_id')
+            ->where('is_active', true)
+            ->whereNotIn('name', $excludedCategories)
+            ->with(['children' => function ($query) use ($excludedCategories) {
+                $query->where('is_active', true)
+                    ->whereNotIn('name', $excludedCategories)
+                    ->orderBy('name');
+            }])
+            ->orderBy('name')
+            ->get()
+            ->filter(function ($category) {
+                // Keep only categories that have children or are standalone
+                return $category->children->isNotEmpty() || !$category->parent_id;
+            })
+            ->values(); // Reset array keys
+
+        // Fallback: flat list of all leaf categories (excluding system categories)
+        $categories = Category::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->whereNotIn('name', $excludedCategories)
+            ->orderBy('name')
+            ->get();
+
+        // Get frequently used categories (top 5, excluding system categories)
+        $frequentCategories = Category::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->whereNotIn('name', $excludedCategories)
+            ->where('usage_count', '>', 0)
+            ->orderBy('usage_count', 'desc')
+            ->limit(5)
+            ->get();
+
         $accounts = \App\Models\Account::where('user_id', Auth::id())
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
 
-        return view('transactions.create', compact('categories', 'accounts'));
+        // Pass transaction costs
+        $mpesaCosts = $this->getMpesaTransactionCosts();
+        $airtelCosts = $this->getAirtelMoneyTransactionCosts();
+
+        return view('transactions.create', compact(
+            'categoryGroups',
+            'categories',
+            'frequentCategories',
+            'accounts',
+            'mpesaCosts',
+            'airtelCosts'
+        ));
+    }
+
+    /**
+     * Calculate transaction cost based on amount and account type
+     */
+    private function calculateTransactionCost($amount, $accountType)
+    {
+        $costs = [];
+
+        if ($accountType === 'mpesa') {
+            $costs = $this->getMpesaTransactionCosts();
+        } elseif ($accountType === 'airtel_money') {
+            $costs = $this->getAirtelMoneyTransactionCosts();
+        } else {
+            return 0; // No fees for other account types
+        }
+
+        // Find the appropriate cost tier
+        foreach ($costs as $tier) {
+            if ($amount >= $tier['min'] && $amount <= $tier['max']) {
+                return $tier['cost'];
+            }
+        }
+
+        // If amount exceeds all tiers, return the highest tier cost
+        return end($costs)['cost'] ?? 0;
     }
 
     /**
@@ -174,7 +328,8 @@ class TransactionController extends Controller
             'description' => 'required|string',
             'amount' => 'required|numeric|min:0.01',
             'category_id' => 'required|exists:categories,id',
-            'account_id' => 'required|exists:accounts,id'
+            'account_id' => 'required|exists:accounts,id',
+            'transaction_cost' => 'nullable|numeric|min:0'
         ]);
 
         // Verify account ownership
@@ -189,13 +344,31 @@ class TransactionController extends Controller
             abort(403, 'Unauthorized access to this category.');
         }
 
+        // Calculate transaction cost based on account type (server-side validation)
+        // Use the value from the form, but recalculate to ensure accuracy
+        $transactionCost = $this->calculateTransactionCost($validated['amount'], $account->type);
+
+        // If frontend sent a different value, use server calculation for security
+        if (isset($validated['transaction_cost']) && $validated['transaction_cost'] != $transactionCost) {
+            \Log::warning('Transaction cost mismatch', [
+                'frontend' => $validated['transaction_cost'],
+                'backend' => $transactionCost,
+                'amount' => $validated['amount'],
+                'account_type' => $account->type
+            ]);
+        }
+
+        $totalAmount = $validated['amount'] + $transactionCost;
+
         // Check if it's an expense and if account has sufficient balance
-        if ($category->type === 'expense' && $account->current_balance < $validated['amount']) {
+        if ($category->type === 'expense' && $account->current_balance < $totalAmount) {
             return redirect()->back()
                 ->withInput()
                 ->with('error', "Insufficient balance in {$account->name}. Current balance: "
                     . number_format($account->current_balance, 0, '.', ',')
-                    . ", Required: " . number_format($validated['amount'], 0, '.', ','));
+                    . ", Required: " . number_format($totalAmount, 0, '.', ',')
+                    . " (Amount: " . number_format($validated['amount'], 0, '.', ',')
+                    . " + Cost: " . number_format($transactionCost, 0, '.', ',') . ")");
         }
 
         // Store old balance before transaction
@@ -213,7 +386,7 @@ class TransactionController extends Controller
         DB::beginTransaction();
 
         try {
-            // Create transaction
+            // Create main transaction
             $transaction = Transaction::create([
                 'user_id'        => Auth::id(),
                 'date'           => $validated['date'],
@@ -221,8 +394,64 @@ class TransactionController extends Controller
                 'amount'         => $validated['amount'],
                 'category_id'    => $validated['category_id'],
                 'account_id'     => $validated['account_id'],
-                'payment_method' => $paymentMethod
+                'payment_method' => $paymentMethod,
+                'is_transaction_fee' => false
             ]);
+
+            // If there's a transaction cost, create a separate transaction for it
+            if ($transactionCost > 0) {
+                \Log::info('Creating transaction fee', [
+                    'amount' => $transactionCost,
+                    'account_type' => $account->type,
+                    'transaction_id' => $transaction->id
+                ]);
+
+                // Find or create "Transaction Fees" category
+                $feesCategory = Category::withoutGlobalScope('ownedByUser')->firstOrCreate(
+                    [
+                        'user_id' => Auth::id(),
+                        'name' => 'Transaction Fees'
+                    ],
+                    [
+                        'type' => 'expense',
+                        'icon' => '💸',
+                        'is_active' => true
+                    ]
+                );
+
+                $feeTransaction = Transaction::withoutGlobalScope('ownedByUser')->create([
+                    'user_id'            => Auth::id(),
+                    'date'               => $validated['date'],
+                    'description'        => $paymentMethod . ' fee: ' . $validated['description'],
+                    'amount'             => $transactionCost,
+                    'category_id'        => $feesCategory->id,
+                    'account_id'         => $validated['account_id'],
+                    'payment_method'     => $paymentMethod,
+                    'is_transaction_fee' => true,
+                    'fee_for_transaction_id' => $transaction->id
+                ]);
+
+                \Log::info('Fee transaction created', [
+                    'fee_transaction_id' => $feeTransaction->id,
+                    'fee_amount' => $feeTransaction->amount
+                ]);
+
+                // Link the fee to the main transaction
+                $transaction->update([
+                    'related_fee_transaction_id' => $feeTransaction->id
+                ]);
+
+                \Log::info('Main transaction updated with fee link', [
+                    'transaction_id' => $transaction->id,
+                    'related_fee_id' => $transaction->related_fee_transaction_id
+                ]);
+            } else {
+                \Log::info('No transaction fee applicable', [
+                    'amount' => $validated['amount'],
+                    'account_type' => $account->type,
+                    'calculated_cost' => $transactionCost
+                ]);
+            }
 
             // Update account balance
             if ($transaction->account) {
@@ -238,12 +467,12 @@ class TransactionController extends Controller
 
             // Pass balance information to the view
             return redirect()->route('transactions.index')
-                ->with('success', 'Transaction recorded successfully')
+                ->with('success', 'Transaction recorded successfully' . ($transactionCost > 0 ? ' (including KSh ' . number_format($transactionCost, 2) . ' transaction fee)' : ''))
                 ->with('show_balance_modal', true)
                 ->with('account_name', $account->name)
                 ->with('old_balance', number_format($oldBalance, 2))
                 ->with('new_balance', number_format($transaction->account->current_balance, 2))
-                ->with('transaction_amount', number_format($validated['amount'], 2))
+                ->with('transaction_amount', number_format($totalAmount, 2))
                 ->with('transaction_type', $category->type);
 
         } catch (\Exception $e) {
@@ -289,7 +518,7 @@ class TransactionController extends Controller
     {
         $this->authorize('view', $transaction);
 
-        $transaction->load(['account', 'category']);
+        $transaction->load(['account', 'category', 'feeTransaction', 'mainTransaction']);
         return view('transactions.show', compact('transaction'));
     }
 }

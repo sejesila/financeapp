@@ -269,30 +269,58 @@ class AccountController extends Controller
 
     private function getTopUpCategories($accountType)
     {
-        $query = Category::where('user_id', Auth::id());
+        // System categories that shouldn't appear in manual top-up
+        $excludedCategories = [
+            'Loan Receipt',
+            'Loan Repayment',
+            'Excise Duty',
+            'Loan Fees Refund',
+            'Facility Fee Refund',
+            'Balance Adjustment',
+        ];
+
+        // Excluded parent categories (we only want their children)
+        $excludedParents = [
+            'Income',
+            'Loans',
+        ];
+
+        $query = Category::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->whereNotIn('name', $excludedCategories)
+            ->whereNotIn('name', $excludedParents)
+            ->whereNotNull('parent_id'); // Only get child categories
 
         if ($accountType === 'bank') {
+            // Banks: Only salary income
             return $query->where('type', 'income')
                 ->where('name', 'Salary')
+                ->orderBy('name')
                 ->get();
-        } elseif ($accountType === 'airtel_money') {
+        }
+        elseif ($accountType === 'airtel_money') {
+            // Airtel Money: Income except salary
             return $query->where('type', 'income')
                 ->where('name', '!=', 'Salary')
-                ->where('name', '!=', 'Loan Receipt')
+                ->orderBy('name')
                 ->get();
-        } elseif ($accountType === 'mpesa') {
+        }
+        elseif ($accountType === 'mpesa') {
+            // M-Pesa: Most income + liability categories (for loans)
             return $query->where(function($q) {
                 $q->where(function($subQ) {
                     $subQ->where('type', 'income')
-                        ->whereNotIn('name', ['Salary', 'Loan Receipt']);
+                        ->where('name', '!=', 'Salary');
                 })
                     ->orWhere('type', 'liability');
             })
-                ->where('name', '!=', 'Loan Receipt')
+                ->orderBy('name')
                 ->get();
-        } else {
+        }
+        else {
+            // Cash and other accounts: All income and liability
             return $query->whereIn('type', ['income', 'liability'])
-                ->where('name', '!=', 'Loan Receipt')
+                ->orderBy('name')
                 ->get();
         }
     }
@@ -320,8 +348,33 @@ class AccountController extends Controller
             return redirect()->back()->with('error', 'Please select a valid category.');
         }
 
+        // Prevent using system categories
+        $systemCategories = [
+            'Loan Receipt',
+            'Loan Repayment',
+            'Excise Duty',
+            'Loan Fees Refund',
+            'Facility Fee Refund',
+            'Balance Adjustment',
+        ];
+
+        if (in_array($category->name, $systemCategories)) {
+            return redirect()->back()->with('error', 'This category is reserved for system use only.');
+        }
+
         if ($account->type === 'bank' && $category->type === 'income' && $category->name !== 'Salary') {
             return redirect()->back()->with('error', 'Only Salary income is allowed for bank accounts.');
+        }
+
+        // Handle loans differently - redirect to loan creation
+        if ($category->type === 'liability' && $category->parent && $category->parent->name === 'Loans') {
+            return redirect()->route('loans.create', [
+                'account_id' => $account->id,
+                'amount' => $request->amount,
+                'source' => $category->name,
+                'date' => $request->date,
+                'notes' => $request->description,
+            ])->with('info', 'Loans require additional details. Please complete the loan form.');
         }
 
         // Use period_date if provided, otherwise use transaction date

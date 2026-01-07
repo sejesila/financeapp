@@ -166,6 +166,42 @@
             @endforeach
         </div>
 
+        {{-- Transaction Fees Summary --}}
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-xs font-semibold text-yellow-800 mb-1">💸 Fees Today</h3>
+                        <p class="text-xl font-bold text-yellow-900">
+                            {{ number_format($totalFeesToday, 0, '.', ',') }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-xs font-semibold text-orange-800 mb-1">💸 Fees This Month</h3>
+                        <p class="text-xl font-bold text-orange-900">
+                            {{ number_format($totalFeesThisMonth, 0, '.', ',') }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-red-50 p-4 rounded-lg border border-red-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-xs font-semibold text-red-800 mb-1">💸 Total Fees</h3>
+                        <p class="text-xl font-bold text-red-900">
+                            {{ number_format($totalFeesAll, 0, '.', ',') }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         {{-- Filters --}}
         <div class="rounded-lg border bg-white p-4 shadow-sm space-y-4">
 
@@ -191,6 +227,18 @@
                 @endforeach
             </div>
 
+            {{-- Show/Hide Fees Toggle --}}
+            <div class="flex items-center gap-2 pt-2 border-t">
+                <label class="flex items-center cursor-pointer">
+                    <input type="checkbox"
+                           onchange="window.location.href='{{ route('transactions.index', array_merge(request()->all(), ['show_fees' => $showFees ? '0' : '1'])) }}'"
+                           {{ $showFees ? 'checked' : '' }}
+                           class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                    <span class="ml-2 text-sm text-gray-700">Show Transaction Fees</span>
+                </label>
+                <span class="text-xs text-gray-500">({{ $showFees ? 'Currently showing fees' : 'Fees hidden' }})</span>
+            </div>
+
             {{-- Advanced Filters --}}
             <details {{ $filter === 'custom' || $search || $categoryId || $accountId ? 'open' : '' }}>
                 <summary class="cursor-pointer text-sm font-medium text-gray-700">
@@ -202,6 +250,7 @@
                       class="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
                     <input type="hidden" name="filter" value="custom">
+                    <input type="hidden" name="show_fees" value="{{ $showFees ? '1' : '0' }}">
 
                     <div>
                         <label class="block text-xs font-medium mb-1">Search</label>
@@ -274,17 +323,40 @@
 
                 <tbody class="divide-y">
                 @forelse($transactions as $t)
-                    <tr class="hover:bg-gray-50">
+                    <tr class="hover:bg-gray-50 {{ $t->is_transaction_fee ? 'bg-yellow-50' : '' }}">
                         <td class="px-3 py-2 whitespace-nowrap">
                             {{ \Carbon\Carbon::parse($t->date)->format('M d, Y') }}
                         </td>
 
-                        <td class="px-3 py-2">{{ $t->description }}</td>
+                        <td class="px-3 py-2">
+                            @if($t->is_transaction_fee)
+                                <span class="inline-flex items-center gap-1 text-xs text-yellow-700">
+                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M10 2a8 8 0 100 16 8 8 0 000-16zM9 9a1 1 0 012 0v4a1 1 0 11-2 0V9zm1-5a1 1 0 100 2 1 1 0 000-2z"/>
+                                    </svg>
+                                    FEE
+                                </span>
+                            @endif
+                            {{ $t->description }}
+                            @if(!$t->is_transaction_fee && $t->hasFee())
+                                <span class="ml-2 text-xs text-gray-500">
+                                    (+{{ number_format($t->feeTransaction->amount, 0) }} fee)
+                                </span>
+                            @endif
+                        </td>
 
-                        <td class="px-3 py-2 text-right font-semibold
-                            {{ $t->category->type === 'income' ? 'text-green-600' : 'text-red-600' }}">
-                            {{ $t->category->type === 'income' ? '+' : '-' }}
-                            {{ number_format($t->amount) }}
+                        <td class="px-3 py-2 text-right">
+                            <div class="flex flex-col items-end">
+                                <span class="font-semibold {{ $t->category->type === 'income' ? 'text-green-600' : ($t->is_transaction_fee ? 'text-yellow-700' : 'text-red-600') }}">
+                                    {{ $t->category->type === 'income' ? '+' : '-' }}
+                                    {{ number_format($t->amount, 0) }}
+                                </span>
+                                @if(!$t->is_transaction_fee && $t->hasFee())
+                                    <span class="text-xs text-gray-500">
+                                        Total: {{ number_format($t->total_amount, 0) }}
+                                    </span>
+                                @endif
+                            </div>
                         </td>
 
                         <td class="px-3 py-2 hidden sm:table-cell">
@@ -295,7 +367,7 @@
                             <span class="inline-flex rounded-full px-2 py-1 text-xs
                                 {{ $t->category->type === 'income'
                                     ? 'bg-green-100 text-green-800'
-                                    : 'bg-red-100 text-red-800' }}">
+                                    : ($t->is_transaction_fee ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800') }}">
                                 {{ $t->category->name }}
                             </span>
                         </td>
@@ -328,7 +400,7 @@
                 <p class="font-semibold">
                     Filtered Total:
                     <span class="text-indigo-600">
-                        {{ number_format($transactions->sum('amount')) }}
+                        {{ number_format($transactions->sum('amount'), 0) }}
                     </span>
                 </p>
             </div>
