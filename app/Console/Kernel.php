@@ -15,30 +15,26 @@ class Kernel extends ConsoleKernel
 
     protected function schedule(Schedule $schedule): void
     {
-        // Send weekly reports every day at the user's preferred time
-        // The command internally checks if it's the right day (Monday, Tuesday, etc.)
+        // Check for weekly reports every hour (commands handle day/time filtering)
         $schedule->command('reports:send-weekly')
-            ->dailyAt('00:00')  // Run at midnight, command handles user's preferred times
-            ->timezone('Africa/Nairobi')
+            ->hourly()
             ->withoutOverlapping()
             ->onSuccess(function () {
-                \Log::info('Weekly reports check completed successfully');
+                \Log::info('Weekly reports sent successfully');
             })
             ->onFailure(function () {
-                \Log::error('Weekly reports check failed');
+                \Log::error('Weekly reports failed');
             });
 
-        // Send monthly reports every day at midnight
-        // The command checks if it's the user's chosen day of the month
+        // Check for monthly reports every hour
         $schedule->command('reports:send-monthly')
-            ->dailyAt('00:00')  // Run at midnight, command handles user's preferred times
-            ->timezone('Africa/Nairobi')
+            ->hourly()
             ->withoutOverlapping()
             ->onSuccess(function () {
-                \Log::info('Monthly reports check completed successfully');
+                \Log::info('Monthly reports sent successfully');
             })
             ->onFailure(function () {
-                \Log::error('Monthly reports check failed');
+                \Log::error('Monthly reports failed');
             });
     }
 
