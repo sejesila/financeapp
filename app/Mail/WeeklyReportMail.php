@@ -42,13 +42,8 @@ class WeeklyReportMail extends Mailable
         $attachments = [];
 
         if ($this->user->emailPreference->include_pdf) {
-            // Generate 4-digit password from user ID (last 4 digits)
             $password = $this->generatePDFPassword();
-
-            // Generate filename with timestamp
             $filename = 'weekly-report-' . now()->format('Y-m-d') . '.pdf';
-
-            // Generate PDF content
             $pdfContent = $this->generatePasswordProtectedPDF($password);
 
             $attachments[] = Attachment::fromData(fn () => $pdfContent, $filename)
@@ -58,20 +53,19 @@ class WeeklyReportMail extends Mailable
         return $attachments;
     }
 
-    /**
-     * Generate 4-digit password from user ID
-     */
     protected function generatePDFPassword(): string
     {
-        // Last 4 digits of padded user ID
         return substr(str_pad($this->user->id, 6, '0', STR_PAD_LEFT), -4);
     }
 
-    /**
-     * Generate password-protected PDF using mPDF
-     */
     protected function generatePasswordProtectedPDF(string $password): string
     {
+        // Ensure temp directory exists
+        $tempDir = storage_path('app/temp');
+        if (!file_exists($tempDir)) {
+            mkdir($tempDir, 0775, true);
+        }
+
         $html = view('emails.pdf.weekly-report', [
             'user' => $this->user,
             'data' => $this->reportData,
@@ -84,19 +78,12 @@ class WeeklyReportMail extends Mailable
             'margin_right' => 15,
             'margin_top' => 15,
             'margin_bottom' => 15,
+            'tempDir' => $tempDir,  // Use storage temp directory
         ]);
 
-        // Set password protection
-        $mpdf->SetProtection(
-            ['print', 'copy'],  // Allow printing and copying
-            $password,          // User password (required to open)
-            null,              // Owner password (optional)
-            128                // Encryption strength (128-bit)
-        );
-
+        $mpdf->SetProtection(['print', 'copy'], $password, null, 128);
         $mpdf->WriteHTML($html);
 
-        // Return PDF as string
         return $mpdf->Output('', 'S');
     }
 }
