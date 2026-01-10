@@ -134,3 +134,4 @@ class Transaction extends Model
         return $query->where('is_transaction_fee', true);
     }
 }
+

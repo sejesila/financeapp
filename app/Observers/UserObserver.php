@@ -15,9 +15,10 @@ class UserObserver
                 'icon' => '🏠',
                 'children' => [
                     ['name' => 'Rent', 'icon' => '🏠'],
-                    ['name' => 'Utilities', 'icon' => '💡'],
-                    ['name' => 'Internet', 'icon' => '📶'],
-                    ['name' => 'Maintenance', 'icon' => '🔧'],
+                    ['name' => 'Electricity', 'icon' => '💡'],
+                    ['name' => 'Internet and Communication', 'icon' => '📶'],
+                    ['name' => 'Drinking Water', 'icon' => '💧'],
+                    ['name' => 'Cooking Gas', 'icon' => '🔥'],
                 ],
             ],
             [
@@ -25,40 +26,54 @@ class UserObserver
                 'type' => 'expense',
                 'icon' => '🚗',
                 'children' => [
-                    ['name' => 'Fuel', 'icon' => '⛽'],
-                    ['name' => 'Taxi/Bus', 'icon' => '🚕'],
-                    ['name' => 'Parking', 'icon' => '🅿️'],
+                    ['name' => 'Fare', 'icon' => '🚕'],
                 ],
             ],
             [
-                'name' => 'Food & Dining',
+                'name' => 'Food',
                 'type' => 'expense',
                 'icon' => '🍽️',
                 'children' => [
                     ['name' => 'Groceries', 'icon' => '🛒'],
-                    ['name' => 'Restaurants', 'icon' => '🍴'],
-                    ['name' => 'Fast Food', 'icon' => '🍔'],
                 ],
             ],
             [
-                'name' => 'Health',
+                'name' => 'Family Support',
                 'type' => 'expense',
-                'icon' => '⚕️',
+                'icon' => '👨‍👩‍👧‍👦',
                 'children' => [
-                    ['name' => 'Doctor', 'icon' => '👨‍⚕️'],
-                    ['name' => 'Pharmacy', 'icon' => '💊'],
-                    ['name' => 'Insurance', 'icon' => '🏥'],
+                    ['name' => 'Spouse', 'icon' => '💑'],
+                    ['name' => 'Parent', 'icon' => '👵'],
+                    ['name' => 'Siblings', 'icon' => '👫'],
+                   
                 ],
             ],
+            [
+                'name' => 'Miscellaneous',
+                'type' => 'expense',
+                'icon' => '📦',
+                'children' => [
+                    ['name' => 'Home Project', 'icon' => '🎬'],
+                    ['name' => 'Other', 'icon' => '🔹'],
+                ],
+            ],
+//            [
+//                'name' => 'Health',
+//                'type' => 'expense',
+//                'icon' => '⚕️',
+//                'children' => [
+//                    ['name' => 'Doctor', 'icon' => '👨‍⚕️'],
+//                    ['name' => 'Pharmacy', 'icon' => '💊'],
+//                    ['name' => 'Insurance', 'icon' => '🏥'],
+//                ],
+//            ],
             [
                 'name' => 'Income',
                 'type' => 'income',
                 'icon' => '💰',
                 'children' => [
                     ['name' => 'Salary', 'icon' => '💼'],
-                    ['name' => 'Freelance', 'icon' => '💻'],
-                    ['name' => 'Business', 'icon' => '🏢'],
-                    ['name' => 'Investments', 'icon' => '📈'],
+                    ['name' => 'Side Income', 'icon' => '🏢'],
                 ],
             ],
             [
@@ -67,7 +82,7 @@ class UserObserver
                 'icon' => '💳',
                 'children' => [
                     ['name' => 'M-Shwari', 'icon' => '📱'],
-                    ['name' => 'KCB Mpesa', 'icon' => '🏦'],
+                    ['name' => 'KCB Mpesa', 'icon' => '📱'],
                     ['name' => 'Other Loan', 'icon' => '💵'],
                 ],
             ],

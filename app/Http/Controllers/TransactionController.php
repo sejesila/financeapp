@@ -18,25 +18,73 @@ class TransactionController extends Controller
     /**
      * M-Pesa transaction costs (Kenya)
      */
+    /**
+     * M-Pesa transaction costs (Kenya) - Send Money & Pochi La Biashara
+     */
     private function getMpesaTransactionCosts()
     {
         return [
-            ['min' => 1, 'max' => 100, 'cost' => 0],
-            ['min' => 101, 'max' => 500, 'cost' => 7],
-            ['min' => 501, 'max' => 1000, 'cost' => 13],
-            ['min' => 1001, 'max' => 1500, 'cost' => 23],
-            ['min' => 1501, 'max' => 2500, 'cost' => 33],
-            ['min' => 2501, 'max' => 3500, 'cost' => 53],
-            ['min' => 3501, 'max' => 5000, 'cost' => 57],
-            ['min' => 5001, 'max' => 7500, 'cost' => 78],
-            ['min' => 7501, 'max' => 10000, 'cost' => 90],
-            ['min' => 10001, 'max' => 15000, 'cost' => 100],
-            ['min' => 15001, 'max' => 20000, 'cost' => 105],
-            ['min' => 20001, 'max' => 35000, 'cost' => 108],
-            ['min' => 35001, 'max' => 50000, 'cost' => 110],
-            ['min' => 50001, 'max' => 150000, 'cost' => 112],
-            ['min' => 150001, 'max' => 250000, 'cost' => 115],
-            ['min' => 250001, 'max' => 500000, 'cost' => 117],
+            'send_money' => [
+                ['min' => 1, 'max' => 100, 'cost' => 0],
+                ['min' => 101, 'max' => 500, 'cost' => 7],
+                ['min' => 501, 'max' => 1000, 'cost' => 13],
+                ['min' => 1001, 'max' => 1500, 'cost' => 23],
+                ['min' => 1501, 'max' => 2500, 'cost' => 33],
+                ['min' => 2501, 'max' => 3500, 'cost' => 53],
+                ['min' => 3501, 'max' => 5000, 'cost' => 57],
+                ['min' => 5001, 'max' => 7500, 'cost' => 78],
+                ['min' => 7501, 'max' => 10000, 'cost' => 90],
+                ['min' => 10001, 'max' => 15000, 'cost' => 100],
+                ['min' => 15001, 'max' => 20000, 'cost' => 105],
+                ['min' => 20001, 'max' => 35000, 'cost' => 108],
+                ['min' => 35001, 'max' => 50000, 'cost' => 110],
+                ['min' => 50001, 'max' => 150000, 'cost' => 112],
+                ['min' => 150001, 'max' => 250000, 'cost' => 115],
+                ['min' => 250001, 'max' => 500000, 'cost' => 117],
+            ],
+            'paybill' => [
+                ['min' => 1, 'max' => 49, 'cost' => 0],
+                ['min' => 50, 'max' => 100, 'cost' => 0],
+                ['min' => 101, 'max' => 500, 'cost' => 5],
+                ['min' => 501, 'max' => 1000, 'cost' => 10],
+                ['min' => 1001, 'max' => 1500, 'cost' => 15],
+                ['min' => 1501, 'max' => 2500, 'cost' => 20],
+                ['min' => 2501, 'max' => 3500, 'cost' => 25],
+                ['min' => 3501, 'max' => 5000, 'cost' => 34],
+                ['min' => 5001, 'max' => 7500, 'cost' => 42],
+                ['min' => 7501, 'max' => 10000, 'cost' => 48],
+                ['min' => 10001, 'max' => 15000, 'cost' => 57],
+                ['min' => 15001, 'max' => 20000, 'cost' => 62],
+                ['min' => 20001, 'max' => 25000, 'cost' => 67],
+                ['min' => 25001, 'max' => 30000, 'cost' => 72],
+                ['min' => 30001, 'max' => 35000, 'cost' => 83],
+                ['min' => 35001, 'max' => 40000, 'cost' => 99],
+                ['min' => 40001, 'max' => 45000, 'cost' => 103],
+                ['min' => 45001, 'max' => 50000, 'cost' => 108],
+                ['min' => 50001, 'max' => 70000, 'cost' => 108],
+                ['min' => 70001, 'max' => 250000, 'cost' => 108],
+            ],
+            'buy_goods' => [
+                ['min' => 1, 'max' => 500000, 'cost' => 0], // Till Number - no charges
+            ],
+            'pochi_la_biashara' => [
+                ['min' => 1, 'max' => 100, 'cost' => 0],
+                ['min' => 101, 'max' => 500, 'cost' => 7],
+                ['min' => 501, 'max' => 1000, 'cost' => 13],
+                ['min' => 1001, 'max' => 1500, 'cost' => 23],
+                ['min' => 1501, 'max' => 2500, 'cost' => 33],
+                ['min' => 2501, 'max' => 3500, 'cost' => 53],
+                ['min' => 3501, 'max' => 5000, 'cost' => 57],
+                ['min' => 5001, 'max' => 7500, 'cost' => 78],
+                ['min' => 7501, 'max' => 10000, 'cost' => 90],
+                ['min' => 10001, 'max' => 15000, 'cost' => 100],
+                ['min' => 15001, 'max' => 20000, 'cost' => 105],
+                ['min' => 20001, 'max' => 35000, 'cost' => 108],
+                ['min' => 35001, 'max' => 50000, 'cost' => 110],
+                ['min' => 50001, 'max' => 150000, 'cost' => 112],
+                ['min' => 150001, 'max' => 250000, 'cost' => 115],
+                ['min' => 250001, 'max' => 500000, 'cost' => 117],
+            ],
         ];
     }
 
@@ -46,24 +94,59 @@ class TransactionController extends Controller
     private function getAirtelMoneyTransactionCosts()
     {
         return [
-            ['min' => 10, 'max' => 100, 'cost' => 0],
-            ['min' => 101, 'max' => 500, 'cost' => 7],
-            ['min' => 501, 'max' => 1000, 'cost' => 15],
-            ['min' => 1001, 'max' => 1500, 'cost' => 25],
-            ['min' => 1501, 'max' => 2500, 'cost' => 35],
-            ['min' => 2501, 'max' => 3500, 'cost' => 55],
-            ['min' => 3501, 'max' => 5000, 'cost' => 65],
-            ['min' => 5001, 'max' => 7500, 'cost' => 80],
-            ['min' => 7501, 'max' => 10000, 'cost' => 95],
-            ['min' => 10001, 'max' => 15000, 'cost' => 105],
-            ['min' => 15001, 'max' => 20000, 'cost' => 110],
-            ['min' => 20001, 'max' => 35000, 'cost' => 115],
-            ['min' => 35001, 'max' => 50000, 'cost' => 120],
-            ['min' => 50001, 'max' => 70000, 'cost' => 125],
-            ['min' => 70001, 'max' => 150000, 'cost' => 130],
+            'send_money' => [
+                ['min' => 10, 'max' => 100, 'cost' => 0],
+                ['min' => 101, 'max' => 500, 'cost' => 7],
+                ['min' => 501, 'max' => 1000, 'cost' => 15],
+                ['min' => 1001, 'max' => 1500, 'cost' => 25],
+                ['min' => 1501, 'max' => 2500, 'cost' => 35],
+                ['min' => 2501, 'max' => 3500, 'cost' => 55],
+                ['min' => 3501, 'max' => 5000, 'cost' => 65],
+                ['min' => 5001, 'max' => 7500, 'cost' => 80],
+                ['min' => 7501, 'max' => 10000, 'cost' => 95],
+                ['min' => 10001, 'max' => 15000, 'cost' => 105],
+                ['min' => 15001, 'max' => 20000, 'cost' => 110],
+                ['min' => 20001, 'max' => 35000, 'cost' => 115],
+                ['min' => 35001, 'max' => 50000, 'cost' => 120],
+                ['min' => 50001, 'max' => 70000, 'cost' => 125],
+                ['min' => 70001, 'max' => 150000, 'cost' => 130],
+            ],
+            'paybill' => [
+                ['min' => 1, 'max' => 150000, 'cost' => 0], // Assuming no charges for paybill
+            ],
+            'buy_goods' => [
+                ['min' => 1, 'max' => 150000, 'cost' => 0], // Assuming no charges for till
+            ],
         ];
     }
 
+    /**
+     * Calculate transaction cost based on amount, account type, and transaction type
+     */
+    private function calculateTransactionCost($amount, $accountType, $transactionType = 'send_money')
+    {
+        $costs = [];
+
+        if ($accountType === 'mpesa') {
+            $allCosts = $this->getMpesaTransactionCosts();
+            $costs = $allCosts[$transactionType] ?? $allCosts['send_money'];
+        } elseif ($accountType === 'airtel_money') {
+            $allCosts = $this->getAirtelMoneyTransactionCosts();
+            $costs = $allCosts[$transactionType] ?? $allCosts['send_money'];
+        } else {
+            return 0; // No fees for other account types
+        }
+
+        // Find the appropriate cost tier
+        foreach ($costs as $tier) {
+            if ($amount >= $tier['min'] && $amount <= $tier['max']) {
+                return $tier['cost'];
+            }
+        }
+
+        // If amount exceeds all tiers, return the highest tier cost
+        return end($costs)['cost'] ?? 0;
+    }
     /**
      * Display a listing of the resource.
      */
@@ -235,6 +318,7 @@ class TransactionController extends Controller
             'Excise Duty',
             'Loan Fees Refund',
             'Facility Fee Refund',
+            'Transaction Fees'
         ];
 
         // Get parent categories with their children (hierarchical structure)
@@ -276,7 +360,7 @@ class TransactionController extends Controller
             ->orderBy('name')
             ->get();
 
-        // Pass transaction costs
+        // Pass all transaction costs with their types
         $mpesaCosts = $this->getMpesaTransactionCosts();
         $airtelCosts = $this->getAirtelMoneyTransactionCosts();
 
@@ -288,32 +372,6 @@ class TransactionController extends Controller
             'mpesaCosts',
             'airtelCosts'
         ));
-    }
-
-    /**
-     * Calculate transaction cost based on amount and account type
-     */
-    private function calculateTransactionCost($amount, $accountType)
-    {
-        $costs = [];
-
-        if ($accountType === 'mpesa') {
-            $costs = $this->getMpesaTransactionCosts();
-        } elseif ($accountType === 'airtel_money') {
-            $costs = $this->getAirtelMoneyTransactionCosts();
-        } else {
-            return 0; // No fees for other account types
-        }
-
-        // Find the appropriate cost tier
-        foreach ($costs as $tier) {
-            if ($amount >= $tier['min'] && $amount <= $tier['max']) {
-                return $tier['cost'];
-            }
-        }
-
-        // If amount exceeds all tiers, return the highest tier cost
-        return end($costs)['cost'] ?? 0;
     }
 
     /**
@@ -329,6 +387,7 @@ class TransactionController extends Controller
             'amount' => 'required|numeric|min:0.01',
             'category_id' => 'required|exists:categories,id',
             'account_id' => 'required|exists:accounts,id',
+            'mobile_money_type' => 'nullable|in:send_money,paybill,buy_goods,pochi_la_biashara',
             'transaction_cost' => 'nullable|numeric|min:0'
         ]);
 
@@ -344,9 +403,15 @@ class TransactionController extends Controller
             abort(403, 'Unauthorized access to this category.');
         }
 
-        // Calculate transaction cost based on account type (server-side validation)
-        // Use the value from the form, but recalculate to ensure accuracy
-        $transactionCost = $this->calculateTransactionCost($validated['amount'], $account->type);
+        // Get transaction type, default to send_money
+        $transactionType = $validated['mobile_money_type'] ?? 'send_money';
+
+        // Calculate transaction cost based on account type and transaction type
+        $transactionCost = $this->calculateTransactionCost(
+            $validated['amount'],
+            $account->type,
+            $transactionType
+        );
 
         // If frontend sent a different value, use server calculation for security
         if (isset($validated['transaction_cost']) && $validated['transaction_cost'] != $transactionCost) {
@@ -354,7 +419,8 @@ class TransactionController extends Controller
                 'frontend' => $validated['transaction_cost'],
                 'backend' => $transactionCost,
                 'amount' => $validated['amount'],
-                'account_type' => $account->type
+                'account_type' => $account->type,
+                'transaction_type' => $transactionType
             ]);
         }
 
@@ -403,6 +469,7 @@ class TransactionController extends Controller
                 \Log::info('Creating transaction fee', [
                     'amount' => $transactionCost,
                     'account_type' => $account->type,
+                    'transaction_type' => $transactionType,
                     'transaction_id' => $transaction->id
                 ]);
 
@@ -419,10 +486,19 @@ class TransactionController extends Controller
                     ]
                 );
 
+                // Format transaction type name for description
+                $typeLabel = match($transactionType) {
+                    'send_money' => 'Send Money',
+                    'paybill' => 'PayBill',
+                    'buy_goods' => 'Buy Goods/Till',
+                    'pochi_la_biashara' => 'Pochi La Biashara',
+                    default => 'Send Money'
+                };
+
                 $feeTransaction = Transaction::withoutGlobalScope('ownedByUser')->create([
                     'user_id'            => Auth::id(),
                     'date'               => $validated['date'],
-                    'description'        => $paymentMethod . ' fee: ' . $validated['description'],
+                    'description'        => $paymentMethod . ' fee (' . $typeLabel . '): ' . $validated['description'],
                     'amount'             => $transactionCost,
                     'category_id'        => $feesCategory->id,
                     'account_id'         => $validated['account_id'],
@@ -444,12 +520,6 @@ class TransactionController extends Controller
                 \Log::info('Main transaction updated with fee link', [
                     'transaction_id' => $transaction->id,
                     'related_fee_id' => $transaction->related_fee_transaction_id
-                ]);
-            } else {
-                \Log::info('No transaction fee applicable', [
-                    'amount' => $validated['amount'],
-                    'account_type' => $account->type,
-                    'calculated_cost' => $transactionCost
                 ]);
             }
 
