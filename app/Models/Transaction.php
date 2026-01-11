@@ -36,6 +36,7 @@ class Transaction extends Model
         'is_reversal' => 'boolean',
         'is_transaction_fee' => 'boolean',
     ];
+    protected $dates = ['deleted_at'];
 
     protected static function booted()
     {

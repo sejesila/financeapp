@@ -406,10 +406,90 @@
             </div>
         @endif
 
-        {{-- Pagination --}}
-        <div class="pt-4 border-t overflow-x-auto">
-            {{ $transactions->links() }}
+        {{-- Pagination - Improved for Mobile and Desktop --}}
+        <div class="pt-4 border-t">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                {{-- Results Summary --}}
+                <div class="text-sm text-gray-700 dark:text-gray-300 order-2 sm:order-1">
+                    <p>
+                        Showing
+                        <span class="font-medium">{{ $transactions->firstItem() ?? 0 }}</span>
+                        to
+                        <span class="font-medium">{{ $transactions->lastItem() ?? 0 }}</span>
+                        of
+                        <span class="font-medium">{{ $transactions->total() }}</span>
+                        transactions
+                    </p>
+                </div>
+
+                {{-- Pagination Links --}}
+                <div class="order-1 sm:order-2 w-full sm:w-auto">
+                    {{ $transactions->links() }}
+                </div>
+            </div>
         </div>
+
+        {{-- Custom Pagination Styles for Better Mobile Experience --}}
+        <style>
+            /* Make pagination more mobile-friendly */
+            nav[role="navigation"] {
+                width: 100%;
+            }
+
+            @media (max-width: 640px) {
+                /* Hide page numbers on very small screens, keep only prev/next */
+                nav[role="navigation"] span[aria-current="page"],
+                nav[role="navigation"] a[rel]:not([rel="prev"]):not([rel="next"]) {
+                    display: none !important;
+                }
+
+                /* Make prev/next buttons larger on mobile */
+                nav[role="navigation"] a[rel="prev"],
+                nav[role="navigation"] a[rel="next"],
+                nav[role="navigation"] span[aria-disabled="true"] {
+                    padding: 0.75rem 1.25rem !important;
+                    font-size: 0.875rem !important;
+                }
+
+                /* Center pagination on mobile */
+                nav[role="navigation"] > div {
+                    justify-content: center !important;
+                }
+            }
+
+            @media (min-width: 641px) {
+                /* Show all page numbers on desktop */
+                nav[role="navigation"] span,
+                nav[role="navigation"] a {
+                    min-width: 2.5rem;
+                }
+            }
+
+            /* Improve button spacing */
+            nav[role="navigation"] .flex {
+                gap: 0.25rem;
+            }
+
+            /* Better hover states */
+            nav[role="navigation"] a:hover {
+                background-color: rgb(79 70 229) !important;
+                border-color: rgb(79 70 229) !important;
+                color: white !important;
+            }
+
+            /* Active page styling */
+            nav[role="navigation"] span[aria-current="page"] {
+                background-color: rgb(79 70 229) !important;
+                border-color: rgb(79 70 229) !important;
+                color: white !important;
+            }
+
+            /* Disabled state */
+            nav[role="navigation"] span[aria-disabled="true"] {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
+        </style>
 
     </div>
     <x-floating-action-button :quickAccount="$accounts->first()" />

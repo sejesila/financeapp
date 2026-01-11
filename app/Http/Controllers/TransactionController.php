@@ -512,18 +512,151 @@ class TransactionController extends Controller
     /**
      * Remove the specified resource from storage.
      */
+    // In TransactionController.php
+
+    /**
+     * Soft delete the specified transaction
+     */
     public function destroy(Transaction $transaction)
     {
         $this->authorize('delete', $transaction);
 
+        // Don't allow deleting system-generated fees directly
+        if ($transaction->is_transaction_fee) {
+            return redirect()->back()
+                ->with('error', 'System-generated transaction fees cannot be deleted directly. Delete the main transaction instead.');
+        }
+
+        DB::beginTransaction();
+
         try {
-            $this->transactionService->deleteTransaction($transaction);
+            // Store account for balance update
+            $account = $transaction->account;
+            $oldAccount = $account; // In case we need it
+
+            // If this transaction has a related fee, delete it too
+            if ($transaction->related_fee_transaction_id) {
+                $feeTransaction = Transaction::find($transaction->related_fee_transaction_id);
+                if ($feeTransaction) {
+                    $feeTransaction->delete(); // Soft delete
+                }
+            }
+
+            // Soft delete the main transaction
+            $transaction->delete();
+
+            // Recalculate account balance
+            $account->updateBalance();
+
+            // If transaction was moved between accounts, update both
+            if (isset($oldAccount) && $oldAccount->id !== $account->id) {
+                $oldAccount->updateBalance();
+            }
+
+            DB::commit();
 
             return redirect()->route('transactions.index')
-                ->with('success', 'Transaction deleted successfully!');
+                ->with('success', 'Transaction deleted successfully. Account balance has been updated.');
 
         } catch (\Exception $e) {
-            return back()->with('error', $e->getMessage());
+            DB::rollBack();
+            \Log::error('Transaction deletion failed: ' . $e->getMessage());
+
+            return back()->with('error', 'Failed to delete transaction: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Show deleted transactions (trash)
+     */
+    public function trash()
+    {
+        $deletedTransactions = Transaction::onlyTrashed()
+            ->where('user_id', Auth::id())
+            ->with(['category', 'account'])
+            ->latest('deleted_at')
+            ->paginate(20);
+
+        return view('transactions.trash', compact('deletedTransactions'));
+    }
+
+    /**
+     * Restore a soft-deleted transaction
+     */
+    public function restore($id)
+    {
+        $transaction = Transaction::onlyTrashed()
+            ->where('user_id', Auth::id())
+            ->findOrFail($id);
+
+        DB::beginTransaction();
+
+        try {
+            // Restore the transaction
+            $transaction->restore();
+
+            // Restore related fee if exists
+            if ($transaction->related_fee_transaction_id) {
+                $feeTransaction = Transaction::onlyTrashed()->find($transaction->related_fee_transaction_id);
+                if ($feeTransaction) {
+                    $feeTransaction->restore();
+                }
+            }
+
+            // Recalculate account balance
+            $transaction->account->updateBalance();
+
+            DB::commit();
+
+            return redirect()->route('transactions.index')
+                ->with('success', 'Transaction restored successfully.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to restore transaction: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Permanently delete a transaction
+     */
+    public function forceDestroy($id)
+    {
+        $transaction = Transaction::onlyTrashed()
+            ->where('user_id', Auth::id())
+            ->findOrFail($id);
+
+        $this->authorize('forceDelete', $transaction);
+
+        DB::beginTransaction();
+
+        try {
+            $account = $transaction->account;
+
+            // Force delete related fee
+            if ($transaction->related_fee_transaction_id) {
+                $feeTransaction = Transaction::onlyTrashed()->find($transaction->related_fee_transaction_id);
+                if ($feeTransaction) {
+                    $feeTransaction->forceDelete();
+                }
+            }
+
+            // Permanently delete
+            $transaction->forceDelete();
+
+            // Recalculate balance
+            if ($account) {
+                $account->updateBalance();
+            }
+
+            DB::commit();
+
+            return redirect()->route('transactions.trash')
+                ->with('success', 'Transaction permanently deleted.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to permanently delete transaction: ' . $e->getMessage());
         }
     }
 }
