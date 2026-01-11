@@ -54,7 +54,7 @@ class ClientFundController extends Controller
 
         DB::beginTransaction();
         try {
-            // Create client fund record
+            // Create client fund record (this is a liability - money you're holding for someone)
             $clientFund = ClientFund::create([
                 'user_id' => Auth::id(),
                 'client_name' => $request->client_name,
@@ -70,7 +70,7 @@ class ClientFundController extends Controller
                 'notes' => $request->notes,
             ]);
 
-            // Create receipt transaction
+            // Create receipt transaction in client fund tracking
             ClientFundTransaction::create([
                 'client_fund_id' => $clientFund->id,
                 'type' => 'receipt',
@@ -79,39 +79,20 @@ class ClientFundController extends Controller
                 'description' => "Received from {$request->client_name} for {$request->purpose}",
             ]);
 
-            // Get or create "Client Funds" income category
-            $category = Category::firstOrCreate(
-                [
-                    'name' => 'Client Funds Receipt',
-                    'user_id' => Auth::id(),
-                ],
-                [
-                    'type' => 'income',
-                    'parent_id' => null,
-                ]
-            );
+            // ❌ DO NOT create income transaction - this is NOT your income yet!
+            // The money just increases your account balance but it's a liability
+            // Only profit/commission becomes your income
 
-            // Create income transaction in the account
-            $transaction = Transaction::create([
-                'user_id' => Auth::id(),
-                'account_id' => $request->account_id,
-                'category_id' => $category->id,
-                'amount' => $request->amount_received,
-                'date' => $request->received_date,
-                'period_date' => $request->received_date,
-                'description' => "Client fund received: {$request->client_name} - {$request->purpose}",
-                'payment_method' => 'Client Transfer',
-            ]);
-
-            // Update account balance
+            // Just update account balance directly (money is in your account but not yours)
             $account = Account::find($request->account_id);
-            $account->updateBalance();
+            $account->current_balance += $request->amount_received;
+            $account->save();
 
             DB::commit();
 
             return redirect()
                 ->route('client-funds.show', $clientFund)
-                ->with('success', 'Client fund recorded successfully!');
+                ->with('success', 'Client fund recorded successfully! Remember: This is not your income yet.');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -145,7 +126,7 @@ class ClientFundController extends Controller
 
         DB::beginTransaction();
         try {
-            // Record expense in client fund
+            // Record expense in client fund tracking
             ClientFundTransaction::create([
                 'client_fund_id' => $clientFund->id,
                 'type' => 'expense',
@@ -154,28 +135,21 @@ class ClientFundController extends Controller
                 'description' => $request->description,
             ]);
 
-            // Create expense transaction in account
-            $transaction = Transaction::create([
-                'user_id' => Auth::id(),
-                'account_id' => $clientFund->account_id,
-                'category_id' => $request->category_id,
-                'amount' => $request->amount,
-                'date' => $request->date,
-                'period_date' => $request->date,
-                'description' => "Client expense: {$clientFund->client_name} - {$request->description}",
-                'payment_method' => 'Client Funds',
-            ]);
+            // ❌ DO NOT create expense transaction in your personal budget
+            // This is the CLIENT'S expense, not yours
+            // Just deduct from account balance directly
+
+            $account = $clientFund->account;
+            $account->current_balance -= $request->amount;
+            $account->save();
 
             // Update client fund
             $clientFund->amount_spent += $request->amount;
             $clientFund->updateBalance();
 
-            // Update account balance
-            $clientFund->account->updateBalance();
-
             DB::commit();
 
-            return back()->with('success', 'Expense recorded successfully!');
+            return back()->with('success', 'Expense recorded successfully! (This was the client\'s expense, not yours)');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -201,7 +175,7 @@ class ClientFundController extends Controller
 
         DB::beginTransaction();
         try {
-            // Record profit in client fund
+            // Record profit in client fund tracking
             ClientFundTransaction::create([
                 'client_fund_id' => $clientFund->id,
                 'type' => 'profit',
@@ -210,13 +184,43 @@ class ClientFundController extends Controller
                 'description' => $request->description ?: "Profit from {$clientFund->purpose}",
             ]);
 
+            // ✅ NOW create income transaction - THIS IS your income!
+            // Get or create "Side Income" category for profit
+            $profitCategory = Category::firstOrCreate(
+                [
+                    'name' => 'Side Income',
+                    'user_id' => Auth::id(),
+                ],
+                [
+                    'type' => 'income',
+                    'parent_id' => Category::where('user_id', Auth::id())
+                            ->where('name', 'Income')
+                            ->first()->id ?? null,
+                ]
+            );
+
+            // Create income transaction for YOUR profit
+            Transaction::create([
+                'user_id' => Auth::id(),
+                'account_id' => $clientFund->account_id,
+                'category_id' => $profitCategory->id,
+                'amount' => $request->amount,
+                'date' => $request->date,
+                'period_date' => $request->date,
+                'description' => "Profit from {$clientFund->client_name}: {$clientFund->purpose}",
+                'payment_method' => 'Client Commission',
+            ]);
+
             // Update client fund
             $clientFund->profit_amount += $request->amount;
             $clientFund->updateBalance();
 
+            // Update account balance using the proper method
+            $clientFund->account->updateBalance();
+
             DB::commit();
 
-            return back()->with('success', 'Profit recorded successfully! This amount is now yours.');
+            return back()->with('success', 'Profit recorded successfully! This is now YOUR income.');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -234,10 +238,22 @@ class ClientFundController extends Controller
             return back()->with('error', 'Cannot complete with remaining balance. Please record all expenses and profit first.');
         }
 
-        $clientFund->status = 'completed';
-        $clientFund->completed_date = now();
-        $clientFund->save();
+        DB::beginTransaction();
+        try {
+            // When completing, if there's any remaining balance, it should be returned to client
+            // But since balance is 0, we just mark as completed
 
-        return back()->with('success', 'Client fund marked as completed!');
+            $clientFund->status = 'completed';
+            $clientFund->completed_date = now();
+            $clientFund->save();
+
+            DB::commit();
+
+            return back()->with('success', 'Client fund marked as completed!');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to complete: ' . $e->getMessage());
+        }
     }
 }
