@@ -242,6 +242,14 @@
                         <a href="{{ route('profile.edit') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition">
                             Profile
                         </a>
+
+                        <a href="{{ route('email-preferences.edit') }}" class="flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                            </svg>
+                            Email Reports
+                        </a>
+
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
                             <button type="submit" class="w-full text-left px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition">
@@ -283,37 +291,78 @@
     }
 
     // Desktop theme toggle
-    document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+    const themeToggle = document.getElementById('themeToggle');
+    if (themeToggle) {
+        themeToggle.addEventListener('click', toggleTheme);
+    }
 
     // Mobile theme toggle
-    document.getElementById('themeToggleMobile').addEventListener('click', toggleTheme);
+    const themeToggleMobile = document.getElementById('themeToggleMobile');
+    if (themeToggleMobile) {
+        themeToggleMobile.addEventListener('click', toggleTheme);
+    }
+
+    // Mobile menu elements
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const mobileMenu = document.getElementById('mobileMenu');
+
+    // Desktop user menu elements
+    const userMenuBtn = document.getElementById('userMenuBtn');
+    const userMenu = document.getElementById('userMenu');
 
     // Mobile menu toggle
-    document.getElementById('mobileMenuBtn').addEventListener('click', function() {
-        const menu = document.getElementById('mobileMenu');
-        menu.classList.toggle('hidden');
-    });
+    if (mobileMenuBtn && mobileMenu) {
+        mobileMenuBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            mobileMenu.classList.toggle('hidden');
+        });
+    }
 
     // Desktop user menu toggle
-    document.getElementById('userMenuBtn').addEventListener('click', function() {
-        const menu = document.getElementById('userMenu');
-        menu.classList.toggle('hidden');
-    });
+    if (userMenuBtn && userMenu) {
+        userMenuBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            userMenu.classList.toggle('hidden');
+        });
+    }
 
-    // Close desktop user menu when clicking outside
+    // Close menus when clicking outside
     document.addEventListener('click', function(event) {
-        const menu = document.getElementById('userMenu');
-        const btn = document.getElementById('userMenuBtn');
-        if (!btn.contains(event.target) && !menu.contains(event.target)) {
-            menu.classList.add('hidden');
+        // Close mobile menu if clicking outside
+        if (mobileMenu && mobileMenuBtn) {
+            const clickedInsideMenu = mobileMenu.contains(event.target);
+            const clickedButton = mobileMenuBtn.contains(event.target);
+
+            if (!clickedButton && !clickedInsideMenu && !mobileMenu.classList.contains('hidden')) {
+                mobileMenu.classList.add('hidden');
+            }
+        }
+
+        // Close desktop user menu if clicking outside
+        if (userMenu && userMenuBtn) {
+            if (!userMenuBtn.contains(event.target) && !userMenu.contains(event.target)) {
+                userMenu.classList.add('hidden');
+            }
         }
     });
 
+    // Close mobile menu when a link is clicked
+    if (mobileMenu) {
+        const menuLinks = mobileMenu.querySelectorAll('a, button[type="submit"]');
+        menuLinks.forEach(link => {
+            link.addEventListener('click', function() {
+                mobileMenu.classList.add('hidden');
+            });
+        });
+    }
+
     // Session Timeout Management
     (function() {
-        const sessionLifetime = {{ config('session.lifetime') }} * 60 * 1000; // Convert to milliseconds
-        const warningTime = 5 * 60 * 1000; // Show warning 5 minutes before expiry
-        const pingInterval = 5 * 60 * 1000; // Ping every 5 minutes
+        const sessionLifetime = {{ config('session.lifetime') }} * 60 * 1000;
+        const warningTime = 5 * 60 * 1000;
+        const pingInterval = 5 * 60 * 1000;
         let timeoutWarning;
         let sessionTimeout;
         let countdownInterval;
@@ -325,10 +374,7 @@
             clearTimeout(timeoutWarning);
             clearTimeout(sessionTimeout);
 
-            // Show warning before session expires
             timeoutWarning = setTimeout(showWarning, sessionLifetime - warningTime);
-
-            // Auto logout when session expires
             sessionTimeout = setTimeout(logout, sessionLifetime);
         }
 
@@ -336,7 +382,7 @@
             const modal = document.getElementById('timeoutWarning');
             modal.classList.remove('hidden');
 
-            let secondsLeft = 300; // 5 minutes
+            let secondsLeft = 300;
             updateCountdown(secondsLeft);
 
             countdownInterval = setInterval(() => {
@@ -397,37 +443,30 @@
                 });
         }
 
-        // Event listeners for user activity
         const events = ['mousedown', 'keypress', 'scroll', 'touchstart', 'click'];
         events.forEach(event => {
             document.addEventListener(event, () => {
                 const now = Date.now();
-                // Only reset if it's been more than 10 seconds since last activity
                 if (now - lastActivity > 10000) {
                     resetTimer();
                 }
             }, { passive: true });
         });
 
-        // Button handlers
         document.getElementById('stayLoggedIn')?.addEventListener('click', stayLoggedIn);
         document.getElementById('logoutNow')?.addEventListener('click', logout);
 
-        // Start periodic ping to keep session alive
         pingTimer = setInterval(() => {
             pingServer(false);
         }, pingInterval);
 
-        // Initialize timer and do initial ping
         resetTimer();
         pingServer(false);
 
-        // Handle 419 CSRF errors globally
         const originalFetch = window.fetch;
         window.fetch = function(...args) {
             return originalFetch.apply(this, args).then(response => {
                 if (response.status === 419) {
-                    // CSRF token mismatch
                     if (confirm('Your session has expired. Reload the page to continue?')) {
                         window.location.reload();
                     } else {
@@ -439,5 +478,6 @@
         };
     })();
 </script>
+
 </body>
 </html>

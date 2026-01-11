@@ -45,7 +45,7 @@ class UserObserver
                     ['name' => 'Spouse', 'icon' => '💑'],
                     ['name' => 'Parent', 'icon' => '👵'],
                     ['name' => 'Siblings', 'icon' => '👫'],
-                   
+
                 ],
             ],
             [

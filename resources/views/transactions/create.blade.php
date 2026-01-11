@@ -1,20 +1,20 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center justify-between mb-6">
-            <h2 class="font-semibold text-lg sm:text-xl text-gray-800 dark:text-gray-200 leading-tight">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+            <h2 class="font-semibold text-base sm:text-lg md:text-xl text-gray-800 dark:text-gray-200 leading-tight">
                 {{ __('Add New Transaction') }}
             </h2>
-            <a href="{{ route('transactions.index') }}" class="text-indigo-600 hover:text-indigo-800">
+            <a href="{{ route('transactions.index') }}" class="text-sm sm:text-base text-indigo-600 hover:text-indigo-800">
                 ← Back to Transactions
             </a>
         </div>
     </x-slot>
 
-    <div class="max-w-2xl mx-auto mt-10 p-6 bg-white dark:bg-gray-800 shadow-xl rounded-2xl">
+    <div class="max-w-2xl mx-auto mt-4 sm:mt-10 p-4 sm:p-6 bg-white dark:bg-gray-800 shadow-xl rounded-xl sm:rounded-2xl">
 
         @if($errors->any())
-            <div class="bg-red-100 text-red-700 p-4 rounded mb-6">
-                <ul class="list-disc list-inside">
+            <div class="bg-red-100 text-red-700 p-3 sm:p-4 rounded text-sm mb-4 sm:mb-6">
+                <ul class="list-disc list-inside space-y-1">
                     @foreach($errors->all() as $error)
                         <li>{{ $error }}</li>
                     @endforeach
@@ -23,48 +23,48 @@
         @endif
 
         @if(session('error'))
-            <div class="bg-red-100 text-red-700 p-4 rounded mb-6">
+            <div class="bg-red-100 text-red-700 p-3 sm:p-4 rounded text-sm mb-4 sm:mb-6">
                 {{ session('error') }}
             </div>
         @endif
 
-        <form action="{{ route('transactions.store') }}" method="POST" class="space-y-5">
+        <form action="{{ route('transactions.store') }}" method="POST" class="space-y-4 sm:space-y-5">
             @csrf
 
             <div x-data="transactionForm()">
                 <!-- Date -->
-                <div class="mb-5">
-                    <label class="block font-semibold mb-1 dark:text-gray-200">Date</label>
+                <div class="mb-4 sm:mb-5">
+                    <label class="block text-sm sm:text-base font-semibold mb-1 dark:text-gray-200">Date</label>
                     <input
                         type="date"
                         name="date"
                         value="{{ old('date', date('Y-m-d')) }}"
-                        class="w-full border dark:border-gray-600 p-2 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
+                        class="w-full text-sm sm:text-base border dark:border-gray-600 p-2 sm:p-2.5 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
                         required
                     >
                 </div>
 
                 <!-- Description -->
-                <div class="mb-5">
-                    <label class="block font-semibold mb-1 dark:text-gray-200">Description</label>
+                <div class="mb-4 sm:mb-5">
+                    <label class="block text-sm sm:text-base font-semibold mb-1 dark:text-gray-200">Description</label>
                     <input
                         type="text"
                         name="description"
                         value="{{ old('description') }}"
                         placeholder="e.g. Supermarket shopping"
-                        class="w-full border dark:border-gray-600 p-2 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
+                        class="w-full text-sm sm:text-base border dark:border-gray-600 p-2 sm:p-2.5 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
                         required
                     >
                 </div>
 
                 <!-- Account -->
-                <div class="mb-5">
-                    <label class="block font-semibold mb-1 dark:text-gray-200">Account</label>
+                <div class="mb-4 sm:mb-5">
+                    <label class="block text-sm sm:text-base font-semibold mb-1 dark:text-gray-200">Account</label>
                     <select
                         name="account_id"
                         x-model="accountId"
                         @change="onAccountChange()"
-                        class="w-full border dark:border-gray-600 p-2 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
+                        class="w-full text-sm sm:text-base border dark:border-gray-600 p-2 sm:p-2.5 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
                         required
                     >
                         <option value="">-- Select Account --</option>
@@ -87,33 +87,33 @@
                             </option>
                         @endforeach
                     </select>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Payment method will be auto-set based on account type</p>
+                    <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">Payment method will be auto-set based on account type</p>
                 </div>
 
                 <!-- Mobile Money Transaction Type -->
-                <div class="mb-5" x-show="showTransactionTypeSelector">
-                    <label class="block font-semibold mb-1 dark:text-gray-200">Transaction Type</label>
+                <div class="mb-4 sm:mb-5" x-show="showTransactionTypeSelector">
+                    <label class="block text-sm sm:text-base font-semibold mb-1 dark:text-gray-200">Transaction Type</label>
                     <select
                         name="mobile_money_type"
                         x-model="mobileMoneyType"
                         @change="calculateTransactionCost()"
-                        class="w-full border dark:border-gray-600 p-2 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
+                        class="w-full text-sm sm:text-base border dark:border-gray-600 p-2 sm:p-2.5 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
                     >
                         <option value="send_money">Send Money</option>
                         <option value="paybill">PayBill</option>
                         <option value="buy_goods">Buy Goods/Till Number</option>
                         <option value="pochi_la_biashara">Pochi La Biashara</option>
                     </select>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        <span x-show="mobileMoneyType === 'send_money' || mobileMoneyType === 'pochi_la_biashara'">Different transaction types have different fees</span>
-                        <span x-show="mobileMoneyType === 'paybill'">PayBill has lower transaction fees</span>
-                        <span x-show="mobileMoneyType === 'buy_goods'">Till Number transactions have no charges</span>
+                    <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        <span x-show="mobileMoneyType === 'send_money' || mobileMoneyType === 'pochi_la_biashara'">Different types have different fees</span>
+                        <span x-show="mobileMoneyType === 'paybill'">PayBill has lower fees</span>
+                        <span x-show="mobileMoneyType === 'buy_goods'">Till has no charges</span>
                     </p>
                 </div>
 
                 <!-- Amount -->
-                <div class="mb-5">
-                    <label class="block font-semibold mb-1 dark:text-gray-200">Amount</label>
+                <div class="mb-4 sm:mb-5">
+                    <label class="block text-sm sm:text-base font-semibold mb-1 dark:text-gray-200">Amount</label>
                     <input
                         type="number"
                         step="0.01"
@@ -121,36 +121,33 @@
                         value="{{ old('amount') }}"
                         x-model="amount"
                         @input="calculateTransactionCost()"
-                        class="w-full border dark:border-gray-600 p-2 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
+                        class="w-full text-sm sm:text-base border dark:border-gray-600 p-2 sm:p-2.5 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
                         required
                     >
                 </div>
 
                 <!-- Transaction Cost -->
-                <div x-show="showTransactionCost" class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-5">
-                    <div class="flex items-center justify-between mb-2">
-                        <label class="block font-semibold text-yellow-800 dark:text-yellow-200">
-                            <span x-text="accountTypeName"></span> <span x-text="getTransactionTypeLabel()"></span> Fee
+                <div x-show="showTransactionCost && amount > 100" class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded p-2 sm:p-3 mb-4 sm:mb-5">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-medium text-yellow-800 dark:text-yellow-200">
+                            <span x-text="accountTypeName"></span> Fee
                         </label>
-                        <span class="text-lg font-bold text-yellow-800 dark:text-yellow-200" x-text="'KSh ' + transactionCost.toFixed(2)"></span>
+                        <span class="text-base sm:text-lg font-bold text-yellow-800 dark:text-yellow-200" x-text="'KSh ' + transactionCost.toFixed(2)"></span>
                     </div>
                     <input type="hidden" name="transaction_cost" :value="transactionCost">
-                    <p class="text-sm text-yellow-700 dark:text-yellow-300">
-                        This fee will be automatically added as a separate transaction under "Transaction Fees" category.
-                    </p>
                 </div>
 
                 <!-- Total Amount Display -->
-                <div x-show="showTransactionCost && amount > 0" class="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg p-4 mb-5">
+                <div x-show="showTransactionCost && amount > 100" class="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded p-2 sm:p-3 mb-4 sm:mb-5">
                     <div class="flex items-center justify-between">
-                        <span class="font-semibold text-indigo-800 dark:text-indigo-200">Total Amount (including fee):</span>
-                        <span class="text-xl font-bold text-indigo-800 dark:text-indigo-200" x-text="'KSh ' + totalAmount.toFixed(2)"></span>
+                        <span class="text-xs font-medium text-indigo-800 dark:text-indigo-200">Total:</span>
+                        <span class="text-base sm:text-lg font-bold text-indigo-800 dark:text-indigo-200" x-text="'KSh ' + totalAmount.toFixed(2)"></span>
                     </div>
                 </div>
 
                 <!-- Category -->
-                <div class="mb-5">
-                    <label class="block font-semibold mb-1 dark:text-gray-200">Category</label>
+                <div class="mb-4 sm:mb-5">
+                    <label class="block text-sm sm:text-base font-semibold mb-1 dark:text-gray-200">Category</label>
                     <div
                         x-data='categoryDropdown(@json($categoryGroups), @json(old("category_id")))'
                         x-init="init()"
@@ -168,7 +165,7 @@
                                 @keydown.escape="closeDropdown()"
                                 @keydown.enter.prevent="selectFirst()"
                                 placeholder="Search or select a category..."
-                                class="w-full border dark:border-gray-600 p-2 pr-20 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
+                                class="w-full text-sm sm:text-base border dark:border-gray-600 p-2 sm:p-2.5 pr-16 sm:pr-20 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
                                 :aria-owns="$id('category-dropdown')"
                                 :aria-expanded="open"
                                 aria-label="Category"
@@ -213,7 +210,7 @@
                         <div
                             x-show="open"
                             x-transition
-                            class="absolute z-50 mt-1 w-full bg-white dark:bg-gray-700 border dark:border-gray-600 rounded-lg shadow-lg max-h-64 overflow-auto"
+                            class="absolute z-50 mt-1 w-full bg-white dark:bg-gray-700 border dark:border-gray-600 rounded-lg shadow-lg max-h-60 sm:max-h-64 overflow-auto"
                             :id="$id('category-dropdown')"
                             role="listbox"
                             style="display: none;"
@@ -221,7 +218,7 @@
                             <template x-for="parent in filteredCategories()" :key="parent.id">
                                 <div>
                                     <!-- Parent Category Header -->
-                                    <div class="px-4 py-2 font-semibold text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 sticky top-0">
+                                    <div class="px-3 sm:px-4 py-2 font-semibold text-xs sm:text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 sticky top-0">
                                         <span x-show="parent.icon" x-text="parent.icon" class="mr-1"></span>
                                         <span x-text="parent.name"></span>
                                     </div>
@@ -230,7 +227,7 @@
                                     <template x-for="child in parent.children" :key="child.id">
                                         <div
                                             @click="select(child)"
-                                            class="px-6 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer text-gray-700 dark:text-gray-200 transition"
+                                            class="px-4 sm:px-6 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer text-sm sm:text-base text-gray-700 dark:text-gray-200 transition"
                                             :class="{ 'bg-indigo-100 dark:bg-indigo-900/50': selectedId === child.id }"
                                             role="option"
                                             :aria-selected="selectedId === child.id"
@@ -244,7 +241,7 @@
                                     <template x-if="parent.children.length === 0">
                                         <div
                                             @click="select(parent)"
-                                            class="px-6 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer text-gray-700 dark:text-gray-200 transition"
+                                            class="px-4 sm:px-6 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer text-sm sm:text-base text-gray-700 dark:text-gray-200 transition"
                                             :class="{ 'bg-indigo-100 dark:bg-indigo-900/50': selectedId === parent.id }"
                                             role="option"
                                             :aria-selected="selectedId === parent.id"
@@ -257,7 +254,7 @@
                             </template>
 
                             <!-- No results message -->
-                            <div x-show="filteredCategories().length === 0" class="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-sm">
+                            <div x-show="filteredCategories().length === 0" class="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs sm:text-sm">
                                 No categories found
                             </div>
                         </div>
@@ -268,9 +265,11 @@
                 </div>
 
                 <!-- Submit -->
-                <div class="flex items-center justify-between">
-                    <a href="{{ route('transactions.index') }}" class="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">Cancel</a>
-                    <button type="submit" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition">
+                <div class="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+                    <a href="{{ route('transactions.index') }}" class="text-center sm:text-left text-sm sm:text-base text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 py-2 sm:py-0">
+                        Cancel
+                    </a>
+                    <button type="submit" class="w-full sm:w-auto bg-indigo-600 text-white px-6 py-2.5 sm:py-2 rounded-lg hover:bg-indigo-700 transition text-sm sm:text-base font-medium">
                         Save Transaction
                     </button>
                 </div>
@@ -297,32 +296,23 @@
                 },
 
                 init() {
-                    console.log('Transaction form initialized');
-                    console.log('Account ID:', this.accountId);
                     this.$nextTick(() => {
                         this.onAccountChange();
                     });
                 },
 
                 onAccountChange() {
-                    console.log('Account changed');
                     const select = document.querySelector('select[name="account_id"]');
-                    if (!select) {
-                        console.error('Account select not found');
-                        return;
-                    }
+                    if (!select) return;
 
                     const selectedOption = select.options[select.selectedIndex];
-                    console.log('Selected option:', selectedOption);
 
                     if (selectedOption && selectedOption.value) {
                         this.accountType = selectedOption.getAttribute('data-type');
-                        console.log('Account type:', this.accountType);
 
                         // Show transaction type selector for mobile money accounts
                         if (this.accountType === 'mpesa' || this.accountType === 'airtel_money') {
                             this.showTransactionTypeSelector = true;
-                            console.log('Showing transaction type selector');
 
                             // Hide Pochi La Biashara for Airtel Money
                             if (this.accountType === 'airtel_money' && this.mobileMoneyType === 'pochi_la_biashara') {
@@ -331,7 +321,6 @@
                         } else {
                             this.showTransactionTypeSelector = false;
                             this.mobileMoneyType = 'send_money';
-                            console.log('Hiding transaction type selector');
                         }
 
                         this.calculateTransactionCost();
@@ -354,11 +343,6 @@
                 },
 
                 calculateTransactionCost() {
-                    console.log('Calculating transaction cost...');
-                    console.log('Amount:', this.amount);
-                    console.log('Account Type:', this.accountType);
-                    console.log('Mobile Money Type:', this.mobileMoneyType);
-
                     const amount = parseFloat(this.amount || 0);
 
                     if (!this.accountType || amount <= 0) {
@@ -384,8 +368,6 @@
                         return;
                     }
 
-                    console.log('Costs array:', costs);
-
                     // Find the appropriate cost tier
                     if (Array.isArray(costs)) {
                         for (let tier of costs) {
@@ -396,7 +378,6 @@
                         }
                     }
 
-                    console.log('Calculated cost:', cost);
                     this.transactionCost = cost;
 
                     // Hide cost display if it's 0 for buy_goods

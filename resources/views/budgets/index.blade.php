@@ -3,20 +3,20 @@
     <x-slot name="header">
         <div class="flex flex-wrap items-center justify-between gap-4">
             <div>
-                <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200">
+                <h2 class="text-lg sm:text-xl font-semibold text-gray-800 dark:text-gray-200">
                     Budget Overview
                 </h2>
-                <p class="text-sm text-gray-500">
-                    {{ $year }} annual budget performance (Auto-generated from transactions)
+                <p class="text-xs sm:text-sm text-gray-500">
+                    {{ $year }} annual budget performance
                 </p>
             </div>
 
-            {{-- APPROACH 1: Smart Dropdown with Recent Years + "All Years" option --}}
+            {{-- Year Selector --}}
             <div class="relative" x-data="{ open: false, selectedYear: {{ $year }} }">
                 <button
                     @click="open = !open"
                     @click.outside="open = false"
-                    class="flex items-center gap-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+                    class="flex items-center gap-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 sm:px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
                 >
                     <span class="font-medium">{{ $year }}</span>
                     <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -30,7 +30,7 @@
                     class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 overflow-hidden"
                     style="display: none;"
                 >
-                    {{-- Recent/Common Years (last 3 years + current) --}}
+                    {{-- Recent Years --}}
                     <div class="border-b border-gray-200 dark:border-gray-700">
                         @php
                             $currentYear = date('Y');
@@ -49,7 +49,7 @@
                         @endforeach
                     </div>
 
-                    {{-- All Years Option (opens modal/expands) --}}
+                    {{-- All Years Option --}}
                     @if($maxYear - $minYear > 3)
                         <button
                             @click="$dispatch('open-all-years-modal')"
@@ -66,17 +66,161 @@
         </div>
     </x-slot>
 
-    <div class="mx-auto max-w-7xl py-10 space-y-10">
+    <div class="mx-auto max-w-7xl py-4 sm:py-10 space-y-6 sm:space-y-10 px-4 sm:px-6 lg:px-8">
 
         {{-- Flash --}}
         @if(session('success'))
-            <div class="rounded-md bg-green-100 px-4 py-3 text-green-700">
+            <div class="rounded-md bg-green-100 px-4 py-3 text-sm text-green-700">
                 {{ session('success') }}
             </div>
         @endif
 
-        {{-- Budget Table (Read-Only) --}}
-        <div class="space-y-4">
+        {{-- Mobile: Card-based view --}}
+        <div class="lg:hidden space-y-6" x-data="{ selectedMonth: {{ $currentMonth }} }">
+            <div>
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                    Monthly Budget Details
+                </h3>
+                <p class="text-xs text-gray-500 mb-4">
+                    Auto-generated from transactions
+                </p>
+            </div>
+
+            {{-- Month Selector for Mobile --}}
+            <div class="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 scrollbar-hide">
+                @for($m = 1; $m <= 12; $m++)
+                    <button
+                        @click="selectedMonth = {{ $m }}"
+                        :class="selectedMonth === {{ $m }} ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'"
+                        class="flex-shrink-0 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-medium transition"
+                    >
+                        {{ \Carbon\Carbon::create()->month($m)->format('M') }}
+                    </button>
+                @endfor
+            </div>
+
+            {{-- Monthly Breakdown Cards --}}
+            <div>
+                @for($m = 1; $m <= 12; $m++)
+                    <div x-show="selectedMonth === {{ $m }}" class="space-y-4">
+                        {{-- Income Section --}}
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <h4 class="font-semibold text-green-600 dark:text-green-400 flex items-center gap-2">
+                                    <span class="text-lg">💰</span>
+                                    INCOME
+                                </h4>
+                                @php
+                                    $monthIncome = 0;
+                                    foreach($incomeCategories as $cat) {
+                                        $monthIncome += $actuals[$cat->id][$m] ?? 0;
+                                    }
+                                @endphp
+                                <span class="text-lg font-bold text-green-600 dark:text-green-400">
+                                    {{ number_format($monthIncome, 0) }}
+                                </span>
+                            </div>
+                            <div class="space-y-2">
+                                @foreach($incomeCategories as $category)
+                                    @php
+                                        $actualAmount = $actuals[$category->id][$m] ?? 0;
+                                    @endphp
+                                    @if($actualAmount > 0)
+                                        <div class="flex items-center justify-between text-sm">
+                                            <span class="text-gray-700 dark:text-gray-300">{{ $category->name }}</span>
+                                            <span class="font-medium text-green-600 dark:text-green-400">
+                                                {{ number_format($actualAmount, 0) }}
+                                            </span>
+                                        </div>
+                                    @endif
+                                @endforeach
+                            </div>
+                        </div>
+
+                        {{-- Expenses Section --}}
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <h4 class="font-semibold text-red-600 dark:text-red-400 flex items-center gap-2">
+                                    <span class="text-lg">💸</span>
+                                    EXPENSES
+                                </h4>
+                                @php
+                                    $monthExpense = 0;
+                                    foreach($expenseCategories as $cat) {
+                                        $monthExpense += $actuals[$cat->id][$m] ?? 0;
+                                    }
+                                @endphp
+                                <span class="text-lg font-bold text-red-600 dark:text-red-400">
+                                    {{ number_format($monthExpense, 0) }}
+                                </span>
+                            </div>
+                            <div class="space-y-2">
+                                @foreach($expenseCategories as $category)
+                                    @php
+                                        $actualAmount = $actuals[$category->id][$m] ?? 0;
+                                    @endphp
+                                    @if($actualAmount > 0)
+                                        <div class="flex items-center justify-between text-sm">
+                                            <span class="text-gray-700 dark:text-gray-300">{{ $category->name }}</span>
+                                            <span class="font-medium text-red-600 dark:text-red-400">
+                                                {{ number_format($actualAmount, 0) }}
+                                            </span>
+                                        </div>
+                                    @endif
+                                @endforeach
+                            </div>
+                        </div>
+
+                        {{-- Net Income Card --}}
+                        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg shadow-sm p-4 border-2 border-blue-200 dark:border-blue-800">
+                            <div class="flex items-center justify-between">
+                                <h4 class="font-semibold text-blue-800 dark:text-blue-200">
+                                    NET INCOME
+                                </h4>
+                                @php
+                                    $netAmount = $monthIncome - $monthExpense;
+                                @endphp
+                                <span class="text-xl font-bold {{ $netAmount < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400' }}">
+                                    {{ number_format($netAmount, 0) }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                @endfor
+            </div>
+
+            {{-- Yearly Summary for Mobile --}}
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 space-y-3">
+                <h4 class="font-semibold text-gray-800 dark:text-gray-200 mb-3">{{ $year }} Summary</h4>
+
+                <div class="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-gray-700">
+                    <span class="text-sm text-gray-600 dark:text-gray-400">Total Income</span>
+                    <span class="font-bold text-green-600 dark:text-green-400">
+                        {{ number_format($incomeCategories->sum('yearly_total'), 0) }}
+                    </span>
+                </div>
+
+                <div class="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-gray-700">
+                    <span class="text-sm text-gray-600 dark:text-gray-400">Total Expenses</span>
+                    <span class="font-bold text-red-600 dark:text-red-400">
+                        {{ number_format($expenseCategories->sum('yearly_total'), 0) }}
+                    </span>
+                </div>
+
+                <div class="flex items-center justify-between pt-2">
+                    <span class="font-semibold text-gray-800 dark:text-gray-200">Net Income</span>
+                    @php
+                        $yearlyNet = $incomeCategories->sum('yearly_total') - $expenseCategories->sum('yearly_total');
+                    @endphp
+                    <span class="text-lg font-bold {{ $yearlyNet < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400' }}">
+                        {{ number_format($yearlyNet, 0) }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        {{-- Desktop: Table view --}}
+        <div class="hidden lg:block space-y-4">
             <div class="flex justify-between items-center">
                 <div>
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
@@ -247,35 +391,35 @@
         </div>
 
         {{-- Liabilities --}}
-        <section class="rounded-lg bg-white dark:bg-gray-800 p-6 shadow-sm space-y-4">
+        <section class="rounded-lg bg-white dark:bg-gray-800 p-4 sm:p-6 shadow-sm space-y-4">
             <div class="flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                <h3 class="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200">
                     Liabilities & Loans
                 </h3>
                 <a href="{{ route('loans.index') }}"
-                   class="text-sm text-blue-600 hover:text-blue-800">
+                   class="text-xs sm:text-sm text-blue-600 hover:text-blue-800">
                     View all →
                 </a>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="rounded-lg border-l-4 border-purple-500 bg-purple-50 dark:bg-purple-900/20 p-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                <div class="rounded-lg border-l-4 border-purple-500 bg-purple-50 dark:bg-purple-900/20 p-3 sm:p-4">
                     <p class="text-xs text-gray-500 mb-1">Loans Taken ({{ $year }})</p>
-                    <p class="text-xl font-bold text-purple-600">
+                    <p class="text-lg sm:text-xl font-bold text-purple-600">
                         {{ number_format($loanStats['disbursed']) }}
                     </p>
                 </div>
 
-                <div class="rounded-lg border-l-4 border-orange-500 bg-orange-50 dark:bg-orange-900/20 p-4">
+                <div class="rounded-lg border-l-4 border-orange-500 bg-orange-50 dark:bg-orange-900/20 p-3 sm:p-4">
                     <p class="text-xs text-gray-500 mb-1">Loan Payments ({{ $year }})</p>
-                    <p class="text-xl font-bold text-orange-600">
+                    <p class="text-lg sm:text-xl font-bold text-orange-600">
                         {{ number_format($loanStats['payments']) }}
                     </p>
                 </div>
 
-                <div class="rounded-lg border-l-4 border-red-500 bg-red-50 dark:bg-red-900/20 p-4">
+                <div class="rounded-lg border-l-4 border-red-500 bg-red-50 dark:bg-red-900/20 p-3 sm:p-4">
                     <p class="text-xs text-gray-500 mb-1">Active Loan Balance</p>
-                    <p class="text-xl font-bold text-red-600">
+                    <p class="text-lg sm:text-xl font-bold text-red-600">
                         {{ number_format($loanStats['active_balance']) }}
                     </p>
                 </div>
@@ -288,7 +432,7 @@
 
     </div>
 
-    {{-- Modal for All Years (shows when >5 years of data) --}}
+    {{-- Modal for All Years --}}
     <div
         x-data="{ open: false }"
         @open-all-years-modal.window="open = true"
@@ -351,6 +495,17 @@
             </div>
         </div>
     </div>
+
+    <style>
+        /* Hide scrollbar for month selector on mobile */
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
 
     <x-floating-action-button :quickAccount="$accounts->first()" />
 </x-app-layout>
