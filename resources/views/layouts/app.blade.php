@@ -11,7 +11,6 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
-
     <!-- Dark mode script (must run before page renders) -->
     <script>
         if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -108,7 +107,10 @@
                     </li>
 
                     <li>
-                        <a href="{{ route('client-funds.index') }}">Client Funds</a>
+                        <a href="{{ route('client-funds.index') }}"
+                           class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('client-funds*') ? 'text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                            Client Funds
+                        </a>
                     </li>
 
                     <!-- Dark Mode Toggle (Desktop) -->
@@ -202,11 +204,14 @@
                     </li>
 
                     <li>
-                        <a href="{{ route('client-funds.index') }}">Client Funds</a>
+                        <a href="{{ route('client-funds.index') }}"
+                           class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('client-funds*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                            Client Funds
+                        </a>
                     </li>
 
                     <!-- Mobile User Menu -->
-                    <li class="border-t dark:border-gray-700 pt-2">
+                    <li class="border-t dark:border-gray-700 pt-2 mt-2">
                         <div class="px-4 py-2 text-gray-900 dark:text-white font-semibold">
                             {{ Auth::user()->name }}
                         </div>
