@@ -32,12 +32,12 @@
                 </svg>
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Session Expiring Soon</h3>
             </div>
-            <p class="text-gray-600 dark:text-gray-300 mb-6">Your session will expire in <span id="countdown" class="font-bold text-red-600 dark:text-red-400"></span> due to inactivity.</p>
+            <p class="text-base text-gray-600 dark:text-gray-300 mb-6">Your session will expire in <span id="countdown" class="font-bold text-red-600 dark:text-red-400"></span> due to inactivity.</p>
             <div class="flex space-x-3">
-                <button id="stayLoggedIn" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                <button id="stayLoggedIn" class="flex-1 bg-blue-600 text-white text-base px-4 py-2 rounded-lg hover:bg-blue-700 transition">
                     Stay Logged In
                 </button>
-                <button id="logoutNow" class="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">
+                <button id="logoutNow" class="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-base px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">
                     Logout Now
                 </button>
             </div>
@@ -66,52 +66,46 @@
                 <ul class="hidden lg:flex space-x-8 items-center">
                     <li>
                         <a href="{{ url('/dashboard') }}"
-                           class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('dashboard') ? 'text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                           class="text-base text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('dashboard') ? 'text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
                             Dashboard
                         </a>
                     </li>
 
                     <li>
                         <a href="{{ url('/accounts') }}"
-                           class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('accounts*') ? 'text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                           class="text-base text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('accounts*') ? 'text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
                             Accounts
                         </a>
                     </li>
 
                     <li>
                         <a href="{{ url('/loans') }}"
-                           class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('loans*') ? 'text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                           class="text-base text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('loans*') ? 'text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
                             Loans
                         </a>
                     </li>
 
                     <li>
                         <a href="{{ url('/transactions') }}"
-                           class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('transactions*') ? 'text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                           class="text-base text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('transactions*') ? 'text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
                             Transactions
                         </a>
                     </li>
 
                     <li>
                         <a href="{{ url('/budgets') }}"
-                           class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('budgets*') ? 'text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                           class="text-base text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('budgets*') ? 'text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
                             Budgets
                         </a>
                     </li>
 
                     <li>
                         <a href="{{ url('/reports') }}"
-                           class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('reports*') ? 'text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                           class="text-base text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('reports*') ? 'text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
                             Reports
                         </a>
                     </li>
 
-                    <li>
-                        <a href="{{ route('client-funds.index') }}"
-                           class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('client-funds*') ? 'text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
-                            Client Funds
-                        </a>
-                    </li>
 
                     <!-- Dark Mode Toggle (Desktop) -->
                     <li>
@@ -129,7 +123,7 @@
 
                     <!-- User Dropdown (Desktop) -->
                     <li class="relative">
-                        <button id="userMenuBtn" class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition flex items-center space-x-2 px-3 py-2">
+                        <button id="userMenuBtn" class="text-base text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition flex items-center space-x-2 px-3 py-2">
                             <span>{{ Auth::user()->name }}</span>
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -138,10 +132,14 @@
 
                         <!-- Dropdown Menu -->
                         <div id="userMenu" class="hidden absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg z-50">
-                            <a href="{{ route('profile.edit') }}" class="block px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm border-b dark:border-gray-700 rounded-t-lg transition">
+                            <a href="{{ route('client-funds.index') }}"
+                               class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('client-funds*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                                Client Funds
+                            </a>
+                            <a href="{{ route('profile.edit') }}" class="block px-4 py-3 text-base text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border-b dark:border-gray-700 rounded-t-lg transition">
                                 Profile
                             </a>
-                            <a href="{{ route('email-preferences.edit') }}" class="flex items-center gap-2 px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                            <a href="{{ route('email-preferences.edit') }}" class="flex items-center gap-2 px-4 py-3 text-base text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                                 </svg>
@@ -149,7 +147,7 @@
                             </a>
                             <form method="POST" action="{{ route('logout') }}" class="block">
                                 @csrf
-                                <button type="submit" class="w-full text-left px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm rounded-b-lg transition">
+                                <button type="submit" class="w-full text-left px-4 py-3 text-base text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-lg transition">
                                     Logout
                                 </button>
                             </form>
@@ -163,56 +161,50 @@
                 <ul class="space-y-2">
                     <li>
                         <a href="{{ url('/dashboard') }}"
-                           class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('dashboard') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                           class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('dashboard') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
                             Dashboard
                         </a>
                     </li>
 
                     <li>
                         <a href="{{ url('/accounts') }}"
-                           class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('accounts*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                           class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('accounts*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
                             Accounts
                         </a>
                     </li>
 
                     <li>
                         <a href="{{ url('/loans') }}"
-                           class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('loans*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                           class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('loans*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
                             Loans
                         </a>
                     </li>
 
                     <li>
                         <a href="{{ url('/transactions') }}"
-                           class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('transactions*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                           class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('transactions*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
                             Transactions
                         </a>
                     </li>
 
                     <li>
                         <a href="{{ url('/budgets') }}"
-                           class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('budgets*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                           class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('budgets*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
                             Budgets
                         </a>
                     </li>
 
                     <li>
                         <a href="{{ url('/reports') }}"
-                           class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('reports*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                           class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('reports*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
                             Reports
                         </a>
                     </li>
 
-                    <li>
-                        <a href="{{ route('client-funds.index') }}"
-                           class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('client-funds*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
-                            Client Funds
-                        </a>
-                    </li>
 
                     <!-- Mobile User Menu -->
                     <li class="border-t dark:border-gray-700 pt-2 mt-2">
-                        <div class="px-4 py-2 text-gray-900 dark:text-white font-semibold">
+                        <div class="px-4 py-2 text-base text-gray-900 dark:text-white font-semibold">
                             {{ Auth::user()->name }}
                         </div>
                         <div class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">
@@ -220,7 +212,7 @@
                         </div>
 
                         <!-- Dark Mode Toggle (Mobile) -->
-                        <button id="themeToggleMobile" class="w-full flex items-center justify-between px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 rounded transition">
+                        <button id="themeToggleMobile" class="w-full flex items-center justify-between px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 rounded transition">
                             <span>Theme</span>
                             <div class="flex items-center space-x-2">
                                 <span id="themeLabel" class="text-sm text-gray-500 dark:text-gray-400">
@@ -237,12 +229,16 @@
                                 </div>
                             </div>
                         </button>
+                        <a href="{{ route('client-funds.index') }}"
+                           class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('client-funds*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                            Client Funds
+                        </a>
 
-                        <a href="{{ route('profile.edit') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition">
+                        <a href="{{ route('profile.edit') }}" class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition">
                             Profile
                         </a>
 
-                        <a href="{{ route('email-preferences.edit') }}" class="flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition">
+                        <a href="{{ route('email-preferences.edit') }}" class="flex items-center gap-2 px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                             </svg>
@@ -251,7 +247,7 @@
 
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
-                            <button type="submit" class="w-full text-left px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition">
+                            <button type="submit" class="w-full text-left px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition">
                                 Logout
                             </button>
                         </form>

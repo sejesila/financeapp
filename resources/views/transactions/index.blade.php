@@ -34,62 +34,62 @@
         {{-- Balance Modal --}}
         @if(session('show_balance_modal'))
             <div id="balanceModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-                <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-auto animate-fade-in">
+                <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-auto animate-fade-in">
                     <div class="p-6">
                         {{-- Icon --}}
-                        <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full
-                        {{ session('transaction_type') === 'expense' ? 'bg-red-100' : (session('transaction_type') === 'liability' ? 'bg-yellow-100' : 'bg-green-100') }}">
+                        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full
+                {{ session('transaction_type') === 'expense' ? 'bg-red-100 dark:bg-red-900/30' : (session('transaction_type') === 'liability' ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-green-100 dark:bg-green-900/30') }}">
                             @if(session('transaction_type') === 'expense')
-                                <svg class="h-8 w-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg class="h-6 w-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
                                 </svg>
                             @elseif(session('transaction_type') === 'liability')
-                                <svg class="h-8 w-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg class="h-6 w-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                 </svg>
                             @else
-                                <svg class="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg class="h-6 w-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
                                 </svg>
                             @endif
                         </div>
 
                         {{-- Title --}}
-                        <h3 class="text-xl font-bold text-gray-900 text-center mt-4">
+                        <h3 class="text-base font-bold text-gray-900 dark:text-white text-center mt-3">
                             Transaction Successful!
                         </h3>
 
                         {{-- Account Name --}}
-                        <p class="text-center text-gray-600 mt-2 font-medium">
+                        <p class="text-center text-gray-600 dark:text-gray-400 mt-2 text-sm font-medium">
                             {{ session('account_name') }}
                         </p>
 
                         {{-- Balance Details --}}
-                        <div class="mt-6 space-y-3 bg-gray-50 p-4 rounded-lg">
+                        <div class="mt-4 space-y-2 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
                             <div class="flex justify-between items-center">
-                                <span class="text-sm text-gray-600">Previous Balance:</span>
-                                <span class="font-semibold text-gray-900">KES {{ session('old_balance') }}</span>
+                                <span class="text-sm text-gray-600 dark:text-gray-400">Previous Balance:</span>
+                                <span class="font-semibold text-sm text-gray-900 dark:text-white">KES {{ session('old_balance') }}</span>
                             </div>
 
                             <div class="flex justify-between items-center">
-                                <span class="text-sm text-gray-600">Transaction:</span>
-                                <span class="font-semibold {{ session('transaction_type') === 'expense' ? 'text-red-600' : 'text-green-600' }}">
-                                {{ session('transaction_type') === 'expense' ? '−' : '+' }} KES {{ session('transaction_amount') }}
-                            </span>
+                                <span class="text-sm text-gray-600 dark:text-gray-400">Transaction:</span>
+                                <span class="font-semibold text-sm {{ session('transaction_type') === 'expense' ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400' }}">
+                            {{ session('transaction_type') === 'expense' ? '−' : '+' }} KES {{ session('transaction_amount') }}
+                        </span>
                             </div>
 
-                            <div class="border-t border-gray-200 pt-3 flex justify-between items-center">
-                                <span class="text-base font-bold text-gray-900">New Balance:</span>
-                                <span class="font-bold text-2xl {{ floatval(str_replace(',', '', session('new_balance'))) < 0 ? 'text-red-600' : 'text-green-600' }}">
-                                KES {{ session('new_balance') }}
-                            </span>
+                            <div class="border-t border-gray-200 dark:border-gray-600 pt-2 flex justify-between items-center">
+                                <span class="text-sm font-bold text-gray-900 dark:text-white">New Balance:</span>
+                                <span class="font-bold text-lg {{ floatval(str_replace(',', '', session('new_balance'))) < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400' }}">
+                            KES {{ session('new_balance') }}
+                        </span>
                             </div>
                         </div>
 
                         {{-- Close Button --}}
-                        <div class="mt-6">
+                        <div class="mt-4">
                             <button id="closeModal"
-                                    class="w-full px-4 py-3 bg-indigo-600 text-white text-base font-medium rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors">
+                                    class="w-full px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors">
                                 Close
                             </button>
                         </div>

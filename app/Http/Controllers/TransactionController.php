@@ -18,6 +18,19 @@ class TransactionController extends Controller
 
     protected TransactionService $transactionService;
 
+    // System categories that should be excluded from manual operations
+    private const EXCLUDED_CATEGORIES = [
+        'Income',
+        'Loans',
+        'Loan Receipt',
+        'Loan Repayment',
+        'Excise Duty',
+        'Loan Fees Refund',
+        'Facility Fee Refund',
+        'Transaction Fees',
+        'Balance Adjustment'
+    ];
+
     public function __construct(TransactionService $transactionService)
     {
         $this->transactionService = $transactionService;
@@ -126,6 +139,138 @@ class TransactionController extends Controller
     }
 
     /**
+     * Get categories for forms (excluding system categories)
+     */
+    private function getCategoriesForForm()
+    {
+        // Get parent categories with their children (hierarchical structure)
+        $categoryGroups = Category::where('user_id', Auth::id())
+            ->whereNull('parent_id')
+            ->where('is_active', true)
+            ->whereNotIn('name', self::EXCLUDED_CATEGORIES)
+            ->with(['children' => function ($query) {
+                $query->where('is_active', true)
+                    ->whereNotIn('name', self::EXCLUDED_CATEGORIES)
+                    ->orderBy('name');
+            }])
+            ->orderBy('name')
+            ->get()
+            ->filter(function ($category) {
+                return $category->children->isNotEmpty() || !$category->parent_id;
+            })
+            ->values();
+
+        // Fallback: flat list of all leaf categories
+        $categories = Category::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->whereNotIn('name', self::EXCLUDED_CATEGORIES)
+            ->orderBy('name')
+            ->get();
+
+        return compact('categoryGroups', 'categories');
+    }
+
+    /**
+     * Get active accounts for the current user
+     */
+    private function getActiveAccounts()
+    {
+        return \App\Models\Account::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+    }
+
+    /**
+     * Calculate transaction totals for a given query
+     */
+    private function calculateTransactionTotals()
+    {
+        $baseQuery = Transaction::where('user_id', Auth::id())
+            ->where('is_transaction_fee', false);
+
+        return [
+            'totalToday' => (clone $baseQuery)->whereDate('date', today())->sum('amount'),
+            'totalYesterday' => (clone $baseQuery)->whereDate('date', today()->subDay())->sum('amount'),
+            'totalThisWeek' => (clone $baseQuery)->whereBetween('date', [
+                now()->startOfWeek(),
+                now()->endOfWeek()
+            ])->sum('amount'),
+            'totalLastWeek' => (clone $baseQuery)->whereBetween('date', [
+                now()->subWeek()->startOfWeek(),
+                now()->subWeek()->endOfWeek()
+            ])->sum('amount'),
+            'totalThisMonth' => (clone $baseQuery)
+                ->whereMonth('date', now()->month)
+                ->whereYear('date', now()->year)
+                ->sum('amount'),
+            'totalLastMonth' => (clone $baseQuery)
+                ->whereMonth('date', now()->subMonth()->month)
+                ->whereYear('date', now()->subMonth()->year)
+                ->sum('amount'),
+            'totalAll' => (clone $baseQuery)->sum('amount'),
+        ];
+    }
+
+    /**
+     * Calculate transaction fee totals
+     */
+    private function calculateFeeTotals()
+    {
+        $feeQuery = Transaction::where('user_id', Auth::id())
+            ->where('is_transaction_fee', true);
+
+        return [
+            'totalFeesToday' => (clone $feeQuery)->whereDate('date', today())->sum('amount'),
+            'totalFeesThisMonth' => (clone $feeQuery)
+                ->whereMonth('date', now()->month)
+                ->whereYear('date', now()->year)
+                ->sum('amount'),
+            'totalFeesAll' => (clone $feeQuery)->sum('amount'),
+        ];
+    }
+
+    /**
+     * Apply date filters to a query based on filter type
+     */
+    private function applyDateFilter($query, $filter, $startDate = null, $endDate = null)
+    {
+        if ($filter === 'custom' && $startDate && $endDate) {
+            return $query->whereBetween('date', [
+                Carbon::parse($startDate)->startOfDay(),
+                Carbon::parse($endDate)->endOfDay()
+            ]);
+        }
+
+        switch ($filter) {
+            case 'today':
+                return $query->whereDate('date', today());
+            case 'yesterday':
+                return $query->whereDate('date', today()->subDay());
+            case 'this_week':
+                return $query->whereBetween('date', [
+                    now()->startOfWeek(),
+                    now()->endOfWeek()
+                ]);
+            case 'last_week':
+                return $query->whereBetween('date', [
+                    now()->subWeek()->startOfWeek(),
+                    now()->subWeek()->endOfWeek()
+                ]);
+            case 'this_month':
+                return $query->whereMonth('date', now()->month)
+                    ->whereYear('date', now()->year);
+            case 'last_month':
+                return $query->whereMonth('date', now()->subMonth()->month)
+                    ->whereYear('date', now()->subMonth()->year);
+            case 'this_year':
+                return $query->whereYear('date', now()->year);
+            default:
+                return $query;
+        }
+    }
+
+    /**
      * Display a listing of the resource.
      */
     public function index(Request $request)
@@ -139,8 +284,7 @@ class TransactionController extends Controller
         $showFees = $request->get('show_fees', false);
 
         // Calculate dynamic year/month ranges
-        $minYear = Transaction::where('user_id', Auth::id())->min(DB::raw('YEAR(date)'));
-        $minYear = $minYear ?? date('Y');
+        $minYear = Transaction::where('user_id', Auth::id())->min(DB::raw('YEAR(date)')) ?? date('Y');
         $maxYear = date('Y');
 
         $query = Transaction::with(['category', 'account', 'feeTransaction'])
@@ -151,134 +295,53 @@ class TransactionController extends Controller
             $query->where('is_transaction_fee', false);
         }
 
-        // Apply search filter
+        // Apply filters
         if ($search) {
             $query->where('description', 'like', '%' . $search . '%');
         }
 
-        // Apply category filter
         if ($categoryId) {
             $query->where('category_id', $categoryId);
         }
 
-        // Apply account filter
         if ($accountId) {
             $query->where('account_id', $accountId);
         }
 
         // Apply date filters
-        if ($filter === 'custom' && $startDate && $endDate) {
-            $query->whereBetween('date', [
-                Carbon::parse($startDate)->startOfDay(),
-                Carbon::parse($endDate)->endOfDay()
-            ]);
-        } else {
-            switch ($filter) {
-                case 'today':
-                    $query->whereDate('date', today());
-                    break;
-                case 'yesterday':
-                    $query->whereDate('date', today()->subDay());
-                    break;
-                case 'this_week':
-                    $query->whereBetween('date', [
-                        now()->startOfWeek(),
-                        now()->endOfWeek()
-                    ]);
-                    break;
-                case 'last_week':
-                    $query->whereBetween('date', [
-                        now()->subWeek()->startOfWeek(),
-                        now()->subWeek()->endOfWeek()
-                    ]);
-                    break;
-                case 'this_month':
-                    $query->whereMonth('date', now()->month)
-                        ->whereYear('date', now()->year);
-                    break;
-                case 'last_month':
-                    $query->whereMonth('date', now()->subMonth()->month)
-                        ->whereYear('date', now()->subMonth()->year);
-                    break;
-                case 'this_year':
-                    $query->whereYear('date', now()->year);
-                    break;
-                case 'all':
-                default:
-                    break;
-            }
-        }
+        $query = $this->applyDateFilter($query, $filter, $startDate, $endDate);
 
         $transactions = $query->latest('date')->latest('id')->paginate(50)->withQueryString();
 
-        // Calculate totals (excluding fees by default)
-        $userTransactions = Transaction::where('user_id', Auth::id())->where('is_transaction_fee', false);
-
-        $totalToday = (clone $userTransactions)->whereDate('date', today())->sum('amount');
-        $totalYesterday = (clone $userTransactions)->whereDate('date', today()->subDay())->sum('amount');
-        $totalThisWeek = (clone $userTransactions)->whereBetween('date', [
-            now()->startOfWeek(),
-            now()->endOfWeek()
-        ])->sum('amount');
-        $totalLastWeek = (clone $userTransactions)->whereBetween('date', [
-            now()->subWeek()->startOfWeek(),
-            now()->subWeek()->endOfWeek()
-        ])->sum('amount');
-        $totalThisMonth = (clone $userTransactions)->whereMonth('date', now()->month)
-            ->whereYear('date', now()->year)
-            ->sum('amount');
-        $totalLastMonth = (clone $userTransactions)->whereMonth('date', now()->subMonth()->month)
-            ->whereYear('date', now()->subMonth()->year)
-            ->sum('amount');
-        $totalAll = Transaction::where('user_id', Auth::id())->where('is_transaction_fee', false)->sum('amount');
-
-        // Calculate total transaction fees
-        $totalFeesToday = Transaction::where('user_id', Auth::id())
-            ->where('is_transaction_fee', true)
-            ->whereDate('date', today())
-            ->sum('amount');
-        $totalFeesThisMonth = Transaction::where('user_id', Auth::id())
-            ->where('is_transaction_fee', true)
-            ->whereMonth('date', now()->month)
-            ->whereYear('date', now()->year)
-            ->sum('amount');
-        $totalFeesAll = Transaction::where('user_id', Auth::id())
-            ->where('is_transaction_fee', true)
-            ->sum('amount');
+        // Calculate totals
+        $totals = $this->calculateTransactionTotals();
+        $feeTotals = $this->calculateFeeTotals();
 
         // Get categories and accounts for filters
         $categories = Category::where('user_id', Auth::id())
             ->orderBy('type')
             ->orderBy('name')
             ->get();
-        $accounts = \App\Models\Account::where('user_id', Auth::id())
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get();
 
-        return view('transactions.index', compact(
-            'transactions',
-            'filter',
-            'totalToday',
-            'totalYesterday',
-            'totalThisWeek',
-            'totalLastWeek',
-            'totalThisMonth',
-            'totalLastMonth',
-            'totalAll',
-            'totalFeesToday',
-            'totalFeesThisMonth',
-            'totalFeesAll',
-            'minYear',
-            'maxYear',
-            'categories',
-            'accounts',
-            'search',
-            'categoryId',
-            'accountId',
-            'startDate',
-            'endDate',
-            'showFees'
+        $accounts = $this->getActiveAccounts();
+
+        return view('transactions.index', array_merge(
+            compact(
+                'transactions',
+                'filter',
+                'minYear',
+                'maxYear',
+                'categories',
+                'accounts',
+                'search',
+                'categoryId',
+                'accountId',
+                'startDate',
+                'endDate',
+                'showFees'
+            ),
+            $totals,
+            $feeTotals
         ));
     }
 
@@ -287,66 +350,24 @@ class TransactionController extends Controller
      */
     public function create()
     {
-        // Special system categories to exclude from manual transaction creation
-        $excludedCategories = [
-            'Income',
-            'Loans',
-            'Loan Receipt',
-            'Loan Repayment',
-            'Excise Duty',
-            'Loan Fees Refund',
-            'Facility Fee Refund',
-            'Transaction Fees'
-        ];
-
-        // Get parent categories with their children (hierarchical structure)
-        $categoryGroups = Category::where('user_id', Auth::id())
-            ->whereNull('parent_id')
-            ->where('is_active', true)
-            ->whereNotIn('name', $excludedCategories)
-            ->with(['children' => function ($query) use ($excludedCategories) {
-                $query->where('is_active', true)
-                    ->whereNotIn('name', $excludedCategories)
-                    ->orderBy('name');
-            }])
-            ->orderBy('name')
-            ->get()
-            ->filter(function ($category) {
-                return $category->children->isNotEmpty() || !$category->parent_id;
-            })
-            ->values();
-
-        // Fallback: flat list of all leaf categories
-        $categories = Category::where('user_id', Auth::id())
-            ->where('is_active', true)
-            ->whereNotIn('name', $excludedCategories)
-            ->orderBy('name')
-            ->get();
+        $categoryData = $this->getCategoriesForForm();
 
         // Get frequently used categories
         $frequentCategories = Category::where('user_id', Auth::id())
             ->where('is_active', true)
-            ->whereNotIn('name', $excludedCategories)
+            ->whereNotIn('name', self::EXCLUDED_CATEGORIES)
             ->where('usage_count', '>', 0)
             ->orderBy('usage_count', 'desc')
             ->limit(5)
             ->get();
 
-        $accounts = \App\Models\Account::where('user_id', Auth::id())
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get();
-
+        $accounts = $this->getActiveAccounts();
         $mpesaCosts = $this->getMpesaTransactionCosts();
         $airtelCosts = $this->getAirtelMoneyTransactionCosts();
 
-        return view('transactions.create', compact(
-            'categoryGroups',
-            'categories',
-            'frequentCategories',
-            'accounts',
-            'mpesaCosts',
-            'airtelCosts'
+        return view('transactions.create', array_merge(
+            $categoryData,
+            compact('frequentCategories', 'accounts', 'mpesaCosts', 'airtelCosts')
         ));
     }
 
@@ -398,8 +419,7 @@ class TransactionController extends Controller
                 ->with('transaction_type', $transaction->category->type);
 
         } catch (\Exception $e) {
-            return back()->with('error', $e->getMessage())
-                ->withInput();
+            return back()->with('error', $e->getMessage())->withInput();
         }
     }
 
@@ -427,56 +447,14 @@ class TransactionController extends Controller
                 ->with('error', 'System-generated transaction fees cannot be edited.');
         }
 
-        // Special system categories to exclude
-        $excludedCategories = [
-            'Income',
-            'Loans',
-            'Loan Receipt',
-            'Loan Repayment',
-            'Excise Duty',
-            'Loan Fees Refund',
-            'Facility Fee Refund',
-            'Transaction Fees',
-            'Balance Adjustment'
-        ];
-
-        $categoryGroups = Category::where('user_id', Auth::id())
-            ->whereNull('parent_id')
-            ->where('is_active', true)
-            ->whereNotIn('name', $excludedCategories)
-            ->with(['children' => function ($query) use ($excludedCategories) {
-                $query->where('is_active', true)
-                    ->whereNotIn('name', $excludedCategories)
-                    ->orderBy('name');
-            }])
-            ->orderBy('name')
-            ->get()
-            ->filter(function ($category) {
-                return $category->children->isNotEmpty() || !$category->parent_id;
-            })
-            ->values();
-
-        $categories = Category::where('user_id', Auth::id())
-            ->where('is_active', true)
-            ->whereNotIn('name', $excludedCategories)
-            ->orderBy('name')
-            ->get();
-
-        $accounts = \App\Models\Account::where('user_id', Auth::id())
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get();
-
+        $categoryData = $this->getCategoriesForForm();
+        $accounts = $this->getActiveAccounts();
         $mpesaCosts = $this->getMpesaTransactionCosts();
         $airtelCosts = $this->getAirtelMoneyTransactionCosts();
 
-        return view('transactions.edit', compact(
-            'transaction',
-            'categoryGroups',
-            'categories',
-            'accounts',
-            'mpesaCosts',
-            'airtelCosts'
+        return view('transactions.edit', array_merge(
+            $categoryData,
+            compact('transaction', 'accounts', 'mpesaCosts', 'airtelCosts')
         ));
     }
 
@@ -504,15 +482,9 @@ class TransactionController extends Controller
                 ->with('success', 'Transaction updated successfully!');
 
         } catch (\Exception $e) {
-            return back()->with('error', $e->getMessage())
-                ->withInput();
+            return back()->with('error', $e->getMessage())->withInput();
         }
     }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    // In TransactionController.php
 
     /**
      * Soft delete the specified transaction
@@ -532,7 +504,6 @@ class TransactionController extends Controller
         try {
             // Store account for balance update
             $account = $transaction->account;
-            $oldAccount = $account; // In case we need it
 
             // If this transaction has a related fee, delete it too
             if ($transaction->related_fee_transaction_id) {
@@ -548,11 +519,6 @@ class TransactionController extends Controller
             // Recalculate account balance
             $account->updateBalance();
 
-            // If transaction was moved between accounts, update both
-            if (isset($oldAccount) && $oldAccount->id !== $account->id) {
-                $oldAccount->updateBalance();
-            }
-
             DB::commit();
 
             return redirect()->route('transactions.index')
@@ -564,20 +530,6 @@ class TransactionController extends Controller
 
             return back()->with('error', 'Failed to delete transaction: ' . $e->getMessage());
         }
-    }
-
-    /**
-     * Show deleted transactions (trash)
-     */
-    public function trash()
-    {
-        $deletedTransactions = Transaction::onlyTrashed()
-            ->where('user_id', Auth::id())
-            ->with(['category', 'account'])
-            ->latest('deleted_at')
-            ->paginate(20);
-
-        return view('transactions.trash', compact('deletedTransactions'));
     }
 
     /**

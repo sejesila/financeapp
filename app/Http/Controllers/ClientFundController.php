@@ -15,20 +15,29 @@ class ClientFundController extends Controller
 {
     public function index()
     {
+        // Get paginated client funds
         $clientFunds = ClientFund::where('user_id', Auth::id())
             ->with('account')
             ->orderBy('status')
             ->orderBy('received_date', 'desc')
-            ->get();
+            ->paginate(15);
+
+        // Calculate summary from all records (not just paginated)
+        $allClientFunds = ClientFund::where('user_id', Auth::id())->get();
 
         $summary = [
-            'total_received' => $clientFunds->sum('amount_received'),
-            'total_spent' => $clientFunds->sum('amount_spent'),
-            'total_profit' => $clientFunds->sum('profit_amount'),
-            'total_balance' => $clientFunds->where('status', '!=', 'completed')->sum('balance'),
+            'total_received' => $allClientFunds->sum('amount_received'),
+            'total_spent' => $allClientFunds->sum('amount_spent'),
+            'total_profit' => $allClientFunds->sum('profit_amount'),
+            'total_balance' => $allClientFunds->where('status', '!=', 'completed')->sum('balance'),
         ];
+        // Get all accounts for the FAB component
+        $allAccounts = Account::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
 
-        return view('client-funds.index', compact('clientFunds', 'summary'));
+        return view('client-funds.index', compact('clientFunds', 'summary','allAccounts'));
     }
 
     public function create()
