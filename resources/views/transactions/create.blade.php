@@ -57,60 +57,6 @@
                     >
                 </div>
 
-                <!-- Account -->
-                <div class="mb-4 sm:mb-5">
-                    <label class="block text-sm sm:text-base font-semibold mb-1 dark:text-gray-200">Account</label>
-                    <select
-                        name="account_id"
-                        x-model="accountId"
-                        @change="onAccountChange()"
-                        class="w-full text-sm sm:text-base border dark:border-gray-600 p-2 sm:p-2.5 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
-                        required
-                    >
-                        <option value="">-- Select Account --</option>
-                        @php
-                            $mpesaAccount = $accounts->where('type', 'mpesa')->first();
-                            $defaultAccountId = old('account_id') ?: ($mpesaAccount ? $mpesaAccount->id : null);
-                        @endphp
-                        @foreach($accounts as $account)
-                            <option
-                                value="{{ $account->id }}"
-                                data-type="{{ $account->type }}"
-                                {{ $defaultAccountId == $account->id ? 'selected' : '' }}
-                            >
-                                @if($account->type == 'cash') 💵
-                                @elseif($account->type == 'mpesa') 📱
-                                @elseif($account->type == 'airtel_money') 📲
-                                @elseif($account->type == 'bank') 🏦
-                                @endif
-                                {{ $account->name }} ({{ number_format($account->current_balance, 0, '.', ',') }})
-                            </option>
-                        @endforeach
-                    </select>
-                    <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">Payment method will be auto-set based on account type</p>
-                </div>
-
-                <!-- Mobile Money Transaction Type -->
-                <div class="mb-4 sm:mb-5" x-show="showTransactionTypeSelector">
-                    <label class="block text-sm sm:text-base font-semibold mb-1 dark:text-gray-200">Transaction Type</label>
-                    <select
-                        name="mobile_money_type"
-                        x-model="mobileMoneyType"
-                        @change="calculateTransactionCost()"
-                        class="w-full text-sm sm:text-base border dark:border-gray-600 p-2 sm:p-2.5 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
-                    >
-                        <option value="send_money">Send Money</option>
-                        <option value="paybill">PayBill</option>
-                        <option value="buy_goods">Buy Goods/Till Number</option>
-                        <option value="pochi_la_biashara">Pochi La Biashara</option>
-                    </select>
-                    <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        <span x-show="mobileMoneyType === 'send_money' || mobileMoneyType === 'pochi_la_biashara'">Different types have different fees</span>
-                        <span x-show="mobileMoneyType === 'paybill'">PayBill has lower fees</span>
-                        <span x-show="mobileMoneyType === 'buy_goods'">Till has no charges</span>
-                    </p>
-                </div>
-
                 <!-- Category -->
                 <div class="mb-4 sm:mb-5">
                     <label class="block text-sm sm:text-base font-semibold mb-1 dark:text-gray-200">Category</label>
@@ -181,46 +127,21 @@
                             role="listbox"
                             style="display: none;"
                         >
-                            <template x-for="parent in filteredCategories()" :key="parent.id">
-                                <div>
-                                    <!-- Parent Category Header -->
-                                    <div class="px-3 sm:px-4 py-2 font-semibold text-xs sm:text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 sticky top-0">
-                                        <span x-show="parent.icon" x-text="parent.icon" class="mr-1"></span>
-                                        <span x-text="parent.name"></span>
-                                    </div>
-
-                                    <!-- Child Categories -->
-                                    <template x-for="child in parent.children" :key="child.id">
-                                        <div
-                                            @click="select(child)"
-                                            class="px-4 sm:px-6 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer text-sm sm:text-base text-gray-700 dark:text-gray-200 transition"
-                                            :class="{ 'bg-indigo-100 dark:bg-indigo-900/50': selectedId === child.id }"
-                                            role="option"
-                                            :aria-selected="selectedId === child.id"
-                                        >
-                                            <span x-show="child.icon" x-text="child.icon" class="mr-2"></span>
-                                            <span x-text="child.name"></span>
-                                        </div>
-                                    </template>
-
-                                    <!-- Parent as selectable option -->
-                                    <template x-if="parent.children.length === 0">
-                                        <div
-                                            @click="select(parent)"
-                                            class="px-4 sm:px-6 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer text-sm sm:text-base text-gray-700 dark:text-gray-200 transition"
-                                            :class="{ 'bg-indigo-100 dark:bg-indigo-900/50': selectedId === parent.id }"
-                                            role="option"
-                                            :aria-selected="selectedId === parent.id"
-                                        >
-                                            <span x-show="parent.icon" x-text="parent.icon" class="mr-2"></span>
-                                            <span x-text="parent.name"></span>
-                                        </div>
-                                    </template>
+                            <template x-for="child in filteredChildren()" :key="child.id">
+                                <div
+                                    @click="select(child)"
+                                    class="px-4 sm:px-6 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer text-sm sm:text-base text-gray-700 dark:text-gray-200 transition"
+                                    :class="{ 'bg-indigo-100 dark:bg-indigo-900/50': selectedId === child.id }"
+                                    role="option"
+                                    :aria-selected="selectedId === child.id"
+                                >
+                                    <span x-show="child.icon" x-text="child.icon" class="mr-2"></span>
+                                    <span x-text="child.name"></span>
                                 </div>
                             </template>
 
                             <!-- No results message -->
-                            <div x-show="filteredCategories().length === 0" class="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs sm:text-sm">
+                            <div x-show="filteredChildren().length === 0" class="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs sm:text-sm">
                                 No categories found
                             </div>
                         </div>
@@ -228,6 +149,60 @@
                         <!-- Hidden input for form submission -->
                         <input type="hidden" name="category_id" :value="selectedId" required>
                     </div>
+                </div>
+
+                <!-- Account -->
+                <div class="mb-4 sm:mb-5">
+                    <label class="block text-sm sm:text-base font-semibold mb-1 dark:text-gray-200">Account</label>
+                    <select
+                        name="account_id"
+                        x-model="accountId"
+                        @change="onAccountChange()"
+                        class="w-full text-sm sm:text-base border dark:border-gray-600 p-2 sm:p-2.5 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
+                        required
+                    >
+                        <option value="">-- Select Account --</option>
+                        @php
+                            $mpesaAccount = $accounts->where('type', 'mpesa')->first();
+                            $defaultAccountId = old('account_id') ?: ($mpesaAccount ? $mpesaAccount->id : null);
+                        @endphp
+                        @foreach($accounts as $account)
+                            <option
+                                value="{{ $account->id }}"
+                                data-type="{{ $account->type }}"
+                                {{ $defaultAccountId == $account->id ? 'selected' : '' }}
+                            >
+                                @if($account->type == 'cash') 💵
+                                @elseif($account->type == 'mpesa') 📱
+                                @elseif($account->type == 'airtel_money') 📲
+                                @elseif($account->type == 'bank') 🏦
+                                @endif
+                                {{ $account->name }} ({{ number_format($account->current_balance, 0, '.', ',') }})
+                            </option>
+                        @endforeach
+                    </select>
+                    <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">Payment method will be auto-set based on account type</p>
+                </div>
+
+                <!-- Mobile Money Transaction Type -->
+                <div class="mb-4 sm:mb-5" x-show="showTransactionTypeSelector">
+                    <label class="block text-sm sm:text-base font-semibold mb-1 dark:text-gray-200">Transaction Type</label>
+                    <select
+                        name="mobile_money_type"
+                        x-model="mobileMoneyType"
+                        @change="calculateTransactionCost()"
+                        class="w-full text-sm sm:text-base border dark:border-gray-600 p-2 sm:p-2.5 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
+                    >
+                        <option value="send_money">Send Money</option>
+                        <option value="paybill">PayBill</option>
+                        <option value="buy_goods">Buy Goods/Till Number</option>
+                        <option value="pochi_la_biashara">Pochi La Biashara</option>
+                    </select>
+                    <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        <span x-show="mobileMoneyType === 'send_money' || mobileMoneyType === 'pochi_la_biashara'">Different types have different fees</span>
+                        <span x-show="mobileMoneyType === 'paybill'">PayBill has lower fees</span>
+                        <span x-show="mobileMoneyType === 'buy_goods'">Till has no charges</span>
+                    </p>
                 </div>
 
                 <!-- Amount -->
@@ -246,9 +221,15 @@
                 </div>
 
                 <!-- Zero Fee Notice for Internet and Communication -->
-                <div x-show="isInternetAndCommunication && (accountType === 'mpesa' || accountType === 'airtel_money')" class="">
+                <div x-show="isInternetAndCommunication && (accountType === 'mpesa' || accountType === 'airtel_money') && amount > 0" class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded p-2 sm:p-3 mb-4 sm:mb-5">
                     <div class="flex items-start gap-2">
-
+                        <svg class="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <div>
+                            <p class="text-sm font-medium text-green-800 dark:text-green-200">No Transaction Fees</p>
+                            <p class="text-xs text-green-700 dark:text-green-300 mt-0.5">Internet and Communication transactions have zero fees</p>
+                        </div>
                     </div>
                 </div>
 
@@ -265,7 +246,7 @@
                 </div>
 
                 <!-- Total Amount Display -->
-                <div x-show="(showTransactionCost || isInternetAndCommunication) && amount > 0" class="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded p-2 sm:p-3 mb-4 sm:mb-5">
+                <div x-show="amount > 0 && (accountType === 'mpesa' || accountType === 'airtel_money')" class="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded p-2 sm:p-3 mb-4 sm:mb-5">
                     <div class="flex items-center justify-between">
                         <span class="text-xs font-medium text-indigo-800 dark:text-indigo-200">Total Amount:</span>
                         <span class="text-base sm:text-lg font-bold text-indigo-800 dark:text-indigo-200" x-text="'KSh ' + totalAmount.toFixed(2)"></span>
@@ -296,105 +277,84 @@
                 transactionCost: 0,
                 showTransactionCost: false,
                 showTransactionTypeSelector: false,
-                isInternetAndCommunication: false,
+                selectedCategoryName: '',
                 mpesaCosts: @json($mpesaCosts),
                 airtelCosts: @json($airtelCosts),
+                categories: @json($categoryGroups),
 
                 get totalAmount() {
                     return parseFloat(this.amount || 0) + parseFloat(this.transactionCost || 0);
                 },
 
+                get isInternetAndCommunication() {
+                    return this.selectedCategoryName === 'Internet and Communication';
+                },
+
                 init() {
+                    // Initialize category name if old value exists
+                    const oldCategoryId = '{{ old("category_id") }}';
+                    if (oldCategoryId) {
+                        this.updateCategoryName(parseInt(oldCategoryId));
+                    }
+
+                    // Listen for category changes
+                    window.addEventListener('category-selected', (e) => {
+                        this.selectedCategoryName = e.detail.categoryName;
+                        this.calculateTransactionCost();
+                    });
+
                     this.$nextTick(() => {
                         this.onAccountChange();
-                        // Listen for category changes
-                        this.$watch('$root.categoryDropdown', () => {
-                            this.checkCategoryAndCalculate();
-                        });
                     });
                 },
 
                 onAccountChange() {
                     const select = document.querySelector('select[name="account_id"]');
-                    if (!select) return;
-
-                    const selectedOption = select.options[select.selectedIndex];
-
-                    if (selectedOption && selectedOption.value) {
-                        this.accountType = selectedOption.getAttribute('data-type');
-
-                        // Show transaction type selector for mobile money accounts
-                        if (this.accountType === 'mpesa' || this.accountType === 'airtel_money') {
-                            this.showTransactionTypeSelector = true;
-
-                            // Hide Pochi La Biashara for Airtel Money
-                            if (this.accountType === 'airtel_money' && this.mobileMoneyType === 'pochi_la_biashara') {
-                                this.mobileMoneyType = 'send_money';
-                            }
-                        } else {
-                            this.showTransactionTypeSelector = false;
-                            this.mobileMoneyType = 'send_money';
-                        }
-
-                        this.calculateTransactionCost();
-                    } else {
+                    if (!select || !select.value) {
                         this.accountType = '';
                         this.showTransactionCost = false;
                         this.showTransactionTypeSelector = false;
                         this.transactionCost = 0;
-                    }
-                },
-
-                checkCategoryAndCalculate() {
-                    // Get the selected category name from the hidden input
-                    const categoryInput = document.querySelector('input[name="category_id"]');
-                    if (!categoryInput || !categoryInput.value) {
-                        this.isInternetAndCommunication = false;
-                        this.calculateTransactionCost();
                         return;
                     }
 
-                    // Find the category name from the dropdown component
-                    const categoryData = this.findCategoryById(parseInt(categoryInput.value));
-                    this.isInternetAndCommunication = categoryData && categoryData.name === 'Internet and Communication';
+                    const selectedOption = select.options[select.selectedIndex];
+                    this.accountType = selectedOption.getAttribute('data-type');
+
+                    // Show transaction type selector for mobile money accounts
+                    if (this.accountType === 'mpesa' || this.accountType === 'airtel_money') {
+                        this.showTransactionTypeSelector = true;
+
+                        // Hide Pochi La Biashara for Airtel Money
+                        if (this.accountType === 'airtel_money' && this.mobileMoneyType === 'pochi_la_biashara') {
+                            this.mobileMoneyType = 'send_money';
+                        }
+                    } else {
+                        this.showTransactionTypeSelector = false;
+                        this.mobileMoneyType = 'send_money';
+                    }
 
                     this.calculateTransactionCost();
                 },
 
-                findCategoryById(categoryId) {
-                    const categories = @json($categoryGroups);
-
-                    for (const parent of categories) {
+                updateCategoryName(categoryId) {
+                    for (const parent of this.categories) {
                         if (parent.id === categoryId) {
-                            return parent;
+                            this.selectedCategoryName = parent.name;
+                            return;
                         }
-
                         if (parent.children) {
                             const child = parent.children.find(c => c.id === categoryId);
                             if (child) {
-                                return child;
+                                this.selectedCategoryName = child.name;
+                                return;
                             }
                         }
                     }
-
-                    return null;
-                },
-
-                getTransactionTypeLabel() {
-                    const labels = {
-                        'send_money': 'Send Money',
-                        'paybill': 'PayBill',
-                        'buy_goods': 'Buy Goods/Till',
-                        'pochi_la_biashara': 'Pochi La Biashara'
-                    };
-                    return labels[this.mobileMoneyType] || 'Transaction';
                 },
 
                 calculateTransactionCost() {
                     const amount = parseFloat(this.amount || 0);
-
-                    // Check if category is selected
-                    this.checkCategoryAndCalculate();
 
                     if (!this.accountType || amount <= 0) {
                         this.showTransactionCost = false;
@@ -402,8 +362,15 @@
                         return;
                     }
 
+                    // Not a mobile money account
+                    if (this.accountType !== 'mpesa' && this.accountType !== 'airtel_money') {
+                        this.showTransactionCost = false;
+                        this.transactionCost = 0;
+                        return;
+                    }
+
                     // Special case: Internet and Communication has zero fees
-                    if (this.isInternetAndCommunication && (this.accountType === 'mpesa' || this.accountType === 'airtel_money')) {
+                    if (this.isInternetAndCommunication) {
                         this.transactionCost = 0;
                         this.showTransactionCost = false;
                         return;
@@ -420,10 +387,6 @@
                         costs = this.airtelCosts[this.mobileMoneyType] || this.airtelCosts['send_money'];
                         this.accountTypeName = 'Airtel Money';
                         this.showTransactionCost = true;
-                    } else {
-                        this.showTransactionCost = false;
-                        this.transactionCost = 0;
-                        return;
                     }
 
                     // Find the appropriate cost tier
@@ -485,13 +448,13 @@
                     this.isSearching = false;
                     this.open = false;
 
-                    // Trigger recalculation in the parent form
-                    this.$nextTick(() => {
-                        const event = new CustomEvent('category-changed', {
-                            detail: { categoryId: category.id, categoryName: category.name }
-                        });
-                        document.dispatchEvent(event);
-                    });
+                    // Dispatch event for transaction form
+                    window.dispatchEvent(new CustomEvent('category-selected', {
+                        detail: {
+                            categoryId: category.id,
+                            categoryName: category.name
+                        }
+                    }));
                 },
 
                 clear() {
@@ -501,42 +464,42 @@
                     this.isSearching = false;
                     this.open = true;
 
-                    // Trigger recalculation
-                    const event = new CustomEvent('category-changed', {
-                        detail: { categoryId: null, categoryName: null }
-                    });
-                    document.dispatchEvent(event);
+                    // Dispatch event
+                    window.dispatchEvent(new CustomEvent('category-selected', {
+                        detail: {
+                            categoryId: null,
+                            categoryName: ''
+                        }
+                    }));
                 },
 
                 selectFirst() {
-                    const filtered = this.filteredCategories();
+                    const filtered = this.filteredChildren();
                     if (filtered.length > 0) {
-                        const firstCategory = filtered[0].children.length > 0
-                            ? filtered[0].children[0]
-                            : filtered[0];
-                        this.select(firstCategory);
+                        this.select(filtered[0]);
                     }
                 },
 
-                filteredCategories() {
-                    if (!this.search || !this.isSearching) {
-                        return this.categories;
+                filteredChildren() {
+                    // Flatten all children from all parents into a single list
+                    let allChildren = [];
+
+                    for (const parent of this.categories) {
+                        if (parent.children && parent.children.length > 0) {
+                            allChildren = allChildren.concat(parent.children);
+                        }
                     }
 
-                    const searchLower = this.search.toLowerCase();
+                    // If not searching, return all children
+                    if (!this.search || !this.isSearching) {
+                        return allChildren;
+                    }
 
-                    return this.categories.filter(parent => {
-                        const parentMatches = parent.name.toLowerCase().includes(searchLower);
-                        const matchingChildren = parent.children.filter(child =>
-                            child.name.toLowerCase().includes(searchLower)
-                        );
-                        return parentMatches || matchingChildren.length > 0;
-                    }).map(parent => ({
-                        ...parent,
-                        children: parent.children.filter(child =>
-                            child.name.toLowerCase().includes(searchLower)
-                        )
-                    }));
+                    // Filter by search term
+                    const searchLower = this.search.toLowerCase();
+                    return allChildren.filter(child =>
+                        child.name.toLowerCase().includes(searchLower)
+                    );
                 },
 
                 init() {
@@ -546,23 +509,31 @@
                             if (child) {
                                 this.selectedName = child.name;
                                 this.search = child.name;
+
+                                // Notify transaction form
+                                window.dispatchEvent(new CustomEvent('category-selected', {
+                                    detail: {
+                                        categoryId: child.id,
+                                        categoryName: child.name
+                                    }
+                                }));
                                 return;
                             }
                             if (parent.id === this.selectedId) {
                                 this.selectedName = parent.name;
                                 this.search = parent.name;
+
+                                // Notify transaction form
+                                window.dispatchEvent(new CustomEvent('category-selected', {
+                                    detail: {
+                                        categoryId: parent.id,
+                                        categoryName: parent.name
+                                    }
+                                }));
                                 return;
                             }
                         }
                     }
-
-                    // Listen for category changes from other components
-                    document.addEventListener('category-changed', (e) => {
-                        const transactionForm = Alpine.$data(document.querySelector('[x-data*="transactionForm"]'));
-                        if (transactionForm) {
-                            transactionForm.checkCategoryAndCalculate();
-                        }
-                    });
                 }
             }
         }
