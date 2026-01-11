@@ -42,9 +42,9 @@ class UserObserver
                 'type' => 'expense',
                 'icon' => '👨‍👩‍👧‍👦',
                 'children' => [
-                    ['name' => 'Spouse', 'icon' => '💑'],
+                    ['name' => 'Better Half', 'icon' => '💑'],
                     ['name' => 'Parent', 'icon' => '👵'],
-                    ['name' => 'Siblings', 'icon' => '👫'],
+                    ['name' => 'Sibling', 'icon' => '👫'],
 
                 ],
             ],

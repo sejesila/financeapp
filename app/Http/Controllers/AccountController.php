@@ -13,13 +13,23 @@ class AccountController extends Controller
 {
     public function index()
     {
-
+        // Regular accounts (excluding savings)
         $accounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
+            ->whereIn('type', ['cash', 'mpesa', 'airtel_money', 'bank'])
             ->get();
 
-        // Calculate total net worth
-        $totalBalance = $accounts->sum('current_balance');
+        // Savings accounts
+        $savingsAccounts = Account::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->where('type', 'savings')
+            ->get();
+
+        // Calculate total net worth (all accounts)
+        $totalBalance = $accounts->sum('current_balance') + $savingsAccounts->sum('current_balance');
+
+        // Calculate savings total separately
+        $totalSavings = $savingsAccounts->sum('current_balance');
 
         // Recent transfers (only user's own)
         $recentTransfers = Transfer::with(['fromAccount', 'toAccount'])
@@ -29,13 +39,14 @@ class AccountController extends Controller
             ->latest()
             ->limit(10)
             ->get();
-        // Get accounts for the FAB component
-        $accounts = \App\Models\Account::where('user_id', Auth::id())
+
+        // Get all accounts for the FAB component
+        $allAccounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
 
-        return view('accounts.index', compact('accounts', 'totalBalance', 'recentTransfers','accounts'));
+        return view('accounts.index', compact('accounts', 'savingsAccounts', 'totalBalance', 'totalSavings', 'recentTransfers', 'allAccounts'));
     }
 
     public function create()
@@ -159,6 +170,7 @@ class AccountController extends Controller
                 'mpesa' => 'Mpesa',
                 'airtel_money' => 'Airtel Money',
                 'bank' => 'Bank Transfer',
+                'savings' => 'Savings',
                 default => 'Cash'
             }
         ]);
@@ -192,8 +204,6 @@ class AccountController extends Controller
         return view('accounts.transfer', compact('sourceAccounts', 'destinationAccounts'));
     }
 
-
-
     public function transfer(Request $request)
     {
         if (auth()->user()->accounts()->count() < 2) {
@@ -210,16 +220,16 @@ class AccountController extends Controller
             'description'     => 'nullable|string',
         ]);
 
-        // 🔹 Fetch accounts ONCE
+        // Fetch accounts ONCE
         $fromAccount = Account::findOrFail($request->from_account_id);
         $toAccount   = Account::findOrFail($request->to_account_id);
 
-        // 🔐 Ownership check
+        // Ownership check
         if ($fromAccount->user_id !== Auth::id() || $toAccount->user_id !== Auth::id()) {
             abort(403, 'Unauthorized access to one or both accounts.');
         }
 
-        // 🚫 Block low-balance source accounts
+        // Block low-balance source accounts
         if ($fromAccount->current_balance < 1) {
             return redirect()
                 ->back()
@@ -236,7 +246,7 @@ class AccountController extends Controller
                     . ", Transfer amount: " . number_format($request->amount, 0, '.', ',')]);
         }
 
-        // ✅ Create transfer
+        // Create transfer
         Transfer::create([
             'from_account_id' => $fromAccount->id,
             'to_account_id'   => $toAccount->id,
@@ -246,7 +256,7 @@ class AccountController extends Controller
             'user_id'         => auth()->id(),
         ]);
 
-        // 🔄 Update balances
+        // Update balances
         $fromAccount->updateBalance();
         $toAccount->updateBalance();
 
@@ -254,7 +264,6 @@ class AccountController extends Controller
             ->route('accounts.index')
             ->with('success', 'Transfer completed successfully!');
     }
-
 
     public function topUpForm(Account $account)
     {
@@ -295,6 +304,12 @@ class AccountController extends Controller
             // Banks: Only salary income
             return $query->where('type', 'income')
                 ->where('name', 'Salary')
+                ->orderBy('name')
+                ->get();
+        }
+        elseif ($accountType === 'savings') {
+            // Savings: Allow all income categories (for deposits)
+            return $query->where('type', 'income')
                 ->orderBy('name')
                 ->get();
         }
@@ -385,7 +400,7 @@ class AccountController extends Controller
             'amount'         => $request->amount,
             'date'           => $request->date,
             'period_date'    => $periodDate,
-            'description'    => $request->description ?: "Top-up to {$account->name}",
+            'description'    => $request->description ?: ($account->type === 'savings' ? "Deposit to {$account->name}" : "Top-up to {$account->name}"),
             'category_id'    => $category->id,
             'payment_method' => $category->name,
         ]);
@@ -396,8 +411,9 @@ class AccountController extends Controller
 
         $account->updateBalance();
 
+        $actionWord = $account->type === 'savings' ? 'deposited to' : 'topped up';
         return redirect()
             ->route('accounts.show', $account)
-            ->with('success', "Account topped up successfully with KES " . number_format($request->amount, 0, '.', ','));
+            ->with('success', "Account {$actionWord} successfully with KES " . number_format($request->amount, 0, '.', ','));
     }
 }

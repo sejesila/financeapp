@@ -51,6 +51,7 @@
                     <option value="airtel_money" {{ old('type') == 'airtel_money' ? 'selected' : '' }}>📱 Airtel Money
                     </option>
                     <option value="bank" {{ old('type') == 'bank' ? 'selected' : '' }}>🏦 Bank Account</option>
+                    <option value="savings">Savings Account</option>
                 </select>
             </div>
 

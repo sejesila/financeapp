@@ -1,0 +1,134 @@
+<x-app-layout>
+    <x-slot name="header">
+        <div class="flex items-center justify-between">
+            <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+                {{ __('Client Funds Management') }}
+            </h2>
+            <a href="{{ route('client-funds.create') }}"
+               class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm">
+                + Record Client Fund
+            </a>
+        </div>
+    </x-slot>
+
+    <div class="py-8 lg:py-12">
+        <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+
+            @if(session('success'))
+                <div class="bg-green-100 text-green-700 p-3 rounded mb-4">
+                    {{ session('success') }}
+                </div>
+            @endif
+
+            @if(session('error'))
+                <div class="bg-red-100 text-red-700 p-3 rounded mb-4">
+                    {{ session('error') }}
+                </div>
+            @endif
+
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                    <p class="text-xs text-gray-600 dark:text-gray-400 mb-1">Total Received</p>
+                    <p class="text-xl font-bold text-blue-600">
+                        KES {{ number_format($summary['total_received'], 0, '.', ',') }}
+                    </p>
+                </div>
+
+                <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                    <p class="text-xs text-gray-600 dark:text-gray-400 mb-1">Total Spent</p>
+                    <p class="text-xl font-bold text-orange-600">
+                        KES {{ number_format($summary['total_spent'], 0, '.', ',') }}
+                    </p>
+                </div>
+
+                <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                    <p class="text-xs text-gray-600 dark:text-gray-400 mb-1">Your Profit</p>
+                    <p class="text-xl font-bold text-green-600">
+                        KES {{ number_format($summary['total_profit'], 0, '.', ',') }}
+                    </p>
+                </div>
+
+                <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                    <p class="text-xs text-gray-600 dark:text-gray-400 mb-1">Pending Balance</p>
+                    <p class="text-xl font-bold text-purple-600">
+                        KES {{ number_format($summary['total_balance'], 0, '.', ',') }}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Client Funds List -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                    <h3 class="text-lg font-semibold">All Client Funds</h3>
+                </div>
+
+                @forelse($clientFunds as $fund)
+                    <div class="p-4 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <h4 class="font-semibold text-gray-800 dark:text-gray-200">
+                                        {{ $fund->client_name }}
+                                    </h4>
+                                    <span class="px-2 py-1 text-xs rounded-full
+                                        {{ $fund->status === 'completed' ? 'bg-green-100 text-green-700' : '' }}
+                                        {{ $fund->status === 'pending' ? 'bg-yellow-100 text-yellow-700' : '' }}
+                                        {{ $fund->status === 'partial' ? 'bg-blue-100 text-blue-700' : '' }}">
+                                        {{ ucfirst($fund->status) }}
+                                    </span>
+                                    <span class="px-2 py-1 text-xs rounded-full
+                                        {{ $fund->type === 'commission' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700' }}">
+                                        {{ $fund->type === 'commission' ? '💰 With Profit' : '🔄 No Profit' }}
+                                    </span>
+                                </div>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">{{ $fund->purpose }}</p>
+                                <p class="text-xs text-gray-500 mt-1">
+                                    Received: {{ $fund->received_date->format('M d, Y') }} |
+                                    Account: {{ $fund->account->name }}
+                                </p>
+                            </div>
+
+                            <div class="flex flex-col md:items-end gap-1">
+                                <div class="text-sm">
+                                    <span class="text-gray-600">Received:</span>
+                                    <span class="font-semibold">KES {{ number_format($fund->amount_received, 0, '.', ',') }}</span>
+                                </div>
+                                <div class="text-sm">
+                                    <span class="text-gray-600">Spent:</span>
+                                    <span class="font-semibold text-orange-600">KES {{ number_format($fund->amount_spent, 0, '.', ',') }}</span>
+                                </div>
+                                @if($fund->type === 'commission')
+                                    <div class="text-sm">
+                                        <span class="text-gray-600">Profit:</span>
+                                        <span class="font-semibold text-green-600">KES {{ number_format($fund->profit_amount, 0, '.', ',') }}</span>
+                                    </div>
+                                @endif
+                                <div class="text-sm">
+                                    <span class="text-gray-600">Balance:</span>
+                                    <span class="font-bold text-purple-600">KES {{ number_format($fund->balance, 0, '.', ',') }}</span>
+                                </div>
+                            </div>
+
+                            <div class="flex gap-2">
+                                <a href="{{ route('client-funds.show', $fund) }}"
+                                   class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm">
+                                    View Details
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                @empty
+                    <div class="p-8 text-center">
+                        <p class="text-gray-500 mb-4">No client funds recorded yet.</p>
+                        <a href="{{ route('client-funds.create') }}"
+                           class="inline-block bg-indigo-600 text-white px-6 py-2 rounded">
+                            Record Your First Client Fund
+                        </a>
+                    </div>
+                @endforelse
+            </div>
+
+        </div>
+    </div>
+</x-app-layout>

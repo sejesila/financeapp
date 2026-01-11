@@ -108,10 +108,7 @@
                     </li>
 
                     <li>
-                        <a href="{{ url('/categories') }}"
-                           class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('categories*') ? 'text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
-                            Categories
-                        </a>
+                        <a href="{{ route('client-funds.index') }}">Client Funds</a>
                     </li>
 
                     <!-- Dark Mode Toggle (Desktop) -->
@@ -205,10 +202,7 @@
                     </li>
 
                     <li>
-                        <a href="{{ url('/categories') }}"
-                           class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('categories*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
-                            Categories
-                        </a>
+                        <a href="{{ route('client-funds.index') }}">Client Funds</a>
                     </li>
 
                     <!-- Mobile User Menu -->

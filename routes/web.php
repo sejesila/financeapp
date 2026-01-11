@@ -1,7 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\{
+use App\Http\Controllers\{ClientFundController,
     DashboardController,
     ReportsController,
     ProfileController,
@@ -10,8 +10,7 @@ use App\Http\Controllers\{
     LoanController,
     TransactionController,
     CategoryController,
-    EmailPreferenceController,
-};
+    EmailPreferenceController};
 use App\Http\Controllers\Auth\{
     RegisteredUserController,
     AuthenticatedSessionController,
@@ -81,6 +80,16 @@ Route::middleware('auth')->group(function () {
         Route::post('{loan}/payment', [LoanController::class, 'recordPayment'])->name('payment.store');
         // Route::post('{loan}/default', [LoanController::class, 'markDefaulted'])->name('default');
     });
+    // In routes/web.php
+
+        Route::resource('client-funds', ClientFundController::class);
+        Route::post('client-funds/{clientFund}/expense', [ClientFundController::class, 'recordExpense'])
+            ->name('client-funds.expense');
+        Route::post('client-funds/{clientFund}/profit', [ClientFundController::class, 'recordProfit'])
+            ->name('client-funds.profit');
+        Route::post('client-funds/{clientFund}/complete', [ClientFundController::class, 'complete'])
+            ->name('client-funds.complete');
+
 
     // Email Preferences
     Route::prefix('email-preferences')->name('email-preferences.')->group(function () {
@@ -119,4 +128,4 @@ Route::get('/session-expired', function () {
     return redirect()
         ->route('login')
         ->with('message', 'Your session has expired due to inactivity. Please login again.');
-})->name('session.expired');    
+})->name('session.expired');
