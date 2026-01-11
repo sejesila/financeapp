@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Budget;
 use App\Models\Category;
 use App\Models\Transaction;
+use App\Services\TransactionService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -15,11 +16,15 @@ class TransactionController extends Controller
 {
     use AuthorizesRequests;
 
+    protected TransactionService $transactionService;
+
+    public function __construct(TransactionService $transactionService)
+    {
+        $this->transactionService = $transactionService;
+    }
+
     /**
-     * M-Pesa transaction costs (Kenya)
-     */
-    /**
-     * M-Pesa transaction costs (Kenya) - Send Money & Pochi La Biashara
+     * M-Pesa transaction costs (Kenya) - for frontend display
      */
     private function getMpesaTransactionCosts()
     {
@@ -65,7 +70,7 @@ class TransactionController extends Controller
                 ['min' => 70001, 'max' => 250000, 'cost' => 108],
             ],
             'buy_goods' => [
-                ['min' => 1, 'max' => 500000, 'cost' => 0], // Till Number - no charges
+                ['min' => 1, 'max' => 500000, 'cost' => 0],
             ],
             'pochi_la_biashara' => [
                 ['min' => 1, 'max' => 100, 'cost' => 0],
@@ -89,7 +94,7 @@ class TransactionController extends Controller
     }
 
     /**
-     * Airtel Money transaction costs (Kenya)
+     * Airtel Money transaction costs (Kenya) - for frontend display
      */
     private function getAirtelMoneyTransactionCosts()
     {
@@ -112,41 +117,14 @@ class TransactionController extends Controller
                 ['min' => 70001, 'max' => 150000, 'cost' => 130],
             ],
             'paybill' => [
-                ['min' => 1, 'max' => 150000, 'cost' => 0], // Assuming no charges for paybill
+                ['min' => 1, 'max' => 150000, 'cost' => 0],
             ],
             'buy_goods' => [
-                ['min' => 1, 'max' => 150000, 'cost' => 0], // Assuming no charges for till
+                ['min' => 1, 'max' => 150000, 'cost' => 0],
             ],
         ];
     }
 
-    /**
-     * Calculate transaction cost based on amount, account type, and transaction type
-     */
-    private function calculateTransactionCost($amount, $accountType, $transactionType = 'send_money')
-    {
-        $costs = [];
-
-        if ($accountType === 'mpesa') {
-            $allCosts = $this->getMpesaTransactionCosts();
-            $costs = $allCosts[$transactionType] ?? $allCosts['send_money'];
-        } elseif ($accountType === 'airtel_money') {
-            $allCosts = $this->getAirtelMoneyTransactionCosts();
-            $costs = $allCosts[$transactionType] ?? $allCosts['send_money'];
-        } else {
-            return 0; // No fees for other account types
-        }
-
-        // Find the appropriate cost tier
-        foreach ($costs as $tier) {
-            if ($amount >= $tier['min'] && $amount <= $tier['max']) {
-                return $tier['cost'];
-            }
-        }
-
-        // If amount exceeds all tiers, return the highest tier cost
-        return end($costs)['cost'] ?? 0;
-    }
     /**
      * Display a listing of the resource.
      */
@@ -158,7 +136,7 @@ class TransactionController extends Controller
         $search = $request->get('search');
         $categoryId = $request->get('category_id');
         $accountId = $request->get('account_id');
-        $showFees = $request->get('show_fees', false); // Option to show/hide transaction fees
+        $showFees = $request->get('show_fees', false);
 
         // Calculate dynamic year/month ranges
         $minYear = Transaction::where('user_id', Auth::id())->min(DB::raw('YEAR(date)'));
@@ -334,19 +312,18 @@ class TransactionController extends Controller
             ->orderBy('name')
             ->get()
             ->filter(function ($category) {
-                // Keep only categories that have children or are standalone
                 return $category->children->isNotEmpty() || !$category->parent_id;
             })
-            ->values(); // Reset array keys
+            ->values();
 
-        // Fallback: flat list of all leaf categories (excluding system categories)
+        // Fallback: flat list of all leaf categories
         $categories = Category::where('user_id', Auth::id())
             ->where('is_active', true)
             ->whereNotIn('name', $excludedCategories)
             ->orderBy('name')
             ->get();
 
-        // Get frequently used categories (top 5, excluding system categories)
+        // Get frequently used categories
         $frequentCategories = Category::where('user_id', Auth::id())
             ->where('is_active', true)
             ->whereNotIn('name', $excludedCategories)
@@ -360,7 +337,6 @@ class TransactionController extends Controller
             ->orderBy('name')
             ->get();
 
-        // Pass all transaction costs with their types
         $mpesaCosts = $this->getMpesaTransactionCosts();
         $airtelCosts = $this->getAirtelMoneyTransactionCosts();
 
@@ -388,197 +364,43 @@ class TransactionController extends Controller
             'category_id' => 'required|exists:categories,id',
             'account_id' => 'required|exists:accounts,id',
             'mobile_money_type' => 'nullable|in:send_money,paybill,buy_goods,pochi_la_biashara',
-            'transaction_cost' => 'nullable|numeric|min:0'
         ]);
 
-        // Verify account ownership
-        $account = \App\Models\Account::findOrFail($validated['account_id']);
-        if ($account->user_id !== Auth::id()) {
-            abort(403, 'Unauthorized access to this account.');
-        }
-
-        // Verify category ownership
-        $category = Category::findOrFail($validated['category_id']);
-        if ($category->user_id !== Auth::id()) {
-            abort(403, 'Unauthorized access to this category.');
-        }
-
-        // Get transaction type, default to send_money
-        $transactionType = $validated['mobile_money_type'] ?? 'send_money';
-
-        // Calculate transaction cost based on account type and transaction type
-        $transactionCost = $this->calculateTransactionCost(
-            $validated['amount'],
-            $account->type,
-            $transactionType
-        );
-
-        // If frontend sent a different value, use server calculation for security
-        if (isset($validated['transaction_cost']) && $validated['transaction_cost'] != $transactionCost) {
-            \Log::warning('Transaction cost mismatch', [
-                'frontend' => $validated['transaction_cost'],
-                'backend' => $transactionCost,
-                'amount' => $validated['amount'],
-                'account_type' => $account->type,
-                'transaction_type' => $transactionType
-            ]);
-        }
-
-        $totalAmount = $validated['amount'] + $transactionCost;
-
-        // Check if it's an expense and if account has sufficient balance
-        if ($category->type === 'expense' && $account->current_balance < $totalAmount) {
-            return redirect()->back()
-                ->withInput()
-                ->with('error', "Insufficient balance in {$account->name}. Current balance: "
-                    . number_format($account->current_balance, 0, '.', ',')
-                    . ", Required: " . number_format($totalAmount, 0, '.', ',')
-                    . " (Amount: " . number_format($validated['amount'], 0, '.', ',')
-                    . " + Cost: " . number_format($transactionCost, 0, '.', ',') . ")");
-        }
-
-        // Store old balance before transaction
-        $oldBalance = $account->current_balance;
-
-        // Auto-set payment method based on account type
-        $paymentMethod = match($account->type) {
-            'cash' => 'Cash',
-            'mpesa' => 'Mpesa',
-            'airtel_money' => 'Airtel Money',
-            'bank' => 'Bank Transfer',
-            default => 'Mpesa'
-        };
-
-        DB::beginTransaction();
-
         try {
-            // Create main transaction
-            $transaction = Transaction::create([
-                'user_id'        => Auth::id(),
-                'date'           => $validated['date'],
-                'description'    => $validated['description'],
-                'amount'         => $validated['amount'],
-                'category_id'    => $validated['category_id'],
-                'account_id'     => $validated['account_id'],
-                'payment_method' => $paymentMethod,
-                'is_transaction_fee' => false
-            ]);
+            // Store old balance for display
+            $account = \App\Models\Account::findOrFail($validated['account_id']);
+            $oldBalance = $account->current_balance;
 
-            // If there's a transaction cost, create a separate transaction for it
-            if ($transactionCost > 0) {
-                \Log::info('Creating transaction fee', [
-                    'amount' => $transactionCost,
-                    'account_type' => $account->type,
-                    'transaction_type' => $transactionType,
-                    'transaction_id' => $transaction->id
-                ]);
+            // Create transaction using service
+            $transaction = $this->transactionService->createTransaction($validated);
 
-                // Find or create "Transaction Fees" category
-                $feesCategory = Category::withoutGlobalScope('ownedByUser')->firstOrCreate(
-                    [
-                        'user_id' => Auth::id(),
-                        'name' => 'Transaction Fees'
-                    ],
-                    [
-                        'type' => 'expense',
-                        'icon' => '💸',
-                        'is_active' => true
-                    ]
-                );
+            // Refresh account to get updated balance
+            $account->refresh();
 
-                // Format transaction type name for description
-                $typeLabel = match($transactionType) {
-                    'send_money' => 'Send Money',
-                    'paybill' => 'PayBill',
-                    'buy_goods' => 'Buy Goods/Till',
-                    'pochi_la_biashara' => 'Pochi La Biashara',
-                    default => 'Send Money'
-                };
-
-                $feeTransaction = Transaction::withoutGlobalScope('ownedByUser')->create([
-                    'user_id'            => Auth::id(),
-                    'date'               => $validated['date'],
-                    'description'        => $paymentMethod . ' fee (' . $typeLabel . '): ' . $validated['description'],
-                    'amount'             => $transactionCost,
-                    'category_id'        => $feesCategory->id,
-                    'account_id'         => $validated['account_id'],
-                    'payment_method'     => $paymentMethod,
-                    'is_transaction_fee' => true,
-                    'fee_for_transaction_id' => $transaction->id
-                ]);
-
-                \Log::info('Fee transaction created', [
-                    'fee_transaction_id' => $feeTransaction->id,
-                    'fee_amount' => $feeTransaction->amount
-                ]);
-
-                // Link the fee to the main transaction
-                $transaction->update([
-                    'related_fee_transaction_id' => $feeTransaction->id
-                ]);
-
-                \Log::info('Main transaction updated with fee link', [
-                    'transaction_id' => $transaction->id,
-                    'related_fee_id' => $transaction->related_fee_transaction_id
-                ]);
+            // Calculate total amount including fees
+            $totalAmount = $transaction->amount;
+            if ($transaction->feeTransaction) {
+                $totalAmount += $transaction->feeTransaction->amount;
             }
 
-            // Update account balance
-            if ($transaction->account) {
-                $transaction->account->updateBalance();
-                // Refresh to get updated balance
-                $transaction->account->refresh();
+            $successMessage = 'Transaction recorded successfully';
+            if ($transaction->feeTransaction) {
+                $successMessage .= ' (including KSh ' . number_format($transaction->feeTransaction->amount, 2) . ' transaction fee)';
             }
 
-            // Auto-create or update budget entry
-            $this->updateBudgetFromTransaction($transaction);
-
-            DB::commit();
-
-            // Pass balance information to the view
             return redirect()->route('transactions.index')
-                ->with('success', 'Transaction recorded successfully' . ($transactionCost > 0 ? ' (including KSh ' . number_format($transactionCost, 2) . ' transaction fee)' : ''))
+                ->with('success', $successMessage)
                 ->with('show_balance_modal', true)
                 ->with('account_name', $account->name)
                 ->with('old_balance', number_format($oldBalance, 2))
-                ->with('new_balance', number_format($transaction->account->current_balance, 2))
+                ->with('new_balance', number_format($account->current_balance, 2))
                 ->with('transaction_amount', number_format($totalAmount, 2))
-                ->with('transaction_type', $category->type);
+                ->with('transaction_type', $transaction->category->type);
 
         } catch (\Exception $e) {
-            DB::rollBack();
-            return back()->with('error', 'Failed to create transaction: ' . $e->getMessage())
+            return back()->with('error', $e->getMessage())
                 ->withInput();
         }
-    }
-
-    /**
-     * Automatically create or update budget based on transaction
-     */
-    private function updateBudgetFromTransaction(Transaction $transaction)
-    {
-        // Use period_date if available, otherwise use transaction date
-        $date = $transaction->period_date ?? $transaction->date;
-        $year = Carbon::parse($date)->year;
-        $month = Carbon::parse($date)->month;
-
-        // Find or create budget entry
-        $budget = Budget::firstOrCreate(
-            [
-                'category_id' => $transaction->category_id,
-                'year' => $year,
-                'month' => $month,
-                'user_id' => $transaction->user_id
-            ],
-            [
-                'amount' => 0
-            ]
-        );
-
-        // Update budget amount by adding this transaction
-        // This creates a running total budget based on actual spending
-        $budget->amount += $transaction->amount;
-        $budget->save();
     }
 
     /**
@@ -590,5 +412,118 @@ class TransactionController extends Controller
 
         $transaction->load(['account', 'category', 'feeTransaction', 'mainTransaction']);
         return view('transactions.show', compact('transaction'));
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     */
+    public function edit(Transaction $transaction)
+    {
+        $this->authorize('update', $transaction);
+
+        // Don't allow editing system-generated transactions
+        if ($transaction->is_transaction_fee) {
+            return redirect()->back()
+                ->with('error', 'System-generated transaction fees cannot be edited.');
+        }
+
+        // Special system categories to exclude
+        $excludedCategories = [
+            'Income',
+            'Loans',
+            'Loan Receipt',
+            'Loan Repayment',
+            'Excise Duty',
+            'Loan Fees Refund',
+            'Facility Fee Refund',
+            'Transaction Fees',
+            'Balance Adjustment'
+        ];
+
+        $categoryGroups = Category::where('user_id', Auth::id())
+            ->whereNull('parent_id')
+            ->where('is_active', true)
+            ->whereNotIn('name', $excludedCategories)
+            ->with(['children' => function ($query) use ($excludedCategories) {
+                $query->where('is_active', true)
+                    ->whereNotIn('name', $excludedCategories)
+                    ->orderBy('name');
+            }])
+            ->orderBy('name')
+            ->get()
+            ->filter(function ($category) {
+                return $category->children->isNotEmpty() || !$category->parent_id;
+            })
+            ->values();
+
+        $categories = Category::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->whereNotIn('name', $excludedCategories)
+            ->orderBy('name')
+            ->get();
+
+        $accounts = \App\Models\Account::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
+        $mpesaCosts = $this->getMpesaTransactionCosts();
+        $airtelCosts = $this->getAirtelMoneyTransactionCosts();
+
+        return view('transactions.edit', compact(
+            'transaction',
+            'categoryGroups',
+            'categories',
+            'accounts',
+            'mpesaCosts',
+            'airtelCosts'
+        ));
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(Request $request, Transaction $transaction)
+    {
+        $this->authorize('update', $transaction);
+
+        $validated = $request->validate([
+            'date' => 'required|date',
+            'description' => 'required|string',
+            'amount' => 'required|numeric|min:0.01',
+            'category_id' => 'required|exists:categories,id',
+            'account_id' => 'required|exists:accounts,id',
+            'mobile_money_type' => 'nullable|in:send_money,paybill,buy_goods,pochi_la_biashara',
+        ]);
+
+        try {
+            // Update transaction using service
+            $updatedTransaction = $this->transactionService->updateTransaction($transaction, $validated);
+
+            return redirect()->route('transactions.show', $updatedTransaction)
+                ->with('success', 'Transaction updated successfully!');
+
+        } catch (\Exception $e) {
+            return back()->with('error', $e->getMessage())
+                ->withInput();
+        }
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(Transaction $transaction)
+    {
+        $this->authorize('delete', $transaction);
+
+        try {
+            $this->transactionService->deleteTransaction($transaction);
+
+            return redirect()->route('transactions.index')
+                ->with('success', 'Transaction deleted successfully!');
+
+        } catch (\Exception $e) {
+            return back()->with('error', $e->getMessage());
+        }
     }
 }

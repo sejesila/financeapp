@@ -2,10 +2,10 @@
     <x-slot name="header">
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
             <h2 class="font-semibold text-base sm:text-lg md:text-xl text-gray-800 dark:text-gray-200 leading-tight">
-                {{ __('Add New Transaction') }}
+                {{ __('Edit Transaction') }}
             </h2>
-            <a href="{{ route('transactions.index') }}" class="text-sm sm:text-base text-indigo-600 hover:text-indigo-800">
-                ← Back to Transactions
+            <a href="{{ route('transactions.show', $transaction) }}" class="text-sm sm:text-base text-indigo-600 hover:text-indigo-800">
+                ← Back
             </a>
         </div>
     </x-slot>
@@ -28,8 +28,9 @@
             </div>
         @endif
 
-        <form action="{{ route('transactions.store') }}" method="POST" class="space-y-4 sm:space-y-5">
+        <form action="{{ route('transactions.update', $transaction) }}" method="POST" class="space-y-4 sm:space-y-5">
             @csrf
+            @method('PUT')
 
             <div x-data="transactionForm()">
                 <!-- Date -->
@@ -38,7 +39,7 @@
                     <input
                         type="date"
                         name="date"
-                        value="{{ old('date', date('Y-m-d')) }}"
+                        value="{{ old('date', $transaction->date->format('Y-m-d')) }}"
                         class="w-full text-sm sm:text-base border dark:border-gray-600 p-2 sm:p-2.5 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
                         required
                     >
@@ -50,7 +51,7 @@
                     <input
                         type="text"
                         name="description"
-                        value="{{ old('description') }}"
+                        value="{{ old('description', $transaction->description) }}"
                         placeholder="e.g. Supermarket shopping"
                         class="w-full text-sm sm:text-base border dark:border-gray-600 p-2 sm:p-2.5 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
                         required
@@ -68,15 +69,11 @@
                         required
                     >
                         <option value="">-- Select Account --</option>
-                        @php
-                            $mpesaAccount = $accounts->where('type', 'mpesa')->first();
-                            $defaultAccountId = old('account_id') ?: ($mpesaAccount ? $mpesaAccount->id : null);
-                        @endphp
                         @foreach($accounts as $account)
                             <option
                                 value="{{ $account->id }}"
                                 data-type="{{ $account->type }}"
-                                {{ $defaultAccountId == $account->id ? 'selected' : '' }}
+                                {{ old('account_id', $transaction->account_id) == $account->id ? 'selected' : '' }}
                             >
                                 @if($account->type == 'cash') 💵
                                 @elseif($account->type == 'mpesa') 📱
@@ -111,17 +108,49 @@
                     </p>
                 </div>
 
+                <!-- Amount -->
+                <div class="mb-4 sm:mb-5">
+                    <label class="block text-sm sm:text-base font-semibold mb-1 dark:text-gray-200">Amount</label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        name="amount"
+                        value="{{ old('amount', $transaction->amount) }}"
+                        x-model="amount"
+                        @input="calculateTransactionCost()"
+                        class="w-full text-sm sm:text-base border dark:border-gray-600 p-2 sm:p-2.5 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
+                        required
+                    >
+                </div>
+
+                <!-- Transaction Cost -->
+                <div x-show="showTransactionCost && amount > 100" class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded p-2 sm:p-3 mb-4 sm:mb-5">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-medium text-yellow-800 dark:text-yellow-200">
+                            <span x-text="accountTypeName"></span> Fee
+                        </label>
+                        <span class="text-base sm:text-lg font-bold text-yellow-800 dark:text-yellow-200" x-text="'KSh ' + transactionCost.toFixed(2)"></span>
+                    </div>
+                </div>
+
+                <!-- Total Amount Display -->
+                <div x-show="showTransactionCost && amount > 100" class="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded p-2 sm:p-3 mb-4 sm:mb-5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-medium text-indigo-800 dark:text-indigo-200">Total:</span>
+                        <span class="text-base sm:text-lg font-bold text-indigo-800 dark:text-indigo-200" x-text="'KSh ' + totalAmount.toFixed(2)"></span>
+                    </div>
+                </div>
+
                 <!-- Category -->
                 <div class="mb-4 sm:mb-5">
                     <label class="block text-sm sm:text-base font-semibold mb-1 dark:text-gray-200">Category</label>
                     <div
-                        x-data='categoryDropdown(@json($categoryGroups), @json(old("category_id")))'
+                        x-data='categoryDropdown(@json($categoryGroups), @json(old("category_id", $transaction->category_id)))'
                         x-init="init()"
                         class="relative w-full"
                         @click.outside="closeDropdown()"
                         x-id="['category-dropdown']"
                     >
-                        <!-- Display/Search Input -->
                         <div class="relative">
                             <input
                                 type="text"
@@ -138,9 +167,7 @@
                                 autocomplete="off"
                             >
 
-                            <!-- Clear & Dropdown Icons -->
                             <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                                <!-- Clear button -->
                                 <button
                                     type="button"
                                     x-show="selectedId"
@@ -153,7 +180,6 @@
                                     </svg>
                                 </button>
 
-                                <!-- Dropdown arrow -->
                                 <button
                                     type="button"
                                     @click.stop="toggle()"
@@ -172,7 +198,6 @@
                             </div>
                         </div>
 
-                        <!-- Dropdown Menu -->
                         <div
                             x-show="open"
                             x-transition
@@ -183,13 +208,11 @@
                         >
                             <template x-for="parent in filteredCategories()" :key="parent.id">
                                 <div>
-                                    <!-- Parent Category Header -->
                                     <div class="px-3 sm:px-4 py-2 font-semibold text-xs sm:text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 sticky top-0">
                                         <span x-show="parent.icon" x-text="parent.icon" class="mr-1"></span>
                                         <span x-text="parent.name"></span>
                                     </div>
 
-                                    <!-- Child Categories -->
                                     <template x-for="child in parent.children" :key="child.id">
                                         <div
                                             @click="select(child)"
@@ -203,7 +226,6 @@
                                         </div>
                                     </template>
 
-                                    <!-- Parent as selectable option -->
                                     <template x-if="parent.children.length === 0">
                                         <div
                                             @click="select(parent)"
@@ -219,66 +241,22 @@
                                 </div>
                             </template>
 
-                            <!-- No results message -->
                             <div x-show="filteredCategories().length === 0" class="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs sm:text-sm">
                                 No categories found
                             </div>
                         </div>
 
-                        <!-- Hidden input for form submission -->
                         <input type="hidden" name="category_id" :value="selectedId" required>
-                    </div>
-                </div>
-
-                <!-- Amount -->
-                <div class="mb-4 sm:mb-5">
-                    <label class="block text-sm sm:text-base font-semibold mb-1 dark:text-gray-200">Amount</label>
-                    <input
-                        type="number"
-                        step="0.01"
-                        name="amount"
-                        value="{{ old('amount') }}"
-                        x-model="amount"
-                        @input="calculateTransactionCost()"
-                        class="w-full text-sm sm:text-base border dark:border-gray-600 p-2 sm:p-2.5 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
-                        required
-                    >
-                </div>
-
-                <!-- Zero Fee Notice for Internet and Communication -->
-                <div x-show="isInternetAndCommunication && (accountType === 'mpesa' || accountType === 'airtel_money')" class="">
-                    <div class="flex items-start gap-2">
-
-                    </div>
-                </div>
-
-                <!-- Transaction Cost -->
-                <div x-show="showTransactionCost && amount > 0 && !isInternetAndCommunication" class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded p-2 sm:p-3 mb-4 sm:mb-5">
-                    <div class="flex items-center justify-between">
-                        <label class="text-xs font-medium text-yellow-800 dark:text-yellow-200">
-                            <span x-text="accountTypeName"></span> Fee
-                            <span x-show="transactionCost === 0" class="text-green-600 dark:text-green-400">(Free)</span>
-                        </label>
-                        <span class="text-base sm:text-lg font-bold text-yellow-800 dark:text-yellow-200" x-text="'KSh ' + transactionCost.toFixed(2)"></span>
-                    </div>
-                    <input type="hidden" name="transaction_cost" :value="transactionCost">
-                </div>
-
-                <!-- Total Amount Display -->
-                <div x-show="(showTransactionCost || isInternetAndCommunication) && amount > 0" class="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded p-2 sm:p-3 mb-4 sm:mb-5">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-medium text-indigo-800 dark:text-indigo-200">Total Amount:</span>
-                        <span class="text-base sm:text-lg font-bold text-indigo-800 dark:text-indigo-200" x-text="'KSh ' + totalAmount.toFixed(2)"></span>
                     </div>
                 </div>
 
                 <!-- Submit -->
                 <div class="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
-                    <a href="{{ route('transactions.index') }}" class="text-center sm:text-left text-sm sm:text-base text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 py-2 sm:py-0">
+                    <a href="{{ route('transactions.show', $transaction) }}" class="text-center sm:text-left text-sm sm:text-base text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 py-2 sm:py-0">
                         Cancel
                     </a>
                     <button type="submit" class="w-full sm:w-auto bg-indigo-600 text-white px-6 py-2.5 sm:py-2 rounded-lg hover:bg-indigo-700 transition text-sm sm:text-base font-medium">
-                        Save Transaction
+                        Update Transaction
                     </button>
                 </div>
             </div>
@@ -288,15 +266,14 @@
     <script>
         function transactionForm() {
             return {
-                amount: {{ old('amount', 0) }},
-                accountId: '{{ old('account_id', $mpesaAccount->id ?? '') }}',
+                amount: {{ old('amount', $transaction->amount) }},
+                accountId: '{{ old('account_id', $transaction->account_id) }}',
                 accountType: '',
                 accountTypeName: '',
                 mobileMoneyType: '{{ old('mobile_money_type', 'send_money') }}',
                 transactionCost: 0,
                 showTransactionCost: false,
                 showTransactionTypeSelector: false,
-                isInternetAndCommunication: false,
                 mpesaCosts: @json($mpesaCosts),
                 airtelCosts: @json($airtelCosts),
 
@@ -307,10 +284,6 @@
                 init() {
                     this.$nextTick(() => {
                         this.onAccountChange();
-                        // Listen for category changes
-                        this.$watch('$root.categoryDropdown', () => {
-                            this.checkCategoryAndCalculate();
-                        });
                     });
                 },
 
@@ -323,11 +296,9 @@
                     if (selectedOption && selectedOption.value) {
                         this.accountType = selectedOption.getAttribute('data-type');
 
-                        // Show transaction type selector for mobile money accounts
                         if (this.accountType === 'mpesa' || this.accountType === 'airtel_money') {
                             this.showTransactionTypeSelector = true;
 
-                            // Hide Pochi La Biashara for Airtel Money
                             if (this.accountType === 'airtel_money' && this.mobileMoneyType === 'pochi_la_biashara') {
                                 this.mobileMoneyType = 'send_money';
                             }
@@ -345,41 +316,6 @@
                     }
                 },
 
-                checkCategoryAndCalculate() {
-                    // Get the selected category name from the hidden input
-                    const categoryInput = document.querySelector('input[name="category_id"]');
-                    if (!categoryInput || !categoryInput.value) {
-                        this.isInternetAndCommunication = false;
-                        this.calculateTransactionCost();
-                        return;
-                    }
-
-                    // Find the category name from the dropdown component
-                    const categoryData = this.findCategoryById(parseInt(categoryInput.value));
-                    this.isInternetAndCommunication = categoryData && categoryData.name === 'Internet and Communication';
-
-                    this.calculateTransactionCost();
-                },
-
-                findCategoryById(categoryId) {
-                    const categories = @json($categoryGroups);
-
-                    for (const parent of categories) {
-                        if (parent.id === categoryId) {
-                            return parent;
-                        }
-
-                        if (parent.children) {
-                            const child = parent.children.find(c => c.id === categoryId);
-                            if (child) {
-                                return child;
-                            }
-                        }
-                    }
-
-                    return null;
-                },
-
                 getTransactionTypeLabel() {
                     const labels = {
                         'send_money': 'Send Money',
@@ -393,19 +329,9 @@
                 calculateTransactionCost() {
                     const amount = parseFloat(this.amount || 0);
 
-                    // Check if category is selected
-                    this.checkCategoryAndCalculate();
-
                     if (!this.accountType || amount <= 0) {
                         this.showTransactionCost = false;
                         this.transactionCost = 0;
-                        return;
-                    }
-
-                    // Special case: Internet and Communication has zero fees
-                    if (this.isInternetAndCommunication && (this.accountType === 'mpesa' || this.accountType === 'airtel_money')) {
-                        this.transactionCost = 0;
-                        this.showTransactionCost = false;
                         return;
                     }
 
@@ -426,7 +352,6 @@
                         return;
                     }
 
-                    // Find the appropriate cost tier
                     if (Array.isArray(costs)) {
                         for (let tier of costs) {
                             if (amount >= tier.min && amount <= tier.max) {
@@ -438,7 +363,6 @@
 
                     this.transactionCost = cost;
 
-                    // Hide cost display if it's 0 for buy_goods
                     if (cost === 0 && this.mobileMoneyType === 'buy_goods') {
                         this.showTransactionCost = false;
                     }
@@ -484,14 +408,6 @@
                     this.search = category.name;
                     this.isSearching = false;
                     this.open = false;
-
-                    // Trigger recalculation in the parent form
-                    this.$nextTick(() => {
-                        const event = new CustomEvent('category-changed', {
-                            detail: { categoryId: category.id, categoryName: category.name }
-                        });
-                        document.dispatchEvent(event);
-                    });
                 },
 
                 clear() {
@@ -500,12 +416,6 @@
                     this.search = '';
                     this.isSearching = false;
                     this.open = true;
-
-                    // Trigger recalculation
-                    const event = new CustomEvent('category-changed', {
-                        detail: { categoryId: null, categoryName: null }
-                    });
-                    document.dispatchEvent(event);
                 },
 
                 selectFirst() {
@@ -555,14 +465,6 @@
                             }
                         }
                     }
-
-                    // Listen for category changes from other components
-                    document.addEventListener('category-changed', (e) => {
-                        const transactionForm = Alpine.$data(document.querySelector('[x-data*="transactionForm"]'));
-                        if (transactionForm) {
-                            transactionForm.checkCategoryAndCalculate();
-                        }
-                    });
                 }
             }
         }
