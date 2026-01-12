@@ -47,22 +47,22 @@ class RollingFundController extends Controller
 
         $wagers = $rollingFund->paginate(15);
 
-        // Calculate statistics (only for completed sessions)
+        // Calculate statistics (only for completed wagers)
         $completedSessions = RollingFund::where('user_id', auth()->id())
             ->where('status', 'completed')
             ->get();
 
         // Fix: Use filter() with closures for proper comparison
-        $wins = $completedSessions->filter(function ($session) {
-            return $session->winnings > $session->stake_amount;
+        $wins = $completedSessions->filter(function ($wager) {
+            return $wager->winnings > $wager->stake_amount;
         })->count();
 
-        $losses = $completedSessions->filter(function ($session) {
-            return $session->winnings < $session->stake_amount;
+        $losses = $completedSessions->filter(function ($wager) {
+            return $wager->winnings < $wager->stake_amount;
         })->count();
 
-        $breakEven = $completedSessions->filter(function ($session) {
-            return $session->winnings == $session->stake_amount;
+        $breakEven = $completedSessions->filter(function ($wager) {
+            return $wager->winnings == $wager->stake_amount;
         })->count();
 
         // Calculate biggest win and loss properly
@@ -70,12 +70,12 @@ class RollingFundController extends Controller
         $biggestLoss = 0;
 
         if ($completedSessions->count() > 0) {
-            $biggestWin = $completedSessions->map(function ($session) {
-                return $session->winnings - $session->stake_amount;
+            $biggestWin = $completedSessions->map(function ($wager) {
+                return $wager->winnings - $wager->stake_amount;
             })->max() ?? 0;
 
-            $biggestLoss = $completedSessions->map(function ($session) {
-                return $session->winnings - $session->stake_amount;
+            $biggestLoss = $completedSessions->map(function ($wager) {
+                return $wager->winnings - $wager->stake_amount;
             })->min() ?? 0;
         }
 
@@ -162,7 +162,7 @@ class RollingFundController extends Controller
                 'category_id' => $category->id,
                 'date' => $validated['date'],
                 'amount' => $validated['stake_amount'],
-                'description' => 'Rolling Funds Investment - ' . ($validated['platform'] ?? 'Session'),
+                'description' => 'Rolling Funds Out ',
                 'payment_method' => 'Rolling Funds',
                 'is_transaction_fee' => false,
             ]);
@@ -224,7 +224,7 @@ class RollingFundController extends Controller
 
         // Check if already completed
         if ($rollingFund->status === 'completed') {
-            return back()->with('error', 'This session outcome has already been recorded.');
+            return back()->with('error', 'This wager outcome has already been recorded.');
         }
 
         $validated = $request->validate([
@@ -347,7 +347,7 @@ Outcome: " . $validated['outcome_notes']
                 'trace' => $e->getTraceAsString(),
                 'rolling_fund_id' => $rollingFund->id, // Add rolling fund ID
             ]);
-            return back()->with('error', 'Failed to delete session: ' . $e->getMessage());
+            return back()->with('error', 'Failed to delete wager: ' . $e->getMessage());
         }
     }
 

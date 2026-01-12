@@ -220,7 +220,7 @@ class AccountController extends Controller
             'description'     => 'nullable|string',
         ]);
 
-        // Fetch accounts ONCE
+        // Fetch accounts
         $fromAccount = Account::findOrFail($request->from_account_id);
         $toAccount   = Account::findOrFail($request->to_account_id);
 
@@ -229,25 +229,40 @@ class AccountController extends Controller
             abort(403, 'Unauthorized access to one or both accounts.');
         }
 
-        // Block low-balance source accounts
-        if ($fromAccount->current_balance < 1) {
-            return redirect()
-                ->back()
-                ->withInput()
-                ->with('error', 'The selected source account does not have sufficient balance.');
+        // Calculate withdrawal fee if transferring from M-Pesa or Airtel Money to Cash/Bank
+        $withdrawalFee = 0;
+        $isWithdrawal = in_array($fromAccount->type, ['mpesa', 'airtel_money']) &&
+            in_array($toAccount->type, ['cash', 'bank']);
+
+        if ($isWithdrawal) {
+            $withdrawalFee = $this->calculateWithdrawalFee(
+                $request->amount,
+                $fromAccount->type
+            );
+
+            // Validate minimum withdrawal amount for M-Pesa
+            if ($fromAccount->type === 'mpesa' && $request->amount < 50) {
+                return redirect()->back()
+                    ->withInput()
+                    ->withErrors(['amount' => 'Minimum M-Pesa withdrawal amount is KES 50.']);
+            }
         }
 
-        // Check if the source account has sufficient balance
-        if ($fromAccount->current_balance < $request->amount) {
+        $totalDeduction = $request->amount + $withdrawalFee;
+
+        // Check if source account has sufficient balance (including fee)
+        if ($fromAccount->current_balance < $totalDeduction) {
             return redirect()->back()
                 ->withInput()
                 ->withErrors(['amount' => "Insufficient balance in {$fromAccount->name}. Current balance: "
                     . number_format($fromAccount->current_balance, 0, '.', ',')
-                    . ", Transfer amount: " . number_format($request->amount, 0, '.', ',')]);
+                    . ", Required: " . number_format($totalDeduction, 0, '.', ',')
+                    . " (Transfer: " . number_format($request->amount, 0, '.', ',')
+                    . " + Fee: " . number_format($withdrawalFee, 0, '.', ',') . ")"]);
         }
 
         // Create transfer
-        Transfer::create([
+        $transfer = Transfer::create([
             'from_account_id' => $fromAccount->id,
             'to_account_id'   => $toAccount->id,
             'amount'          => $request->amount,
@@ -256,13 +271,104 @@ class AccountController extends Controller
             'user_id'         => auth()->id(),
         ]);
 
+        // Create withdrawal fee transaction if applicable
+        if ($withdrawalFee > 0) {
+            // Get or create Transaction Fees category
+            $feeCategory = Category::firstOrCreate(
+                [
+                    'user_id' => Auth::id(),
+                    'name' => 'Transaction Fees'
+                ],
+                [
+                    'type' => 'expense',
+                    'icon' => '💸',
+                    'is_active' => true
+                ]
+            );
+
+            Transaction::create([
+                'user_id' => Auth::id(),
+                'date' => $request->date,
+                'description' => "{$fromAccount->name} withdrawal fee: " . ($request->description ?? "Transfer to {$toAccount->name}"),
+                'amount' => $withdrawalFee,
+                'category_id' => $feeCategory->id,
+                'account_id' => $fromAccount->id,
+                'payment_method' => match($fromAccount->type) {
+                    'mpesa' => 'Mpesa',
+                    'airtel_money' => 'Airtel Money',
+                    default => 'Cash'
+                },
+                'is_transaction_fee' => true,
+            ]);
+        }
+
         // Update balances
         $fromAccount->updateBalance();
         $toAccount->updateBalance();
 
+        $successMessage = 'Transfer completed successfully!';
+        if ($withdrawalFee > 0) {
+            $successMessage .= ' (Withdrawal fee: KES ' . number_format($withdrawalFee, 0, '.', ',') . ')';
+        }
+
         return redirect()
             ->route('accounts.index')
-            ->with('success', 'Transfer completed successfully!');
+            ->with('success', $successMessage);
+    }
+
+    /**
+     * Calculate withdrawal fee based on amount and account type
+     */
+    private function calculateWithdrawalFee(float $amount, string $accountType): float
+    {
+        if ($accountType === 'mpesa') {
+            $tiers = [
+                ['min' => 50, 'max' => 100, 'cost' => 11],
+                ['min' => 101, 'max' => 500, 'cost' => 29],
+                ['min' => 501, 'max' => 1000, 'cost' => 29],
+                ['min' => 1001, 'max' => 1500, 'cost' => 29],
+                ['min' => 1501, 'max' => 2500, 'cost' => 29],
+                ['min' => 2501, 'max' => 3500, 'cost' => 52],
+                ['min' => 3501, 'max' => 5000, 'cost' => 69],
+                ['min' => 5001, 'max' => 7500, 'cost' => 87],
+                ['min' => 7501, 'max' => 10000, 'cost' => 115],
+                ['min' => 10001, 'max' => 15000, 'cost' => 167],
+                ['min' => 15001, 'max' => 20000, 'cost' => 185],
+                ['min' => 20001, 'max' => 35000, 'cost' => 197],
+                ['min' => 35001, 'max' => 50000, 'cost' => 278],
+                ['min' => 50001, 'max' => 250000, 'cost' => 309],
+            ];
+        } elseif ($accountType === 'airtel_money') {
+            // Airtel Money withdrawal fees (you can add these if they differ)
+            $tiers = [
+                ['min' => 50, 'max' => 100, 'cost' => 11],
+                ['min' => 101, 'max' => 500, 'cost' => 29],
+                ['min' => 501, 'max' => 1000, 'cost' => 29],
+                ['min' => 1001, 'max' => 1500, 'cost' => 29],
+                ['min' => 1501, 'max' => 2500, 'cost' => 29],
+                ['min' => 2501, 'max' => 3500, 'cost' => 52],
+                ['min' => 3501, 'max' => 5000, 'cost' => 69],
+                ['min' => 5001, 'max' => 7500, 'cost' => 87],
+                ['min' => 7501, 'max' => 10000, 'cost' => 115],
+                ['min' => 10001, 'max' => 15000, 'cost' => 167],
+                ['min' => 15001, 'max' => 20000, 'cost' => 185],
+                ['min' => 20001, 'max' => 35000, 'cost' => 197],
+                ['min' => 35001, 'max' => 50000, 'cost' => 278],
+                ['min' => 50001, 'max' => 250000, 'cost' => 309],
+            ];
+        } else {
+            return 0;
+        }
+
+        // Find the appropriate tier
+        foreach ($tiers as $tier) {
+            if ($amount >= $tier['min'] && $amount <= $tier['max']) {
+                return $tier['cost'];
+            }
+        }
+
+        // If amount exceeds all tiers, return the highest tier cost
+        return end($tiers)['cost'] ?? 0;
     }
 
     public function topUpForm(Account $account)

@@ -35,7 +35,6 @@ class TransactionController extends Controller
     {
         $this->transactionService = $transactionService;
     }
-
     /**
      * M-Pesa transaction costs (Kenya) - for frontend display
      */
@@ -471,7 +470,7 @@ class TransactionController extends Controller
             'amount' => 'required|numeric|min:0.01',
             'category_id' => 'required|exists:categories,id',
             'account_id' => 'required|exists:accounts,id',
-            'mobile_money_type' => 'nullable|in:send_money,paybill,buy_goods,pochi_la_biashara',
+            'mobile_money_type' => 'nullable|in:send_money,paybill,buy_goods,pochi_la_biashara,withdraw',
         ]);
 
         try {
@@ -612,3 +611,6 @@ class TransactionController extends Controller
         }
     }
 }
+
+
+
