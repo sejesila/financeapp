@@ -215,6 +215,7 @@
                         value="{{ old('amount') }}"
                         x-model="amount"
                         @input="calculateTransactionCost()"
+                        placeholder="Enter amount"
                         class="w-full text-sm sm:text-base border dark:border-gray-600 p-2 sm:p-2.5 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
                         required
                     >
@@ -269,7 +270,7 @@
     <script>
         function transactionForm() {
             return {
-                amount: {{ old('amount', 0) }},
+                amount: {{ old('amount') ?: 'null' }},
                 accountId: '{{ old('account_id', $mpesaAccount->id ?? '') }}',
                 accountType: '',
                 accountTypeName: '',

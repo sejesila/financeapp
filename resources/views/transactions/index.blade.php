@@ -118,28 +118,48 @@
                     const modal = document.getElementById('balanceModal');
                     const closeBtn = document.getElementById('closeModal');
 
-                    if (modal && closeBtn) {
-                        // Close on button click
-                        closeBtn.addEventListener('click', function() {
+                    function closeModal() {
+                        // Add fade-out animation
+                        modal.style.transition = 'opacity 0.5s ease-out';
+                        modal.style.opacity = '0';
+
+                        // Hide after animation completes
+                        setTimeout(function() {
                             modal.style.display = 'none';
+                        }, 300);
+                    }
+
+                    if (modal && closeBtn) {
+                        // Set initial opacity for smooth transition
+                        modal.style.opacity = '1';
+
+                        // Auto-close after 1 second
+                        setTimeout(function() {
+                            closeModal();
+                        }, 1000);
+
+                        // Close on button click (if user clicks before auto-close)
+                        closeBtn.addEventListener('click', function() {
+                            closeModal();
                         });
 
                         // Close on outside click
                         modal.addEventListener('click', function(e) {
                             if (e.target === modal) {
-                                modal.style.display = 'none';
+                                closeModal();
                             }
                         });
 
                         // Close on Escape key
                         document.addEventListener('keydown', function(e) {
                             if (e.key === 'Escape') {
-                                modal.style.display = 'none';
+                                closeModal();
                             }
                         });
                     }
                 });
             </script>
+
         @endif
 
         {{-- Summary Cards --}}
