@@ -8,6 +8,7 @@ use App\Http\Controllers\{ClientFundController,
     AccountController,
     BudgetController,
     LoanController,
+    RollingFundController,
     TransactionController,
     CategoryController,
     EmailPreferenceController};
@@ -99,6 +100,14 @@ Route::middleware('auth')->group(function () {
         Route::post('test-monthly', [EmailPreferenceController::class, 'sendTestMonthly'])->name('test-monthly');
         Route::post('send-custom', [EmailPreferenceController::class, 'sendCustom'])->name('send-custom');
     });
+
+    // Rolling Funds Routes
+    Route::get('/rolling-funds', [RollingFundController::class, 'index'])->name('rolling-funds.index');
+    Route::get('/rolling-funds/create', [RollingFundController::class, 'create'])->name('rolling-funds.create');
+    Route::post('/rolling-funds', [RollingFundController::class, 'store'])->name('rolling-funds.store');
+    Route::get('/rolling-funds/{rollingFund}', [RollingFundController::class, 'show'])->name('rolling-funds.show');
+    Route::post('/rolling-funds/{rollingFund}/record-outcome', [RollingFundController::class, 'recordOutcome'])->name('rolling-funds.record-outcome');
+    Route::delete('/rolling-funds/{rollingFund}', [RollingFundController::class, 'destroy'])->name('rolling-funds.destroy');
 
     // Profile & Password
     Route::prefix('profile')->name('profile.')->group(function () {
