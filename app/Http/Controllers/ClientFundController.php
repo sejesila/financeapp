@@ -236,6 +236,179 @@ class ClientFundController extends Controller
             return back()->with('error', 'Failed to record profit: ' . $e->getMessage());
         }
     }
+    /**
+     * Show the form for editing basic client fund details
+     */
+    public function edit(ClientFund $clientFund)
+    {
+        if ($clientFund->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        $accounts = Account::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->get();
+
+        return view('client-funds.edit', compact('clientFund', 'accounts'));
+    }
+
+    /**
+     * Update basic client fund details (not amounts)
+     */
+    public function update(Request $request, ClientFund $clientFund)
+    {
+        if ($clientFund->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        $request->validate([
+            'client_name' => 'required|string|max:255',
+            'purpose' => 'required|string',
+            'notes' => 'nullable|string',
+        ]);
+
+        try {
+            $clientFund->update([
+                'client_name' => $request->client_name,
+                'purpose' => $request->purpose,
+                'notes' => $request->notes,
+            ]);
+
+            return redirect()
+                ->route('client-funds.show', $clientFund)
+                ->with('success', 'Client fund updated successfully!');
+
+        } catch (\Exception $e) {
+            return back()->withInput()->with('error', 'Failed to update: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Delete a client fund (only if no transactions recorded)
+     */
+    public function destroy(ClientFund $clientFund)
+    {
+        if ($clientFund->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        // Check if any expenses or profits have been recorded
+        $hasTransactions = ClientFundTransaction::where('client_fund_id', $clientFund->id)
+            ->whereIn('type', ['expense', 'profit'])
+            ->exists();
+
+        if ($hasTransactions) {
+            return back()->with('error', 'Cannot delete client fund with recorded expenses or profits. Delete individual transactions first.');
+        }
+
+        DB::beginTransaction();
+        try {
+            // Reverse the initial account balance increase
+            $account = $clientFund->account;
+            $account->current_balance -= $clientFund->amount_received;
+            $account->save();
+
+            // Delete all client fund transactions (should only be the initial receipt)
+            ClientFundTransaction::where('client_fund_id', $clientFund->id)->delete();
+
+            // Delete the client fund
+            $clientFund->delete();
+
+            DB::commit();
+
+            return redirect()
+                ->route('client-funds.index')
+                ->with('success', 'Client fund deleted successfully!');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to delete: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Delete an individual expense transaction
+     */
+    public function deleteExpense(ClientFund $clientFund, ClientFundTransaction $transaction)
+    {
+        if ($clientFund->user_id !== Auth::id() || $transaction->client_fund_id !== $clientFund->id) {
+            abort(403);
+        }
+
+        if ($transaction->type !== 'expense') {
+            return back()->with('error', 'Invalid transaction type');
+        }
+
+        DB::beginTransaction();
+        try {
+            // Add the amount back to account balance
+            $account = $clientFund->account;
+            $account->current_balance += $transaction->amount;
+            $account->save();
+
+            // Update client fund
+            $clientFund->amount_spent -= $transaction->amount;
+            $clientFund->updateBalance();
+
+            // Delete the transaction
+            $transaction->delete();
+
+            DB::commit();
+
+            return back()->with('success', 'Expense deleted successfully!');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to delete expense: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Delete an individual profit transaction
+     */
+    public function deleteProfit(ClientFund $clientFund, ClientFundTransaction $transaction)
+    {
+        if ($clientFund->user_id !== Auth::id() || $transaction->client_fund_id !== $clientFund->id) {
+            abort(403);
+        }
+
+        if ($transaction->type !== 'profit') {
+            return back()->with('error', 'Invalid transaction type');
+        }
+
+        DB::beginTransaction();
+        try {
+            // Find and delete the corresponding income transaction
+            $incomeTransaction = Transaction::where('user_id', Auth::id())
+                ->where('account_id', $clientFund->account_id)
+                ->where('amount', $transaction->amount)
+                ->where('date', $transaction->date)
+                ->where('description', 'like', "%{$clientFund->client_name}%")
+                ->first();
+
+            if ($incomeTransaction) {
+                $incomeTransaction->delete();
+            }
+
+            // Update client fund
+            $clientFund->profit_amount -= $transaction->amount;
+            $clientFund->updateBalance();
+
+            // Update account balance
+            $clientFund->account->updateBalance();
+
+            // Delete the profit transaction
+            $transaction->delete();
+
+            DB::commit();
+
+            return back()->with('success', 'Profit deleted successfully!');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to delete profit: ' . $e->getMessage());
+        }
+    }
 
     public function complete(ClientFund $clientFund)
     {

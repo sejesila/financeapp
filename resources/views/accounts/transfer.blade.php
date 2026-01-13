@@ -202,18 +202,6 @@
             </form>
         </div>
 
-        <!-- Quick Info -->
-        <div class="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-            <p class="text-sm text-blue-800 dark:text-blue-200 mb-2">
-                <strong>💡 Transfer Fees:</strong>
-            </p>
-            <ul class="text-xs text-blue-700 dark:text-blue-300 space-y-1 ml-4">
-                <li>• <strong>M-Pesa/Airtel → Cash:</strong> Withdrawal fees apply (agent withdrawal)</li>
-                <li>• <strong>M-Pesa/Airtel → Bank:</strong> PayBill fees apply (lower than withdrawal)</li>
-                <li>• <strong>M-Pesa/Airtel → Savings:</strong> No fees (internal transfer)</li>
-                <li>• <strong>Other transfers:</strong> No fees</li>
-            </ul>
-        </div>
     </div>
 
     <script>

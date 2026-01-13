@@ -81,7 +81,10 @@ Route::middleware('auth')->group(function () {
         Route::post('{loan}/payment', [LoanController::class, 'recordPayment'])->name('payment.store');
         // Route::post('{loan}/default', [LoanController::class, 'markDefaulted'])->name('default');
     });
-    // In routes/web.php
+
+
+
+    // Client Funds
 
         Route::resource('client-funds', ClientFundController::class);
         Route::post('client-funds/{clientFund}/expense', [ClientFundController::class, 'recordExpense'])
@@ -90,6 +93,11 @@ Route::middleware('auth')->group(function () {
             ->name('client-funds.profit');
         Route::post('client-funds/{clientFund}/complete', [ClientFundController::class, 'complete'])
             ->name('client-funds.complete');
+        Route::get('/client-funds/{clientFund}/edit', [ClientFundController::class, 'edit'])->name('client-funds.edit');
+        Route::put('/client-funds/{clientFund}', [ClientFundController::class, 'update'])->name('client-funds.update');
+        Route::delete('/client-funds/{clientFund}', [ClientFundController::class, 'destroy'])->name('client-funds.destroy');
+        Route::delete('/client-funds/{clientFund}/expense/{transaction}', [ClientFundController::class, 'deleteExpense'])->name('client-funds.expense.delete');
+        Route::delete('/client-funds/{clientFund}/profit/{transaction}', [ClientFundController::class, 'deleteProfit'])->name('client-funds.profit.delete');
 
 
     // Email Preferences

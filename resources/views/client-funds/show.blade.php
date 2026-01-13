@@ -69,6 +69,23 @@
                     <!-- Fund Details -->
                     <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6">
                         <h3 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Fund Details</h3>
+                        <div class="flex gap-2">
+                            <a href="{{ route('client-funds.edit', $clientFund) }}"
+                               class="text-blue-600 hover:text-blue-800 text-xs">
+                                ✏️ Edit
+                            </a>
+                            @if($clientFund->transactions->whereIn('type', ['expense', 'profit'])->isEmpty())
+                                <form method="POST" action="{{ route('client-funds.destroy', $clientFund) }}" class="inline">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit"
+                                            onclick="return confirm('Are you sure? This will reverse the account balance change.')"
+                                            class="text-red-600 hover:text-red-800 text-xs">
+                                        🗑️ Delete
+                                    </button>
+                                </form>
+                            @endif
+                        </div>
 
                         <div class="space-y-3">
                             <div>
@@ -194,6 +211,19 @@
                                                 {{ $transaction->type === 'receipt' || $transaction->type === 'return' ? '+' : '-' }}
                                                 {{ number_format($transaction->amount, 0) }}
                                             </p>
+                                            @if($transaction->type === 'expense' || $transaction->type === 'profit')
+                                                <form method="POST"
+                                                      action="{{ route('client-funds.' . $transaction->type . '.delete', [$clientFund, $transaction]) }}"
+                                                      class="mt-1">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit"
+                                                            onclick="return confirm('Delete this {{ $transaction->type }}?')"
+                                                            class="text-xs text-red-600 hover:text-red-800">
+                                                        Delete
+                                                    </button>
+                                                </form>
+                                            @endif
                                         </div>
                                     </div>
                                 </div>

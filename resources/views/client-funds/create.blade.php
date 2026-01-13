@@ -199,17 +199,6 @@
                 </form>
             </div>
 
-            <!-- Info Box -->
-            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 sm:p-4 mt-6">
-                <h4 class="font-semibold text-blue-900 dark:text-blue-300 mb-2 text-sm">💡 How it works:</h4>
-                <ol class="text-xs sm:text-sm text-blue-800 dark:text-blue-400 space-y-1 list-decimal list-inside">
-                    <li>Record the money received from your client</li>
-                    <li>Track expenses as you spend the client's money</li>
-                    <li>If applicable, record your profit/commission</li>
-                    <li>Complete the transaction when done</li>
-                </ol>
-            </div>
-
         </div>
     </div>
 </x-app-layout>
