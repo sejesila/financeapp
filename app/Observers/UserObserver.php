@@ -35,6 +35,28 @@ class UserObserver
                 'icon' => '🍽️',
                 'children' => [
                     ['name' => 'Groceries', 'icon' => '🛒'],
+                    ['name' => 'Dining Out', 'icon' => '🍴'],
+                ],
+            ],
+            [
+                'name' => 'Shopping',
+                'type' => 'expense',
+                'icon' => '🛍️',
+                'children' => [
+                    ['name' => 'Clothing', 'icon' => '👔'],
+                    ['name' => 'Electronics', 'icon' => '📱'],
+                    ['name' => 'Personal Care', 'icon' => '💄'],
+                ],
+            ],
+            [
+                'name' => 'Household & Appliances',
+                'type' => 'expense',
+                'icon' => '🏡',
+                'children' => [
+                    ['name' => 'Furniture', 'icon' => '🛋️'],
+                    ['name' => 'Kitchen Appliances', 'icon' => '🍳'],
+                    ['name' => 'Home Appliances', 'icon' => '📺'],
+
                 ],
             ],
             [
@@ -43,9 +65,28 @@ class UserObserver
                 'icon' => '👨‍👩‍👧‍👦',
                 'children' => [
                     ['name' => 'Better Half', 'icon' => '💑'],
-                    ['name' => 'Parent', 'icon' => '👵'],
+                    ['name' => 'Mum', 'icon' => '👵'],
                     ['name' => 'Sibling', 'icon' => '👫'],
 
+                ],
+            ],
+            [
+                'name' => 'Health',
+                'type' => 'expense',
+                'icon' => '⚕️',
+                'children' => [
+                    ['name' => 'Doctor', 'icon' => '👨‍⚕️'],
+                    ['name' => 'Pharmacy', 'icon' => '💊'],
+                    ['name' => 'Gym & Fitness', 'icon' => '💪'],
+                ],
+            ],
+            [
+                'name' => 'Education',
+                'type' => 'expense',
+                'icon' => '📚',
+                'children' => [
+                    ['name' => 'School Fees', 'icon' => '🎓'],
+                    ['name' => 'Books & Supplies', 'icon' => '📖'],
                 ],
             ],
             [
@@ -53,20 +94,11 @@ class UserObserver
                 'type' => 'expense',
                 'icon' => '📦',
                 'children' => [
-                    ['name' => 'Home Project', 'icon' => '🎬'],
-                    ['name' => 'Other', 'icon' => '🔹'],
+                    ['name' => 'Home Project', 'icon' => '🏗️'],
+                    ['name' => 'Other Expenses', 'icon' => '🔹'],
+                    ['name' => 'Third Party Purchase', 'icon' => '🔹'],
                 ],
             ],
-//            [
-//                'name' => 'Health',
-//                'type' => 'expense',
-//                'icon' => '⚕️',
-//                'children' => [
-//                    ['name' => 'Doctor', 'icon' => '👨‍⚕️'],
-//                    ['name' => 'Pharmacy', 'icon' => '💊'],
-//                    ['name' => 'Insurance', 'icon' => '🏥'],
-//                ],
-//            ],
             [
                 'name' => 'Income',
                 'type' => 'income',
@@ -74,6 +106,9 @@ class UserObserver
                 'children' => [
                     ['name' => 'Salary', 'icon' => '💼'],
                     ['name' => 'Side Income', 'icon' => '🏢'],
+                    //['name' => 'Freelance', 'icon' => '💻'],
+                    //['name' => 'Business', 'icon' => '🏪'],
+                    //['name' => 'Investment Returns', 'icon' => '📈'],
                 ],
             ],
             [
@@ -101,7 +136,7 @@ class UserObserver
                     'user_id'   => $user->id,
                     'name'      => $childData['name'],
                     'icon'      => $childData['icon'] ?? null,
-                    'type'      => $parentData['type'], // ✅ inherit
+                    'type'      => $parentData['type'],
                     'parent_id' => $parent->id,
                 ]);
             }

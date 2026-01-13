@@ -61,7 +61,7 @@
                 <div class="mb-4 sm:mb-5">
                     <label class="block text-sm sm:text-base font-semibold mb-1 dark:text-gray-200">Category</label>
                     <div
-                        x-data='categoryDropdown(@json($categoryGroups), @json(old("category_id")))'
+                        x-data='categoryDropdown(@json($categoryGroups), @json($allCategoriesArray), @json(old("category_id")))'
                         x-init="init()"
                         class="relative w-full"
                         @click.outside="closeDropdown()"
@@ -281,7 +281,7 @@
                 selectedCategoryName: '',
                 mpesaCosts: @json($mpesaCosts),
                 airtelCosts: @json($airtelCosts),
-                categories: @json($categoryGroups),
+                categories: @json($allCategoriesArray), // Use the flat sorted array
 
                 get totalAmount() {
                     return parseFloat(this.amount || 0) + parseFloat(this.transactionCost || 0);
@@ -339,18 +339,9 @@
                 },
 
                 updateCategoryName(categoryId) {
-                    for (const parent of this.categories) {
-                        if (parent.id === categoryId) {
-                            this.selectedCategoryName = parent.name;
-                            return;
-                        }
-                        if (parent.children) {
-                            const child = parent.children.find(c => c.id === categoryId);
-                            if (child) {
-                                this.selectedCategoryName = child.name;
-                                return;
-                            }
-                        }
+                    const found = this.categories.find(c => c.id === categoryId);
+                    if (found) {
+                        this.selectedCategoryName = found.name;
                     }
                 },
 
@@ -410,17 +401,15 @@
             }
         }
 
-        function categoryDropdown(categories, oldId = null) {
+        function categoryDropdown(categoryGroups, allCategoriesArray, oldId = null) {
             return {
                 open: false,
                 search: '',
                 selectedId: oldId,
                 selectedName: '',
                 isSearching: false,
-                categories: categories.map(parent => ({
-                    ...parent,
-                    children: parent.children || []
-                })),
+                categories: categoryGroups,
+                allCategoriesSorted: allCategoriesArray, // Pre-sorted flat list from backend
 
                 toggle() {
                     this.open = !this.open;
@@ -482,21 +471,15 @@
                 },
 
                 filteredChildren() {
-                    // Flatten all children from all parents into a single list
-                    let allChildren = [];
+                    // Use the pre-sorted flat list from backend
+                    const allChildren = this.allCategoriesSorted;
 
-                    for (const parent of this.categories) {
-                        if (parent.children && parent.children.length > 0) {
-                            allChildren = allChildren.concat(parent.children);
-                        }
-                    }
-
-                    // If not searching, return all children
+                    // If not searching, return all children (already sorted by usage_count DESC)
                     if (!this.search || !this.isSearching) {
                         return allChildren;
                     }
 
-                    // Filter by search term
+                    // Filter by search term (maintains usage_count order)
                     const searchLower = this.search.toLowerCase();
                     return allChildren.filter(child =>
                         child.name.toLowerCase().includes(searchLower)
@@ -505,34 +488,19 @@
 
                 init() {
                     if (this.selectedId) {
-                        for (const parent of this.categories) {
-                            const child = parent.children.find(c => c.id === this.selectedId);
-                            if (child) {
-                                this.selectedName = child.name;
-                                this.search = child.name;
+                        // Find in the sorted list
+                        const found = this.allCategoriesSorted.find(c => c.id === this.selectedId);
+                        if (found) {
+                            this.selectedName = found.name;
+                            this.search = found.name;
 
-                                // Notify transaction form
-                                window.dispatchEvent(new CustomEvent('category-selected', {
-                                    detail: {
-                                        categoryId: child.id,
-                                        categoryName: child.name
-                                    }
-                                }));
-                                return;
-                            }
-                            if (parent.id === this.selectedId) {
-                                this.selectedName = parent.name;
-                                this.search = parent.name;
-
-                                // Notify transaction form
-                                window.dispatchEvent(new CustomEvent('category-selected', {
-                                    detail: {
-                                        categoryId: parent.id,
-                                        categoryName: parent.name
-                                    }
-                                }));
-                                return;
-                            }
+                            // Notify transaction form
+                            window.dispatchEvent(new CustomEvent('category-selected', {
+                                detail: {
+                                    categoryId: found.id,
+                                    categoryName: found.name
+                                }
+                            }));
                         }
                     }
                 }

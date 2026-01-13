@@ -28,7 +28,7 @@ class TransactionController extends Controller
         'Loan Fees Refund',
         'Facility Fee Refund',
         'Transaction Fees',
-        'Balance Adjustment'
+        'Balance Adjustment',
     ];
 
     public function __construct(TransactionService $transactionService)
@@ -106,6 +106,77 @@ class TransactionController extends Controller
     }
 
     /**
+     * Get categories for forms (excluding system categories and parent categories)
+     * Returns only child categories sorted by usage frequency
+     */
+    private function getCategoriesForForm()
+    {
+        // Get all child categories sorted by usage frequency (this will be used for the dropdown)
+        $allCategories = Category::where('user_id', Auth::id())
+            ->whereNotNull('parent_id') // Only child categories
+            ->where('is_active', true)
+            ->whereNotIn('name', self::EXCLUDED_CATEGORIES)
+            ->with(['parent' => function($query) {
+                // Also exclude parent categories that are in excluded list
+                $query->whereNotIn('name', self::EXCLUDED_CATEGORIES);
+            }])
+            ->orderBy('usage_count', 'desc')
+            ->orderBy('name')
+            ->get();
+
+        // Filter out any categories whose parent is in the excluded list
+        $allCategories = $allCategories->filter(function($category) {
+            return $category->parent && !in_array($category->parent->name, self::EXCLUDED_CATEGORIES);
+        });
+
+        // Get parent categories for grouping (UI purposes)
+        $parentCategories = Category::where('user_id', Auth::id())
+            ->whereNull('parent_id')
+            ->where('is_active', true)
+            ->whereNotIn('name', self::EXCLUDED_CATEGORIES)
+            ->get()
+            ->keyBy('id');
+
+        // Group categories by parent for structured display
+        $categoryGroups = $parentCategories->map(function ($parent) use ($allCategories) {
+            return [
+                'id' => $parent->id,
+                'name' => $parent->name,
+                'icon' => $parent->icon,
+                'type' => $parent->type,
+                'children' => $allCategories->where('parent_id', $parent->id)->values()
+            ];
+        })->filter(function ($group) {
+            return $group['children']->isNotEmpty();
+        })->values();
+
+        // Convert allCategories to array for JSON serialization
+        // Only include the fields we need
+        $allCategoriesArray = $allCategories->map(function($category) {
+            return [
+                'id' => $category->id,
+                'name' => $category->name,
+                'icon' => $category->icon,
+                'parent_id' => $category->parent_id,
+                'usage_count' => $category->usage_count,
+            ];
+        })->values()->toArray();
+
+        return compact('categoryGroups', 'allCategoriesArray');
+    }
+    /**
+     * Get active accounts for the current user
+     */
+    private function getActiveAccounts()
+    {
+        return \App\Models\Account::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+    }
+
+
+    /**
      * Airtel Money transaction costs (Kenya) - for frontend display
      */
     private function getAirtelMoneyTransactionCosts()
@@ -137,48 +208,7 @@ class TransactionController extends Controller
         ];
     }
 
-    /**
-     * Get categories for forms (excluding system categories)
-     */
-    private function getCategoriesForForm()
-    {
-        // Get parent categories with their children (hierarchical structure)
-        $categoryGroups = Category::where('user_id', Auth::id())
-            ->whereNull('parent_id')
-            ->where('is_active', true)
-            ->whereNotIn('name', self::EXCLUDED_CATEGORIES)
-            ->with(['children' => function ($query) {
-                $query->where('is_active', true)
-                    ->whereNotIn('name', self::EXCLUDED_CATEGORIES)
-                    ->orderBy('name');
-            }])
-            ->orderBy('name')
-            ->get()
-            ->filter(function ($category) {
-                return $category->children->isNotEmpty() || !$category->parent_id;
-            })
-            ->values();
 
-        // Fallback: flat list of all leaf categories
-        $categories = Category::where('user_id', Auth::id())
-            ->where('is_active', true)
-            ->whereNotIn('name', self::EXCLUDED_CATEGORIES)
-            ->orderBy('name')
-            ->get();
-
-        return compact('categoryGroups', 'categories');
-    }
-
-    /**
-     * Get active accounts for the current user
-     */
-    private function getActiveAccounts()
-    {
-        return \App\Models\Account::where('user_id', Auth::id())
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get();
-    }
 
     /**
      * Calculate transaction totals for a given query
@@ -351,22 +381,13 @@ class TransactionController extends Controller
     {
         $categoryData = $this->getCategoriesForForm();
 
-        // Get frequently used categories
-        $frequentCategories = Category::where('user_id', Auth::id())
-            ->where('is_active', true)
-            ->whereNotIn('name', self::EXCLUDED_CATEGORIES)
-            ->where('usage_count', '>', 0)
-            ->orderBy('usage_count', 'desc')
-            ->limit(5)
-            ->get();
-
         $accounts = $this->getActiveAccounts();
         $mpesaCosts = $this->getMpesaTransactionCosts();
         $airtelCosts = $this->getAirtelMoneyTransactionCosts();
 
         return view('transactions.create', array_merge(
             $categoryData,
-            compact('frequentCategories', 'accounts', 'mpesaCosts', 'airtelCosts')
+            compact('accounts', 'mpesaCosts', 'airtelCosts')
         ));
     }
 
@@ -387,17 +408,19 @@ class TransactionController extends Controller
         ]);
 
         try {
-            // Store old balance for display
             $account = \App\Models\Account::findOrFail($validated['account_id']);
             $oldBalance = $account->current_balance;
 
-            // Create transaction using service
             $transaction = $this->transactionService->createTransaction($validated);
 
-            // Refresh account to get updated balance
+            // Increment category usage count
+            $category = Category::find($validated['category_id']);
+            if ($category) {
+                $category->increment('usage_count');
+            }
+
             $account->refresh();
 
-            // Calculate total amount including fees
             $totalAmount = $transaction->amount;
             if ($transaction->feeTransaction) {
                 $totalAmount += $transaction->feeTransaction->amount;
