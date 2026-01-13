@@ -361,9 +361,9 @@ class LoanController extends Controller implements HasMiddleware
     {
         $this->authorize('create', Loan::class);
 
+        // Get accounts - Allow mpesa, airtel_money for M-Shwari/KCB, and ALL active accounts for 'other' loans
         $accounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
-            ->whereIn('type', ['mpesa', 'airtel_money'])
             ->orderBy('name')
             ->get();
 
@@ -464,6 +464,10 @@ class LoanController extends Controller implements HasMiddleware
     /**
      * Record loan payment with early repayment credit (within 10 days)
      */
+    /**
+     * Record loan payment with early repayment credit (within 10 days)
+     * Updated to support payment from any account
+     */
     public function recordPayment(Request $request, Loan $loan)
     {
         $this->authorize('makePayment', $loan);
@@ -473,6 +477,7 @@ class LoanController extends Controller implements HasMiddleware
         }
 
         $validated = $request->validate([
+            'payment_account_id' => 'required|exists:accounts,id', // NEW: Account to pay from
             'payment_amount' => 'required|numeric|min:0.01',
             'payment_date' => 'required|date|before_or_equal:today',
             'principal_portion' => 'nullable|numeric|min:0',
@@ -485,10 +490,18 @@ class LoanController extends Controller implements HasMiddleware
         try {
             $paymentAmount = (float)$validated['payment_amount'];
             $paymentDate = $validated['payment_date'];
-            $account = Account::find($loan->account_id);
 
-            if ($account->current_balance < $paymentAmount) {
-                throw new Exception("Insufficient balance. Required: KES " . number_format($paymentAmount, 0) . ", Available: KES " . number_format($account->current_balance, 0));
+            // Get the account to pay from (can be different from loan disbursement account)
+            $paymentAccount = Account::findOrFail($validated['payment_account_id']);
+
+            // Verify account ownership
+            if ($paymentAccount->user_id !== Auth::id()) {
+                throw new Exception("Unauthorized access to this account.");
+            }
+
+            // Check if payment account has sufficient balance
+            if ($paymentAccount->current_balance < $paymentAmount) {
+                throw new Exception("Insufficient balance in {$paymentAccount->name}. Required: KES " . number_format($paymentAmount, 0) . ", Available: KES " . number_format($paymentAccount->current_balance, 0));
             }
 
             $repayment = $this->calculateTotalRepayment(
@@ -511,9 +524,10 @@ class LoanController extends Controller implements HasMiddleware
                 ['name' => 'Loan Repayment', 'type' => 'expense']
             );
 
+            // Create transaction - use the payment account, not the loan's original account
             $transaction = Transaction::create([
                 'user_id' => Auth::id(),
-                'account_id' => $loan->account_id,
+                'account_id' => $paymentAccount->id, // CHANGED: Use payment account
                 'category_id' => $repaymentCategory->id,
                 'description' => "Loan repayment to {$loan->source}",
                 'amount' => $paymentAmount,
@@ -522,10 +536,11 @@ class LoanController extends Controller implements HasMiddleware
                 'loan_id' => $loan->id,
             ]);
 
+            // Record loan payment with the payment account
             LoanPayment::create([
                 'user_id' => Auth::id(),
                 'loan_id' => $loan->id,
-                'account_id' => $loan->account_id,
+                'account_id' => $paymentAccount->id, // CHANGED: Use payment account
                 'amount' => $paymentAmount,
                 'principal_portion' => $principalPortion,
                 'interest_portion' => $interestPortion,
@@ -544,12 +559,14 @@ class LoanController extends Controller implements HasMiddleware
 
             $loan->save();
 
-            $account->current_balance -= $paymentAmount;
+            // Deduct from payment account
+            $paymentAccount->current_balance -= $paymentAmount;
 
             $earlyRepaymentCredit = 0;
             $loanType = $loan->loan_type ?? $this->detectLoanType($loan->source);
 
             // Check for early repayment credit (within 10 days from disbursement)
+            // NOTE: Early repayment credits go to the LOAN's original account, not payment account
             if ($loan->balance <= 0) {
                 $daysElapsed = Carbon::parse($loan->disbursed_date)->diffInDays(Carbon::parse($paymentDate));
 
@@ -563,9 +580,12 @@ class LoanController extends Controller implements HasMiddleware
                         ['name' => 'Loan Fees Refund', 'type' => 'income']
                     );
 
+                    // Credit goes to the loan's original account
+                    $loanOriginalAccount = Account::find($loan->account_id);
+
                     Transaction::create([
                         'user_id' => Auth::id(),
-                        'account_id' => $loan->account_id,
+                        'account_id' => $loan->account_id, // Original loan account
                         'category_id' => $loanFeesCategory->id,
                         'description' => "Early repayment credit - 20% of loan fees refunded (Repaid in {$daysElapsed} days from {$loan->source})",
                         'amount' => $earlyRepaymentCredit,
@@ -574,7 +594,8 @@ class LoanController extends Controller implements HasMiddleware
                         'loan_id' => $loan->id,
                     ]);
 
-                    $account->current_balance += $earlyRepaymentCredit;
+                    $loanOriginalAccount->current_balance += $earlyRepaymentCredit;
+                    $loanOriginalAccount->save();
 
                 } elseif ($loanType === 'kcb_mpesa' && $daysElapsed <= 10) {
                     // KCB M-Pesa: Full facility fee refund (1.76%)
@@ -585,9 +606,12 @@ class LoanController extends Controller implements HasMiddleware
                         ['name' => 'Facility Fee Refund', 'type' => 'income']
                     );
 
+                    // Credit goes to the loan's original account
+                    $loanOriginalAccount = Account::find($loan->account_id);
+
                     Transaction::create([
                         'user_id' => Auth::id(),
-                        'account_id' => $loan->account_id,
+                        'account_id' => $loan->account_id, // Original loan account
                         'category_id' => $facilityFeeCategory->id,
                         'description' => "Early repayment cashback - Facility fee refunded (Repaid in {$daysElapsed} days from {$loan->source})",
                         'amount' => $earlyRepaymentCredit,
@@ -596,22 +620,26 @@ class LoanController extends Controller implements HasMiddleware
                         'loan_id' => $loan->id,
                     ]);
 
-                    $account->current_balance += $earlyRepaymentCredit;
+                    $loanOriginalAccount->current_balance += $earlyRepaymentCredit;
+                    $loanOriginalAccount->save();
                 }
             }
 
-            $account->save();
+            // Save payment account
+            $paymentAccount->save();
 
             DB::commit();
 
-            $successMessage = "Payment of KES " . number_format($paymentAmount, 0) . " recorded successfully!";
+            $successMessage = "Payment of KES " . number_format($paymentAmount, 0) . " recorded successfully from {$paymentAccount->name}!";
 
             if ($earlyRepaymentCredit > 0) {
                 $daysElapsed = Carbon::parse($loan->disbursed_date)->diffInDays(Carbon::parse($paymentDate));
+                $creditAccountName = Account::find($loan->account_id)->name;
+
                 if ($loanType === 'kcb_mpesa') {
-                    $successMessage .= " 🎉 You received an early repayment cashback of KES " . number_format($earlyRepaymentCredit, 0) . " (facility fee refunded) for repaying within {$daysElapsed} days!";
+                    $successMessage .= " 🎉 You received an early repayment cashback of KES " . number_format($earlyRepaymentCredit, 0) . " (facility fee refunded) to {$creditAccountName} for repaying within {$daysElapsed} days!";
                 } else {
-                    $successMessage .= " 🎉 You received an early repayment credit of KES " . number_format($earlyRepaymentCredit, 0) . " (20% of loan fees refunded) for repaying within {$daysElapsed} days!";
+                    $successMessage .= " 🎉 You received an early repayment credit of KES " . number_format($earlyRepaymentCredit, 0) . " (20% of loan fees refunded) to {$creditAccountName} for repaying within {$daysElapsed} days!";
                 }
             }
 
@@ -689,9 +717,11 @@ class LoanController extends Controller implements HasMiddleware
             $account = Account::find($loan->account_id);
             $loanType = $loan->loan_type ?? $this->detectLoanType($loan->source);
 
-            if ($loanType === 'kcb_mpesa') {
+            if ($loanType === 'kcb_mpesa' || $loanType === 'other') {
+                // For KCB M-Pesa and Other loans, reverse the full principal amount
                 $account->current_balance -= $loan->principal_amount;
             } else {
+                // For M-Shwari, reverse the deposit amount (principal minus excise duty)
                 $breakdown = $this->calculateMshwariBreakdown($loan->principal_amount);
                 $account->current_balance -= $breakdown['deposit_amount'];
             }

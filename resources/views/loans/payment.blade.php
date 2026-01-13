@@ -22,6 +22,12 @@
                 $facilitationFee = $loan->principal_amount * 0.09;
                 $remainingInterest = $facilitationFee - $totalInterestPaid;
             }
+
+            // Get all active accounts for payment
+            $accounts = \App\Models\Account::where('user_id', Auth::id())
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get();
         @endphp
 
         @if(session('error'))
@@ -89,6 +95,39 @@
 
             <input type="hidden" id="remaining_interest" value="{{ max(0, $remainingInterest) }}">
             <input type="hidden" id="remaining_principal" value="{{ $remainingPrincipal }}">
+
+            <!-- Payment Account Selection -->
+            <div>
+                <label for="payment_account_id" class="block text-gray-700 font-semibold mb-2">
+                    Pay From Account <span class="text-red-500">*</span>
+                </label>
+                <select
+                    name="payment_account_id"
+                    id="payment_account_id"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg text-base @error('payment_account_id') border-red-500 @enderror"
+                    required
+                    onchange="updateAccountBalance()">
+                    <option value="">Select account to pay from</option>
+                    @foreach($accounts as $account)
+                        <option value="{{ $account->id }}"
+                                data-balance="{{ $account->current_balance }}"
+                            {{ old('payment_account_id', $loan->account_id) == $account->id ? 'selected' : '' }}>
+                            {{ $account->name }}
+                            (Balance: KES {{ number_format($account->current_balance, 0, '.', ',') }})
+                        </option>
+                    @endforeach
+                </select>
+                <p class="text-xs text-gray-500 mt-2" id="selected_account_balance">
+                    @if($loan->account)
+                        Available balance: KES {{ number_format($loan->account->current_balance, 0, '.', ',') }}
+                    @else
+                        Select an account to see available balance
+                    @endif
+                </p>
+                @error('payment_account_id')
+                <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
+                @enderror
+            </div>
 
             <!-- Payment Amount -->
             <div>
@@ -255,5 +294,105 @@
         </form>
     </div>
 
-    <!-- Original JavaScript remains unchanged -->
+    <script>
+        // Update account balance display when account is selected
+        function updateAccountBalance() {
+            const accountSelect = document.getElementById('payment_account_id');
+            const selectedOption = accountSelect.options[accountSelect.selectedIndex];
+            const balance = selectedOption.getAttribute('data-balance');
+            const balanceDisplay = document.getElementById('selected_account_balance');
+
+            if (balance) {
+                const formattedBalance = parseFloat(balance).toLocaleString('en-US', {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                });
+                balanceDisplay.textContent = `Available balance: KES ${formattedBalance}`;
+                balanceDisplay.classList.remove('text-red-500');
+                balanceDisplay.classList.add('text-gray-500');
+            } else {
+                balanceDisplay.textContent = 'Select an account to see available balance';
+                balanceDisplay.classList.remove('text-red-500', 'text-gray-500');
+            }
+        }
+
+        // Set payment amount from quick buttons
+        function setPaymentAmount(amount) {
+            document.getElementById('payment_amount').value = amount.toFixed(2);
+            calculatePaymentAllocation();
+        }
+
+        // Calculate payment allocation
+        function calculatePaymentAllocation() {
+            const paymentAmount = parseFloat(document.getElementById('payment_amount').value) || 0;
+            const remainingInterest = parseFloat(document.getElementById('remaining_interest').value) || 0;
+            const remainingPrincipal = parseFloat(document.getElementById('remaining_principal').value) || 0;
+
+            let interestPortion = Math.min(paymentAmount, remainingInterest);
+            let principalPortion = Math.max(0, paymentAmount - interestPortion);
+
+            // Cap principal portion to remaining principal
+            principalPortion = Math.min(principalPortion, remainingPrincipal);
+
+            document.getElementById('interest_portion').value = interestPortion.toFixed(2);
+            document.getElementById('principal_portion').value = principalPortion.toFixed(2);
+
+            const total = interestPortion + principalPortion;
+            document.getElementById('total_display').textContent = `KES ${total.toLocaleString('en-US', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            })}`;
+        }
+
+        // Enable manual override
+        document.getElementById('manual_override').addEventListener('change', function() {
+            const interestInput = document.getElementById('interest_portion');
+            const principalInput = document.getElementById('principal_portion');
+
+            if (this.checked) {
+                interestInput.removeAttribute('readonly');
+                principalInput.removeAttribute('readonly');
+                interestInput.classList.remove('bg-gray-50');
+                principalInput.classList.remove('bg-gray-50');
+                interestInput.classList.add('bg-white');
+                principalInput.classList.add('bg-white');
+            } else {
+                interestInput.setAttribute('readonly', true);
+                principalInput.setAttribute('readonly', true);
+                interestInput.classList.add('bg-gray-50');
+                principalInput.classList.add('bg-gray-50');
+                interestInput.classList.remove('bg-white');
+                principalInput.classList.remove('bg-white');
+                calculatePaymentAllocation();
+            }
+        });
+
+        // Auto-calculate on payment amount change
+        document.getElementById('payment_amount').addEventListener('input', function() {
+            if (!document.getElementById('manual_override').checked) {
+                calculatePaymentAllocation();
+            }
+        });
+
+        // Manual allocation change updates total
+        document.getElementById('interest_portion').addEventListener('input', updateTotal);
+        document.getElementById('principal_portion').addEventListener('input', updateTotal);
+
+        function updateTotal() {
+            const interestPortion = parseFloat(document.getElementById('interest_portion').value) || 0;
+            const principalPortion = parseFloat(document.getElementById('principal_portion').value) || 0;
+            const total = interestPortion + principalPortion;
+
+            document.getElementById('total_display').textContent = `KES ${total.toLocaleString('en-US', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            })}`;
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            updateAccountBalance();
+            calculatePaymentAllocation();
+        });
+    </script>
 </x-app-layout>
