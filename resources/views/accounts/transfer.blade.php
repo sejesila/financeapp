@@ -1,5 +1,4 @@
 <x-app-layout>
-
     <x-slot name="header">
         <div class="flex items-center justify-between mb-6">
             <h2 class="font-semibold text-lg sm:text-xl text-gray-800 dark:text-gray-200 leading-tight">
@@ -12,7 +11,6 @@
     </x-slot>
 
     <div class="max-w-2xl mx-auto">
-
         @if($errors->any())
             <div class="bg-red-100 text-red-700 p-4 rounded mb-6">
                 <ul class="list-disc list-inside">
@@ -112,31 +110,34 @@
                     <p class="text-red-500 text-sm mt-2">{{ $message }}</p>
                     @enderror
 
-                    <!-- Minimum withdrawal warning -->
-                    <p x-show="isWithdrawal && amount > 0 && amount < 50" class="text-red-500 text-sm mt-2">
+                    <!-- Minimum withdrawal warning (only for cash withdrawals) -->
+                    <p x-show="feeType === 'withdrawal' && amount > 0 && amount < 50" class="text-red-500 text-sm mt-2">
                         ⚠️ Minimum M-Pesa withdrawal amount is KES 50
                     </p>
                 </div>
 
-                <!-- Withdrawal Fee Display -->
+                <!-- Transaction Fee Display -->
                 <div
-                    x-show="showWithdrawalFee && withdrawalFee > 0"
+                    x-show="showFee && transactionFee > 0"
                     x-transition
-                    class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded p-3 mb-4"
+                    :class="feeType === 'withdrawal' ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800' : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'"
+                    class="border rounded p-3 mb-4"
                 >
                     <div class="flex items-start gap-2">
-                        <svg class="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-5 h-5 flex-shrink-0 mt-0.5" :class="feeType === 'withdrawal' ? 'text-yellow-600 dark:text-yellow-400' : 'text-blue-600 dark:text-blue-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
                         <div class="flex-1">
                             <div class="flex items-center justify-between">
-                                <p class="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                                    <span x-text="fromAccountType === 'mpesa' ? 'M-Pesa' : 'Airtel Money'"></span> Withdrawal Fee
+                                <p class="text-sm font-medium" :class="feeType === 'withdrawal' ? 'text-yellow-800 dark:text-yellow-200' : 'text-blue-800 dark:text-blue-200'">
+                                    <span x-text="fromAccountType === 'mpesa' ? 'M-Pesa' : 'Airtel Money'"></span>
+                                    <span x-text="feeType === 'withdrawal' ? ' Withdrawal Fee' : ' PayBill Fee'"></span>
                                 </p>
-                                <span class="text-lg font-bold text-yellow-800 dark:text-yellow-200" x-text="'KES ' + withdrawalFee.toLocaleString()"></span>
+                                <span class="text-lg font-bold" :class="feeType === 'withdrawal' ? 'text-yellow-800 dark:text-yellow-200' : 'text-blue-800 dark:text-blue-200'" x-text="'KES ' + transactionFee.toLocaleString()"></span>
                             </div>
-                            <p class="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
-                                Agent withdrawal fee will be deducted from <span x-text="fromAccountName"></span>
+                            <p class="text-xs mt-1" :class="feeType === 'withdrawal' ? 'text-yellow-700 dark:text-yellow-300' : 'text-blue-700 dark:text-blue-300'">
+                                <span x-show="feeType === 'withdrawal'">Agent withdrawal fee will be deducted from <span x-text="fromAccountName"></span></span>
+                                <span x-show="feeType === 'paybill'">PayBill transaction fee will be deducted from <span x-text="fromAccountName"></span></span>
                             </p>
                         </div>
                     </div>
@@ -144,7 +145,7 @@
 
                 <!-- Total Deduction Display -->
                 <div
-                    x-show="showWithdrawalFee && withdrawalFee > 0"
+                    x-show="showFee && transactionFee > 0"
                     x-transition
                     class="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded p-3 mb-4"
                 >
@@ -155,7 +156,7 @@
                         <span class="text-lg font-bold text-indigo-800 dark:text-indigo-200" x-text="'KES ' + totalDeduction.toLocaleString()"></span>
                     </div>
                     <p class="text-xs text-indigo-600 dark:text-indigo-300 mt-1">
-                        Transfer: KES <span x-text="parseFloat(amount || 0).toLocaleString()"></span> + Fee: KES <span x-text="withdrawalFee.toLocaleString()"></span>
+                        Transfer: KES <span x-text="parseFloat(amount || 0).toLocaleString()"></span> + Fee: KES <span x-text="transactionFee.toLocaleString()"></span>
                     </p>
                 </div>
 
@@ -183,7 +184,7 @@
                         name="description"
                         id="description"
                         value="{{ old('description') }}"
-                        placeholder="e.g., Withdraw cash from M-Pesa"
+                        placeholder="e.g., Transfer to savings"
                         class="w-full border border-gray-300 dark:border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
                     >
                     @error('description')
@@ -202,10 +203,15 @@
 
         <!-- Quick Info -->
         <div class="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-            <p class="text-sm text-blue-800 dark:text-blue-200">
-                <strong>💡 Tip:</strong> Transfers don't affect your budget categories. They simply move money between
-                your accounts. Withdrawal fees (M-Pesa/Airtel to Cash/Bank) are automatically calculated and recorded.
+            <p class="text-sm text-blue-800 dark:text-blue-200 mb-2">
+                <strong>💡 Transfer Fees:</strong>
             </p>
+            <ul class="text-xs text-blue-700 dark:text-blue-300 space-y-1 ml-4">
+                <li>• <strong>M-Pesa/Airtel → Cash:</strong> Withdrawal fees apply (agent withdrawal)</li>
+                <li>• <strong>M-Pesa/Airtel → Bank:</strong> PayBill fees apply (lower than withdrawal)</li>
+                <li>• <strong>M-Pesa/Airtel → Savings:</strong> No fees (internal transfer)</li>
+                <li>• <strong>Other transfers:</strong> No fees</li>
+            </ul>
         </div>
     </div>
 
@@ -215,26 +221,15 @@
                 fromAccountId: '{{ old('from_account_id') }}',
                 toAccountId: '{{ old('to_account_id') }}',
                 amount: {{ old('amount', 0) }},
-                withdrawalFee: 0,
-                showWithdrawalFee: false,
+                transactionFee: 0,
+                showFee: false,
+                feeType: null, // 'withdrawal' or 'paybill'
                 fromAccountType: '',
                 fromAccountName: '',
+                toAccountType: '',
 
                 get totalDeduction() {
-                    return parseFloat(this.amount || 0) + this.withdrawalFee;
-                },
-
-                get isWithdrawal() {
-                    const fromAccount = this.getAccount(this.fromAccountId);
-                    const toAccount = this.getAccount(this.toAccountId);
-
-                    if (!fromAccount || !toAccount) return false;
-
-                    const mobileMoneyTypes = ['mpesa', 'airtel_money'];
-                    const cashTypes = ['cash', 'bank'];
-
-                    return mobileMoneyTypes.includes(fromAccount.type) &&
-                        cashTypes.includes(toAccount.type);
+                    return parseFloat(this.amount || 0) + this.transactionFee;
                 },
 
                 getAccount(id) {
@@ -249,17 +244,47 @@
                 },
 
                 calculateFee() {
-                    this.showWithdrawalFee = this.isWithdrawal;
-
                     const fromAccount = this.getAccount(this.fromAccountId);
-                    if (fromAccount) {
-                        this.fromAccountType = fromAccount.type;
-                        this.fromAccountName = fromAccount.name;
+                    const toAccount = this.getAccount(this.toAccountId);
+
+                    if (!fromAccount || !toAccount || !this.amount || this.amount <= 0) {
+                        this.showFee = false;
+                        this.transactionFee = 0;
+                        this.feeType = null;
+                        return;
                     }
 
-                    if (!this.isWithdrawal || this.amount < 50) {
-                        this.withdrawalFee = 0;
-                        return;
+                    this.fromAccountType = fromAccount.type;
+                    this.fromAccountName = fromAccount.name;
+                    this.toAccountType = toAccount.type;
+
+                    const mobileMoneyTypes = ['mpesa', 'airtel_money'];
+                    const isMobileMoney = mobileMoneyTypes.includes(fromAccount.type);
+
+                    // M-Pesa/Airtel to Cash = Withdrawal fee
+                    if (isMobileMoney && toAccount.type === 'cash') {
+                        this.feeType = 'withdrawal';
+                        this.transactionFee = this.getWithdrawalFee(parseFloat(this.amount), fromAccount.type);
+                        this.showFee = this.transactionFee > 0;
+                    }
+                    // M-Pesa/Airtel to Bank = PayBill fee
+                    else if (isMobileMoney && toAccount.type === 'bank') {
+                        this.feeType = 'paybill';
+                        this.transactionFee = this.getPayBillFee(parseFloat(this.amount), fromAccount.type);
+                        this.showFee = this.transactionFee > 0;
+                    }
+                    // All other transfers = No fee
+                    else {
+                        this.feeType = null;
+                        this.transactionFee = 0;
+                        this.showFee = false;
+                    }
+                },
+
+                getWithdrawalFee(amount, accountType) {
+                    // Return 0 if amount is invalid or below minimum
+                    if (!amount || amount < 50) {
+                        return 0;
                     }
 
                     const tiers = [
@@ -280,17 +305,59 @@
                     ];
 
                     for (let tier of tiers) {
-                        if (this.amount >= tier.min && this.amount <= tier.max) {
-                            this.withdrawalFee = tier.cost;
-                            return;
+                        if (amount >= tier.min && amount <= tier.max) {
+                            return tier.cost;
                         }
                     }
 
-                    this.withdrawalFee = 309; // Max fee
+                    // If amount exceeds all tiers, return the highest tier cost
+                    return amount > 250000 ? 309 : 0;
+                },
+
+                getPayBillFee(amount, accountType) {
+                    // Return 0 if amount is invalid or zero
+                    if (!amount || amount <= 0) {
+                        return 0;
+                    }
+
+                    if (accountType === 'airtel_money') {
+                        return 0; // Airtel Money PayBill is free
+                    }
+
+                    // M-Pesa PayBill fees
+                    const tiers = [
+                        { min: 1, max: 49, cost: 0 },
+                        { min: 50, max: 100, cost: 0 },
+                        { min: 101, max: 500, cost: 5 },
+                        { min: 501, max: 1000, cost: 10 },
+                        { min: 1001, max: 1500, cost: 15 },
+                        { min: 1501, max: 2500, cost: 20 },
+                        { min: 2501, max: 3500, cost: 25 },
+                        { min: 3501, max: 5000, cost: 34 },
+                        { min: 5001, max: 7500, cost: 42 },
+                        { min: 7501, max: 10000, cost: 48 },
+                        { min: 10001, max: 15000, cost: 57 },
+                        { min: 15001, max: 20000, cost: 62 },
+                        { min: 20001, max: 25000, cost: 67 },
+                        { min: 25001, max: 30000, cost: 72 },
+                        { min: 30001, max: 35000, cost: 83 },
+                        { min: 35001, max: 40000, cost: 99 },
+                        { min: 40001, max: 45000, cost: 103 },
+                        { min: 45001, max: 50000, cost: 108 },
+                        { min: 50001, max: 250000, cost: 108 },
+                    ];
+
+                    for (let tier of tiers) {
+                        if (amount >= tier.min && amount <= tier.max) {
+                            return tier.cost;
+                        }
+                    }
+
+                    // If amount exceeds all tiers, return the highest tier cost
+                    return amount > 250000 ? 108 : 0;
                 },
 
                 init() {
-                    // Calculate on init if old values exist
                     this.$nextTick(() => {
                         this.calculateFee();
                         this.updateDestinationOptions();
@@ -309,23 +376,19 @@
                 const fromValue = fromSelect.value;
 
                 Array.from(toSelect.options).forEach(option => {
-                    if (!option.value) return; // skip placeholder
+                    if (!option.value) return;
 
                     option.disabled = option.value === fromValue;
                     option.hidden = option.value === fromValue;
                 });
 
-                // Reset destination if it became invalid
                 if (toSelect.value === fromValue) {
                     toSelect.value = '';
                 }
             }
 
             fromSelect.addEventListener('change', window.updateDestinationOptions);
-
-            // Run once on load (for old() values)
             window.updateDestinationOptions();
         });
     </script>
-
 </x-app-layout>
