@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreTransactionRequest;
 use App\Models\Budget;
 use App\Models\Category;
 use App\Models\Transaction;
@@ -394,20 +395,32 @@ class TransactionController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(StoreTransactionRequest $request)
     {
         $this->authorize('create', Transaction::class);
 
-        $validated = $request->validate([
-            'date' => 'required|date',
-            'description' => 'required|string',
-            'amount' => 'required|numeric|min:0.01',
-            'category_id' => 'required|exists:categories,id',
-            'account_id' => 'required|exists:accounts,id',
-            'mobile_money_type' => 'nullable|in:send_money,paybill,buy_goods,pochi_la_biashara',
-        ]);
+        $validated = $request->validated();
 
         try {
+            // Check if transaction with this idempotency key already exists
+            $existingTransaction = Transaction::where('user_id', Auth::id())
+                ->where('idempotency_key', $validated['idempotency_key'])
+                ->first();
+
+            if ($existingTransaction) {
+                // Transaction already processed, return the existing one
+                $account = $existingTransaction->account;
+
+                return redirect()->route('transactions.index')
+                    ->with('info', 'This transaction was already recorded.')
+                    ->with('show_balance_modal', true)
+                    ->with('account_name', $account->name)
+                    ->with('old_balance', number_format($account->current_balance, 2))
+                    ->with('new_balance', number_format($account->current_balance, 2))
+                    ->with('transaction_amount', number_format($existingTransaction->amount, 2))
+                    ->with('transaction_type', $existingTransaction->category->type);
+            }
+
             $account = \App\Models\Account::findOrFail($validated['account_id']);
             $oldBalance = $account->current_balance;
 
@@ -483,6 +496,9 @@ class TransactionController extends Controller
     /**
      * Update the specified resource in storage.
      */
+    /**
+     * Update the specified resource in storage.
+     */
     public function update(Request $request, Transaction $transaction)
     {
         $this->authorize('update', $transaction);
@@ -493,12 +509,21 @@ class TransactionController extends Controller
             'amount' => 'required|numeric|min:0.01',
             'category_id' => 'required|exists:categories,id',
             'account_id' => 'required|exists:accounts,id',
-            'mobile_money_type' => 'nullable|in:send_money,paybill,buy_goods,pochi_la_biashara,withdraw',
+            'mobile_money_type' => 'nullable|in:send_money,paybill,buy_goods,pochi_la_biashara',
+            // Note: No idempotency_key for updates
         ]);
 
         try {
             // Update transaction using service
             $updatedTransaction = $this->transactionService->updateTransaction($transaction, $validated);
+
+            // Increment category usage count if category changed
+            if ($transaction->category_id != $validated['category_id']) {
+                $category = Category::find($validated['category_id']);
+                if ($category) {
+                    $category->increment('usage_count');
+                }
+            }
 
             return redirect()->route('transactions.show', $updatedTransaction)
                 ->with('success', 'Transaction updated successfully!');

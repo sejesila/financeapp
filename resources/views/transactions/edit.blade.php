@@ -262,7 +262,6 @@
             </div>
         </form>
     </div>
-
     <script>
         function transactionForm() {
             return {

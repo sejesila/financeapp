@@ -267,6 +267,102 @@
         </form>
     </div>
 
+    
+    <script>
+        (function() {
+            // Generate unique idempotency key when page loads
+            const idempotencyKey = `txn_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+
+            document.addEventListener('DOMContentLoaded', function() {
+                const form = document.querySelector('form[action*="transactions"]');
+
+                if (!form) {
+                    console.warn('Transaction form not found');
+                    return;
+                }
+
+                // Create and add hidden input for idempotency key
+                const idempotencyInput = document.createElement('input');
+                idempotencyInput.type = 'hidden';
+                idempotencyInput.name = 'idempotency_key';
+                idempotencyInput.value = idempotencyKey;
+                form.appendChild(idempotencyInput);
+
+                console.log('Idempotency key generated:', idempotencyKey);
+
+                // Disable submit button after first click
+                const submitButton = form.querySelector('button[type="submit"]');
+                let isSubmitting = false;
+
+                if (submitButton) {
+                    const originalButtonText = submitButton.textContent;
+
+                    form.addEventListener('submit', function(e) {
+                        if (isSubmitting) {
+                            e.preventDefault();
+                            console.log('Form already submitting, prevented duplicate submission');
+                            return false;
+                        }
+
+                        isSubmitting = true;
+                        submitButton.disabled = true;
+                        submitButton.innerHTML = '<span class="inline-flex items-center"><svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Processing...</span>';
+
+                        // Store submission state
+                        sessionStorage.setItem('transaction_submitting', 'true');
+                        sessionStorage.setItem('transaction_key', idempotencyKey);
+
+                        // Re-enable after 10 seconds in case of network error
+                        setTimeout(() => {
+                            isSubmitting = false;
+                            submitButton.disabled = false;
+                            submitButton.textContent = originalButtonText;
+                            sessionStorage.removeItem('transaction_submitting');
+                            console.log('Submit button re-enabled after timeout');
+                        }, 10000);
+                    });
+                }
+            });
+
+            // Check on page load if we were in middle of submission
+            window.addEventListener('load', function() {
+                const wasSubmitting = sessionStorage.getItem('transaction_submitting');
+                const lastKey = sessionStorage.getItem('transaction_key');
+
+                if (wasSubmitting === 'true') {
+                    // Clear the flags
+                    sessionStorage.removeItem('transaction_submitting');
+                    sessionStorage.removeItem('transaction_key');
+
+                    // Show warning message
+                    const warningDiv = document.createElement('div');
+                    warningDiv.className = 'bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded mb-4';
+                    warningDiv.innerHTML = `
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-yellow-500" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                </svg>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm">
+                                    Your previous transaction may have been recorded. Please check your transaction history before submitting again.
+                                </p>
+                            </div>
+                        </div>
+                    `;
+
+                    const container = document.querySelector('.max-w-2xl');
+                    if (container) {
+                        container.insertBefore(warningDiv, container.firstChild);
+                    }
+
+                    console.log('Detected interrupted submission. Last key:', lastKey);
+                }
+            });
+        })();
+    </script>
+
     <script>
         function transactionForm() {
             return {
@@ -507,4 +603,5 @@
             }
         }
     </script>
+
 </x-app-layout>

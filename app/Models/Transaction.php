@@ -27,6 +27,7 @@ class Transaction extends Model
         'related_fee_transaction_id',
         'fee_for_transaction_id',
         'is_transaction_fee',
+        'idempotency_key',
     ];
 
     protected $casts = [

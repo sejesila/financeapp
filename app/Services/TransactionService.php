@@ -199,6 +199,7 @@ class TransactionService
     /**
      * Create a new transaction with fee handling and balance updates
      */
+
     public function createTransaction(array $data): Transaction
     {
         return DB::transaction(function () use ($data) {
@@ -238,13 +239,10 @@ class TransactionService
                 );
             }
 
-            // Store old balance for return
-            $oldBalance = $account->current_balance;
-
             // Determine payment method
             $paymentMethod = $this->getPaymentMethod($account);
 
-            // Create main transaction
+            // Create main transaction with idempotency key
             $transaction = Transaction::create([
                 'user_id' => Auth::id(),
                 'date' => $data['date'],
@@ -254,9 +252,9 @@ class TransactionService
                 'account_id' => $data['account_id'],
                 'payment_method' => $paymentMethod,
                 'mobile_money_type' => $transactionType,
-                'is_transaction_fee' => false
+                'is_transaction_fee' => false,
+                'idempotency_key' => $data['idempotency_key'] ?? null,
             ]);
-
 
             // Create fee transaction if applicable
             if ($transactionCost > 0) {
