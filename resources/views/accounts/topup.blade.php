@@ -87,6 +87,7 @@
                     id="amount"
                     step="0.01"
                     value="{{ old('amount') }}"
+                    placeholder="Enter amount"
                     class="w-full border border-gray-300 rounded px-4 py-2"
                     required
                 >
