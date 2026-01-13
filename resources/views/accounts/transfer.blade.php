@@ -32,7 +32,7 @@
                         name="from_account_id"
                         id="from_account_id"
                         x-model="fromAccountId"
-                        @change="calculateFee()"
+                        @change="calculateFee(); updateDestinationOptions();"
                         required
                         class="w-full border border-gray-300 dark:border-gray-600 rounded px-4 py-2 dark:bg-gray-700 dark:text-gray-200"
                     >
@@ -41,6 +41,7 @@
                             <option
                                 value="{{ $account->id }}"
                                 data-type="{{ $account->type }}"
+                                data-name="{{ $account->name }}"
                                 {{ old('from_account_id') == $account->id ? 'selected' : '' }}
                             >
                                 @if($account->type == 'cash') 💵
@@ -74,6 +75,7 @@
                             <option
                                 value="{{ $account->id }}"
                                 data-type="{{ $account->type }}"
+                                data-name="{{ $account->name }}"
                                 {{ old('to_account_id') == $account->id ? 'selected' : '' }}
                             >
                                 @if($account->type == 'cash') 💵
@@ -99,9 +101,8 @@
                         step="0.01"
                         name="amount"
                         id="amount"
-                        x-model="amount"
+                        x-model.number="amount"
                         @input="calculateFee()"
-                        value="{{ old('amount') }}"
                         placeholder="Enter amount to transfer"
                         class="w-full border border-gray-300 dark:border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
                         required
@@ -167,7 +168,7 @@
                         type="date"
                         name="date"
                         id="date"
-                        value="{{ old('date', date('Y-m-d')) }}"
+                        x-model="date"
                         class="w-full border border-gray-300 dark:border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
                         required
                     >
@@ -183,7 +184,7 @@
                         type="text"
                         name="description"
                         id="description"
-                        value="{{ old('description') }}"
+                        x-model="description"
                         placeholder="e.g., Transfer to savings"
                         class="w-full border border-gray-300 dark:border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
                     >
@@ -220,7 +221,9 @@
             return {
                 fromAccountId: '{{ old('from_account_id') }}',
                 toAccountId: '{{ old('to_account_id') }}',
-                amount: {{ old('amount', 0) }},
+                amount: {{ old('amount') ?: 'null' }},
+                date: '{{ old('date', date('Y-m-d')) }}',
+                description: '{{ old('description') }}',
                 transactionFee: 0,
                 showFee: false,
                 feeType: null, // 'withdrawal' or 'paybill'
@@ -239,7 +242,7 @@
 
                     return {
                         type: select.dataset.type,
-                        name: select.textContent.split('(')[0].trim()
+                        name: select.dataset.name || select.textContent.split('(')[0].trim()
                     };
                 },
 
@@ -357,6 +360,22 @@
                     return amount > 250000 ? 108 : 0;
                 },
 
+                updateDestinationOptions() {
+                    const toSelect = document.getElementById('to_account_id');
+                    if (!toSelect) return;
+
+                    Array.from(toSelect.options).forEach(option => {
+                        if (!option.value) return;
+
+                        option.disabled = option.value === this.fromAccountId;
+                        option.hidden = option.value === this.fromAccountId;
+                    });
+
+                    if (this.toAccountId === this.fromAccountId) {
+                        this.toAccountId = '';
+                    }
+                },
+
                 init() {
                     this.$nextTick(() => {
                         this.calculateFee();
@@ -365,30 +384,5 @@
                 }
             }
         }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            const fromSelect = document.getElementById('from_account_id');
-            const toSelect = document.getElementById('to_account_id');
-
-            if (!fromSelect || !toSelect) return;
-
-            window.updateDestinationOptions = function() {
-                const fromValue = fromSelect.value;
-
-                Array.from(toSelect.options).forEach(option => {
-                    if (!option.value) return;
-
-                    option.disabled = option.value === fromValue;
-                    option.hidden = option.value === fromValue;
-                });
-
-                if (toSelect.value === fromValue) {
-                    toSelect.value = '';
-                }
-            }
-
-            fromSelect.addEventListener('change', window.updateDestinationOptions);
-            window.updateDestinationOptions();
-        });
     </script>
 </x-app-layout>

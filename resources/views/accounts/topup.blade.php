@@ -1,18 +1,16 @@
 <x-app-layout>
-<x-slot name="header">
-    <div class="flex items-center justify-between">
-        <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-            {{ __('Top-Up Account') }}
-        </h2>
-        <a href="{{ route('accounts.show',$account) }}" class="text-indigo-600 hover:text-indigo-800">
-            ← Back to Account
-        </a>
-    </div>
-</x-slot>
+    <x-slot name="header">
+        <div class="flex items-center justify-between">
+            <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+                {{ __('Top-Up Account') }}
+            </h2>
+            <a href="{{ route('accounts.show',$account) }}" class="text-indigo-600 hover:text-indigo-800">
+                ← Back to Account
+            </a>
+        </div>
+    </x-slot>
 
     <div class="max-w-2xl mx-auto">
-
-
 
         @if(session('success'))
             <div class="bg-green-100 text-green-700 p-4 rounded mb-6">
@@ -26,9 +24,7 @@
             </div>
         @endif
 
-
-
-        <form method="POST" action="{{ route('accounts.topup.store', $account) }}" class="bg-white shadow rounded-lg p-6" id="topupForm">
+        <form method="POST" action="{{ route('accounts.topup.store', $account) }}" class="bg-white shadow rounded-lg p-6" id="topupForm" x-data="topupForm()">
             @csrf
 
             <div class="mb-4">
@@ -86,6 +82,7 @@
                     name="amount"
                     id="amount"
                     step="0.01"
+                    x-model="amount"
                     value="{{ old('amount') }}"
                     placeholder="Enter amount"
                     class="w-full border border-gray-300 rounded px-4 py-2"
@@ -104,6 +101,7 @@
                     type="date"
                     name="date"
                     id="date"
+                    x-model="date"
                     value="{{ old('date', date('Y-m-d')) }}"
                     class="w-full border border-gray-300 rounded px-4 py-2"
                     required
@@ -121,6 +119,7 @@
                     name="description"
                     id="description"
                     rows="3"
+                    x-model="description"
                     class="w-full border border-gray-300 rounded px-4 py-2"
                     placeholder="Any notes about this top-up"
                 >{{ old('description') }}</textarea>
@@ -141,55 +140,60 @@
     </div>
 
     <script>
-        const categorySelect = document.getElementById('category_id');
-        const topupForm = document.getElementById('topupForm');
+        function topupForm() {
+            return {
+                amount: '{{ old('amount') }}',
+                date: '{{ old('date', date('Y-m-d')) }}',
+                description: '{{ old('description') }}',
 
-        // Detect loan type from category name
-        function detectLoanType(categoryName) {
-            const name = categoryName.toLowerCase();
+                init() {
+                    // Listen for form submit
+                    this.$el.addEventListener('submit', (e) => this.handleSubmit(e));
+                },
 
-            if (name.includes('kcb') || name.includes('kcb-mpesa') || name.includes('kcb mpesa')) {
-                return 'kcb_mpesa';
+                handleSubmit(e) {
+                    const categorySelect = document.getElementById('category_id');
+                    const selectedOption = categorySelect.options[categorySelect.selectedIndex];
+                    const categoryType = selectedOption.getAttribute('data-type');
+
+                    if (categoryType === 'liability') {
+                        e.preventDefault();
+
+                        const categoryName = selectedOption.text;
+                        const loanType = this.detectLoanType(categoryName);
+
+                        // Build URL with query parameters
+                        const url = new URL('{{ route("loans.create") }}', window.location.origin);
+                        url.searchParams.append('account_id', '{{ $account->id }}');
+                        if (this.amount) url.searchParams.append('amount', this.amount);
+                        if (this.date) url.searchParams.append('date', this.date);
+                        url.searchParams.append('source', categoryName);
+                        url.searchParams.append('loan_type', loanType);
+                        if (this.description) url.searchParams.append('notes', this.description);
+
+                        window.location.href = url.toString();
+                    }
+                },
+
+                detectLoanType(categoryName) {
+                    const name = categoryName.toLowerCase();
+
+                    if (name.includes('kcb') || name.includes('kcb-mpesa') || name.includes('kcb mpesa')) {
+                        return 'kcb_mpesa';
+                    }
+
+                    if (name.includes('mshwari') || name.includes('m-shwari')) {
+                        return 'mshwari';
+                    }
+
+                    if (name.includes('other') || name.includes('mother')) {
+                        return 'other';
+                    }
+
+                    // Default to other for unknown loan types
+                    return 'other';
+                }
             }
-
-            if (name.includes('mshwari') || name.includes('m-shwari')) {
-                return 'mshwari';
-            }
-            if (name.includes('other') || name.includes('mother')) {
-                return 'other';
-            }
-
-            // Default to mshwari for other loan types
-            return 'other';
         }
-
-        // Check on form submit if liability category is selected
-        topupForm.addEventListener('submit', function(e) {
-            const selectedOption = categorySelect.options[categorySelect.selectedIndex];
-            const categoryType = selectedOption.getAttribute('data-type');
-
-            if (categoryType === 'liability') {
-                e.preventDefault();
-
-                const amount = document.getElementById('amount').value;
-                const date = document.getElementById('date').value;
-                const description = document.getElementById('description').value;
-                const categoryName = selectedOption.text;
-
-                // Detect loan type
-                const loanType = detectLoanType(categoryName);
-
-                // Build URL with query parameters
-                const url = new URL('{{ route("loans.create") }}', window.location.origin);
-                url.searchParams.append('account_id', '{{ $account->id }}');
-                if (amount) url.searchParams.append('amount', amount);
-                if (date) url.searchParams.append('date', date);
-                url.searchParams.append('source', categoryName);
-                url.searchParams.append('loan_type', loanType);
-                if (description) url.searchParams.append('notes', description);
-
-                window.location.href = url.toString();
-            }
-        });
     </script>
 </x-app-layout>
