@@ -21,10 +21,14 @@
                             ↔ Transfer Money
                         </a>
                     @endif
-                    <a href="{{ route('accounts.create') }}"
-                       class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm text-center w-full sm:w-auto">
-                        + Add Account
-                    </a>
+
+                    {{-- Only show Add Account button if total accounts is less than 7 --}}
+                    @if (($accounts->count() + $savingsAccounts->count()) < 7)
+                        <a href="{{ route('accounts.create') }}"
+                           class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm text-center w-full sm:w-auto">
+                            + Add Account
+                        </a>
+                    @endif
                 </div>
             </div>
 
@@ -65,13 +69,17 @@
             </div>
 
             <!-- Regular Accounts Grid -->
-            @if($accounts->count() > 0)
+            @php
+                $visibleAccounts = $accounts->filter(fn($account) => $account->current_balance >= 1);
+            @endphp
+
+            @if($visibleAccounts->count() > 0)
                 <div class="mb-6">
                     <h3 class="text-base sm:text-lg font-semibold mb-3 text-gray-800 dark:text-gray-200">
                         Main Accounts
                     </h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
-                        @foreach($accounts as $account)
+                        @foreach($visibleAccounts as $account)
                             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md">
                                 <div class="p-4">
 
@@ -132,13 +140,17 @@
             @endif
 
             <!-- Savings Accounts Grid -->
-            @if($savingsAccounts->count() > 0)
+            @php
+                $visibleSavingsAccounts = $savingsAccounts->filter(fn($account) => $account->current_balance >= 1);
+            @endphp
+
+            @if($visibleSavingsAccounts->count() > 0)
                 <div class="mb-6">
                     <h3 class="text-base sm:text-lg font-semibold mb-3 text-gray-800 dark:text-gray-200 flex items-center gap-2">
                         <span>💰</span> Savings Accounts
                     </h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
-                        @foreach($savingsAccounts as $account)
+                        @foreach($visibleSavingsAccounts as $account)
                             <div class="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg shadow-md border-2 border-green-200 dark:border-green-700">
                                 <div class="p-4">
 
@@ -202,15 +214,21 @@
             @endif
 
             <!-- Empty State -->
-            @if($accounts->count() === 0 && $savingsAccounts->count() === 0)
+            @if($visibleAccounts->count() === 0 && $visibleSavingsAccounts->count() === 0)
                 <div class="col-span-full text-center py-10 bg-gray-50 dark:bg-gray-700 rounded-lg">
                     <p class="text-gray-500 text-sm mb-4 px-4">
-                        No accounts yet. Create your first account to get started!
+                        @if($accounts->count() === 0 && $savingsAccounts->count() === 0)
+                            No accounts yet. Create your first account to get started!
+                        @else
+                            All accounts have balances below KES 1. Top up an account to see it here.
+                        @endif
                     </p>
-                    <a href="{{ route('accounts.create') }}"
-                       class="inline-block bg-indigo-600 text-white px-6 py-2 rounded text-sm">
-                        + Add First Account
-                    </a>
+                    @if (($accounts->count() + $savingsAccounts->count()) === 0)
+                        <a href="{{ route('accounts.create') }}"
+                           class="inline-block bg-indigo-600 text-white px-6 py-2 rounded text-sm">
+                            + Add First Account
+                        </a>
+                    @endif
                 </div>
             @endif
 
