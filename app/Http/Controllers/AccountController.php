@@ -8,6 +8,7 @@ use App\Models\Transaction;
 use App\Models\Transfer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class AccountController extends Controller
 {
@@ -82,7 +83,43 @@ class AccountController extends Controller
             abort(403, 'Unauthorized access to this account.');
         }
 
-        return view('accounts.show', compact('account'));
+        // Get paginated transactions with eager loading (optimized query)
+        $transactions = $account->transactions()
+            ->with(['category.parent', 'feeTransaction'])
+            ->select(['id', 'date', 'description', 'amount', 'category_id', 'account_id', 'is_transaction_fee', 'related_fee_transaction_id'])
+            ->latest('date')
+            ->latest('id')
+            ->paginate(20)
+            ->appends(request()->query());
+
+        // Calculate statistics efficiently using single query
+        $stats = $account->transactions()
+            ->selectRaw('
+            COUNT(*) as total_transactions,
+            SUM(CASE WHEN categories.type = "income" THEN amount ELSE 0 END) as total_income,
+            SUM(CASE WHEN categories.type = "expense" THEN amount ELSE 0 END) as total_expenses,
+            SUM(CASE
+                WHEN MONTH(date) = ? AND YEAR(date) = ?
+                THEN amount
+                ELSE 0
+            END) as this_month_total
+        ', [now()->month, now()->year])
+            ->join('categories', 'transactions.category_id', '=', 'categories.id')
+            ->first();
+
+        $totalTransactions = $stats->total_transactions ?? 0;
+        $totalIncome = $stats->total_income ?? 0;
+        $totalExpenses = $stats->total_expenses ?? 0;
+        $thisMonthTotal = $stats->this_month_total ?? 0;
+
+        return view('accounts.show', compact(
+            'account',
+            'transactions',
+            'totalTransactions',
+            'totalIncome',
+            'totalExpenses',
+            'thisMonthTotal'
+        ));
     }
 
     public function edit(Account $account)
@@ -176,6 +213,9 @@ class AccountController extends Controller
         ]);
 
         $account->updateBalance();
+
+// Clear cache after balance adjustment
+        $this->clearAccountCache($account->id);
 
         return redirect()
             ->route('accounts.edit', $account)
@@ -331,6 +371,9 @@ class AccountController extends Controller
         // Update balances
         $fromAccount->updateBalance();
         $toAccount->updateBalance();
+        // Clear cache for both accounts
+        $this->clearAccountCache($fromAccount->id);
+        $this->clearAccountCache($toAccount->id);
 
         $successMessage = 'Transfer completed successfully!';
         if ($transactionFee > 0) {
@@ -606,10 +649,19 @@ class AccountController extends Controller
         }
 
         $account->updateBalance();
+        // Clear cache after top-up
+        $this->clearAccountCache($account->id);
 
         $actionWord = $account->type === 'savings' ? 'deposited to' : 'topped up';
         return redirect()
             ->route('accounts.show', $account)
             ->with('success', "Account {$actionWord} successfully with KES " . number_format($request->amount, 0, '.', ','));
+    }
+    /**
+     * Clear account statistics cache
+     */
+    private function clearAccountCache(int $accountId): void
+    {
+        Cache::forget("account.{$accountId}.stats");
     }
 }

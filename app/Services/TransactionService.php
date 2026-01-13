@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Exception;
+use Illuminate\Support\Facades\Cache;
 
 class TransactionService
 {
@@ -256,11 +257,6 @@ class TransactionService
                 'is_transaction_fee' => false
             ]);
 
-            Log::info('Transaction created', [
-                'transaction_id' => $transaction->id,
-                'amount' => $transaction->amount,
-                'account_id' => $transaction->account_id
-            ]);
 
             // Create fee transaction if applicable
             if ($transactionCost > 0) {
@@ -275,12 +271,6 @@ class TransactionService
                 $transaction->update([
                     'related_fee_transaction_id' => $feeTransaction->id
                 ]);
-
-                Log::info('Fee transaction created and linked', [
-                    'main_transaction_id' => $transaction->id,
-                    'fee_transaction_id' => $feeTransaction->id,
-                    'fee_amount' => $feeTransaction->amount
-                ]);
             }
 
             // Recalculate account balance
@@ -291,12 +281,8 @@ class TransactionService
 
             // Refresh account to get updated balance
             $account->refresh();
-
-            Log::info('Transaction creation completed', [
-                'transaction_id' => $transaction->id,
-                'old_balance' => $oldBalance,
-                'new_balance' => $account->current_balance
-            ]);
+            // Clear cache after transaction is created
+            $this->clearAccountCache($data['account_id']);
 
             return $transaction;
         });
@@ -340,15 +326,6 @@ class TransactionService
                 $category
             );
 
-            Log::info('Updating transaction', [
-                'transaction_id' => $transaction->id,
-                'old_amount' => $transaction->amount,
-                'new_amount' => $data['amount'],
-                'old_account_id' => $oldAccount->id,
-                'new_account_id' => $newAccount->id,
-                'old_fee' => $transaction->feeTransaction?->amount ?? 0,
-                'new_fee' => $newTransactionCost
-            ]);
 
             // Update main transaction
             $transaction->update([
@@ -366,21 +343,19 @@ class TransactionService
 
             // Recalculate balances for affected accounts
             if ($accountChanged) {
-                Log::info('Account changed, recalculating both accounts', [
-                    'old_account_id' => $oldAccount->id,
-                    'new_account_id' => $newAccount->id
-                ]);
                 $this->recalculateAccountBalance($oldAccount);
             }
 
             $this->recalculateAccountBalance($newAccount);
+            // Clear cache for both old and new accounts (if changed)
+            $this->clearAccountCache($oldAccount->id);
+            if ($accountChanged) {
+                $this->clearAccountCache($newAccount->id);
+            }
 
             // Update budget
             $this->updateBudgetFromTransaction($transaction);
 
-            Log::info('Transaction update completed', [
-                'transaction_id' => $transaction->id
-            ]);
 
             return $transaction->fresh(['account', 'category', 'feeTransaction']);
         });
@@ -399,21 +374,12 @@ class TransactionService
         return DB::transaction(function () use ($transaction) {
             $account = $transaction->account;
 
-            Log::info('Deleting transaction', [
-                'transaction_id' => $transaction->id,
-                'amount' => $transaction->amount,
-                'account_id' => $account->id
-            ]);
-
             // Delete related fee transaction if exists
             if ($transaction->related_fee_transaction_id) {
                 $feeTransaction = Transaction::withoutGlobalScope('ownedByUser')
                     ->find($transaction->related_fee_transaction_id);
 
                 if ($feeTransaction) {
-                    Log::info('Deleting related fee transaction', [
-                        'fee_transaction_id' => $feeTransaction->id
-                    ]);
                     $feeTransaction->delete();
                 }
             }
@@ -423,13 +389,11 @@ class TransactionService
 
             // Recalculate account balance
             $this->recalculateAccountBalance($account);
-
-            Log::info('Transaction deletion completed', [
-                'transaction_id' => $transaction->id,
-                'new_account_balance' => $account->fresh()->current_balance
-            ]);
+            // Clear cache after deletion
 
             return true;
+
+
         });
     }
 
@@ -438,21 +402,13 @@ class TransactionService
      */
     public function recalculateAccountBalance(Account $account): void
     {
-        Log::info('Recalculating account balance', [
-            'account_id' => $account->id,
-            'account_name' => $account->name,
-            'old_balance' => $account->current_balance
-        ]);
-
         // Use the existing updateBalance method on the Account model
         $account->updateBalance();
 
         $account->refresh();
+        // Clear cache after recalculation
+        $this->clearAccountCache($account->id);
 
-        Log::info('Account balance recalculated', [
-            'account_id' => $account->id,
-            'new_balance' => $account->current_balance
-        ]);
     }
 
     /**
@@ -503,10 +459,6 @@ class TransactionService
                     'payment_method' => $transaction->payment_method
                 ]);
 
-                Log::info('Fee transaction updated', [
-                    'fee_transaction_id' => $existingFee->id,
-                    'new_amount' => $newTransactionCost
-                ]);
             } else {
                 // Create new fee transaction
                 $feeTransaction = $this->createFeeTransaction(
@@ -520,18 +472,10 @@ class TransactionService
                     'related_fee_transaction_id' => $feeTransaction->id
                 ]);
 
-                Log::info('New fee transaction created', [
-                    'fee_transaction_id' => $feeTransaction->id,
-                    'amount' => $newTransactionCost
-                ]);
             }
         } else {
             // Delete fee transaction if new cost is 0
             if ($existingFee) {
-                Log::info('Deleting fee transaction (cost is now 0)', [
-                    'fee_transaction_id' => $existingFee->id
-                ]);
-
                 $existingFee->delete();
                 $transaction->update(['related_fee_transaction_id' => null]);
             }
@@ -565,12 +509,12 @@ class TransactionService
         $budget->amount += $transaction->amount;
         $budget->save();
 
-        Log::info('Budget updated from transaction', [
-            'budget_id' => $budget->id,
-            'category_id' => $transaction->category_id,
-            'year' => $year,
-            'month' => $month,
-            'new_amount' => $budget->amount
-        ]);
+    }
+    /**
+     * Clear account statistics cache
+     */
+    private function clearAccountCache(int $accountId): void
+    {
+        Cache::forget("account.{$accountId}.stats");
     }
 }
