@@ -126,7 +126,7 @@
                         // Hide after animation completes
                         setTimeout(function() {
                             modal.style.display = 'none';
-                        }, 500);
+                        }, 1000);
                     }
 
                     if (modal && closeBtn) {

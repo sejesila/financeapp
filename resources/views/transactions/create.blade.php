@@ -307,9 +307,9 @@
                                 </svg>
                             </div>
                             <div class="ml-3">
-                                <p class="text-sm">
-                                    Your previous transaction may have been recorded. Please check your transaction history before submitting again.
-                                </p>
+<!--                                <p class="text-sm">-->
+<!--                                    Your previous transaction may have been recorded. Please check your transaction history before submitting again.-->
+<!--                                </p>-->
                             </div>
                         </div>
                     `;

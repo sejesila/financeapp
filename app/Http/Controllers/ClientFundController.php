@@ -63,7 +63,19 @@ class ClientFundController extends Controller
 
         DB::beginTransaction();
         try {
-            // Create client fund record (this is a liability - money you're holding for someone)
+            // Get or create "Client Funds" liability category
+            $liabilityCategory = Category::firstOrCreate(
+                [
+                    'name' => 'Client Funds',
+                    'user_id' => Auth::id(),
+                ],
+                [
+                    'type' => 'liability',
+                    'parent_id' => null,
+                ]
+            );
+
+            // Create client fund record
             $clientFund = ClientFund::create([
                 'user_id' => Auth::id(),
                 'client_name' => $request->client_name,
@@ -79,29 +91,37 @@ class ClientFundController extends Controller
                 'notes' => $request->notes,
             ]);
 
+            // Create liability transaction (this increases account balance)
+            $liabilityTransaction = Transaction::create([
+                'user_id' => Auth::id(),
+                'account_id' => $request->account_id,
+                'category_id' => $liabilityCategory->id,
+                'amount' => $request->amount_received,
+                'date' => $request->received_date,
+                'period_date' => $request->received_date,
+                'description' => "Client fund received from {$request->client_name} for {$request->purpose}",
+                'payment_method' => 'Client Fund',
+            ]);
+
             // Create receipt transaction in client fund tracking
             ClientFundTransaction::create([
                 'client_fund_id' => $clientFund->id,
+                'transaction_id' => $liabilityTransaction->id,
                 'type' => 'receipt',
                 'amount' => $request->amount_received,
                 'date' => $request->received_date,
                 'description' => "Received from {$request->client_name} for {$request->purpose}",
             ]);
 
-            // ❌ DO NOT create income transaction - this is NOT your income yet!
-            // The money just increases your account balance but it's a liability
-            // Only profit/commission becomes your income
-
-            // Just update account balance directly (money is in your account but not yours)
+            // Update account balance properly
             $account = Account::find($request->account_id);
-            $account->current_balance += $request->amount_received;
-            $account->save();
+            $account->updateBalance();
 
             DB::commit();
 
             return redirect()
                 ->route('client-funds.show', $clientFund)
-                ->with('success', 'Client fund recorded successfully! Remember: This is not your income yet.');
+                ->with('success', 'Client fund recorded successfully! This is tracked as a liability.');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -135,30 +155,43 @@ class ClientFundController extends Controller
 
         DB::beginTransaction();
         try {
+            // Get the liability category
+            $liabilityCategory = Category::where('name', 'Client Funds')
+                ->where('user_id', Auth::id())
+                ->first();
+
+            // Create an offsetting liability reduction (negative liability = reduces the debt)
+            $liabilityReduction = Transaction::create([
+                'user_id' => Auth::id(),
+                'account_id' => $clientFund->account_id,
+                'category_id' => $liabilityCategory->id,
+                'amount' => -$request->amount, // Negative to reduce liability
+                'date' => $request->date,
+                'period_date' => $request->date,
+                'description' => "Client expense: {$request->description} (for {$clientFund->client_name})",
+                'payment_method' => 'Client Fund',
+            ]);
+
             // Record expense in client fund tracking
             ClientFundTransaction::create([
                 'client_fund_id' => $clientFund->id,
+                'transaction_id' => $liabilityReduction->id,
                 'type' => 'expense',
                 'amount' => $request->amount,
                 'date' => $request->date,
                 'description' => $request->description,
             ]);
 
-            // ❌ DO NOT create expense transaction in your personal budget
-            // This is the CLIENT'S expense, not yours
-            // Just deduct from account balance directly
-
-            $account = $clientFund->account;
-            $account->current_balance -= $request->amount;
-            $account->save();
-
             // Update client fund
             $clientFund->amount_spent += $request->amount;
             $clientFund->updateBalance();
 
+            // Update account balance
+            $clientFund->account->updateBalance();
+
             DB::commit();
 
-            return back()->with('success', 'Expense recorded successfully! (This was the client\'s expense, not yours)');
+            return back()->with('success', 'Expense recorded successfully! Liability reduced accordingly.');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -298,21 +331,28 @@ class ClientFundController extends Controller
             ->exists();
 
         if ($hasTransactions) {
-            return back()->with('error', 'Cannot delete client fund with recorded expenses or profits. Delete individual transactions first.');
+            return back()->with('error', 'Cannot delete client fund with recorded expenses or profits.');
         }
 
         DB::beginTransaction();
         try {
-            // Reverse the initial account balance increase
-            $account = $clientFund->account;
-            $account->current_balance -= $clientFund->amount_received;
-            $account->save();
+            // Delete the liability transaction
+            Transaction::where('user_id', Auth::id())
+                ->where('account_id', $clientFund->account_id)
+                ->where('amount', $clientFund->amount_received)
+                ->where('date', $clientFund->received_date)
+                ->where('description', 'like', "%{$clientFund->client_name}%")
+                ->delete();
 
-            // Delete all client fund transactions (should only be the initial receipt)
+            // Delete client fund transactions
             ClientFundTransaction::where('client_fund_id', $clientFund->id)->delete();
 
             // Delete the client fund
             $clientFund->delete();
+
+            // Recalculate account balance
+            $account = Account::find($clientFund->account_id);
+            $account->updateBalance();
 
             DB::commit();
 
