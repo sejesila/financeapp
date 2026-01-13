@@ -61,8 +61,7 @@ class DashboardController extends Controller
         $monthlyIncome = Transaction::where('user_id', $userId)
             ->whereMonth('date', $currentMonth)
             ->whereYear('date', $currentYear)
-            ->whereHas('category', fn($q) =>
-            $q->where('type', 'income')
+            ->whereHas('category', fn($q) => $q->where('type', 'income')
                 ->whereNotIn('name', ['Loan Disbursement', 'Balance Adjustment'])
             )
             ->sum('amount');
@@ -81,8 +80,7 @@ class DashboardController extends Controller
 
         $yearlyIncome = Transaction::where('user_id', $userId)
             ->whereYear('date', $currentYear)
-            ->whereHas('category', fn($q) =>
-            $q->where('type', 'income')
+            ->whereHas('category', fn($q) => $q->where('type', 'income')
                 ->whereNotIn('name', ['Loan Disbursement', 'Balance Adjustment'])
             )
             ->sum('amount');
@@ -103,14 +101,13 @@ class DashboardController extends Controller
             ->with('category')
             ->get()
             ->groupBy('category_id')
-            ->map(function($group) {
+            ->map(function ($group) {
                 $first = $group->first(); // take the first transaction for the category
                 $first->total = $group->sum('amount'); // sum total
                 return $first;
             })
             ->sortByDesc('total')
             ->take(5);
-
 
 
         $dailySpending = Transaction::where('user_id', $userId)

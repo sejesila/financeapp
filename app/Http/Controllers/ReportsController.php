@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Account;
 use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -100,7 +101,7 @@ class ReportsController extends Controller
             ? round((($totalExpenses - $previousExpenses) / $previousExpenses) * 100, 1)
             : 0;
         // Get accounts for the FAB component
-        $accounts = \App\Models\Account::where('user_id', Auth::id())
+        $accounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
             ->orderBy('name')
             ->get();

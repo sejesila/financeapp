@@ -2,19 +2,141 @@
 
 namespace App\Services;
 
-use App\Models\Transaction;
 use App\Models\Account;
-use App\Models\Category;
 use App\Models\Budget;
+use App\Models\Category;
+use App\Models\Transaction;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Auth;
 use Exception;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class TransactionService
 {
+    /**
+     * Create a new transaction with fee handling and balance updates
+     */
+
+    public function createTransaction(array $data): Transaction
+    {
+        return DB::transaction(function () use ($data) {
+            // Validate account ownership
+            $account = Account::findOrFail($data['account_id']);
+            if ($account->user_id !== Auth::id()) {
+                throw new Exception('Unauthorized access to this account.');
+            }
+
+            // Validate category ownership
+            $category = Category::findOrFail($data['category_id']);
+            if ($category->user_id !== Auth::id()) {
+                throw new Exception('Unauthorized access to this category.');
+            }
+
+            // Get transaction type, default to send_money
+            $transactionType = $data['mobile_money_type'] ?? 'send_money';
+
+            // Calculate transaction cost
+            $transactionCost = $this->calculateTransactionCost(
+                $data['amount'],
+                $account->type,
+                $transactionType,
+                $category
+            );
+
+            $totalAmount = $data['amount'] + $transactionCost;
+
+            // Check if it's an expense and if account has sufficient balance
+            if ($category->type === 'expense' && $account->current_balance < $totalAmount) {
+                throw new Exception(
+                    "Insufficient balance in {$account->name}. Current balance: "
+                    . number_format($account->current_balance, 0, '.', ',')
+                    . ", Required: " . number_format($totalAmount, 0, '.', ',')
+                    . " (Amount: " . number_format($data['amount'], 0, '.', ',')
+                    . " + Cost: " . number_format($transactionCost, 0, '.', ',') . ")"
+                );
+            }
+
+            // Determine payment method
+            $paymentMethod = $this->getPaymentMethod($account);
+
+            // Create main transaction with idempotency key
+            $transaction = Transaction::create([
+                'user_id' => Auth::id(),
+                'date' => $data['date'],
+                'description' => $data['description'],
+                'amount' => $data['amount'],
+                'category_id' => $data['category_id'],
+                'account_id' => $data['account_id'],
+                'payment_method' => $paymentMethod,
+                'mobile_money_type' => $transactionType,
+                'is_transaction_fee' => false,
+                'idempotency_key' => $data['idempotency_key'] ?? null,
+            ]);
+
+            // Create fee transaction if applicable
+            if ($transactionCost > 0) {
+                $feeTransaction = $this->createFeeTransaction(
+                    $transaction,
+                    $transactionCost,
+                    $transactionType,
+                    $paymentMethod
+                );
+
+                // Link fee to main transaction
+                $transaction->update([
+                    'related_fee_transaction_id' => $feeTransaction->id
+                ]);
+            }
+
+            // Recalculate account balance
+            $this->recalculateAccountBalance($account);
+
+            // Auto-create or update budget entry
+            $this->updateBudgetFromTransaction($transaction);
+
+            // Refresh account to get updated balance
+            $account->refresh();
+            // Clear cache after transaction is created
+            $this->clearAccountCache($data['account_id']);
+
+            return $transaction;
+        });
+    }
+
+    /**
+     * Calculate transaction cost based on amount, account type, transaction type, and category
+     */
+    private function calculateTransactionCost(float $amount, string $accountType, string $transactionType = 'send_money', ?Category $category = null): float
+    {
+        // Special case: Internet and Communication has zero transaction fees
+        if ($category && $category->name === 'Internet and Communication') {
+            return 0;
+        }
+
+        $costs = [];
+
+        if ($accountType === 'mpesa') {
+            $allCosts = $this->getMpesaTransactionCosts();
+            $costs = $allCosts[$transactionType] ?? $allCosts['send_money'];
+        } elseif ($accountType === 'airtel_money') {
+            $allCosts = $this->getAirtelMoneyTransactionCosts();
+            $costs = $allCosts[$transactionType] ?? $allCosts['send_money'];
+        } else {
+            return 0; // No fees for other account types
+        }
+
+        // Find the appropriate cost tier
+        foreach ($costs as $tier) {
+            if ($amount >= $tier['min'] && $amount <= $tier['max']) {
+                return $tier['cost'];
+            }
+        }
+
+        // If amount exceeds all tiers, return the highest tier cost
+        return end($costs)['cost'] ?? 0;
+    }
+
     /**
      * M-Pesa transaction costs (Kenya)
      */
@@ -118,44 +240,11 @@ class TransactionService
     }
 
     /**
-     * Calculate transaction cost based on amount, account type, transaction type, and category
-     */
-    private function calculateTransactionCost(float $amount, string $accountType, string $transactionType = 'send_money', ?Category $category = null): float
-    {
-        // Special case: Internet and Communication has zero transaction fees
-        if ($category && $category->name === 'Internet and Communication') {
-            return 0;
-        }
-
-        $costs = [];
-
-        if ($accountType === 'mpesa') {
-            $allCosts = $this->getMpesaTransactionCosts();
-            $costs = $allCosts[$transactionType] ?? $allCosts['send_money'];
-        } elseif ($accountType === 'airtel_money') {
-            $allCosts = $this->getAirtelMoneyTransactionCosts();
-            $costs = $allCosts[$transactionType] ?? $allCosts['send_money'];
-        } else {
-            return 0; // No fees for other account types
-        }
-
-        // Find the appropriate cost tier
-        foreach ($costs as $tier) {
-            if ($amount >= $tier['min'] && $amount <= $tier['max']) {
-                return $tier['cost'];
-            }
-        }
-
-        // If amount exceeds all tiers, return the highest tier cost
-        return end($costs)['cost'] ?? 0;
-    }
-
-    /**
      * Get payment method based on account type
      */
     private function getPaymentMethod(Account $account): string
     {
-        return match($account->type) {
+        return match ($account->type) {
             'cash' => 'Cash',
             'mpesa' => 'Mpesa',
             'airtel_money' => 'Airtel Money',
@@ -165,17 +254,29 @@ class TransactionService
     }
 
     /**
-     * Get formatted transaction type label
+     * Create a fee transaction linked to main transaction
      */
-    private function getTransactionTypeLabel(string $transactionType): string
+    private function createFeeTransaction(
+        Transaction $mainTransaction,
+        float       $feeAmount,
+        string      $transactionType,
+        string      $paymentMethod
+    ): Transaction
     {
-        return match($transactionType) {
-            'send_money' => 'Send Money',
-            'paybill' => 'PayBill',
-            'buy_goods' => 'Buy Goods/Till',
-            'pochi_la_biashara' => 'Pochi La Biashara',
-            default => 'Send Money'
-        };
+        $feesCategory = $this->getFeesCategory($mainTransaction->user_id);
+        $typeLabel = $this->getTransactionTypeLabel($transactionType);
+
+        return Transaction::withoutGlobalScope('ownedByUser')->create([
+            'user_id' => $mainTransaction->user_id,
+            'date' => $mainTransaction->date,
+            'description' => "{$paymentMethod} fee ({$typeLabel}): {$mainTransaction->description}",
+            'amount' => $feeAmount,
+            'category_id' => $feesCategory->id,
+            'account_id' => $mainTransaction->account_id,
+            'payment_method' => $paymentMethod,
+            'is_transaction_fee' => true,
+            'fee_for_transaction_id' => $mainTransaction->id
+        ]);
     }
 
     /**
@@ -197,93 +298,68 @@ class TransactionService
     }
 
     /**
-     * Create a new transaction with fee handling and balance updates
+     * Get formatted transaction type label
      */
-
-    public function createTransaction(array $data): Transaction
+    private function getTransactionTypeLabel(string $transactionType): string
     {
-        return DB::transaction(function () use ($data) {
-            // Validate account ownership
-            $account = Account::findOrFail($data['account_id']);
-            if ($account->user_id !== Auth::id()) {
-                throw new Exception('Unauthorized access to this account.');
-            }
+        return match ($transactionType) {
+            'send_money' => 'Send Money',
+            'paybill' => 'PayBill',
+            'buy_goods' => 'Buy Goods/Till',
+            'pochi_la_biashara' => 'Pochi La Biashara',
+            default => 'Send Money'
+        };
+    }
 
-            // Validate category ownership
-            $category = Category::findOrFail($data['category_id']);
-            if ($category->user_id !== Auth::id()) {
-                throw new Exception('Unauthorized access to this category.');
-            }
+    /**
+     * Fully recalculate account balance from all transactions
+     */
+    public function recalculateAccountBalance(Account $account): void
+    {
+        // Use the existing updateBalance method on the Account model
+        $account->updateBalance();
 
-            // Get transaction type, default to send_money
-            $transactionType = $data['mobile_money_type'] ?? 'send_money';
+        $account->refresh();
+        // Clear cache after recalculation
+        $this->clearAccountCache($account->id);
 
-            // Calculate transaction cost
-            $transactionCost = $this->calculateTransactionCost(
-                $data['amount'],
-                $account->type,
-                $transactionType,
-                $category
-            );
+    }
 
-            $totalAmount = $data['amount'] + $transactionCost;
+    /**
+     * Clear account statistics cache
+     */
+    private function clearAccountCache(int $accountId): void
+    {
+        Cache::forget("account.{$accountId}.stats");
+    }
 
-            // Check if it's an expense and if account has sufficient balance
-            if ($category->type === 'expense' && $account->current_balance < $totalAmount) {
-                throw new Exception(
-                    "Insufficient balance in {$account->name}. Current balance: "
-                    . number_format($account->current_balance, 0, '.', ',')
-                    . ", Required: " . number_format($totalAmount, 0, '.', ',')
-                    . " (Amount: " . number_format($data['amount'], 0, '.', ',')
-                    . " + Cost: " . number_format($transactionCost, 0, '.', ',') . ")"
-                );
-            }
+    /**
+     * Automatically create or update budget based on transaction
+     */
+    private function updateBudgetFromTransaction(Transaction $transaction): void
+    {
+        // Use period_date if available, otherwise use transaction date
+        $date = $transaction->period_date ?? $transaction->date;
+        $year = Carbon::parse($date)->year;
+        $month = Carbon::parse($date)->month;
 
-            // Determine payment method
-            $paymentMethod = $this->getPaymentMethod($account);
+        // Find or create budget entry
+        $budget = Budget::firstOrCreate(
+            [
+                'category_id' => $transaction->category_id,
+                'year' => $year,
+                'month' => $month,
+                'user_id' => $transaction->user_id
+            ],
+            [
+                'amount' => 0
+            ]
+        );
 
-            // Create main transaction with idempotency key
-            $transaction = Transaction::create([
-                'user_id' => Auth::id(),
-                'date' => $data['date'],
-                'description' => $data['description'],
-                'amount' => $data['amount'],
-                'category_id' => $data['category_id'],
-                'account_id' => $data['account_id'],
-                'payment_method' => $paymentMethod,
-                'mobile_money_type' => $transactionType,
-                'is_transaction_fee' => false,
-                'idempotency_key' => $data['idempotency_key'] ?? null,
-            ]);
+        // Update budget amount by adding this transaction
+        $budget->amount += $transaction->amount;
+        $budget->save();
 
-            // Create fee transaction if applicable
-            if ($transactionCost > 0) {
-                $feeTransaction = $this->createFeeTransaction(
-                    $transaction,
-                    $transactionCost,
-                    $transactionType,
-                    $paymentMethod
-                );
-
-                // Link fee to main transaction
-                $transaction->update([
-                    'related_fee_transaction_id' => $feeTransaction->id
-                ]);
-            }
-
-            // Recalculate account balance
-            $this->recalculateAccountBalance($account);
-
-            // Auto-create or update budget entry
-            $this->updateBudgetFromTransaction($transaction);
-
-            // Refresh account to get updated balance
-            $account->refresh();
-            // Clear cache after transaction is created
-            $this->clearAccountCache($data['account_id']);
-
-            return $transaction;
-        });
     }
 
     /**
@@ -360,88 +436,14 @@ class TransactionService
     }
 
     /**
-     * Soft delete a transaction and recalculate balances
-     */
-    public function deleteTransaction(Transaction $transaction): bool
-    {
-        // Don't allow deleting system-generated transactions directly
-        if ($transaction->is_transaction_fee) {
-            throw new Exception('System-generated transaction fees cannot be deleted directly.');
-        }
-
-        return DB::transaction(function () use ($transaction) {
-            $account = $transaction->account;
-
-            // Delete related fee transaction if exists
-            if ($transaction->related_fee_transaction_id) {
-                $feeTransaction = Transaction::withoutGlobalScope('ownedByUser')
-                    ->find($transaction->related_fee_transaction_id);
-
-                if ($feeTransaction) {
-                    $feeTransaction->delete();
-                }
-            }
-
-            // Delete main transaction
-            $transaction->delete();
-
-            // Recalculate account balance
-            $this->recalculateAccountBalance($account);
-            // Clear cache after deletion
-
-            return true;
-
-
-        });
-    }
-
-    /**
-     * Fully recalculate account balance from all transactions
-     */
-    public function recalculateAccountBalance(Account $account): void
-    {
-        // Use the existing updateBalance method on the Account model
-        $account->updateBalance();
-
-        $account->refresh();
-        // Clear cache after recalculation
-        $this->clearAccountCache($account->id);
-
-    }
-
-    /**
-     * Create a fee transaction linked to main transaction
-     */
-    private function createFeeTransaction(
-        Transaction $mainTransaction,
-        float $feeAmount,
-        string $transactionType,
-        string $paymentMethod
-    ): Transaction {
-        $feesCategory = $this->getFeesCategory($mainTransaction->user_id);
-        $typeLabel = $this->getTransactionTypeLabel($transactionType);
-
-        return Transaction::withoutGlobalScope('ownedByUser')->create([
-            'user_id' => $mainTransaction->user_id,
-            'date' => $mainTransaction->date,
-            'description' => "{$paymentMethod} fee ({$typeLabel}): {$mainTransaction->description}",
-            'amount' => $feeAmount,
-            'category_id' => $feesCategory->id,
-            'account_id' => $mainTransaction->account_id,
-            'payment_method' => $paymentMethod,
-            'is_transaction_fee' => true,
-            'fee_for_transaction_id' => $mainTransaction->id
-        ]);
-    }
-
-    /**
      * Update or create/delete fee transaction based on new cost
      */
     private function updateFeeTransaction(
         Transaction $transaction,
-        float $newTransactionCost,
-        string $transactionType
-    ): void {
+        float       $newTransactionCost,
+        string      $transactionType
+    ): void
+    {
         $existingFee = $transaction->feeTransaction;
 
         if ($newTransactionCost > 0) {
@@ -481,38 +483,38 @@ class TransactionService
     }
 
     /**
-     * Automatically create or update budget based on transaction
+     * Soft delete a transaction and recalculate balances
      */
-    private function updateBudgetFromTransaction(Transaction $transaction): void
+    public function deleteTransaction(Transaction $transaction): bool
     {
-        // Use period_date if available, otherwise use transaction date
-        $date = $transaction->period_date ?? $transaction->date;
-        $year = Carbon::parse($date)->year;
-        $month = Carbon::parse($date)->month;
+        // Don't allow deleting system-generated transactions directly
+        if ($transaction->is_transaction_fee) {
+            throw new Exception('System-generated transaction fees cannot be deleted directly.');
+        }
 
-        // Find or create budget entry
-        $budget = Budget::firstOrCreate(
-            [
-                'category_id' => $transaction->category_id,
-                'year' => $year,
-                'month' => $month,
-                'user_id' => $transaction->user_id
-            ],
-            [
-                'amount' => 0
-            ]
-        );
+        return DB::transaction(function () use ($transaction) {
+            $account = $transaction->account;
 
-        // Update budget amount by adding this transaction
-        $budget->amount += $transaction->amount;
-        $budget->save();
+            // Delete related fee transaction if exists
+            if ($transaction->related_fee_transaction_id) {
+                $feeTransaction = Transaction::withoutGlobalScope('ownedByUser')
+                    ->find($transaction->related_fee_transaction_id);
 
-    }
-    /**
-     * Clear account statistics cache
-     */
-    private function clearAccountCache(int $accountId): void
-    {
-        Cache::forget("account.{$accountId}.stats");
+                if ($feeTransaction) {
+                    $feeTransaction->delete();
+                }
+            }
+
+            // Delete main transaction
+            $transaction->delete();
+
+            // Recalculate account balance
+            $this->recalculateAccountBalance($account);
+            // Clear cache after deletion
+
+            return true;
+
+
+        });
     }
 }

@@ -3,23 +3,22 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreTransactionRequest;
-use App\Models\Budget;
+use App\Models\Account;
 use App\Models\Category;
 use App\Models\Transaction;
 use App\Services\TransactionService;
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Log;
 
 class TransactionController extends Controller
 {
     use AuthorizesRequests;
 
-    protected TransactionService $transactionService;
-
-    // System categories that should be excluded from manual operations
     private const EXCLUDED_CATEGORIES = [
         'Income',
         'Loans',
@@ -32,272 +31,12 @@ class TransactionController extends Controller
         'Balance Adjustment',
     ];
 
+    // System categories that should be excluded from manual operations
+    protected TransactionService $transactionService;
+
     public function __construct(TransactionService $transactionService)
     {
         $this->transactionService = $transactionService;
-    }
-    /**
-     * M-Pesa transaction costs (Kenya) - for frontend display
-     */
-    private function getMpesaTransactionCosts()
-    {
-        return [
-            'send_money' => [
-                ['min' => 1, 'max' => 100, 'cost' => 0],
-                ['min' => 101, 'max' => 500, 'cost' => 7],
-                ['min' => 501, 'max' => 1000, 'cost' => 13],
-                ['min' => 1001, 'max' => 1500, 'cost' => 23],
-                ['min' => 1501, 'max' => 2500, 'cost' => 33],
-                ['min' => 2501, 'max' => 3500, 'cost' => 53],
-                ['min' => 3501, 'max' => 5000, 'cost' => 57],
-                ['min' => 5001, 'max' => 7500, 'cost' => 78],
-                ['min' => 7501, 'max' => 10000, 'cost' => 90],
-                ['min' => 10001, 'max' => 15000, 'cost' => 100],
-                ['min' => 15001, 'max' => 20000, 'cost' => 105],
-                ['min' => 20001, 'max' => 35000, 'cost' => 108],
-                ['min' => 35001, 'max' => 50000, 'cost' => 110],
-                ['min' => 50001, 'max' => 150000, 'cost' => 112],
-                ['min' => 150001, 'max' => 250000, 'cost' => 115],
-                ['min' => 250001, 'max' => 500000, 'cost' => 117],
-            ],
-            'paybill' => [
-                ['min' => 1, 'max' => 49, 'cost' => 0],
-                ['min' => 50, 'max' => 100, 'cost' => 0],
-                ['min' => 101, 'max' => 500, 'cost' => 5],
-                ['min' => 501, 'max' => 1000, 'cost' => 10],
-                ['min' => 1001, 'max' => 1500, 'cost' => 15],
-                ['min' => 1501, 'max' => 2500, 'cost' => 20],
-                ['min' => 2501, 'max' => 3500, 'cost' => 25],
-                ['min' => 3501, 'max' => 5000, 'cost' => 34],
-                ['min' => 5001, 'max' => 7500, 'cost' => 42],
-                ['min' => 7501, 'max' => 10000, 'cost' => 48],
-                ['min' => 10001, 'max' => 15000, 'cost' => 57],
-                ['min' => 15001, 'max' => 20000, 'cost' => 62],
-                ['min' => 20001, 'max' => 25000, 'cost' => 67],
-                ['min' => 25001, 'max' => 30000, 'cost' => 72],
-                ['min' => 30001, 'max' => 35000, 'cost' => 83],
-                ['min' => 35001, 'max' => 40000, 'cost' => 99],
-                ['min' => 40001, 'max' => 45000, 'cost' => 103],
-                ['min' => 45001, 'max' => 50000, 'cost' => 108],
-                ['min' => 50001, 'max' => 70000, 'cost' => 108],
-                ['min' => 70001, 'max' => 250000, 'cost' => 108],
-            ],
-            'buy_goods' => [
-                ['min' => 1, 'max' => 500000, 'cost' => 0],
-            ],
-            'pochi_la_biashara' => [
-                ['min' => 1, 'max' => 100, 'cost' => 0],
-                ['min' => 101, 'max' => 500, 'cost' => 7],
-                ['min' => 501, 'max' => 1000, 'cost' => 13],
-                ['min' => 1001, 'max' => 1500, 'cost' => 23],
-                ['min' => 1501, 'max' => 2500, 'cost' => 33],
-                ['min' => 2501, 'max' => 3500, 'cost' => 53],
-                ['min' => 3501, 'max' => 5000, 'cost' => 57],
-                ['min' => 5001, 'max' => 7500, 'cost' => 78],
-                ['min' => 7501, 'max' => 10000, 'cost' => 90],
-                ['min' => 10001, 'max' => 15000, 'cost' => 100],
-                ['min' => 15001, 'max' => 20000, 'cost' => 105],
-                ['min' => 20001, 'max' => 35000, 'cost' => 108],
-                ['min' => 35001, 'max' => 50000, 'cost' => 110],
-                ['min' => 50001, 'max' => 150000, 'cost' => 112],
-                ['min' => 150001, 'max' => 250000, 'cost' => 115],
-                ['min' => 250001, 'max' => 500000, 'cost' => 117],
-            ],
-        ];
-    }
-
-    /**
-     * Get categories for forms (excluding system categories and parent categories)
-     * Returns only child categories sorted by usage frequency
-     */
-    private function getCategoriesForForm()
-    {
-        // Get all child categories sorted by usage frequency (this will be used for the dropdown)
-        $allCategories = Category::where('user_id', Auth::id())
-            ->whereNotNull('parent_id') // Only child categories
-            ->where('is_active', true)
-            ->whereNotIn('name', self::EXCLUDED_CATEGORIES)
-            ->with(['parent' => function($query) {
-                // Also exclude parent categories that are in excluded list
-                $query->whereNotIn('name', self::EXCLUDED_CATEGORIES);
-            }])
-            ->orderBy('usage_count', 'desc')
-            ->orderBy('name')
-            ->get();
-
-        // Filter out any categories whose parent is in the excluded list
-        $allCategories = $allCategories->filter(function($category) {
-            return $category->parent && !in_array($category->parent->name, self::EXCLUDED_CATEGORIES);
-        });
-
-        // Get parent categories for grouping (UI purposes)
-        $parentCategories = Category::where('user_id', Auth::id())
-            ->whereNull('parent_id')
-            ->where('is_active', true)
-            ->whereNotIn('name', self::EXCLUDED_CATEGORIES)
-            ->get()
-            ->keyBy('id');
-
-        // Group categories by parent for structured display
-        $categoryGroups = $parentCategories->map(function ($parent) use ($allCategories) {
-            return [
-                'id' => $parent->id,
-                'name' => $parent->name,
-                'icon' => $parent->icon,
-                'type' => $parent->type,
-                'children' => $allCategories->where('parent_id', $parent->id)->values()
-            ];
-        })->filter(function ($group) {
-            return $group['children']->isNotEmpty();
-        })->values();
-
-        // Convert allCategories to array for JSON serialization
-        // Only include the fields we need
-        $allCategoriesArray = $allCategories->map(function($category) {
-            return [
-                'id' => $category->id,
-                'name' => $category->name,
-                'icon' => $category->icon,
-                'parent_id' => $category->parent_id,
-                'usage_count' => $category->usage_count,
-            ];
-        })->values()->toArray();
-
-        return compact('categoryGroups', 'allCategoriesArray');
-    }
-    /**
-     * Get active accounts for the current user
-     */
-    private function getActiveAccounts()
-    {
-        return \App\Models\Account::where('user_id', Auth::id())
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get();
-    }
-
-
-    /**
-     * Airtel Money transaction costs (Kenya) - for frontend display
-     */
-    private function getAirtelMoneyTransactionCosts()
-    {
-        return [
-            'send_money' => [
-                ['min' => 10, 'max' => 100, 'cost' => 0],
-                ['min' => 101, 'max' => 500, 'cost' => 7],
-                ['min' => 501, 'max' => 1000, 'cost' => 15],
-                ['min' => 1001, 'max' => 1500, 'cost' => 25],
-                ['min' => 1501, 'max' => 2500, 'cost' => 35],
-                ['min' => 2501, 'max' => 3500, 'cost' => 55],
-                ['min' => 3501, 'max' => 5000, 'cost' => 65],
-                ['min' => 5001, 'max' => 7500, 'cost' => 80],
-                ['min' => 7501, 'max' => 10000, 'cost' => 95],
-                ['min' => 10001, 'max' => 15000, 'cost' => 105],
-                ['min' => 15001, 'max' => 20000, 'cost' => 110],
-                ['min' => 20001, 'max' => 35000, 'cost' => 115],
-                ['min' => 35001, 'max' => 50000, 'cost' => 120],
-                ['min' => 50001, 'max' => 70000, 'cost' => 125],
-                ['min' => 70001, 'max' => 150000, 'cost' => 130],
-            ],
-            'paybill' => [
-                ['min' => 1, 'max' => 150000, 'cost' => 0],
-            ],
-            'buy_goods' => [
-                ['min' => 1, 'max' => 150000, 'cost' => 0],
-            ],
-        ];
-    }
-
-
-
-    /**
-     * Calculate transaction totals for a given query
-     */
-    private function calculateTransactionTotals()
-    {
-        $baseQuery = Transaction::where('user_id', Auth::id())
-            ->where('is_transaction_fee', false);
-
-        return [
-            'totalToday' => (clone $baseQuery)->whereDate('date', today())->sum('amount'),
-            'totalYesterday' => (clone $baseQuery)->whereDate('date', today()->subDay())->sum('amount'),
-            'totalThisWeek' => (clone $baseQuery)->whereBetween('date', [
-                now()->startOfWeek(),
-                now()->endOfWeek()
-            ])->sum('amount'),
-            'totalLastWeek' => (clone $baseQuery)->whereBetween('date', [
-                now()->subWeek()->startOfWeek(),
-                now()->subWeek()->endOfWeek()
-            ])->sum('amount'),
-            'totalThisMonth' => (clone $baseQuery)
-                ->whereMonth('date', now()->month)
-                ->whereYear('date', now()->year)
-                ->sum('amount'),
-            'totalLastMonth' => (clone $baseQuery)
-                ->whereMonth('date', now()->subMonth()->month)
-                ->whereYear('date', now()->subMonth()->year)
-                ->sum('amount'),
-            'totalAll' => (clone $baseQuery)->sum('amount'),
-        ];
-    }
-
-    /**
-     * Calculate transaction fee totals
-     */
-    private function calculateFeeTotals()
-    {
-        $feeQuery = Transaction::where('user_id', Auth::id())
-            ->where('is_transaction_fee', true);
-
-        return [
-            'totalFeesToday' => (clone $feeQuery)->whereDate('date', today())->sum('amount'),
-            'totalFeesThisMonth' => (clone $feeQuery)
-                ->whereMonth('date', now()->month)
-                ->whereYear('date', now()->year)
-                ->sum('amount'),
-            'totalFeesAll' => (clone $feeQuery)->sum('amount'),
-        ];
-    }
-
-    /**
-     * Apply date filters to a query based on filter type
-     */
-    private function applyDateFilter($query, $filter, $startDate = null, $endDate = null)
-    {
-        if ($filter === 'custom' && $startDate && $endDate) {
-            return $query->whereBetween('date', [
-                Carbon::parse($startDate)->startOfDay(),
-                Carbon::parse($endDate)->endOfDay()
-            ]);
-        }
-
-        switch ($filter) {
-            case 'today':
-                return $query->whereDate('date', today());
-            case 'yesterday':
-                return $query->whereDate('date', today()->subDay());
-            case 'this_week':
-                return $query->whereBetween('date', [
-                    now()->startOfWeek(),
-                    now()->endOfWeek()
-                ]);
-            case 'last_week':
-                return $query->whereBetween('date', [
-                    now()->subWeek()->startOfWeek(),
-                    now()->subWeek()->endOfWeek()
-                ]);
-            case 'this_month':
-                return $query->whereMonth('date', now()->month)
-                    ->whereYear('date', now()->year);
-            case 'last_month':
-                return $query->whereMonth('date', now()->subMonth()->month)
-                    ->whereYear('date', now()->subMonth()->year);
-            case 'this_year':
-                return $query->whereYear('date', now()->year);
-            default:
-                return $query;
-        }
     }
 
     /**
@@ -376,6 +115,106 @@ class TransactionController extends Controller
     }
 
     /**
+     * Apply date filters to a query based on filter type
+     */
+    private function applyDateFilter($query, $filter, $startDate = null, $endDate = null)
+    {
+        if ($filter === 'custom' && $startDate && $endDate) {
+            return $query->whereBetween('date', [
+                Carbon::parse($startDate)->startOfDay(),
+                Carbon::parse($endDate)->endOfDay()
+            ]);
+        }
+
+        switch ($filter) {
+            case 'today':
+                return $query->whereDate('date', today());
+            case 'yesterday':
+                return $query->whereDate('date', today()->subDay());
+            case 'this_week':
+                return $query->whereBetween('date', [
+                    now()->startOfWeek(),
+                    now()->endOfWeek()
+                ]);
+            case 'last_week':
+                return $query->whereBetween('date', [
+                    now()->subWeek()->startOfWeek(),
+                    now()->subWeek()->endOfWeek()
+                ]);
+            case 'this_month':
+                return $query->whereMonth('date', now()->month)
+                    ->whereYear('date', now()->year);
+            case 'last_month':
+                return $query->whereMonth('date', now()->subMonth()->month)
+                    ->whereYear('date', now()->subMonth()->year);
+            case 'this_year':
+                return $query->whereYear('date', now()->year);
+            default:
+                return $query;
+        }
+    }
+
+    /**
+     * Calculate transaction totals for a given query
+     */
+    private function calculateTransactionTotals()
+    {
+        $baseQuery = Transaction::where('user_id', Auth::id())
+            ->where('is_transaction_fee', false);
+
+        return [
+            'totalToday' => (clone $baseQuery)->whereDate('date', today())->sum('amount'),
+            'totalYesterday' => (clone $baseQuery)->whereDate('date', today()->subDay())->sum('amount'),
+            'totalThisWeek' => (clone $baseQuery)->whereBetween('date', [
+                now()->startOfWeek(),
+                now()->endOfWeek()
+            ])->sum('amount'),
+            'totalLastWeek' => (clone $baseQuery)->whereBetween('date', [
+                now()->subWeek()->startOfWeek(),
+                now()->subWeek()->endOfWeek()
+            ])->sum('amount'),
+            'totalThisMonth' => (clone $baseQuery)
+                ->whereMonth('date', now()->month)
+                ->whereYear('date', now()->year)
+                ->sum('amount'),
+            'totalLastMonth' => (clone $baseQuery)
+                ->whereMonth('date', now()->subMonth()->month)
+                ->whereYear('date', now()->subMonth()->year)
+                ->sum('amount'),
+            'totalAll' => (clone $baseQuery)->sum('amount'),
+        ];
+    }
+
+    /**
+     * Calculate transaction fee totals
+     */
+    private function calculateFeeTotals()
+    {
+        $feeQuery = Transaction::where('user_id', Auth::id())
+            ->where('is_transaction_fee', true);
+
+        return [
+            'totalFeesToday' => (clone $feeQuery)->whereDate('date', today())->sum('amount'),
+            'totalFeesThisMonth' => (clone $feeQuery)
+                ->whereMonth('date', now()->month)
+                ->whereYear('date', now()->year)
+                ->sum('amount'),
+            'totalFeesAll' => (clone $feeQuery)->sum('amount'),
+        ];
+    }
+
+    /**
+     * Get active accounts for the current user
+     */
+    private function getActiveAccounts()
+    {
+        return Account::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+    }
+
+    /**
      * Show the form for creating a new resource.
      */
     public function create()
@@ -390,6 +229,168 @@ class TransactionController extends Controller
             $categoryData,
             compact('accounts', 'mpesaCosts', 'airtelCosts')
         ));
+    }
+
+    /**
+     * Get categories for forms (excluding system categories and parent categories)
+     * Returns only child categories sorted by usage frequency
+     */
+    private function getCategoriesForForm()
+    {
+        // Get all child categories sorted by usage frequency (this will be used for the dropdown)
+        $allCategories = Category::where('user_id', Auth::id())
+            ->whereNotNull('parent_id') // Only child categories
+            ->where('is_active', true)
+            ->whereNotIn('name', self::EXCLUDED_CATEGORIES)
+            ->with(['parent' => function ($query) {
+                // Also exclude parent categories that are in excluded list
+                $query->whereNotIn('name', self::EXCLUDED_CATEGORIES);
+            }])
+            ->orderBy('usage_count', 'desc')
+            ->orderBy('name')
+            ->get();
+
+        // Filter out any categories whose parent is in the excluded list
+        $allCategories = $allCategories->filter(function ($category) {
+            return $category->parent && !in_array($category->parent->name, self::EXCLUDED_CATEGORIES);
+        });
+
+        // Get parent categories for grouping (UI purposes)
+        $parentCategories = Category::where('user_id', Auth::id())
+            ->whereNull('parent_id')
+            ->where('is_active', true)
+            ->whereNotIn('name', self::EXCLUDED_CATEGORIES)
+            ->get()
+            ->keyBy('id');
+
+        // Group categories by parent for structured display
+        $categoryGroups = $parentCategories->map(function ($parent) use ($allCategories) {
+            return [
+                'id' => $parent->id,
+                'name' => $parent->name,
+                'icon' => $parent->icon,
+                'type' => $parent->type,
+                'children' => $allCategories->where('parent_id', $parent->id)->values()
+            ];
+        })->filter(function ($group) {
+            return $group['children']->isNotEmpty();
+        })->values();
+
+        // Convert allCategories to array for JSON serialization
+        // Only include the fields we need
+        $allCategoriesArray = $allCategories->map(function ($category) {
+            return [
+                'id' => $category->id,
+                'name' => $category->name,
+                'icon' => $category->icon,
+                'parent_id' => $category->parent_id,
+                'usage_count' => $category->usage_count,
+            ];
+        })->values()->toArray();
+
+        return compact('categoryGroups', 'allCategoriesArray');
+    }
+
+    /**
+     * M-Pesa transaction costs (Kenya) - for frontend display
+     */
+    private function getMpesaTransactionCosts()
+    {
+        return [
+            'send_money' => [
+                ['min' => 1, 'max' => 100, 'cost' => 0],
+                ['min' => 101, 'max' => 500, 'cost' => 7],
+                ['min' => 501, 'max' => 1000, 'cost' => 13],
+                ['min' => 1001, 'max' => 1500, 'cost' => 23],
+                ['min' => 1501, 'max' => 2500, 'cost' => 33],
+                ['min' => 2501, 'max' => 3500, 'cost' => 53],
+                ['min' => 3501, 'max' => 5000, 'cost' => 57],
+                ['min' => 5001, 'max' => 7500, 'cost' => 78],
+                ['min' => 7501, 'max' => 10000, 'cost' => 90],
+                ['min' => 10001, 'max' => 15000, 'cost' => 100],
+                ['min' => 15001, 'max' => 20000, 'cost' => 105],
+                ['min' => 20001, 'max' => 35000, 'cost' => 108],
+                ['min' => 35001, 'max' => 50000, 'cost' => 110],
+                ['min' => 50001, 'max' => 150000, 'cost' => 112],
+                ['min' => 150001, 'max' => 250000, 'cost' => 115],
+                ['min' => 250001, 'max' => 500000, 'cost' => 117],
+            ],
+            'paybill' => [
+                ['min' => 1, 'max' => 49, 'cost' => 0],
+                ['min' => 50, 'max' => 100, 'cost' => 0],
+                ['min' => 101, 'max' => 500, 'cost' => 5],
+                ['min' => 501, 'max' => 1000, 'cost' => 10],
+                ['min' => 1001, 'max' => 1500, 'cost' => 15],
+                ['min' => 1501, 'max' => 2500, 'cost' => 20],
+                ['min' => 2501, 'max' => 3500, 'cost' => 25],
+                ['min' => 3501, 'max' => 5000, 'cost' => 34],
+                ['min' => 5001, 'max' => 7500, 'cost' => 42],
+                ['min' => 7501, 'max' => 10000, 'cost' => 48],
+                ['min' => 10001, 'max' => 15000, 'cost' => 57],
+                ['min' => 15001, 'max' => 20000, 'cost' => 62],
+                ['min' => 20001, 'max' => 25000, 'cost' => 67],
+                ['min' => 25001, 'max' => 30000, 'cost' => 72],
+                ['min' => 30001, 'max' => 35000, 'cost' => 83],
+                ['min' => 35001, 'max' => 40000, 'cost' => 99],
+                ['min' => 40001, 'max' => 45000, 'cost' => 103],
+                ['min' => 45001, 'max' => 50000, 'cost' => 108],
+                ['min' => 50001, 'max' => 70000, 'cost' => 108],
+                ['min' => 70001, 'max' => 250000, 'cost' => 108],
+            ],
+            'buy_goods' => [
+                ['min' => 1, 'max' => 500000, 'cost' => 0],
+            ],
+            'pochi_la_biashara' => [
+                ['min' => 1, 'max' => 100, 'cost' => 0],
+                ['min' => 101, 'max' => 500, 'cost' => 7],
+                ['min' => 501, 'max' => 1000, 'cost' => 13],
+                ['min' => 1001, 'max' => 1500, 'cost' => 23],
+                ['min' => 1501, 'max' => 2500, 'cost' => 33],
+                ['min' => 2501, 'max' => 3500, 'cost' => 53],
+                ['min' => 3501, 'max' => 5000, 'cost' => 57],
+                ['min' => 5001, 'max' => 7500, 'cost' => 78],
+                ['min' => 7501, 'max' => 10000, 'cost' => 90],
+                ['min' => 10001, 'max' => 15000, 'cost' => 100],
+                ['min' => 15001, 'max' => 20000, 'cost' => 105],
+                ['min' => 20001, 'max' => 35000, 'cost' => 108],
+                ['min' => 35001, 'max' => 50000, 'cost' => 110],
+                ['min' => 50001, 'max' => 150000, 'cost' => 112],
+                ['min' => 150001, 'max' => 250000, 'cost' => 115],
+                ['min' => 250001, 'max' => 500000, 'cost' => 117],
+            ],
+        ];
+    }
+
+    /**
+     * Airtel Money transaction costs (Kenya) - for frontend display
+     */
+    private function getAirtelMoneyTransactionCosts()
+    {
+        return [
+            'send_money' => [
+                ['min' => 10, 'max' => 100, 'cost' => 0],
+                ['min' => 101, 'max' => 500, 'cost' => 7],
+                ['min' => 501, 'max' => 1000, 'cost' => 15],
+                ['min' => 1001, 'max' => 1500, 'cost' => 25],
+                ['min' => 1501, 'max' => 2500, 'cost' => 35],
+                ['min' => 2501, 'max' => 3500, 'cost' => 55],
+                ['min' => 3501, 'max' => 5000, 'cost' => 65],
+                ['min' => 5001, 'max' => 7500, 'cost' => 80],
+                ['min' => 7501, 'max' => 10000, 'cost' => 95],
+                ['min' => 10001, 'max' => 15000, 'cost' => 105],
+                ['min' => 15001, 'max' => 20000, 'cost' => 110],
+                ['min' => 20001, 'max' => 35000, 'cost' => 115],
+                ['min' => 35001, 'max' => 50000, 'cost' => 120],
+                ['min' => 50001, 'max' => 70000, 'cost' => 125],
+                ['min' => 70001, 'max' => 150000, 'cost' => 130],
+            ],
+            'paybill' => [
+                ['min' => 1, 'max' => 150000, 'cost' => 0],
+            ],
+            'buy_goods' => [
+                ['min' => 1, 'max' => 150000, 'cost' => 0],
+            ],
+        ];
     }
 
     /**
@@ -421,7 +422,7 @@ class TransactionController extends Controller
                     ->with('transaction_type', $existingTransaction->category->type);
             }
 
-            $account = \App\Models\Account::findOrFail($validated['account_id']);
+            $account = Account::findOrFail($validated['account_id']);
             $oldBalance = $account->current_balance;
 
             $transaction = $this->transactionService->createTransaction($validated);
@@ -453,7 +454,7 @@ class TransactionController extends Controller
                 ->with('transaction_amount', number_format($totalAmount, 2))
                 ->with('transaction_type', $transaction->category->type);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return back()->with('error', $e->getMessage())->withInput();
         }
     }
@@ -528,7 +529,7 @@ class TransactionController extends Controller
             return redirect()->route('transactions.show', $updatedTransaction)
                 ->with('success', 'Transaction updated successfully!');
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return back()->with('error', $e->getMessage())->withInput();
         }
     }
@@ -571,9 +572,9 @@ class TransactionController extends Controller
             return redirect()->route('transactions.index')
                 ->with('success', 'Transaction deleted successfully. Account balance has been updated.');
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
-            \Log::error('Transaction deletion failed: ' . $e->getMessage());
+            Log::error('Transaction deletion failed: ' . $e->getMessage());
 
             return back()->with('error', 'Failed to delete transaction: ' . $e->getMessage());
         }
@@ -610,7 +611,7 @@ class TransactionController extends Controller
             return redirect()->route('transactions.index')
                 ->with('success', 'Transaction restored successfully.');
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Failed to restore transaction: ' . $e->getMessage());
         }
@@ -653,7 +654,7 @@ class TransactionController extends Controller
             return redirect()->route('transactions.trash')
                 ->with('success', 'Transaction permanently deleted.');
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Failed to permanently delete transaction: ' . $e->getMessage());
         }

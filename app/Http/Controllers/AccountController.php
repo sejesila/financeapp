@@ -34,7 +34,7 @@ class AccountController extends Controller
 
         // Recent transfers (only user's own)
         $recentTransfers = Transfer::with(['fromAccount', 'toAccount'])
-            ->whereHas('fromAccount', function($query) {
+            ->whereHas('fromAccount', function ($query) {
                 $query->where('user_id', Auth::id());
             })
             ->latest()
@@ -48,11 +48,6 @@ class AccountController extends Controller
             ->get();
 
         return view('accounts.index', compact('accounts', 'savingsAccounts', 'totalBalance', 'totalSavings', 'recentTransfers', 'allAccounts'));
-    }
-
-    public function create()
-    {
-        return view('accounts.create');
     }
 
     public function store(Request $request)
@@ -74,6 +69,11 @@ class AccountController extends Controller
         ]);
 
         return redirect()->route('accounts.index')->with('success', 'Account created successfully!');
+    }
+
+    public function create()
+    {
+        return view('accounts.create');
     }
 
     public function show(Account $account)
@@ -177,8 +177,8 @@ class AccountController extends Controller
         ]);
 
         $currentBalance = $account->current_balance;
-        $targetBalance  = $request->initial_balance;
-        $difference     = $targetBalance - $currentBalance;
+        $targetBalance = $request->initial_balance;
+        $difference = $targetBalance - $currentBalance;
 
         if ($difference == 0) {
             return back()->with('success', 'Balance already matches the entered value.');
@@ -222,6 +222,14 @@ class AccountController extends Controller
             ->with('success', 'Balance adjusted successfully.');
     }
 
+    /**
+     * Clear account statistics cache
+     */
+    private function clearAccountCache(int $accountId): void
+    {
+        Cache::forget("account.{$accountId}.stats");
+    }
+
     public function transferForm()
     {
         if (auth()->user()->accounts()->count() < 2) {
@@ -244,8 +252,6 @@ class AccountController extends Controller
         return view('accounts.transfer', compact('sourceAccounts', 'destinationAccounts'));
     }
 
-
-
     /**
      * Calculate withdrawal fee based on amount and account type
      */
@@ -259,15 +265,15 @@ class AccountController extends Controller
 
         $request->validate([
             'from_account_id' => 'required|exists:accounts,id|different:to_account_id',
-            'to_account_id'   => 'required|exists:accounts,id',
-            'amount'          => 'required|numeric|min:0.01',
-            'date'            => 'required|date',
-            'description'     => 'nullable|string',
+            'to_account_id' => 'required|exists:accounts,id',
+            'amount' => 'required|numeric|min:0.01',
+            'date' => 'required|date',
+            'description' => 'nullable|string',
         ]);
 
         // Fetch accounts
         $fromAccount = Account::findOrFail($request->from_account_id);
-        $toAccount   = Account::findOrFail($request->to_account_id);
+        $toAccount = Account::findOrFail($request->to_account_id);
 
         // Ownership check
         if ($fromAccount->user_id !== Auth::id() || $toAccount->user_id !== Auth::id()) {
@@ -294,8 +300,7 @@ class AccountController extends Controller
                         ->withInput()
                         ->withErrors(['amount' => 'Minimum M-Pesa withdrawal amount is KES 50.']);
                 }
-            }
-            // M-Pesa/Airtel Money to Bank = PayBill
+            } // M-Pesa/Airtel Money to Bank = PayBill
             elseif ($toAccount->type === 'bank') {
                 $feeType = 'paybill';
                 $transactionFee = $this->calculatePayBillFee(
@@ -323,11 +328,11 @@ class AccountController extends Controller
         // Create transfer
         $transfer = Transfer::create([
             'from_account_id' => $fromAccount->id,
-            'to_account_id'   => $toAccount->id,
-            'amount'          => $request->amount,
-            'date'            => $request->date,
-            'description'     => $request->description,
-            'user_id'         => auth()->id(),
+            'to_account_id' => $toAccount->id,
+            'amount' => $request->amount,
+            'date' => $request->date,
+            'description' => $request->description,
+            'user_id' => auth()->id(),
         ]);
 
         // Create transaction fee if applicable
@@ -359,7 +364,7 @@ class AccountController extends Controller
                 'amount' => $transactionFee,
                 'category_id' => $feeCategory->id,
                 'account_id' => $fromAccount->id,
-                'payment_method' => match($fromAccount->type) {
+                'payment_method' => match ($fromAccount->type) {
                     'mpesa' => 'Mpesa',
                     'airtel_money' => 'Airtel Money',
                     default => 'Cash'
@@ -491,7 +496,8 @@ class AccountController extends Controller
         Account $toAccount,
         ?string $feeType,
         ?string $userDescription
-    ): string {
+    ): string
+    {
         $accountName = $fromAccount->type === 'mpesa' ? 'M-Pesa' : 'Airtel Money';
         $feeTypeName = $feeType === 'withdrawal' ? 'withdrawal' : 'PayBill';
 
@@ -545,24 +551,21 @@ class AccountController extends Controller
                 ->where('name', 'Salary')
                 ->orderBy('name')
                 ->get();
-        }
-        elseif ($accountType === 'savings') {
+        } elseif ($accountType === 'savings') {
             // Savings: Allow all income categories (for deposits)
             return $query->where('type', 'income')
                 ->orderBy('name')
                 ->get();
-        }
-        elseif ($accountType === 'airtel_money') {
+        } elseif ($accountType === 'airtel_money') {
             // Airtel Money: Income except salary
             return $query->where('type', 'income')
                 ->where('name', '!=', 'Salary')
                 ->orderBy('name')
                 ->get();
-        }
-        elseif ($accountType === 'mpesa') {
+        } elseif ($accountType === 'mpesa') {
             // M-Pesa: Most income + liability categories (for loans)
-            return $query->where(function($q) {
-                $q->where(function($subQ) {
+            return $query->where(function ($q) {
+                $q->where(function ($subQ) {
                     $subQ->where('type', 'income')
                         ->where('name', '!=', 'Salary');
                 })
@@ -570,8 +573,7 @@ class AccountController extends Controller
             })
                 ->orderBy('name')
                 ->get();
-        }
-        else {
+        } else {
             // Cash and other accounts: All income and liability
             return $query->whereIn('type', ['income', 'liability'])
                 ->orderBy('name')
@@ -635,12 +637,12 @@ class AccountController extends Controller
         $periodDate = $request->period_date ?? $request->date;
 
         $transaction = $account->transactions()->create([
-            'user_id'        => Auth::id(),
-            'amount'         => $request->amount,
-            'date'           => $request->date,
-            'period_date'    => $periodDate,
-            'description'    => $request->description ?: ($account->type === 'savings' ? "Deposit to {$account->name}" : "Top-up to {$account->name}"),
-            'category_id'    => $category->id,
+            'user_id' => Auth::id(),
+            'amount' => $request->amount,
+            'date' => $request->date,
+            'period_date' => $periodDate,
+            'description' => $request->description ?: ($account->type === 'savings' ? "Deposit to {$account->name}" : "Top-up to {$account->name}"),
+            'category_id' => $category->id,
             'payment_method' => $category->name,
         ]);
 
@@ -656,12 +658,5 @@ class AccountController extends Controller
         return redirect()
             ->route('accounts.show', $account)
             ->with('success', "Account {$actionWord} successfully with KES " . number_format($request->amount, 0, '.', ','));
-    }
-    /**
-     * Clear account statistics cache
-     */
-    private function clearAccountCache(int $accountId): void
-    {
-        Cache::forget("account.{$accountId}.stats");
     }
 }

@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\ClientFund;
 use App\Models\ClientFundTransaction;
 use App\Models\Transaction;
+use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -37,16 +38,7 @@ class ClientFundController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('client-funds.index', compact('clientFunds', 'summary','allAccounts'));
-    }
-
-    public function create()
-    {
-        $accounts = Account::where('user_id', Auth::id())
-            ->where('is_active', true)
-            ->get();
-
-        return view('client-funds.create', compact('accounts'));
+        return view('client-funds.index', compact('clientFunds', 'summary', 'allAccounts'));
     }
 
     public function store(Request $request)
@@ -123,10 +115,19 @@ class ClientFundController extends Controller
                 ->route('client-funds.show', $clientFund)
                 ->with('success', 'Client fund recorded successfully! This is tracked as a liability.');
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             return back()->withInput()->with('error', 'Failed to record client fund: ' . $e->getMessage());
         }
+    }
+
+    public function create()
+    {
+        $accounts = Account::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->get();
+
+        return view('client-funds.create', compact('accounts'));
     }
 
     public function show(ClientFund $clientFund)
@@ -193,7 +194,7 @@ class ClientFundController extends Controller
 
             return back()->with('success', 'Expense recorded successfully! Liability reduced accordingly.');
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Failed to record expense: ' . $e->getMessage());
         }
@@ -264,11 +265,12 @@ class ClientFundController extends Controller
 
             return back()->with('success', 'Profit recorded successfully! This is now YOUR income.');
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Failed to record profit: ' . $e->getMessage());
         }
     }
+
     /**
      * Show the form for editing basic client fund details
      */
@@ -311,7 +313,7 @@ class ClientFundController extends Controller
                 ->route('client-funds.show', $clientFund)
                 ->with('success', 'Client fund updated successfully!');
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return back()->withInput()->with('error', 'Failed to update: ' . $e->getMessage());
         }
     }
@@ -360,7 +362,7 @@ class ClientFundController extends Controller
                 ->route('client-funds.index')
                 ->with('success', 'Client fund deleted successfully!');
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Failed to delete: ' . $e->getMessage());
         }
@@ -397,7 +399,7 @@ class ClientFundController extends Controller
 
             return back()->with('success', 'Expense deleted successfully!');
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Failed to delete expense: ' . $e->getMessage());
         }
@@ -444,7 +446,7 @@ class ClientFundController extends Controller
 
             return back()->with('success', 'Profit deleted successfully!');
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Failed to delete profit: ' . $e->getMessage());
         }
@@ -473,7 +475,7 @@ class ClientFundController extends Controller
 
             return back()->with('success', 'Client fund marked as completed!');
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Failed to complete: ' . $e->getMessage());
         }

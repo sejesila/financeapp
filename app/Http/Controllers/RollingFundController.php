@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\RollingFund;
 use App\Models\Account;
-use App\Models\Transaction;
 use App\Models\Category;
+use App\Models\RollingFund;
+use App\Models\Transaction;
+use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -98,17 +99,6 @@ class RollingFundController extends Controller
         return view('rolling-funds.index', compact('wagers', 'stats', 'filter'));
     }
 
-    public function create()
-    {
-        $accounts = Account::where('user_id', auth()->id())
-            ->where('is_active', true)
-            ->get();
-
-        $paybillCosts = $this->getPaybillCosts();
-
-        return view('rolling-funds.create', compact('accounts', 'paybillCosts'));
-    }
-
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -192,7 +182,7 @@ class RollingFundController extends Controller
             return redirect()->route('rolling-funds.show', $rollingFund)
                 ->with('success', 'Investment recorded successfully! Update the outcome when ready.');
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             Log::error('Rolling Fund Store Error: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
@@ -201,6 +191,86 @@ class RollingFundController extends Controller
             return back()->withErrors(['error' => 'Failed to record investment: ' . $e->getMessage()])
                 ->withInput();
         }
+    }
+
+    private function calculatePaybillFee($amount)
+    {
+        $costs = $this->getPaybillCosts();
+
+        foreach ($costs as $tier) {
+            if ($amount >= $tier['min'] && $amount <= $tier['max']) {
+                return $tier['cost'];
+            }
+        }
+
+        return end($costs)['cost'] ?? 0;
+    }
+
+    private function getPaybillCosts()
+    {
+        return [
+            ['min' => 1, 'max' => 49, 'cost' => 0],
+            ['min' => 50, 'max' => 100, 'cost' => 0],
+            ['min' => 101, 'max' => 500, 'cost' => 7],
+            ['min' => 501, 'max' => 1000, 'cost' => 13],
+            ['min' => 1001, 'max' => 1500, 'cost' => 23],
+            ['min' => 1501, 'max' => 2500, 'cost' => 33],
+            ['min' => 2501, 'max' => 3500, 'cost' => 53],
+            ['min' => 3501, 'max' => 5000, 'cost' => 57],
+            ['min' => 5001, 'max' => 7500, 'cost' => 61],
+            ['min' => 7501, 'max' => 10000, 'cost' => 67],
+            ['min' => 10001, 'max' => 15000, 'cost' => 77],
+            ['min' => 15001, 'max' => 20000, 'cost' => 87],
+            ['min' => 20001, 'max' => 35000, 'cost' => 97],
+            ['min' => 35001, 'max' => 50000, 'cost' => 107],
+            ['min' => 50001, 'max' => 150000, 'cost' => 112],
+        ];
+    }
+
+    public function create()
+    {
+        $accounts = Account::where('user_id', auth()->id())
+            ->where('is_active', true)
+            ->get();
+
+        $paybillCosts = $this->getPaybillCosts();
+
+        return view('rolling-funds.create', compact('accounts', 'paybillCosts'));
+    }
+
+    private function getOrCreateCategory($type, $name, $parentName)
+    {
+        $category = Category::where('user_id', auth()->id())
+            ->where('type', $type)
+            ->where('name', $name)
+            ->first();
+
+        if (!$category) {
+            $parentCategory = Category::where('user_id', auth()->id())
+                ->where('type', $type)
+                ->whereNull('parent_id')
+                ->where('name', $parentName)
+                ->first();
+
+            if (!$parentCategory) {
+                $parentCategory = Category::create([
+                    'user_id' => auth()->id(),
+                    'name' => $parentName,
+                    'type' => $type,
+                    'is_active' => true,
+                ]);
+            }
+
+            $category = Category::create([
+                'user_id' => auth()->id(),
+                'parent_id' => $parentCategory->id,
+                'name' => $name,
+                'type' => $type,
+                'is_active' => true,
+            ]);
+        }
+
+        return $category;
     }
 
     public function show(RollingFund $rollingFund)
@@ -285,7 +355,7 @@ Outcome: " . $validated['outcome_notes']
             return redirect()->route('rolling-funds.show', $rollingFund)
                 ->with('success', $message);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             Log::error('Rolling Fund Record Outcome Error: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
@@ -341,7 +411,7 @@ Outcome: " . $validated['outcome_notes']
             return redirect()->route('rolling-funds.index')
                 ->with('success', 'Session deleted successfully.');
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             Log::error('Rolling Fund Destroy Error: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
@@ -349,74 +419,5 @@ Outcome: " . $validated['outcome_notes']
             ]);
             return back()->with('error', 'Failed to delete wager: ' . $e->getMessage());
         }
-    }
-
-    private function getOrCreateCategory($type, $name, $parentName)
-    {
-        $category = Category::where('user_id', auth()->id())
-            ->where('type', $type)
-            ->where('name', $name)
-            ->first();
-
-        if (!$category) {
-            $parentCategory = Category::where('user_id', auth()->id())
-                ->where('type', $type)
-                ->whereNull('parent_id')
-                ->where('name', $parentName)
-                ->first();
-
-            if (!$parentCategory) {
-                $parentCategory = Category::create([
-                    'user_id' => auth()->id(),
-                    'name' => $parentName,
-                    'type' => $type,
-                    'is_active' => true,
-                ]);
-            }
-
-            $category = Category::create([
-                'user_id' => auth()->id(),
-                'parent_id' => $parentCategory->id,
-                'name' => $name,
-                'type' => $type,
-                'is_active' => true,
-            ]);
-        }
-
-        return $category;
-    }
-
-    private function calculatePaybillFee($amount)
-    {
-        $costs = $this->getPaybillCosts();
-
-        foreach ($costs as $tier) {
-            if ($amount >= $tier['min'] && $amount <= $tier['max']) {
-                return $tier['cost'];
-            }
-        }
-
-        return end($costs)['cost'] ?? 0;
-    }
-
-    private function getPaybillCosts()
-    {
-        return [
-            ['min' => 1, 'max' => 49, 'cost' => 0],
-            ['min' => 50, 'max' => 100, 'cost' => 0],
-            ['min' => 101, 'max' => 500, 'cost' => 7],
-            ['min' => 501, 'max' => 1000, 'cost' => 13],
-            ['min' => 1001, 'max' => 1500, 'cost' => 23],
-            ['min' => 1501, 'max' => 2500, 'cost' => 33],
-            ['min' => 2501, 'max' => 3500, 'cost' => 53],
-            ['min' => 3501, 'max' => 5000, 'cost' => 57],
-            ['min' => 5001, 'max' => 7500, 'cost' => 61],
-            ['min' => 7501, 'max' => 10000, 'cost' => 67],
-            ['min' => 10001, 'max' => 15000, 'cost' => 77],
-            ['min' => 15001, 'max' => 20000, 'cost' => 87],
-            ['min' => 20001, 'max' => 35000, 'cost' => 97],
-            ['min' => 35001, 'max' => 50000, 'cost' => 107],
-            ['min' => 50001, 'max' => 150000, 'cost' => 112],
-        ];
     }
 }

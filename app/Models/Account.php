@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 
@@ -25,19 +26,6 @@ class Account extends Model
         'current_balance' => 'decimal:2',
         'is_active' => 'boolean',
     ];
-
-    /**
-     * Get the route key for the model.
-     */
-    public function getRouteKeyName()
-    {
-        return 'slug';
-    }
-
-    public function user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
 
     protected static function booted()
     {
@@ -81,19 +69,17 @@ class Account extends Model
         });
     }
 
-    public function transactions()
+    /**
+     * Get the route key for the model.
+     */
+    public function getRouteKeyName()
     {
-        return $this->hasMany(Transaction::class);
+        return 'slug';
     }
 
-    public function transfersFrom()
+    public function user(): BelongsTo
     {
-        return $this->hasMany(Transfer::class, 'from_account_id');
-    }
-
-    public function transfersTo()
-    {
-        return $this->hasMany(Transfer::class, 'to_account_id');
+        return $this->belongsTo(User::class);
     }
 
     public function loans()
@@ -101,7 +87,6 @@ class Account extends Model
         return $this->hasMany(Loan::class);
     }
 
-    // Update balance based on ACTIVE transactions only
     public function updateBalance()
     {
         // Count ALL non-deleted transactions (don't hide reversed ones)
@@ -131,5 +116,22 @@ class Account extends Model
             + $transfersIn;
 
         $this->save();
+    }
+
+    public function transactions()
+    {
+        return $this->hasMany(Transaction::class);
+    }
+
+    public function transfersFrom()
+    {
+        return $this->hasMany(Transfer::class, 'from_account_id');
+    }
+
+    // Update balance based on ACTIVE transactions only
+
+    public function transfersTo()
+    {
+        return $this->hasMany(Transfer::class, 'to_account_id');
     }
 }

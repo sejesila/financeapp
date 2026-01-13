@@ -7,6 +7,8 @@ use App\Models\Category;
 use App\Models\Loan;
 use App\Models\LoanPayment;
 use App\Models\Transaction;
+use Carbon\Carbon;
+use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -20,81 +22,6 @@ class LoanController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return ['auth'];
-    }
-
-    private function getLoanTypes()
-    {
-        return [
-            'mshwari' => [
-                'name' => 'M-Shwari',
-                'excise_duty_rate' => 0.015,
-                'facilitation_fee_rate' => 0.075,
-                'early_repayment_days' => 10,
-                'early_repayment_refund_rate' => 0.20,
-                'has_early_repayment' => true,
-            ],
-            'kcb_mpesa' => [
-                'name' => 'KCB M-Pesa',
-                'facility_fee_rate' => 0.0176,
-                'interest_rate' => 7.05,
-                'early_repayment_days' => 10,
-                'has_early_repayment' => true,
-            ],
-            'other' => [
-                'name' => 'Other Loan Source',
-                'is_custom' => true,
-                'has_early_repayment' => false,
-            ],
-        ];
-    }
-
-    public function calculateCustomBreakdown($principalAmount, $interestAmount = 0)
-    {
-        $totalRepayment = $principalAmount + $interestAmount;
-
-        return [
-            'loan_type' => 'other',
-            'principal' => $principalAmount,
-            'interest_amount' => round($interestAmount, 2),
-            'total_repayment' => round($totalRepayment, 2),
-            'deposit_amount' => $principalAmount,
-        ];
-    }
-
-    private function detectLoanType($source)
-    {
-        $source = strtolower($source);
-
-        if (strpos($source, 'kcb') !== false || strpos($source, 'kcb-mpesa') !== false) {
-            return 'kcb_mpesa';
-        }
-
-        if (strpos($source, 'mshwari') !== false || strpos($source, 'm-shwari') !== false) {
-            return 'mshwari';
-        }
-
-        return 'other';
-    }
-
-    private function calculateTotalRepayment($principalAmount, $interestRate = null, $interestAmount = null)
-    {
-        if ($interestRate !== null && $interestRate > 0) {
-            $calculatedInterest = ($principalAmount * $interestRate) / 100;
-            return [
-                'interest' => round($calculatedInterest, 2),
-                'total' => round($principalAmount + $calculatedInterest, 2)
-            ];
-        } elseif ($interestAmount !== null && $interestAmount > 0) {
-            return [
-                'interest' => round($interestAmount, 2),
-                'total' => round($principalAmount + $interestAmount, 2)
-            ];
-        }
-
-        return [
-            'interest' => 0,
-            'total' => $principalAmount
-        ];
     }
 
     public function index(Request $request)
@@ -137,7 +64,7 @@ class LoanController extends Controller implements HasMiddleware
             ->orderBy('updated_at', 'desc')
             ->get();
 
-        $accounts = \App\Models\Account::where('user_id', Auth::id())
+        $accounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
@@ -151,93 +78,6 @@ class LoanController extends Controller implements HasMiddleware
             'maxYear',
             'accounts'
         ));
-    }
-
-    public function create(Request $request)
-    {
-        $this->authorize('create', Loan::class);
-
-        $accounts = Account::where('user_id', Auth::id())
-            ->where('is_active', true)
-            ->whereIn('type', ['mpesa', 'airtel_money'])
-            ->orderBy('name')
-            ->get();
-
-        $fromTopup = $request->has('account_id') && $request->has('amount') && $request->has('source');
-
-        $prefillData = [
-            'account_id' => $request->query('account_id'),
-            'amount' => $request->query('amount'),
-            'source' => $request->query('source'),
-            'date' => $request->query('date'),
-            'notes' => $request->query('notes'),
-        ];
-
-        $loanType = $this->detectLoanType($prefillData['source'] ?? '');
-        $loanTypes = $this->getLoanTypes();
-
-        return view('loans.create', compact('accounts', 'fromTopup', 'prefillData', 'loanType', 'loanTypes'));
-    }
-
-    public function calculateMshwariBreakdown($principalAmount)
-    {
-        $config = $this->getLoanTypes()['mshwari'];
-
-        $exciseDuty = $principalAmount * $config['excise_duty_rate'];
-        $depositAmount = $principalAmount - $exciseDuty;
-        $facilitationFee = $principalAmount * $config['facilitation_fee_rate'];
-        $standardRepayment = $principalAmount + $facilitationFee;
-        $totalLoanFees = $exciseDuty + $facilitationFee;
-        $earlyRepaymentDiscount = $totalLoanFees * $config['early_repayment_refund_rate'];
-        $earlyRepayment = $standardRepayment - $earlyRepaymentDiscount;
-
-        return [
-            'loan_type' => 'mshwari',
-            'principal' => $principalAmount,
-            'excise_duty' => round($exciseDuty, 2),
-            'deposit_amount' => round($depositAmount, 2),
-            'facilitation_fee' => round($facilitationFee, 2),
-            'total_loan_fees' => round($totalLoanFees, 2),
-            'standard_repayment' => round($standardRepayment, 2),
-            'early_repayment' => round($earlyRepayment, 2),
-            'early_repayment_discount' => round($earlyRepaymentDiscount, 2),
-            'early_repayment_days' => $config['early_repayment_days'],
-        ];
-    }
-
-    public function calculateKcbMpesaBreakdown($principalAmount)
-    {
-        $config = $this->getLoanTypes()['kcb_mpesa'];
-
-        $facilityFee = $principalAmount * $config['facility_fee_rate'];
-        $interest = ($principalAmount * $config['interest_rate']) / 100;
-        $totalRepayment = $principalAmount + $facilityFee + $interest;
-        $earlyRepayment = $principalAmount + $interest;
-
-        return [
-            'loan_type' => 'kcb_mpesa',
-            'principal' => $principalAmount,
-            'facility_fee_rate' => $config['facility_fee_rate'] * 100,
-            'facility_fee' => round($facilityFee, 2),
-            'interest_rate' => $config['interest_rate'],
-            'interest_amount' => round($interest, 2),
-            'total_repayment' => round($totalRepayment, 2),
-            'early_repayment' => round($earlyRepayment, 2),
-            'early_repayment_savings' => round($facilityFee, 2),
-            'early_repayment_days' => $config['early_repayment_days'],
-            'deposit_amount' => $principalAmount,
-        ];
-    }
-
-    public function calculateBreakdown($principalAmount, $loanType = 'mshwari', $customInterestAmount = 0)
-    {
-        if ($loanType === 'kcb_mpesa') {
-            return $this->calculateKcbMpesaBreakdown($principalAmount);
-        } elseif ($loanType === 'other') {
-            return $this->calculateCustomBreakdown($principalAmount, $customInterestAmount);
-        }
-
-        return $this->calculateMshwariBreakdown($principalAmount);
     }
 
     public function store(Request $request)
@@ -284,13 +124,13 @@ class LoanController extends Controller implements HasMiddleware
         DB::beginTransaction();
 
         try {
-            $principalAmount = (float) $validated['principal_amount'];
+            $principalAmount = (float)$validated['principal_amount'];
             $loanType = $validated['loan_type'];
             $customInterestAmount = $validated['custom_interest_amount'] ?? 0;
 
             $breakdown = $this->calculateBreakdown($principalAmount, $loanType, $customInterestAmount);
 
-            $disbursedDate = \Carbon\Carbon::parse($validated['disbursed_date']);
+            $disbursedDate = Carbon::parse($validated['disbursed_date']);
 
             if ($loanType === 'other') {
                 $dueDate = $validated['due_date'];
@@ -402,19 +242,160 @@ class LoanController extends Controller implements HasMiddleware
                     $message .= "Total repayment: KES " . number_format($totalRepayment, 0) . " (No interest).";
                 }
                 if ($dueDate) {
-                    $message .= " Due on " . \Carbon\Carbon::parse($dueDate)->format('M d, Y') . ".";
+                    $message .= " Due on " . Carbon::parse($dueDate)->format('M d, Y') . ".";
                 }
             } else {
                 $message .= "Total repayment: KES " . number_format($totalRepayment, 0) . ". ";
-                $message .= "💡 Due on " . \Carbon\Carbon::parse($dueDate)->format('M d, Y') . ".";
+                $message .= "💡 Due on " . Carbon::parse($dueDate)->format('M d, Y') . ".";
             }
 
             return redirect()->route('loans.show', $loan->id)->with('success', $message);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Failed to create loan: ' . $e->getMessage())->withInput();
         }
+    }
+
+    public function calculateBreakdown($principalAmount, $loanType = 'mshwari', $customInterestAmount = 0)
+    {
+        if ($loanType === 'kcb_mpesa') {
+            return $this->calculateKcbMpesaBreakdown($principalAmount);
+        } elseif ($loanType === 'other') {
+            return $this->calculateCustomBreakdown($principalAmount, $customInterestAmount);
+        }
+
+        return $this->calculateMshwariBreakdown($principalAmount);
+    }
+
+    public function calculateKcbMpesaBreakdown($principalAmount)
+    {
+        $config = $this->getLoanTypes()['kcb_mpesa'];
+
+        $facilityFee = $principalAmount * $config['facility_fee_rate'];
+        $interest = ($principalAmount * $config['interest_rate']) / 100;
+        $totalRepayment = $principalAmount + $facilityFee + $interest;
+        $earlyRepayment = $principalAmount + $interest;
+
+        return [
+            'loan_type' => 'kcb_mpesa',
+            'principal' => $principalAmount,
+            'facility_fee_rate' => $config['facility_fee_rate'] * 100,
+            'facility_fee' => round($facilityFee, 2),
+            'interest_rate' => $config['interest_rate'],
+            'interest_amount' => round($interest, 2),
+            'total_repayment' => round($totalRepayment, 2),
+            'early_repayment' => round($earlyRepayment, 2),
+            'early_repayment_savings' => round($facilityFee, 2),
+            'early_repayment_days' => $config['early_repayment_days'],
+            'deposit_amount' => $principalAmount,
+        ];
+    }
+
+    private function getLoanTypes()
+    {
+        return [
+            'mshwari' => [
+                'name' => 'M-Shwari',
+                'excise_duty_rate' => 0.015,
+                'facilitation_fee_rate' => 0.075,
+                'early_repayment_days' => 10,
+                'early_repayment_refund_rate' => 0.20,
+                'has_early_repayment' => true,
+            ],
+            'kcb_mpesa' => [
+                'name' => 'KCB M-Pesa',
+                'facility_fee_rate' => 0.0176,
+                'interest_rate' => 7.05,
+                'early_repayment_days' => 10,
+                'has_early_repayment' => true,
+            ],
+            'other' => [
+                'name' => 'Other Loan Source',
+                'is_custom' => true,
+                'has_early_repayment' => false,
+            ],
+        ];
+    }
+
+    public function calculateCustomBreakdown($principalAmount, $interestAmount = 0)
+    {
+        $totalRepayment = $principalAmount + $interestAmount;
+
+        return [
+            'loan_type' => 'other',
+            'principal' => $principalAmount,
+            'interest_amount' => round($interestAmount, 2),
+            'total_repayment' => round($totalRepayment, 2),
+            'deposit_amount' => $principalAmount,
+        ];
+    }
+
+    public function calculateMshwariBreakdown($principalAmount)
+    {
+        $config = $this->getLoanTypes()['mshwari'];
+
+        $exciseDuty = $principalAmount * $config['excise_duty_rate'];
+        $depositAmount = $principalAmount - $exciseDuty;
+        $facilitationFee = $principalAmount * $config['facilitation_fee_rate'];
+        $standardRepayment = $principalAmount + $facilitationFee;
+        $totalLoanFees = $exciseDuty + $facilitationFee;
+        $earlyRepaymentDiscount = $totalLoanFees * $config['early_repayment_refund_rate'];
+        $earlyRepayment = $standardRepayment - $earlyRepaymentDiscount;
+
+        return [
+            'loan_type' => 'mshwari',
+            'principal' => $principalAmount,
+            'excise_duty' => round($exciseDuty, 2),
+            'deposit_amount' => round($depositAmount, 2),
+            'facilitation_fee' => round($facilitationFee, 2),
+            'total_loan_fees' => round($totalLoanFees, 2),
+            'standard_repayment' => round($standardRepayment, 2),
+            'early_repayment' => round($earlyRepayment, 2),
+            'early_repayment_discount' => round($earlyRepaymentDiscount, 2),
+            'early_repayment_days' => $config['early_repayment_days'],
+        ];
+    }
+
+    public function create(Request $request)
+    {
+        $this->authorize('create', Loan::class);
+
+        $accounts = Account::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->whereIn('type', ['mpesa', 'airtel_money'])
+            ->orderBy('name')
+            ->get();
+
+        $fromTopup = $request->has('account_id') && $request->has('amount') && $request->has('source');
+
+        $prefillData = [
+            'account_id' => $request->query('account_id'),
+            'amount' => $request->query('amount'),
+            'source' => $request->query('source'),
+            'date' => $request->query('date'),
+            'notes' => $request->query('notes'),
+        ];
+
+        $loanType = $this->detectLoanType($prefillData['source'] ?? '');
+        $loanTypes = $this->getLoanTypes();
+
+        return view('loans.create', compact('accounts', 'fromTopup', 'prefillData', 'loanType', 'loanTypes'));
+    }
+
+    private function detectLoanType($source)
+    {
+        $source = strtolower($source);
+
+        if (strpos($source, 'kcb') !== false || strpos($source, 'kcb-mpesa') !== false) {
+            return 'kcb_mpesa';
+        }
+
+        if (strpos($source, 'mshwari') !== false || strpos($source, 'm-shwari') !== false) {
+            return 'mshwari';
+        }
+
+        return 'other';
     }
 
     /**
@@ -437,6 +418,27 @@ class LoanController extends Controller implements HasMiddleware
         $isOverdue = $loan->due_date && now()->isAfter($loan->due_date) && $loan->status === 'active';
 
         return view('loans.show', compact('loan', 'repayment', 'daysElapsed', 'daysRemaining', 'isOverdue'));
+    }
+
+    private function calculateTotalRepayment($principalAmount, $interestRate = null, $interestAmount = null)
+    {
+        if ($interestRate !== null && $interestRate > 0) {
+            $calculatedInterest = ($principalAmount * $interestRate) / 100;
+            return [
+                'interest' => round($calculatedInterest, 2),
+                'total' => round($principalAmount + $calculatedInterest, 2)
+            ];
+        } elseif ($interestAmount !== null && $interestAmount > 0) {
+            return [
+                'interest' => round($interestAmount, 2),
+                'total' => round($principalAmount + $interestAmount, 2)
+            ];
+        }
+
+        return [
+            'interest' => 0,
+            'total' => $principalAmount
+        ];
     }
 
     /**
@@ -481,12 +483,12 @@ class LoanController extends Controller implements HasMiddleware
         DB::beginTransaction();
 
         try {
-            $paymentAmount = (float) $validated['payment_amount'];
+            $paymentAmount = (float)$validated['payment_amount'];
             $paymentDate = $validated['payment_date'];
             $account = Account::find($loan->account_id);
 
             if ($account->current_balance < $paymentAmount) {
-                throw new \Exception("Insufficient balance. Required: KES " . number_format($paymentAmount, 0) . ", Available: KES " . number_format($account->current_balance, 0));
+                throw new Exception("Insufficient balance. Required: KES " . number_format($paymentAmount, 0) . ", Available: KES " . number_format($account->current_balance, 0));
             }
 
             $repayment = $this->calculateTotalRepayment(
@@ -495,8 +497,8 @@ class LoanController extends Controller implements HasMiddleware
                 $loan->interest_amount
             );
 
-            $principalPortion = $validated['principal_portion'] ? (float) $validated['principal_portion'] : 0;
-            $interestPortion = $validated['interest_portion'] ? (float) $validated['interest_portion'] : 0;
+            $principalPortion = $validated['principal_portion'] ? (float)$validated['principal_portion'] : 0;
+            $interestPortion = $validated['interest_portion'] ? (float)$validated['interest_portion'] : 0;
 
             if ($principalPortion == 0 && $interestPortion == 0) {
                 $remainingInterest = $repayment['interest'] - (LoanPayment::where('loan_id', $loan->id)->sum('interest_portion') ?? 0);
@@ -549,7 +551,7 @@ class LoanController extends Controller implements HasMiddleware
 
             // Check for early repayment credit (within 10 days from disbursement)
             if ($loan->balance <= 0) {
-                $daysElapsed = \Carbon\Carbon::parse($loan->disbursed_date)->diffInDays(\Carbon\Carbon::parse($paymentDate));
+                $daysElapsed = Carbon::parse($loan->disbursed_date)->diffInDays(Carbon::parse($paymentDate));
 
                 if ($loanType === 'mshwari' && $daysElapsed <= 10) {
                     // M-Shwari: 20% of total loan fees
@@ -605,7 +607,7 @@ class LoanController extends Controller implements HasMiddleware
             $successMessage = "Payment of KES " . number_format($paymentAmount, 0) . " recorded successfully!";
 
             if ($earlyRepaymentCredit > 0) {
-                $daysElapsed = \Carbon\Carbon::parse($loan->disbursed_date)->diffInDays(\Carbon\Carbon::parse($paymentDate));
+                $daysElapsed = Carbon::parse($loan->disbursed_date)->diffInDays(Carbon::parse($paymentDate));
                 if ($loanType === 'kcb_mpesa') {
                     $successMessage .= " 🎉 You received an early repayment cashback of KES " . number_format($earlyRepaymentCredit, 0) . " (facility fee refunded) for repaying within {$daysElapsed} days!";
                 } else {
@@ -616,7 +618,7 @@ class LoanController extends Controller implements HasMiddleware
             return redirect()->route('loans.show', $loan->id)
                 ->with('success', $successMessage);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Payment failed: ' . $e->getMessage())->withInput();
         }
@@ -703,7 +705,7 @@ class LoanController extends Controller implements HasMiddleware
             return redirect()->route('loans.index')
                 ->with('success', 'Loan deleted successfully');
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Failed to delete loan: ' . $e->getMessage());
         }

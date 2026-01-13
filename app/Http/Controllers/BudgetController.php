@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Account;
 use App\Models\Budget;
 use App\Models\Category;
 use App\Models\Loan;
@@ -40,7 +41,7 @@ class BudgetController extends Controller
         $budgets = Budget::where('user_id', Auth::id())
             ->where('year', $year)
             ->get()
-            ->keyBy(function($b) {
+            ->keyBy(function ($b) {
                 return $b->category_id . '-' . $b->month;
             });
 
@@ -49,7 +50,7 @@ class BudgetController extends Controller
             ->selectRaw('category_id, MONTH(COALESCE(period_date, date)) as month, SUM(amount) as total')
             ->where('user_id', Auth::id())
             ->whereYear(DB::raw('COALESCE(period_date, date)'), $year)
-            ->whereHas('category', function($q) {
+            ->whereHas('category', function ($q) {
                 $q->whereIn('type', ['income', 'expense'])
                     ->whereNotIn('name', [
                         'Loan Disbursement',
@@ -67,7 +68,7 @@ class BudgetController extends Controller
         }
 
         // Calculate yearly totals for income categories
-        $incomeCategories = $incomeCategories->map(function($category) use ($actuals, $budgets) {
+        $incomeCategories = $incomeCategories->map(function ($category) use ($actuals, $budgets) {
             $yearlyTotal = 0;
             $yearlyBudget = 0;
             for ($m = 1; $m <= 12; $m++) {
@@ -84,7 +85,7 @@ class BudgetController extends Controller
         })->sortByDesc('yearly_total');
 
         // Calculate yearly totals for expense categories
-        $expenseCategories = $expenseCategories->map(function($category) use ($actuals, $budgets) {
+        $expenseCategories = $expenseCategories->map(function ($category) use ($actuals, $budgets) {
             $yearlyTotal = 0;
             $yearlyBudget = 0;
             for ($m = 1; $m <= 12; $m++) {
@@ -103,7 +104,7 @@ class BudgetController extends Controller
         // Get loan statistics for the year
         $loanStats = $this->getLoanStats($year);
         // Get accounts for the FAB component
-        $accounts = \App\Models\Account::where('user_id', Auth::id())
+        $accounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
