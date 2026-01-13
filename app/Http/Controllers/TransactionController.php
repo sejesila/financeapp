@@ -340,7 +340,7 @@ class TransactionController extends Controller
         // Apply date filters
         $query = $this->applyDateFilter($query, $filter, $startDate, $endDate);
 
-        $transactions = $query->latest('date')->latest('id')->paginate(50)->withQueryString();
+        $transactions = $query->latest('date')->latest('id')->paginate(25)->withQueryString();
 
         // Calculate totals
         $totals = $this->calculateTransactionTotals();

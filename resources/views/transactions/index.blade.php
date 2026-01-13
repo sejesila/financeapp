@@ -126,7 +126,7 @@
                         // Hide after animation completes
                         setTimeout(function() {
                             modal.style.display = 'none';
-                        }, 300);
+                        }, 500);
                     }
 
                     if (modal && closeBtn) {
@@ -425,89 +425,188 @@
                 </p>
             </div>
         @endif
-
         {{-- Pagination - Improved for Mobile and Desktop --}}
         <div class="pt-4 border-t">
-            <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
-                {{-- Results Summary --}}
-                <div class="text-sm text-gray-700 dark:text-gray-300 order-2 sm:order-1">
+            @if($transactions->hasPages())
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    {{-- Results Summary --}}
+                    <div class="text-sm text-gray-700 dark:text-gray-300 order-2 sm:order-1">
+                        <p>
+                            Showing
+                            <span class="font-medium">{{ $transactions->firstItem() ?? 0 }}</span>
+                            to
+                            <span class="font-medium">{{ $transactions->lastItem() ?? 0 }}</span>
+                            of
+                            <span class="font-medium">{{ number_format($transactions->total()) }}</span>
+                            transactions
+                        </p>
+                    </div>
+
+                    {{-- Pagination Links --}}
+                    <div class="order-1 sm:order-2 w-full sm:w-auto">
+                        <div class="flex justify-center sm:justify-end">
+                            {{ $transactions->onEachSide(1)->links() }}
+                        </div>
+                    </div>
+                </div>
+            @else
+                {{-- Show summary even when no pagination --}}
+                <div class="text-sm text-gray-700 dark:text-gray-300 text-center">
                     <p>
                         Showing
-                        <span class="font-medium">{{ $transactions->firstItem() ?? 0 }}</span>
-                        to
-                        <span class="font-medium">{{ $transactions->lastItem() ?? 0 }}</span>
-                        of
-                        <span class="font-medium">{{ $transactions->total() }}</span>
-                        transactions
+                        <span class="font-medium">{{ $transactions->count() }}</span>
+                        {{ Str::plural('transaction', $transactions->count()) }}
                     </p>
                 </div>
-
-                {{-- Pagination Links --}}
-                <div class="order-1 sm:order-2 w-full sm:w-auto">
-                    {{ $transactions->links() }}
-                </div>
-            </div>
+            @endif
         </div>
 
         {{-- Custom Pagination Styles for Better Mobile Experience --}}
         <style>
-            /* Make pagination more mobile-friendly */
+            /* Hide Laravel's default "Showing X to Y of Z results" text */
+            nav[role="navigation"] p.text-sm {
+                display: none !important;
+            }
+
+            /* Pagination Container */
             nav[role="navigation"] {
                 width: 100%;
             }
 
+            nav[role="navigation"] > div {
+                display: flex;
+                align-items: center;
+                gap: 0.25rem;
+            }
+
+            /* Pagination Links Base Styles */
+            nav[role="navigation"] a,
+            nav[role="navigation"] span {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                min-width: 2.5rem;
+                padding: 0.5rem 0.75rem;
+                font-size: 0.875rem;
+                font-weight: 500;
+                border: 1px solid #e5e7eb;
+                border-radius: 0.375rem;
+                transition: all 0.2s;
+            }
+
+            /* Links (clickable pages) */
+            nav[role="navigation"] a {
+                background-color: white;
+                color: #374151;
+                text-decoration: none;
+            }
+
+            nav[role="navigation"] a:hover:not([rel="prev"]):not([rel="next"]) {
+                background-color: #f3f4f6 !important;
+                border-color: #d1d5db !important;
+                color: #111827 !important;
+            }
+
+            /* Active Page - More Subtle Styling */
+            nav[role="navigation"] span[aria-current="page"] {
+                background-color: #e5e7eb !important;
+                border-color: #d1d5db !important;
+                color: #111827 !important;
+                font-weight: 600;
+            }
+
+            /* Disabled State */
+            nav[role="navigation"] span[aria-disabled="true"] {
+                background-color: #f9fafb;
+                color: #d1d5db;
+                cursor: not-allowed;
+                opacity: 0.6;
+            }
+
+            /* Previous/Next Buttons */
+            nav[role="navigation"] a[rel="prev"],
+            nav[role="navigation"] a[rel="next"] {
+                padding: 0.5rem 1rem;
+                font-weight: 500;
+            }
+
+            nav[role="navigation"] a[rel="prev"]:hover,
+            nav[role="navigation"] a[rel="next"]:hover {
+                background-color: #4f46e5 !important;
+                border-color: #4f46e5 !important;
+                color: white !important;
+            }
+
+            /* Ellipsis */
+            nav[role="navigation"] span[aria-disabled="true"]:not([role]) {
+                border: none;
+                background: transparent;
+                padding: 0.5rem 0.25rem;
+            }
+
+            /* Mobile Responsive */
             @media (max-width: 640px) {
-                /* Hide page numbers on very small screens, keep only prev/next */
-                nav[role="navigation"] span[aria-current="page"],
-                nav[role="navigation"] a[rel]:not([rel="prev"]):not([rel="next"]) {
+                /* Hide page numbers on mobile, show only prev/next and current */
+                nav[role="navigation"] a[href]:not([rel="prev"]):not([rel="next"]) {
+                    display: none !important;
+                }
+
+                /* Keep current page visible */
+                nav[role="navigation"] span[aria-current="page"] {
+                    display: inline-flex !important;
+                }
+
+                /* Hide ellipsis on mobile */
+                nav[role="navigation"] span[aria-disabled="true"]:not([role]) {
                     display: none !important;
                 }
 
                 /* Make prev/next buttons larger on mobile */
                 nav[role="navigation"] a[rel="prev"],
-                nav[role="navigation"] a[rel="next"],
-                nav[role="navigation"] span[aria-disabled="true"] {
-                    padding: 0.75rem 1.25rem !important;
+                nav[role="navigation"] a[rel="next"] {
+                    padding: 0.625rem 1rem !important;
                     font-size: 0.875rem !important;
+                    flex: 1;
+                    max-width: 120px;
                 }
 
                 /* Center pagination on mobile */
                 nav[role="navigation"] > div {
                     justify-content: center !important;
+                    gap: 0.5rem;
                 }
             }
 
             @media (min-width: 641px) {
-                /* Show all page numbers on desktop */
-                nav[role="navigation"] span,
-                nav[role="navigation"] a {
-                    min-width: 2.5rem;
+                /* Desktop: Show all elements */
+                nav[role="navigation"] > div {
+                    justify-content: flex-end;
                 }
             }
 
-            /* Improve button spacing */
-            nav[role="navigation"] .flex {
-                gap: 0.25rem;
-            }
+            /* Dark Mode Support */
+            @media (prefers-color-scheme: dark) {
+                nav[role="navigation"] a {
+                    background-color: #374151;
+                    color: #e5e7eb;
+                    border-color: #4b5563;
+                }
 
-            /* Better hover states */
-            nav[role="navigation"] a:hover {
-                background-color: rgb(79 70 229) !important;
-                border-color: rgb(79 70 229) !important;
-                color: white !important;
-            }
+                nav[role="navigation"] a:hover:not([rel="prev"]):not([rel="next"]) {
+                    background-color: #4b5563 !important;
+                    border-color: #6b7280 !important;
+                }
 
-            /* Active page styling */
-            nav[role="navigation"] span[aria-current="page"] {
-                background-color: rgb(79 70 229) !important;
-                border-color: rgb(79 70 229) !important;
-                color: white !important;
-            }
+                nav[role="navigation"] span[aria-current="page"] {
+                    background-color: #4b5563 !important;
+                    border-color: #6b7280 !important;
+                    color: #f3f4f6 !important;
+                }
 
-            /* Disabled state */
-            nav[role="navigation"] span[aria-disabled="true"] {
-                opacity: 0.5;
-                cursor: not-allowed;
+                nav[role="navigation"] span[aria-disabled="true"] {
+                    background-color: #1f2937;
+                    color: #6b7280;
+                }
             }
         </style>
 
