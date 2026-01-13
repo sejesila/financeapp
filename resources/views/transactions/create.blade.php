@@ -198,11 +198,6 @@
                         <option value="buy_goods">Buy Goods/Till Number</option>
                         <option value="pochi_la_biashara">Pochi La Biashara</option>
                     </select>
-                    <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        <span x-show="mobileMoneyType === 'send_money' || mobileMoneyType === 'pochi_la_biashara'">Different types have different fees</span>
-                        <span x-show="mobileMoneyType === 'paybill'">PayBill has lower fees</span>
-                        <span x-show="mobileMoneyType === 'buy_goods'">Till has no charges</span>
-                    </p>
                 </div>
 
                 <!-- Amount -->
@@ -221,39 +216,6 @@
                     >
                 </div>
 
-                <!-- Zero Fee Notice for Internet and Communication -->
-                <div x-show="isInternetAndCommunication && (accountType === 'mpesa' || accountType === 'airtel_money') && amount > 0" class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded p-2 sm:p-3 mb-4 sm:mb-5">
-                    <div class="flex items-start gap-2">
-                        <svg class="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                        <div>
-                            <p class="text-sm font-medium text-green-800 dark:text-green-200">No Transaction Fees</p>
-                            <p class="text-xs text-green-700 dark:text-green-300 mt-0.5">Internet and Communication transactions have zero fees</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Transaction Cost -->
-                <div x-show="showTransactionCost && amount > 0 && !isInternetAndCommunication" class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded p-2 sm:p-3 mb-4 sm:mb-5">
-                    <div class="flex items-center justify-between">
-                        <label class="text-xs font-medium text-yellow-800 dark:text-yellow-200">
-                            <span x-text="accountTypeName"></span> Fee
-                            <span x-show="transactionCost === 0" class="text-green-600 dark:text-green-400">(Free)</span>
-                        </label>
-                        <span class="text-base sm:text-lg font-bold text-yellow-800 dark:text-yellow-200" x-text="'KSh ' + transactionCost.toFixed(2)"></span>
-                    </div>
-                    <input type="hidden" name="transaction_cost" :value="transactionCost">
-                </div>
-
-                <!-- Total Amount Display -->
-                <div x-show="amount > 0 && (accountType === 'mpesa' || accountType === 'airtel_money')" class="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded p-2 sm:p-3 mb-4 sm:mb-5">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-medium text-indigo-800 dark:text-indigo-200">Total Amount:</span>
-                        <span class="text-base sm:text-lg font-bold text-indigo-800 dark:text-indigo-200" x-text="'KSh ' + totalAmount.toFixed(2)"></span>
-                    </div>
-                </div>
-
                 <!-- Submit -->
                 <div class="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
                     <a href="{{ route('transactions.index') }}" class="text-center sm:text-left text-sm sm:text-base text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 py-2 sm:py-0">
@@ -267,7 +229,7 @@
         </form>
     </div>
 
-    
+
     <script>
         (function() {
             // Generate unique idempotency key when page loads
@@ -369,37 +331,10 @@
                 amount: {{ old('amount') ?: 'null' }},
                 accountId: '{{ old('account_id', $mpesaAccount->id ?? '') }}',
                 accountType: '',
-                accountTypeName: '',
                 mobileMoneyType: '{{ old('mobile_money_type', 'send_money') }}',
-                transactionCost: 0,
-                showTransactionCost: false,
                 showTransactionTypeSelector: false,
-                selectedCategoryName: '',
-                mpesaCosts: @json($mpesaCosts),
-                airtelCosts: @json($airtelCosts),
-                categories: @json($allCategoriesArray), // Use the flat sorted array
-
-                get totalAmount() {
-                    return parseFloat(this.amount || 0) + parseFloat(this.transactionCost || 0);
-                },
-
-                get isInternetAndCommunication() {
-                    return this.selectedCategoryName === 'Internet and Communication';
-                },
 
                 init() {
-                    // Initialize category name if old value exists
-                    const oldCategoryId = '{{ old("category_id") }}';
-                    if (oldCategoryId) {
-                        this.updateCategoryName(parseInt(oldCategoryId));
-                    }
-
-                    // Listen for category changes
-                    window.addEventListener('category-selected', (e) => {
-                        this.selectedCategoryName = e.detail.categoryName;
-                        this.calculateTransactionCost();
-                    });
-
                     this.$nextTick(() => {
                         this.onAccountChange();
                     });
@@ -407,91 +342,27 @@
 
                 onAccountChange() {
                     const select = document.querySelector('select[name="account_id"]');
+
                     if (!select || !select.value) {
                         this.accountType = '';
-                        this.showTransactionCost = false;
                         this.showTransactionTypeSelector = false;
-                        this.transactionCost = 0;
                         return;
                     }
 
                     const selectedOption = select.options[select.selectedIndex];
                     this.accountType = selectedOption.getAttribute('data-type');
 
-                    // Show transaction type selector for mobile money accounts
+                    // Show transaction type selector only for mobile money accounts
                     if (this.accountType === 'mpesa' || this.accountType === 'airtel_money') {
                         this.showTransactionTypeSelector = true;
 
-                        // Hide Pochi La Biashara for Airtel Money
+                        // Airtel Money does not support Pochi
                         if (this.accountType === 'airtel_money' && this.mobileMoneyType === 'pochi_la_biashara') {
                             this.mobileMoneyType = 'send_money';
                         }
                     } else {
                         this.showTransactionTypeSelector = false;
                         this.mobileMoneyType = 'send_money';
-                    }
-
-                    this.calculateTransactionCost();
-                },
-
-                updateCategoryName(categoryId) {
-                    const found = this.categories.find(c => c.id === categoryId);
-                    if (found) {
-                        this.selectedCategoryName = found.name;
-                    }
-                },
-
-                calculateTransactionCost() {
-                    const amount = parseFloat(this.amount || 0);
-
-                    if (!this.accountType || amount <= 0) {
-                        this.showTransactionCost = false;
-                        this.transactionCost = 0;
-                        return;
-                    }
-
-                    // Not a mobile money account
-                    if (this.accountType !== 'mpesa' && this.accountType !== 'airtel_money') {
-                        this.showTransactionCost = false;
-                        this.transactionCost = 0;
-                        return;
-                    }
-
-                    // Special case: Internet and Communication has zero fees
-                    if (this.isInternetAndCommunication) {
-                        this.transactionCost = 0;
-                        this.showTransactionCost = false;
-                        return;
-                    }
-
-                    let cost = 0;
-                    let costs = [];
-
-                    if (this.accountType === 'mpesa') {
-                        costs = this.mpesaCosts[this.mobileMoneyType] || this.mpesaCosts['send_money'];
-                        this.accountTypeName = 'M-Pesa';
-                        this.showTransactionCost = true;
-                    } else if (this.accountType === 'airtel_money') {
-                        costs = this.airtelCosts[this.mobileMoneyType] || this.airtelCosts['send_money'];
-                        this.accountTypeName = 'Airtel Money';
-                        this.showTransactionCost = true;
-                    }
-
-                    // Find the appropriate cost tier
-                    if (Array.isArray(costs)) {
-                        for (let tier of costs) {
-                            if (amount >= tier.min && amount <= tier.max) {
-                                cost = tier.cost;
-                                break;
-                            }
-                        }
-                    }
-
-                    this.transactionCost = cost;
-
-                    // Hide cost display if it's 0 for buy_goods
-                    if (cost === 0 && this.mobileMoneyType === 'buy_goods') {
-                        this.showTransactionCost = false;
                     }
                 }
             }
