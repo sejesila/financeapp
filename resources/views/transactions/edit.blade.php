@@ -58,6 +58,100 @@
                     >
                 </div>
 
+                <!-- Category -->
+                <div class="mb-4 sm:mb-5">
+                    <label class="block text-sm sm:text-base font-semibold mb-1 dark:text-gray-200">Category</label>
+                    <div
+                        x-data='categoryDropdown(@json($categoryGroups), @json($allCategoriesArray), @json(old("category_id", $transaction->category_id)))'
+                        x-init="init()"
+                        class="relative w-full"
+                        @click.outside="closeDropdown()"
+                        x-id="['category-dropdown']"
+                    >
+                        <!-- Display/Search Input -->
+                        <div class="relative">
+                            <input
+                                type="text"
+                                x-model="search"
+                                @input="handleInput()"
+                                @focus="open = true"
+                                @keydown.escape="closeDropdown()"
+                                @keydown.enter.prevent="selectFirst()"
+                                placeholder="Search or select a category..."
+                                class="w-full text-sm sm:text-base border dark:border-gray-600 p-2 sm:p-2.5 pr-16 sm:pr-20 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
+                                :aria-owns="$id('category-dropdown')"
+                                :aria-expanded="open"
+                                aria-label="Category"
+                                autocomplete="off"
+                            >
+
+                            <!-- Clear & Dropdown Icons -->
+                            <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                <!-- Clear button -->
+                                <button
+                                    type="button"
+                                    x-show="selectedId"
+                                    @click.stop="clear()"
+                                    class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition"
+                                    title="Clear selection"
+                                >
+                                    <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </button>
+
+                                <!-- Dropdown arrow -->
+                                <button
+                                    type="button"
+                                    @click.stop="toggle()"
+                                    class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition"
+                                >
+                                    <svg
+                                        class="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform"
+                                        :class="{ 'rotate-180': open }"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Dropdown Menu -->
+                        <div
+                            x-show="open"
+                            x-transition
+                            class="absolute z-50 mt-1 w-full bg-white dark:bg-gray-700 border dark:border-gray-600 rounded-lg shadow-lg max-h-60 sm:max-h-64 overflow-auto"
+                            :id="$id('category-dropdown')"
+                            role="listbox"
+                            style="display: none;"
+                        >
+                            <template x-for="child in filteredChildren()" :key="child.id">
+                                <div
+                                    @click="select(child)"
+                                    class="px-4 sm:px-6 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer text-sm sm:text-base text-gray-700 dark:text-gray-200 transition"
+                                    :class="{ 'bg-indigo-100 dark:bg-indigo-900/50': selectedId === child.id }"
+                                    role="option"
+                                    :aria-selected="selectedId === child.id"
+                                >
+                                    <span x-show="child.icon" x-text="child.icon" class="mr-2"></span>
+                                    <span x-text="child.name"></span>
+                                </div>
+                            </template>
+
+                            <!-- No results message -->
+                            <div x-show="filteredChildren().length === 0" class="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs sm:text-sm">
+                                No categories found
+                            </div>
+                        </div>
+
+                        <!-- Hidden input for form submission -->
+                        <input type="hidden" name="category_id" :value="selectedId" required>
+                    </div>
+                </div>
+
                 <!-- Account -->
                 <div class="mb-4 sm:mb-5">
                     <label class="block text-sm sm:text-base font-semibold mb-1 dark:text-gray-200">Account</label>
@@ -101,11 +195,6 @@
                         <option value="buy_goods">Buy Goods/Till Number</option>
                         <option value="pochi_la_biashara">Pochi La Biashara</option>
                     </select>
-                    <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        <span x-show="mobileMoneyType === 'send_money' || mobileMoneyType === 'pochi_la_biashara'">Different types have different fees</span>
-                        <span x-show="mobileMoneyType === 'paybill'">PayBill has lower fees</span>
-                        <span x-show="mobileMoneyType === 'buy_goods'">Till has no charges</span>
-                    </p>
                 </div>
 
                 <!-- Amount -->
@@ -118,136 +207,10 @@
                         value="{{ old('amount', $transaction->amount) }}"
                         x-model="amount"
                         @input="calculateTransactionCost()"
+                        placeholder="Enter amount"
                         class="w-full text-sm sm:text-base border dark:border-gray-600 p-2 sm:p-2.5 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
                         required
                     >
-                </div>
-
-                <!-- Transaction Cost -->
-                <div x-show="showTransactionCost && amount > 100" class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded p-2 sm:p-3 mb-4 sm:mb-5">
-                    <div class="flex items-center justify-between">
-                        <label class="text-xs font-medium text-yellow-800 dark:text-yellow-200">
-                            <span x-text="accountTypeName"></span> Fee
-                        </label>
-                        <span class="text-base sm:text-lg font-bold text-yellow-800 dark:text-yellow-200" x-text="'KSh ' + transactionCost.toFixed(2)"></span>
-                    </div>
-                </div>
-
-                <!-- Total Amount Display -->
-                <div x-show="showTransactionCost && amount > 100" class="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded p-2 sm:p-3 mb-4 sm:mb-5">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-medium text-indigo-800 dark:text-indigo-200">Total:</span>
-                        <span class="text-base sm:text-lg font-bold text-indigo-800 dark:text-indigo-200" x-text="'KSh ' + totalAmount.toFixed(2)"></span>
-                    </div>
-                </div>
-
-                <!-- Category -->
-                <div class="mb-4 sm:mb-5">
-                    <label class="block text-sm sm:text-base font-semibold mb-1 dark:text-gray-200">Category</label>
-                    <div
-                        x-data='categoryDropdown(@json($categoryGroups), @json(old("category_id", $transaction->category_id)))'
-                        x-init="init()"
-                        class="relative w-full"
-                        @click.outside="closeDropdown()"
-                        x-id="['category-dropdown']"
-                    >
-                        <div class="relative">
-                            <input
-                                type="text"
-                                x-model="search"
-                                @input="handleInput()"
-                                @focus="open = true"
-                                @keydown.escape="closeDropdown()"
-                                @keydown.enter.prevent="selectFirst()"
-                                placeholder="Search or select a category..."
-                                class="w-full text-sm sm:text-base border dark:border-gray-600 p-2 sm:p-2.5 pr-16 sm:pr-20 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
-                                :aria-owns="$id('category-dropdown')"
-                                :aria-expanded="open"
-                                aria-label="Category"
-                                autocomplete="off"
-                            >
-
-                            <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                                <button
-                                    type="button"
-                                    x-show="selectedId"
-                                    @click.stop="clear()"
-                                    class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition"
-                                    title="Clear selection"
-                                >
-                                    <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                    </svg>
-                                </button>
-
-                                <button
-                                    type="button"
-                                    @click.stop="toggle()"
-                                    class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition"
-                                >
-                                    <svg
-                                        class="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform"
-                                        :class="{ 'rotate-180': open }"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div
-                            x-show="open"
-                            x-transition
-                            class="absolute z-50 mt-1 w-full bg-white dark:bg-gray-700 border dark:border-gray-600 rounded-lg shadow-lg max-h-60 sm:max-h-64 overflow-auto"
-                            :id="$id('category-dropdown')"
-                            role="listbox"
-                            style="display: none;"
-                        >
-                            <template x-for="parent in filteredCategories()" :key="parent.id">
-                                <div>
-                                    <div class="px-3 sm:px-4 py-2 font-semibold text-xs sm:text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 sticky top-0">
-                                        <span x-show="parent.icon" x-text="parent.icon" class="mr-1"></span>
-                                        <span x-text="parent.name"></span>
-                                    </div>
-
-                                    <template x-for="child in parent.children" :key="child.id">
-                                        <div
-                                            @click="select(child)"
-                                            class="px-4 sm:px-6 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer text-sm sm:text-base text-gray-700 dark:text-gray-200 transition"
-                                            :class="{ 'bg-indigo-100 dark:bg-indigo-900/50': selectedId === child.id }"
-                                            role="option"
-                                            :aria-selected="selectedId === child.id"
-                                        >
-                                            <span x-show="child.icon" x-text="child.icon" class="mr-2"></span>
-                                            <span x-text="child.name"></span>
-                                        </div>
-                                    </template>
-
-                                    <template x-if="parent.children.length === 0">
-                                        <div
-                                            @click="select(parent)"
-                                            class="px-4 sm:px-6 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer text-sm sm:text-base text-gray-700 dark:text-gray-200 transition"
-                                            :class="{ 'bg-indigo-100 dark:bg-indigo-900/50': selectedId === parent.id }"
-                                            role="option"
-                                            :aria-selected="selectedId === parent.id"
-                                        >
-                                            <span x-show="parent.icon" x-text="parent.icon" class="mr-2"></span>
-                                            <span x-text="parent.name"></span>
-                                        </div>
-                                    </template>
-                                </div>
-                            </template>
-
-                            <div x-show="filteredCategories().length === 0" class="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs sm:text-sm">
-                                No categories found
-                            </div>
-                        </div>
-
-                        <input type="hidden" name="category_id" :value="selectedId" required>
-                    </div>
                 </div>
 
                 <!-- Submit -->
@@ -262,23 +225,15 @@
             </div>
         </form>
     </div>
+
     <script>
         function transactionForm() {
             return {
                 amount: {{ old('amount', $transaction->amount) }},
                 accountId: '{{ old('account_id', $transaction->account_id) }}',
                 accountType: '',
-                accountTypeName: '',
-                mobileMoneyType: '{{ old('mobile_money_type', 'send_money') }}',
-                transactionCost: 0,
-                showTransactionCost: false,
+                mobileMoneyType: '{{ old('mobile_money_type', $transaction->mobile_money_type ?? 'send_money') }}',
                 showTransactionTypeSelector: false,
-                mpesaCosts: @json($mpesaCosts),
-                airtelCosts: @json($airtelCosts),
-
-                get totalAmount() {
-                    return parseFloat(this.amount || 0) + parseFloat(this.transactionCost || 0);
-                },
 
                 init() {
                     this.$nextTick(() => {
@@ -288,98 +243,41 @@
 
                 onAccountChange() {
                     const select = document.querySelector('select[name="account_id"]');
-                    if (!select) return;
+
+                    if (!select || !select.value) {
+                        this.accountType = '';
+                        this.showTransactionTypeSelector = false;
+                        return;
+                    }
 
                     const selectedOption = select.options[select.selectedIndex];
+                    this.accountType = selectedOption.getAttribute('data-type');
 
-                    if (selectedOption && selectedOption.value) {
-                        this.accountType = selectedOption.getAttribute('data-type');
+                    // Show transaction type selector only for mobile money accounts
+                    if (this.accountType === 'mpesa' || this.accountType === 'airtel_money') {
+                        this.showTransactionTypeSelector = true;
 
-                        if (this.accountType === 'mpesa' || this.accountType === 'airtel_money') {
-                            this.showTransactionTypeSelector = true;
-
-                            if (this.accountType === 'airtel_money' && this.mobileMoneyType === 'pochi_la_biashara') {
-                                this.mobileMoneyType = 'send_money';
-                            }
-                        } else {
-                            this.showTransactionTypeSelector = false;
+                        // Airtel Money does not support Pochi
+                        if (this.accountType === 'airtel_money' && this.mobileMoneyType === 'pochi_la_biashara') {
                             this.mobileMoneyType = 'send_money';
                         }
-
-                        this.calculateTransactionCost();
                     } else {
-                        this.accountType = '';
-                        this.showTransactionCost = false;
                         this.showTransactionTypeSelector = false;
-                        this.transactionCost = 0;
-                    }
-                },
-
-                getTransactionTypeLabel() {
-                    const labels = {
-                        'send_money': 'Send Money',
-                        'paybill': 'PayBill',
-                        'buy_goods': 'Buy Goods/Till',
-                        'pochi_la_biashara': 'Pochi La Biashara'
-                    };
-                    return labels[this.mobileMoneyType] || 'Transaction';
-                },
-
-                calculateTransactionCost() {
-                    const amount = parseFloat(this.amount || 0);
-
-                    if (!this.accountType || amount <= 0) {
-                        this.showTransactionCost = false;
-                        this.transactionCost = 0;
-                        return;
-                    }
-
-                    let cost = 0;
-                    let costs = [];
-
-                    if (this.accountType === 'mpesa') {
-                        costs = this.mpesaCosts[this.mobileMoneyType] || this.mpesaCosts['send_money'];
-                        this.accountTypeName = 'M-Pesa';
-                        this.showTransactionCost = true;
-                    } else if (this.accountType === 'airtel_money') {
-                        costs = this.airtelCosts[this.mobileMoneyType] || this.airtelCosts['send_money'];
-                        this.accountTypeName = 'Airtel Money';
-                        this.showTransactionCost = true;
-                    } else {
-                        this.showTransactionCost = false;
-                        this.transactionCost = 0;
-                        return;
-                    }
-
-                    if (Array.isArray(costs)) {
-                        for (let tier of costs) {
-                            if (amount >= tier.min && amount <= tier.max) {
-                                cost = tier.cost;
-                                break;
-                            }
-                        }
-                    }
-
-                    this.transactionCost = cost;
-
-                    if (cost === 0 && this.mobileMoneyType === 'buy_goods') {
-                        this.showTransactionCost = false;
+                        this.mobileMoneyType = 'send_money';
                     }
                 }
             }
         }
 
-        function categoryDropdown(categories, oldId = null) {
+        function categoryDropdown(categoryGroups, allCategoriesArray, oldId = null) {
             return {
                 open: false,
                 search: '',
                 selectedId: oldId,
                 selectedName: '',
                 isSearching: false,
-                categories: categories.map(parent => ({
-                    ...parent,
-                    children: parent.children || []
-                })),
+                categories: categoryGroups,
+                allCategoriesSorted: allCategoriesArray, // Pre-sorted flat list from backend
 
                 toggle() {
                     this.open = !this.open;
@@ -407,6 +305,14 @@
                     this.search = category.name;
                     this.isSearching = false;
                     this.open = false;
+
+                    // Dispatch event for transaction form
+                    window.dispatchEvent(new CustomEvent('category-selected', {
+                        detail: {
+                            categoryId: category.id,
+                            categoryName: category.name
+                        }
+                    }));
                 },
 
                 clear() {
@@ -415,53 +321,54 @@
                     this.search = '';
                     this.isSearching = false;
                     this.open = true;
+
+                    // Dispatch event
+                    window.dispatchEvent(new CustomEvent('category-selected', {
+                        detail: {
+                            categoryId: null,
+                            categoryName: ''
+                        }
+                    }));
                 },
 
                 selectFirst() {
-                    const filtered = this.filteredCategories();
+                    const filtered = this.filteredChildren();
                     if (filtered.length > 0) {
-                        const firstCategory = filtered[0].children.length > 0
-                            ? filtered[0].children[0]
-                            : filtered[0];
-                        this.select(firstCategory);
+                        this.select(filtered[0]);
                     }
                 },
 
-                filteredCategories() {
+                filteredChildren() {
+                    // Use the pre-sorted flat list from backend
+                    const allChildren = this.allCategoriesSorted;
+
+                    // If not searching, return all children (already sorted by usage_count DESC)
                     if (!this.search || !this.isSearching) {
-                        return this.categories;
+                        return allChildren;
                     }
 
+                    // Filter by search term (maintains usage_count order)
                     const searchLower = this.search.toLowerCase();
-
-                    return this.categories.filter(parent => {
-                        const parentMatches = parent.name.toLowerCase().includes(searchLower);
-                        const matchingChildren = parent.children.filter(child =>
-                            child.name.toLowerCase().includes(searchLower)
-                        );
-                        return parentMatches || matchingChildren.length > 0;
-                    }).map(parent => ({
-                        ...parent,
-                        children: parent.children.filter(child =>
-                            child.name.toLowerCase().includes(searchLower)
-                        )
-                    }));
+                    return allChildren.filter(child =>
+                        child.name.toLowerCase().includes(searchLower)
+                    );
                 },
 
                 init() {
                     if (this.selectedId) {
-                        for (const parent of this.categories) {
-                            const child = parent.children.find(c => c.id === this.selectedId);
-                            if (child) {
-                                this.selectedName = child.name;
-                                this.search = child.name;
-                                return;
-                            }
-                            if (parent.id === this.selectedId) {
-                                this.selectedName = parent.name;
-                                this.search = parent.name;
-                                return;
-                            }
+                        // Find in the sorted list
+                        const found = this.allCategoriesSorted.find(c => c.id === this.selectedId);
+                        if (found) {
+                            this.selectedName = found.name;
+                            this.search = found.name;
+
+                            // Notify transaction form
+                            window.dispatchEvent(new CustomEvent('category-selected', {
+                                detail: {
+                                    categoryId: found.id,
+                                    categoryName: found.name
+                                }
+                            }));
                         }
                     }
                 }

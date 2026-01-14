@@ -4,19 +4,10 @@
             <h2 class="font-semibold text-lg sm:text-xl text-gray-800 dark:text-gray-200 leading-tight">
                 {{ __('Transaction Details') }}
             </h2>
-            <div class="flex items-center gap-2 sm:gap-3">
-                @if(!$transaction->is_transaction_fee)
-                    <a href="{{ route('transactions.edit', $transaction) }}"
-                       class="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 bg-indigo-600 text-white text-xs sm:text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
-                        <svg class="w-3 h-3 sm:w-4 sm:h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                        </svg>
-                        Edit
-                    </a>
-                @endif
+            <div class="flex items-center gap-2">
                 <a href="{{ route('transactions.index') }}"
-                   class="inline-flex items-center text-xs sm:text-sm text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors">
-                    <svg class="w-3 h-3 sm:w-4 sm:h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   class="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-xs sm:text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                    <svg class="w-3 h-3 sm:w-4 sm:h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
                     </svg>
                     {{ __('Back') }}
@@ -155,9 +146,42 @@
                     </div>
                 </dl>
             </div>
+
+            <!-- Action Buttons Section (Bottom of Card) -->
+            @if(!$transaction->is_transaction_fee)
+                <div class="px-4 sm:px-6 py-4 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-700">
+                    <div class="flex flex-col sm:flex-row gap-3 justify-end">
+                        <a href="{{ route('transactions.edit', $transaction) }}"
+                           class="inline-flex items-center justify-center px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                            </svg>
+                            {{ __('Edit Transaction') }}
+                        </a>
+
+                        <button type="button"
+                                onclick="confirmDelete()"
+                                class="inline-flex items-center justify-center px-4 py-2.5 bg-white dark:bg-gray-800 text-red-600 dark:text-red-400 border-2 border-red-600 dark:border-red-400 text-sm font-medium rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                            {{ __('Delete Transaction') }}
+                        </button>
+
+                        <!-- Hidden delete form -->
+                        <form id="delete-form"
+                              action="{{ route('transactions.destroy', $transaction) }}"
+                              method="POST"
+                              class="hidden">
+                            @csrf
+                            @method('DELETE')
+                        </form>
+                    </div>
+                </div>
+            @endif
         </div>
 
-        <!-- Info Note -->
+        <!-- Info Notes -->
         @if($transaction->is_transaction_fee)
             <div class="mt-4 sm:mt-6 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-500 dark:border-yellow-400 p-3 sm:p-4 rounded-lg">
                 <div class="flex items-start">
@@ -182,32 +206,23 @@
                     </svg>
                     <div>
                         <p class="text-xs sm:text-sm font-medium text-blue-900 dark:text-blue-200 mb-1">
-                            {{ __('Edit Transaction') }}
+                            {{ __('Need to Make Changes?') }}
                         </p>
                         <p class="text-xs sm:text-sm text-blue-800 dark:text-blue-300">
-                            {{ __('You can edit this transaction if you made a mistake. Account balances will be automatically recalculated.') }}
+                            {{ __('You can edit or delete this transaction. Account balances will be automatically recalculated.') }}
                         </p>
                     </div>
                 </div>
             </div>
         @endif
-        <!-- Add this to transactions/show.blade.php after the Edit button -->
-
-        @if(!$transaction->is_transaction_fee)
-            <form action="{{ route('transactions.destroy', $transaction) }}"
-                  method="POST"
-                  class="inline-block"
-                  onsubmit="return confirm('Are you sure you want to delete this transaction? This will update your account balance.');">
-                @csrf
-                @method('DELETE')
-                <button type="submit"
-                        class="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 bg-red-600 text-white text-xs sm:text-sm font-medium rounded-lg hover:bg-red-700 transition-colors">
-                    <svg class="w-3 h-3 sm:w-4 sm:h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                    </svg>
-                    Delete
-                </button>
-            </form>
-        @endif
     </div>
+
+    <!-- Delete Confirmation Modal -->
+    <script>
+        function confirmDelete() {
+            if (confirm('Are you sure you want to delete this transaction?\n\nThis action cannot be undone and will update your account balance.')) {
+                document.getElementById('delete-form').submit();
+            }
+        }
+    </script>
 </x-app-layout>
