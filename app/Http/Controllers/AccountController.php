@@ -55,7 +55,7 @@ class AccountController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'type' => 'required|string',
-            'initial_balance' => 'required|numeric',
+            'initial_balance' => 'required|numeric|min:0',
             'notes' => 'nullable|string',
         ]);
 
@@ -165,62 +165,62 @@ class AccountController extends Controller
         return redirect()->route('accounts.index')->with('success', 'Account deleted successfully!');
     }
 
-    public function adjustBalance(Request $request, Account $account)
-    {
-        // Verify ownership
-        if ($account->user_id !== Auth::id()) {
-            abort(403, 'Unauthorized access to this account.');
-        }
-
-        $request->validate([
-            'initial_balance' => 'required|numeric',
-        ]);
-
-        $currentBalance = $account->current_balance;
-        $targetBalance = $request->initial_balance;
-        $difference = $targetBalance - $currentBalance;
-
-        if ($difference == 0) {
-            return back()->with('success', 'Balance already matches the entered value.');
-        }
-
-        $category = Category::firstOrCreate(
-            [
-                'name' => 'Balance Adjustment',
-                'user_id' => Auth::id()
-            ],
-            [
-                'type' => $difference > 0 ? 'income' : 'expense'
-            ]
-        );
-
-        Transaction::create([
-            'user_id' => Auth::id(),
-            'date' => now()->toDateString(),
-            'period_date' => now()->toDateString(),
-            'description' => "Balance adjustment for {$account->name}",
-            'amount' => abs($difference),
-            'category_id' => $category->id,
-            'account_id' => $account->id,
-            'payment_method' => match ($account->type) {
-                'cash' => 'Cash',
-                'mpesa' => 'Mpesa',
-                'airtel_money' => 'Airtel Money',
-                'bank' => 'Bank Transfer',
-                'savings' => 'Savings',
-                default => 'Cash'
-            }
-        ]);
-
-        $account->updateBalance();
-
-// Clear cache after balance adjustment
-        $this->clearAccountCache($account->id);
-
-        return redirect()
-            ->route('accounts.edit', $account)
-            ->with('success', 'Balance adjusted successfully.');
-    }
+//    public function adjustBalance(Request $request, Account $account)
+//    {
+//        // Verify ownership
+//        if ($account->user_id !== Auth::id()) {
+//            abort(403, 'Unauthorized access to this account.');
+//        }
+//
+//        $request->validate([
+//            'initial_balance' => 'required|numeric',
+//        ]);
+//
+//        $currentBalance = $account->current_balance;
+//        $targetBalance = $request->initial_balance;
+//        $difference = $targetBalance - $currentBalance;
+//
+//        if ($difference == 0) {
+//            return back()->with('success', 'Balance already matches the entered value.');
+//        }
+//
+//        $category = Category::firstOrCreate(
+//            [
+//                'name' => 'Balance Adjustment',
+//                'user_id' => Auth::id()
+//            ],
+//            [
+//                'type' => $difference > 0 ? 'income' : 'expense'
+//            ]
+//        );
+//
+//        Transaction::create([
+//            'user_id' => Auth::id(),
+//            'date' => now()->toDateString(),
+//            'period_date' => now()->toDateString(),
+//            'description' => "Balance adjustment for {$account->name}",
+//            'amount' => abs($difference),
+//            'category_id' => $category->id,
+//            'account_id' => $account->id,
+//            'payment_method' => match ($account->type) {
+//                'cash' => 'Cash',
+//                'mpesa' => 'Mpesa',
+//                'airtel_money' => 'Airtel Money',
+//                'bank' => 'Bank Transfer',
+//                'savings' => 'Savings',
+//                default => 'Cash'
+//            }
+//        ]);
+//
+//        $account->updateBalance();
+//
+//        // Clear cache after balance adjustment
+//        $this->clearAccountCache($account->id);
+//
+//        return redirect()
+//            ->route('accounts.edit', $account)
+//            ->with('success', 'Balance adjusted successfully.');
+//    }
 
     /**
      * Clear account statistics cache
@@ -373,9 +373,10 @@ class AccountController extends Controller
             ]);
         }
 
-        // Update balances
+        // Update balances AFTER all transactions are created
         $fromAccount->updateBalance();
         $toAccount->updateBalance();
+
         // Clear cache for both accounts
         $this->clearAccountCache($fromAccount->id);
         $this->clearAccountCache($toAccount->id);
@@ -650,7 +651,9 @@ class AccountController extends Controller
             return redirect()->back()->with('error', 'Failed to create transaction.');
         }
 
+        // Update balance AFTER transaction is created
         $account->updateBalance();
+
         // Clear cache after top-up
         $this->clearAccountCache($account->id);
 

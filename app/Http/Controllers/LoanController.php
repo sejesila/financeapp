@@ -80,6 +80,7 @@ class LoanController extends Controller implements HasMiddleware
         ));
     }
 
+
     public function store(Request $request)
     {
         $this->authorize('create', Loan::class);
@@ -179,7 +180,10 @@ class LoanController extends Controller implements HasMiddleware
                 ['name' => 'Loan Receipt', 'type' => 'liability']
             );
 
+            // ✅ FIX: Only KCB and Custom loans go directly as Loan Receipt
+            // M-Shwari loan needs to be split: principal + excise duty
             if ($loanType === 'kcb_mpesa' || $loanType === 'other') {
+                // These don't have excise duty, so single transaction for the full principal
                 Transaction::create([
                     'user_id' => Auth::id(),
                     'account_id' => $validated['account_id'],
@@ -191,22 +195,22 @@ class LoanController extends Controller implements HasMiddleware
                     'loan_id' => $loan->id,
                 ]);
 
-                $account->current_balance += $principalAmount;
-
             } else {
-                $depositAfterExcise = $breakdown['deposit_amount'];
+                // ✅ M-SHWARI ONLY: Two separate transactions
 
+                // Transaction 1: Loan Receipt for FULL PRINCIPAL (what you owe)
                 Transaction::create([
                     'user_id' => Auth::id(),
                     'account_id' => $validated['account_id'],
                     'category_id' => $loanCategory->id,
                     'description' => "Loan disbursement from {$validated['source']}",
-                    'amount' => $depositAfterExcise,
+                    'amount' => $principalAmount,  // FULL 1,000 - this is what you owe back
                     'date' => $validated['disbursed_date'],
                     'type' => 'loan_disbursement',
                     'loan_id' => $loan->id,
                 ]);
 
+                // Transaction 2: Excise Duty expense (deducted upfront)
                 $exciseCategory = Category::firstOrCreate(
                     ['name' => 'Excise Duty', 'type' => 'expense', 'user_id' => Auth::id()],
                     ['name' => 'Excise Duty', 'type' => 'expense']
@@ -217,18 +221,17 @@ class LoanController extends Controller implements HasMiddleware
                     'account_id' => $validated['account_id'],
                     'category_id' => $exciseCategory->id,
                     'description' => "Excise duty (1.5%) on loan from {$validated['source']}",
-                    'amount' => $breakdown['excise_duty'],
+                    'amount' => $breakdown['excise_duty'],  // 15
                     'date' => $validated['disbursed_date'],
                     'type' => 'loan_charge',
                     'loan_id' => $loan->id,
                 ]);
-
-                $account->current_balance += $depositAfterExcise;
             }
 
-            $account->save();
-
             DB::commit();
+
+            // Update account balance AFTER transaction is committed
+            $account->updateBalance();
 
             $depositAmount = $breakdown['deposit_amount'];
             $totalRepayment = $breakdown['total_repayment'] ?? $breakdown['standard_repayment'];
@@ -468,189 +471,7 @@ class LoanController extends Controller implements HasMiddleware
      * Record loan payment with early repayment credit (within 10 days)
      * Updated to support payment from any account
      */
-    public function recordPayment(Request $request, Loan $loan)
-    {
-        $this->authorize('makePayment', $loan);
 
-        if ($loan->status !== 'active') {
-            return back()->with('error', 'Only active loans can be repaid');
-        }
-
-        $validated = $request->validate([
-            'payment_account_id' => 'required|exists:accounts,id', // NEW: Account to pay from
-            'payment_amount' => 'required|numeric|min:0.01',
-            'payment_date' => 'required|date|before_or_equal:today',
-            'principal_portion' => 'nullable|numeric|min:0',
-            'interest_portion' => 'nullable|numeric|min:0',
-            'notes' => 'nullable|string',
-        ]);
-
-        DB::beginTransaction();
-
-        try {
-            $paymentAmount = (float)$validated['payment_amount'];
-            $paymentDate = $validated['payment_date'];
-
-            // Get the account to pay from (can be different from loan disbursement account)
-            $paymentAccount = Account::findOrFail($validated['payment_account_id']);
-
-            // Verify account ownership
-            if ($paymentAccount->user_id !== Auth::id()) {
-                throw new Exception("Unauthorized access to this account.");
-            }
-
-            // Check if payment account has sufficient balance
-            if ($paymentAccount->current_balance < $paymentAmount) {
-                throw new Exception("Insufficient balance in {$paymentAccount->name}. Required: KES " . number_format($paymentAmount, 0) . ", Available: KES " . number_format($paymentAccount->current_balance, 0));
-            }
-
-            $repayment = $this->calculateTotalRepayment(
-                $loan->principal_amount,
-                $loan->interest_rate,
-                $loan->interest_amount
-            );
-
-            $principalPortion = $validated['principal_portion'] ? (float)$validated['principal_portion'] : 0;
-            $interestPortion = $validated['interest_portion'] ? (float)$validated['interest_portion'] : 0;
-
-            if ($principalPortion == 0 && $interestPortion == 0) {
-                $remainingInterest = $repayment['interest'] - (LoanPayment::where('loan_id', $loan->id)->sum('interest_portion') ?? 0);
-                $interestPortion = min($paymentAmount, $remainingInterest);
-                $principalPortion = $paymentAmount - $interestPortion;
-            }
-
-            $repaymentCategory = Category::firstOrCreate(
-                ['name' => 'Loan Repayment', 'type' => 'expense', 'user_id' => Auth::id()],
-                ['name' => 'Loan Repayment', 'type' => 'expense']
-            );
-
-            // Create transaction - use the payment account, not the loan's original account
-            $transaction = Transaction::create([
-                'user_id' => Auth::id(),
-                'account_id' => $paymentAccount->id, // CHANGED: Use payment account
-                'category_id' => $repaymentCategory->id,
-                'description' => "Loan repayment to {$loan->source}",
-                'amount' => $paymentAmount,
-                'date' => $paymentDate,
-                'type' => 'loan_payment',
-                'loan_id' => $loan->id,
-            ]);
-
-            // Record loan payment with the payment account
-            LoanPayment::create([
-                'user_id' => Auth::id(),
-                'loan_id' => $loan->id,
-                'account_id' => $paymentAccount->id, // CHANGED: Use payment account
-                'amount' => $paymentAmount,
-                'principal_portion' => $principalPortion,
-                'interest_portion' => $interestPortion,
-                'payment_date' => $paymentDate,
-                'transaction_id' => $transaction->id,
-                'notes' => $validated['notes'],
-            ]);
-
-            $loan->amount_paid += $paymentAmount;
-            $loan->balance = $loan->total_amount - $loan->amount_paid;
-
-            if ($loan->balance <= 0) {
-                $loan->status = 'paid';
-                $loan->repaid_date = $paymentDate;
-            }
-
-            $loan->save();
-
-            // Deduct from payment account
-            $paymentAccount->current_balance -= $paymentAmount;
-
-            $earlyRepaymentCredit = 0;
-            $loanType = $loan->loan_type ?? $this->detectLoanType($loan->source);
-
-            // Check for early repayment credit (within 10 days from disbursement)
-            // NOTE: Early repayment credits go to the LOAN's original account, not payment account
-            if ($loan->balance <= 0) {
-                $daysElapsed = Carbon::parse($loan->disbursed_date)->diffInDays(Carbon::parse($paymentDate));
-
-                if ($loanType === 'mshwari' && $daysElapsed <= 10) {
-                    // M-Shwari: 20% of total loan fees
-                    $breakdown = $this->calculateMshwariBreakdown($loan->principal_amount);
-                    $earlyRepaymentCredit = $breakdown['early_repayment_discount'];
-
-                    $loanFeesCategory = Category::firstOrCreate(
-                        ['name' => 'Loan Fees Refund', 'type' => 'income', 'user_id' => Auth::id()],
-                        ['name' => 'Loan Fees Refund', 'type' => 'income']
-                    );
-
-                    // Credit goes to the loan's original account
-                    $loanOriginalAccount = Account::find($loan->account_id);
-
-                    Transaction::create([
-                        'user_id' => Auth::id(),
-                        'account_id' => $loan->account_id, // Original loan account
-                        'category_id' => $loanFeesCategory->id,
-                        'description' => "Early repayment credit - 20% of loan fees refunded (Repaid in {$daysElapsed} days from {$loan->source})",
-                        'amount' => $earlyRepaymentCredit,
-                        'date' => $paymentDate,
-                        'type' => 'loan_credit',
-                        'loan_id' => $loan->id,
-                    ]);
-
-                    $loanOriginalAccount->current_balance += $earlyRepaymentCredit;
-                    $loanOriginalAccount->save();
-
-                } elseif ($loanType === 'kcb_mpesa' && $daysElapsed <= 10) {
-                    // KCB M-Pesa: Full facility fee refund (1.76%)
-                    $earlyRepaymentCredit = $loan->facility_fee ?? (($loan->principal_amount * 0.0176));
-
-                    $facilityFeeCategory = Category::firstOrCreate(
-                        ['name' => 'Facility Fee Refund', 'type' => 'income', 'user_id' => Auth::id()],
-                        ['name' => 'Facility Fee Refund', 'type' => 'income']
-                    );
-
-                    // Credit goes to the loan's original account
-                    $loanOriginalAccount = Account::find($loan->account_id);
-
-                    Transaction::create([
-                        'user_id' => Auth::id(),
-                        'account_id' => $loan->account_id, // Original loan account
-                        'category_id' => $facilityFeeCategory->id,
-                        'description' => "Early repayment cashback - Facility fee refunded (Repaid in {$daysElapsed} days from {$loan->source})",
-                        'amount' => $earlyRepaymentCredit,
-                        'date' => $paymentDate,
-                        'type' => 'loan_credit',
-                        'loan_id' => $loan->id,
-                    ]);
-
-                    $loanOriginalAccount->current_balance += $earlyRepaymentCredit;
-                    $loanOriginalAccount->save();
-                }
-            }
-
-            // Save payment account
-            $paymentAccount->save();
-
-            DB::commit();
-
-            $successMessage = "Payment of KES " . number_format($paymentAmount, 0) . " recorded successfully from {$paymentAccount->name}!";
-
-            if ($earlyRepaymentCredit > 0) {
-                $daysElapsed = Carbon::parse($loan->disbursed_date)->diffInDays(Carbon::parse($paymentDate));
-                $creditAccountName = Account::find($loan->account_id)->name;
-
-                if ($loanType === 'kcb_mpesa') {
-                    $successMessage .= " 🎉 You received an early repayment cashback of KES " . number_format($earlyRepaymentCredit, 0) . " (facility fee refunded) to {$creditAccountName} for repaying within {$daysElapsed} days!";
-                } else {
-                    $successMessage .= " 🎉 You received an early repayment credit of KES " . number_format($earlyRepaymentCredit, 0) . " (20% of loan fees refunded) to {$creditAccountName} for repaying within {$daysElapsed} days!";
-                }
-            }
-
-            return redirect()->route('loans.show', $loan->id)
-                ->with('success', $successMessage);
-
-        } catch (Exception $e) {
-            DB::rollBack();
-            return back()->with('error', 'Payment failed: ' . $e->getMessage())->withInput();
-        }
-    }
 
     /**
      * Show loan edit form
@@ -697,6 +518,179 @@ class LoanController extends Controller implements HasMiddleware
     /**
      * Delete loan (only active loans with no payments)
      */
+    /**
+     * Record loan payment with early repayment credit (within 10 days)
+     * Updated to support payment from any account
+     */
+    public function recordPayment(Request $request, Loan $loan)
+    {
+        $this->authorize('makePayment', $loan);
+
+        if ($loan->status !== 'active') {
+            return back()->with('error', 'Only active loans can be repaid');
+        }
+
+        $validated = $request->validate([
+            'payment_account_id' => 'required|exists:accounts,id',
+            'payment_amount' => 'required|numeric|min:0.01',
+            'payment_date' => 'required|date|before_or_equal:today',
+            'principal_portion' => 'nullable|numeric|min:0',
+            'interest_portion' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string',
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            $paymentAmount = (float)$validated['payment_amount'];
+            $paymentDate = $validated['payment_date'];
+
+            // Get the account to pay from
+            $paymentAccount = Account::findOrFail($validated['payment_account_id']);
+
+            if ($paymentAccount->user_id !== Auth::id()) {
+                throw new Exception("Unauthorized access to this account.");
+            }
+
+            if ($paymentAccount->current_balance < $paymentAmount) {
+                throw new Exception("Insufficient balance in {$paymentAccount->name}. Required: KES " . number_format($paymentAmount, 0) . ", Available: KES " . number_format($paymentAccount->current_balance, 0));
+            }
+
+            $repayment = $this->calculateTotalRepayment(
+                $loan->principal_amount,
+                $loan->interest_rate,
+                $loan->interest_amount
+            );
+
+            $principalPortion = $validated['principal_portion'] ? (float)$validated['principal_portion'] : 0;
+            $interestPortion = $validated['interest_portion'] ? (float)$validated['interest_portion'] : 0;
+
+            if ($principalPortion == 0 && $interestPortion == 0) {
+                $remainingInterest = $repayment['interest'] - (LoanPayment::where('loan_id', $loan->id)->sum('interest_portion') ?? 0);
+                $interestPortion = min($paymentAmount, $remainingInterest);
+                $principalPortion = $paymentAmount - $interestPortion;
+            }
+
+            $repaymentCategory = Category::firstOrCreate(
+                ['name' => 'Loan Repayment', 'type' => 'expense', 'user_id' => Auth::id()],
+                ['name' => 'Loan Repayment', 'type' => 'expense']
+            );
+
+            // Create transaction from payment account
+            $transaction = Transaction::create([
+                'user_id' => Auth::id(),
+                'account_id' => $paymentAccount->id,
+                'category_id' => $repaymentCategory->id,
+                'description' => "Loan repayment to {$loan->source}",
+                'amount' => $paymentAmount,
+                'date' => $paymentDate,
+                'type' => 'loan_payment',
+                'loan_id' => $loan->id,
+            ]);
+
+            // Record loan payment
+            LoanPayment::create([
+                'user_id' => Auth::id(),
+                'loan_id' => $loan->id,
+                'account_id' => $paymentAccount->id,
+                'amount' => $paymentAmount,
+                'principal_portion' => $principalPortion,
+                'interest_portion' => $interestPortion,
+                'payment_date' => $paymentDate,
+                'transaction_id' => $transaction->id,
+                'notes' => $validated['notes'],
+            ]);
+
+            $loan->amount_paid += $paymentAmount;
+            $loan->balance = $loan->total_amount - $loan->amount_paid;
+
+            if ($loan->balance <= 0) {
+                $loan->status = 'paid';
+                $loan->repaid_date = $paymentDate;
+            }
+
+            $loan->save();
+
+            $earlyRepaymentCredit = 0;
+            $loanType = $loan->loan_type ?? $this->detectLoanType($loan->source);
+
+            // Handle early repayment credit (goes to loan's original account)
+            if ($loan->balance <= 0) {
+                $daysElapsed = Carbon::parse($loan->disbursed_date)->diffInDays(Carbon::parse($paymentDate));
+
+                if ($loanType === 'mshwari' && $daysElapsed <= 10) {
+                    $breakdown = $this->calculateMshwariBreakdown($loan->principal_amount);
+                    $earlyRepaymentCredit = $breakdown['early_repayment_discount'];
+
+                    $loanFeesCategory = Category::firstOrCreate(
+                        ['name' => 'Loan Fees Refund', 'type' => 'income', 'user_id' => Auth::id()],
+                        ['name' => 'Loan Fees Refund', 'type' => 'income']
+                    );
+
+                    Transaction::create([
+                        'user_id' => Auth::id(),
+                        'account_id' => $loan->account_id,
+                        'category_id' => $loanFeesCategory->id,
+                        'description' => "Early repayment credit - 20% of loan fees refunded (Repaid in {$daysElapsed} days from {$loan->source})",
+                        'amount' => $earlyRepaymentCredit,
+                        'date' => $paymentDate,
+                        'type' => 'loan_credit',
+                        'loan_id' => $loan->id,
+                    ]);
+
+                } elseif ($loanType === 'kcb_mpesa' && $daysElapsed <= 10) {
+                    $earlyRepaymentCredit = $loan->facility_fee ?? (($loan->principal_amount * 0.0176));
+
+                    $facilityFeeCategory = Category::firstOrCreate(
+                        ['name' => 'Facility Fee Refund', 'type' => 'income', 'user_id' => Auth::id()],
+                        ['name' => 'Facility Fee Refund', 'type' => 'income']
+                    );
+
+                    Transaction::create([
+                        'user_id' => Auth::id(),
+                        'account_id' => $loan->account_id,
+                        'category_id' => $facilityFeeCategory->id,
+                        'description' => "Early repayment cashback - Facility fee refunded (Repaid in {$daysElapsed} days from {$loan->source})",
+                        'amount' => $earlyRepaymentCredit,
+                        'date' => $paymentDate,
+                        'type' => 'loan_credit',
+                        'loan_id' => $loan->id,
+                    ]);
+                }
+            }
+
+            DB::commit();
+
+            // Update both accounts AFTER commit
+            $paymentAccount->updateBalance();
+            $loanAccount = Account::find($loan->account_id);
+            $loanAccount->updateBalance();
+
+            $successMessage = "Payment of KES " . number_format($paymentAmount, 0) . " recorded successfully from {$paymentAccount->name}!";
+
+            if ($earlyRepaymentCredit > 0) {
+                $daysElapsed = Carbon::parse($loan->disbursed_date)->diffInDays(Carbon::parse($paymentDate));
+                $creditAccountName = Account::find($loan->account_id)->name;
+
+                if ($loanType === 'kcb_mpesa') {
+                    $successMessage .= " 🎉 You received an early repayment cashback of KES " . number_format($earlyRepaymentCredit, 0) . " (facility fee refunded) to {$creditAccountName} for repaying within {$daysElapsed} days!";
+                } else {
+                    $successMessage .= " 🎉 You received an early repayment credit of KES " . number_format($earlyRepaymentCredit, 0) . " (20% of loan fees refunded) to {$creditAccountName} for repaying within {$daysElapsed} days!";
+                }
+            }
+
+            return redirect()->route('loans.show', $loan->id)
+                ->with('success', $successMessage);
+
+        } catch (Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Payment failed: ' . $e->getMessage())->withInput();
+        }
+    }
+
+    /**
+     * Delete loan (only active loans with no payments)
+     */
     public function destroy(Loan $loan)
     {
         $this->authorize('delete', $loan);
@@ -712,25 +706,17 @@ class LoanController extends Controller implements HasMiddleware
         DB::beginTransaction();
 
         try {
+            // Delete all transactions associated with this loan
             Transaction::where('loan_id', $loan->id)->delete();
 
-            $account = Account::find($loan->account_id);
-            $loanType = $loan->loan_type ?? $this->detectLoanType($loan->source);
-
-            if ($loanType === 'kcb_mpesa' || $loanType === 'other') {
-                // For KCB M-Pesa and Other loans, reverse the full principal amount
-                $account->current_balance -= $loan->principal_amount;
-            } else {
-                // For M-Shwari, reverse the deposit amount (principal minus excise duty)
-                $breakdown = $this->calculateMshwariBreakdown($loan->principal_amount);
-                $account->current_balance -= $breakdown['deposit_amount'];
-            }
-
-            $account->save();
-
+            // Delete the loan
             $loan->delete();
 
             DB::commit();
+
+            // Update the account balance AFTER commit
+            $account = Account::find($loan->account_id);
+            $account->updateBalance();
 
             return redirect()->route('loans.index')
                 ->with('success', 'Loan deleted successfully');

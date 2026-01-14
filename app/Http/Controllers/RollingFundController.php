@@ -108,7 +108,7 @@ class RollingFundController extends Controller
             'notes' => 'nullable|string|max:1000',
         ]);
 
-        $account = Account::lockForUpdate()->findOrFail($validated['account_id']);
+        $account = Account::findOrFail($validated['account_id']);
 
         // Check if account belongs to user
         if ($account->user_id !== auth()->id()) {
@@ -151,8 +151,9 @@ class RollingFundController extends Controller
                 'account_id' => $validated['account_id'],
                 'category_id' => $category->id,
                 'date' => $validated['date'],
+                'period_date' => $validated['date'],
                 'amount' => $validated['stake_amount'],
-                'description' => 'Rolling Funds Out ',
+                'description' => 'Rolling Funds Out',
                 'payment_method' => 'Rolling Funds',
                 'is_transaction_fee' => false,
             ]);
@@ -166,6 +167,7 @@ class RollingFundController extends Controller
                     'account_id' => $validated['account_id'],
                     'category_id' => $feeCategory->id,
                     'date' => $validated['date'],
+                    'period_date' => $validated['date'],
                     'amount' => $transactionFee,
                     'description' => 'M-Pesa PayBill Fee - Rolling Funds',
                     'payment_method' => 'Rolling Funds',
@@ -173,11 +175,10 @@ class RollingFundController extends Controller
                 ]);
             }
 
-            // Update account balance
-            $account->current_balance -= $totalDeduction;
-            $account->save();
-
             DB::commit();
+
+            // Update account balance AFTER commit
+            $account->updateBalance();
 
             return redirect()->route('rolling-funds.show', $rollingFund)
                 ->with('success', 'Investment recorded successfully! Update the outcome when ready.');
@@ -186,7 +187,7 @@ class RollingFundController extends Controller
             DB::rollBack();
             Log::error('Rolling Fund Store Error: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
-                'user_id' => auth()->id(), // Add user ID for context
+                'user_id' => auth()->id(),
             ]);
             return back()->withErrors(['error' => 'Failed to record investment: ' . $e->getMessage()])
                 ->withInput();
@@ -314,9 +315,7 @@ class RollingFundController extends Controller
             // Append outcome notes to existing notes
             if (!empty($validated['outcome_notes'])) {
                 $rollingFund->notes = $rollingFund->notes
-                    ? $rollingFund->notes . "
-
-Outcome: " . $validated['outcome_notes']
+                    ? $rollingFund->notes . "\n\nOutcome: " . $validated['outcome_notes']
                     : "Outcome: " . $validated['outcome_notes'];
             }
 
@@ -331,19 +330,19 @@ Outcome: " . $validated['outcome_notes']
                     'account_id' => $rollingFund->account_id,
                     'category_id' => $incomeCategory->id,
                     'date' => $validated['completed_date'],
+                    'period_date' => $validated['completed_date'],
                     'amount' => $validated['winnings'],
                     'description' => 'Rolling Funds Returns - ' . ($rollingFund->platform ?? 'Session'),
                     'payment_method' => 'Rolling Funds',
                     'is_transaction_fee' => false,
                 ]);
-
-                // Update account balance with winnings
-                $account = Account::findOrFail($rollingFund->account_id);
-                $account->current_balance += $validated['winnings'];
-                $account->save();
             }
 
             DB::commit();
+
+            // Update account balance AFTER commit
+            $account = Account::findOrFail($rollingFund->account_id);
+            $account->updateBalance();
 
             $netResult = $validated['winnings'] - $rollingFund->stake_amount;
             $message = $netResult > 0
@@ -359,7 +358,7 @@ Outcome: " . $validated['outcome_notes']
             DB::rollBack();
             Log::error('Rolling Fund Record Outcome Error: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
-                'rolling_fund_id' => $rollingFund->id, // Add rolling fund ID
+                'rolling_fund_id' => $rollingFund->id,
             ]);
             return back()->with('error', 'Failed to record outcome: ' . $e->getMessage());
         }
@@ -391,22 +390,15 @@ Outcome: " . $validated['outcome_notes']
                                 ->where('description', 'like', '%Rolling Funds%');
                         });
                 })
-                ->each(function ($transaction) {
-                    $account = Account::findOrFail($transaction->account_id);
-
-                    if ($transaction->category->type === 'expense' || $transaction->is_transaction_fee) {
-                        $account->current_balance += $transaction->amount;
-                    } else {
-                        $account->current_balance -= $transaction->amount;
-                    }
-
-                    $account->save();
-                    $transaction->delete();
-                });
+                ->delete();
 
             $rollingFund->delete();
 
             DB::commit();
+
+            // Update account balance AFTER commit
+            $account = Account::findOrFail($rollingFund->account_id);
+            $account->updateBalance();
 
             return redirect()->route('rolling-funds.index')
                 ->with('success', 'Session deleted successfully.');
@@ -415,7 +407,7 @@ Outcome: " . $validated['outcome_notes']
             DB::rollBack();
             Log::error('Rolling Fund Destroy Error: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
-                'rolling_fund_id' => $rollingFund->id, // Add rolling fund ID
+                'rolling_fund_id' => $rollingFund->id,
             ]);
             return back()->with('error', 'Failed to delete wager: ' . $e->getMessage());
         }

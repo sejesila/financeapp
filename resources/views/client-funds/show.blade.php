@@ -347,16 +347,7 @@
                             Available: KES {{ number_format($clientFund->balance, 0, '.', ',') }}
                         </p>
                     </div>
-
-                    <div class="mb-3 sm:mb-4">
-                        <label class="block text-xs sm:text-sm font-medium mb-1 sm:mb-2">Description (Optional)</label>
-                        <input
-                            type="text"
-                            name="description"
-                            placeholder="e.g., Commission for laptop purchase"
-                            class="w-full border rounded px-3 py-2 text-sm sm:text-base dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
-                        >
-                    </div>
+                    
 
                     <div class="mb-4 sm:mb-6">
                         <label class="block text-xs sm:text-sm font-medium mb-1 sm:mb-2">Date</label>
