@@ -21,7 +21,6 @@ class StoreTransactionRequest extends FormRequest
             'category_id' => 'required|exists:categories,id',
             'account_id' => 'required|exists:accounts,id',
             'mobile_money_type' => 'nullable|in:send_money,paybill,buy_goods,pochi_la_biashara',
-            'idempotency_key' => 'required|string|max:64',
         ];
     }
 

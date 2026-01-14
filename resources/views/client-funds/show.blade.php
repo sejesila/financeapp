@@ -347,7 +347,7 @@
                             Available: KES {{ number_format($clientFund->balance, 0, '.', ',') }}
                         </p>
                     </div>
-                    
+
 
                     <div class="mb-4 sm:mb-6">
                         <label class="block text-xs sm:text-sm font-medium mb-1 sm:mb-2">Date</label>

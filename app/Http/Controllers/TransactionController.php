@@ -403,35 +403,13 @@ class TransactionController extends Controller
         $validated = $request->validated();
 
         try {
-            // Check if transaction with this idempotency key already exists
-            $existingTransaction = Transaction::where('user_id', Auth::id())
-                ->where('idempotency_key', $validated['idempotency_key'])
-                ->first();
-
-            if ($existingTransaction) {
-                // Transaction already processed, return the existing one
-                $account = $existingTransaction->account;
-
-                return redirect()->route('transactions.index')
-                    ->with('info', 'This transaction was already recorded.')
-                    ->with('show_balance_modal', true)
-                    ->with('account_name', $account->name)
-                    ->with('old_balance', number_format($account->current_balance, 2))
-                    ->with('new_balance', number_format($account->current_balance, 2))
-                    ->with('transaction_amount', number_format($existingTransaction->amount, 2))
-                    ->with('transaction_type', $existingTransaction->category->type);
-            }
-
             $account = Account::findOrFail($validated['account_id']);
             $oldBalance = $account->current_balance;
 
             $transaction = $this->transactionService->createTransaction($validated);
 
             // Increment category usage count
-            $category = Category::find($validated['category_id']);
-            if ($category) {
-                $category->increment('usage_count');
-            }
+            Category::find($validated['category_id'])?->increment('usage_count');
 
             $account->refresh();
 
@@ -440,10 +418,7 @@ class TransactionController extends Controller
                 $totalAmount += $transaction->feeTransaction->amount;
             }
 
-            $successMessage = 'Transaction recorded successfully';
-            if ($transaction->feeTransaction) {
-                $successMessage .= ' (including KSh ' . number_format($transaction->feeTransaction->amount, 2) . ' transaction fee)';
-            }
+            $successMessage = $this->buildSuccessMessage($transaction);
 
             return redirect()->route('transactions.index')
                 ->with('success', $successMessage)
@@ -457,6 +432,20 @@ class TransactionController extends Controller
         } catch (Exception $e) {
             return back()->with('error', $e->getMessage())->withInput();
         }
+    }
+    /**
+     * Build the success message including fee information if applicable
+     */
+    private function buildSuccessMessage(Transaction $transaction): string
+    {
+        $message = 'Transaction recorded successfully';
+
+        if ($transaction->feeTransaction) {
+            $feeAmount = number_format($transaction->feeTransaction->amount, 2);
+            $message .= " (including KSh {$feeAmount} transaction fee)";
+        }
+
+        return $message;
     }
 
     /**
