@@ -228,22 +228,22 @@ class Account extends Model
             - $transfersOut             // Money sent to other accounts
             + $transfersIn;             // Money received from other accounts
 
-        \Log::info('UpdateBalance Calculation', [
-            'account_id' => $this->id,
-            'account_name' => $this->name,
-            'initial_balance' => $this->initial_balance,
-            'regular_income' => $totalIncome,
-            'loan_disbursements' => $loanDisbursements,
-            'client_funds_received' => $clientFundsReceived,
-            'client_funds_reduction' => $clientFundsReduction,
-            'loan_credits' => $loanCredits,
-            'total_expenses' => $totalExpenses,
-            'balance_adjustments' => $balanceAdjustments,
-            'transfers_out' => $transfersOut,
-            'transfers_in' => $transfersIn,
-            'new_balance' => $newBalance,
-            'total_transactions' => $activeTransactions->count(),
-        ]);
+//        \Log::info('UpdateBalance Calculation', [
+//            'account_id' => $this->id,
+//            'account_name' => $this->name,
+//            'initial_balance' => $this->initial_balance,
+//            'regular_income' => $totalIncome,
+//            'loan_disbursements' => $loanDisbursements,
+//            'client_funds_received' => $clientFundsReceived,
+//            'client_funds_reduction' => $clientFundsReduction,
+//            'loan_credits' => $loanCredits,
+//            'total_expenses' => $totalExpenses,
+//            'balance_adjustments' => $balanceAdjustments,
+//            'transfers_out' => $transfersOut,
+//            'transfers_in' => $transfersIn,
+//            'new_balance' => $newBalance,
+//            'total_transactions' => $activeTransactions->count(),
+//        ]);
 
         $this->current_balance = $newBalance;
         $this->save();
