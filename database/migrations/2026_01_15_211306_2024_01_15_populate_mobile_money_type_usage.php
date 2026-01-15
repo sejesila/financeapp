@@ -28,9 +28,11 @@ return new class extends Migration
             )
             ->whereNotNull('transactions.mobile_money_type')
             ->whereNull('transactions.deleted_at') // Exclude soft-deleted transactions
-            ->where('accounts.type', 'in', ['mpesa', 'airtel_money'])
+            ->whereIn('accounts.type', ['mpesa', 'airtel_money'])
             ->groupBy('transactions.user_id', 'accounts.type', 'transactions.mobile_money_type')
             ->get();
+
+        echo "\nFound " . count($transactions) . " transaction records to process.\n";
 
         // Update or create usage records
         foreach ($transactions as $row) {
@@ -45,6 +47,8 @@ return new class extends Migration
                 ]
             );
         }
+
+        echo "Migration completed successfully!\n";
     }
 
     /**
