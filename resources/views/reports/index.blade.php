@@ -131,6 +131,105 @@
                 </div>
             </div>
         </div>
+
+        {{-- Mobile Money Transaction Type Stats --}}
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {{-- M-Pesa Stats --}}
+            @if($transactionTypeStats['mpesa']['period']->isNotEmpty())
+                <div class="rounded-lg border bg-white p-6 shadow-sm">
+                    <h3 class="text-lg font-semibold mb-4">
+                        📱 M-Pesa Transaction Types
+                    </h3>
+
+                    <div class="space-y-3">
+                        @foreach($transactionTypeStats['mpesa']['period'] as $stat)
+                            <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                                <div>
+                                    <p class="font-medium text-sm capitalize">
+                                        {{ str_replace('_', ' ', $stat->type) }}
+                                    </p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                                        {{ $stat->count }} transaction{{ $stat->count !== 1 ? 's' : '' }}
+                                    </p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-semibold text-sm">
+                                        KSh {{ number_format($stat->total, 0) }}
+                                    </p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                                        {{ round(($stat->count / $transactionTypeStats['mpesa']['period']->sum('count')) * 100, 1) }}%
+                                    </p>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    @if($transactionTypeStats['mpesa']['frequency']->isNotEmpty())
+                        <div class="mt-4 pt-4 border-t">
+                            <p class="text-xs font-semibold text-gray-600 dark:text-gray-300 mb-2">
+                                ALL-TIME PREFERENCE
+                            </p>
+                            <div class="space-y-2">
+                                @foreach($transactionTypeStats['mpesa']['frequency'] as $freq)
+                                    <div class="flex justify-between items-center text-xs">
+                                        <span class="capitalize">{{ str_replace('_', ' ', $freq->transaction_type) }}</span>
+                                        <span class="font-medium">{{ $freq->usage_count }} uses</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            @endif
+
+            {{-- Airtel Money Stats --}}
+            @if($transactionTypeStats['airtel_money']['period']->isNotEmpty())
+                <div class="rounded-lg border bg-white p-6 shadow-sm">
+                    <h3 class="text-lg font-semibold mb-4">
+                        📲 Airtel Money Transaction Types
+                    </h3>
+
+                    <div class="space-y-3">
+                        @foreach($transactionTypeStats['airtel_money']['period'] as $stat)
+                            <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                                <div>
+                                    <p class="font-medium text-sm capitalize">
+                                        {{ str_replace('_', ' ', $stat->type) }}
+                                    </p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                                        {{ $stat->count }} transaction{{ $stat->count !== 1 ? 's' : '' }}
+                                    </p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-semibold text-sm">
+                                        KSh {{ number_format($stat->total, 0) }}
+                                    </p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                                        {{ round(($stat->count / $transactionTypeStats['airtel_money']['period']->sum('count')) * 100, 1) }}%
+                                    </p>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    @if($transactionTypeStats['airtel_money']['frequency']->isNotEmpty())
+                        <div class="mt-4 pt-4 border-t">
+                            <p class="text-xs font-semibold text-gray-600 dark:text-gray-300 mb-2">
+                                ALL-TIME PREFERENCE
+                            </p>
+                            <div class="space-y-2">
+                                @foreach($transactionTypeStats['airtel_money']['frequency'] as $freq)
+                                    <div class="flex justify-between items-center text-xs">
+                                        <span class="capitalize">{{ str_replace('_', ' ', $freq->transaction_type) }}</span>
+                                        <span class="font-medium">{{ $freq->usage_count }} uses</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            @endif
+        </div>
     </div>
 
     {{-- Scripts --}}
