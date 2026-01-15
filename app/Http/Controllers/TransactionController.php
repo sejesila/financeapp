@@ -204,12 +204,13 @@ class TransactionController extends Controller
     }
 
     /**
-     * Get active accounts for the current user
+     * Get active accounts for the current user (excluding savings accounts)
      */
     private function getActiveAccounts()
     {
         return Account::where('user_id', Auth::id())
             ->where('is_active', true)
+            ->where('type', '!=', 'savings')
             ->orderBy('name')
             ->get();
     }
@@ -433,6 +434,7 @@ class TransactionController extends Controller
             return back()->with('error', $e->getMessage())->withInput();
         }
     }
+
     /**
      * Build the success message including fee information if applicable
      */
