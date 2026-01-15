@@ -206,11 +206,15 @@ class TransactionController extends Controller
     /**
      * Get active accounts for the current user (excluding savings accounts)
      */
+    /**
+     * Get active accounts for the current user (excluding savings accounts and accounts with balance < 5)
+     */
     private function getActiveAccounts()
     {
         return Account::where('user_id', Auth::id())
             ->where('is_active', true)
             ->where('type', '!=', 'savings')
+            ->where('current_balance', '>=', 1)
             ->orderBy('name')
             ->get();
     }
