@@ -105,7 +105,6 @@ class RollingFundController extends Controller
             'date' => 'required|date|before_or_equal:today',
             'account_id' => 'required|exists:accounts,id',
             'stake_amount' => 'required|numeric|min:0.01',
-            'notes' => 'nullable|string|max:1000',
         ]);
 
         $account = Account::findOrFail($validated['account_id']);
@@ -139,7 +138,7 @@ class RollingFundController extends Controller
                 'stake_amount' => $validated['stake_amount'],
                 'winnings' => null,
                 'status' => 'pending',
-                'notes' => $validated['notes'],
+                
             ]);
 
             // Get or create expense category for Rolling Funds
