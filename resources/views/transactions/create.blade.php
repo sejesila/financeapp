@@ -193,11 +193,13 @@
                         @change="calculateTransactionCost()"
                         class="w-full text-sm sm:text-base border dark:border-gray-600 p-2 sm:p-2.5 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
                     >
-                        <option value="send_money">Send Money</option>
-                        <option value="paybill">PayBill</option>
-                        <option value="buy_goods">Buy Goods/Till Number</option>
-                        <option value="pochi_la_biashara">Pochi La Biashara</option>
+                        <template x-for="type in transactionTypeOptions" :key="type.key">
+                            <option :value="type.key" x-text="type.label"></option>
+                        </template>
                     </select>
+                    <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        Sorted by frequency of use
+                    </p>
                 </div>
 
                 <!-- Amount -->
@@ -295,8 +297,13 @@
                 amount: {{ old('amount') ?: 'null' }},
                 accountId: '{{ old('account_id', $mpesaAccount->id ?? '') }}',
                 accountType: '',
-                mobileMoneyType: '{{ old('mobile_money_type', 'send_money') }}',
+                mobileMoneyType: '{{ old('mobile_money_type') }}',
                 showTransactionTypeSelector: false,
+                defaultMpesaType: '{{ $defaultMpesaType ?? 'send_money' }}',
+                defaultAirtelType: '{{ $defaultAirtelType ?? 'send_money' }}',
+                transactionTypeOptions: [],
+                mpesaTypes: @json($mpesaTransactionTypes),
+                airtelTypes: @json($airtelTransactionTypes),
 
                 init() {
                     this.$nextTick(() => {
@@ -320,13 +327,31 @@
                     if (this.accountType === 'mpesa' || this.accountType === 'airtel_money') {
                         this.showTransactionTypeSelector = true;
 
-                        // Airtel Money does not support Pochi
-                        if (this.accountType === 'airtel_money' && this.mobileMoneyType === 'pochi_la_biashara') {
-                            this.mobileMoneyType = 'send_money';
+                        // Set transaction type options based on account type
+                        if (this.accountType === 'mpesa') {
+                            this.transactionTypeOptions = this.mpesaTypes;
+
+                            // Set default if not already set
+                            if (!this.mobileMoneyType || this.mobileMoneyType === '') {
+                                this.mobileMoneyType = this.defaultMpesaType;
+                            }
+                        } else if (this.accountType === 'airtel_money') {
+                            this.transactionTypeOptions = this.airtelTypes;
+
+                            // Set default if not already set
+                            if (!this.mobileMoneyType || this.mobileMoneyType === '') {
+                                this.mobileMoneyType = this.defaultAirtelType;
+                            }
+
+                            // Airtel doesn't support Pochi
+                            if (this.mobileMoneyType === 'pochi_la_biashara') {
+                                this.mobileMoneyType = 'send_money';
+                            }
                         }
                     } else {
                         this.showTransactionTypeSelector = false;
                         this.mobileMoneyType = 'send_money';
+                        this.transactionTypeOptions = [];
                     }
                 }
             }
@@ -340,7 +365,7 @@
                 selectedName: '',
                 isSearching: false,
                 categories: categoryGroups,
-                allCategoriesSorted: allCategoriesArray, // Pre-sorted flat list from backend
+                allCategoriesSorted: allCategoriesArray,
 
                 toggle() {
                     this.open = !this.open;
@@ -369,7 +394,6 @@
                     this.isSearching = false;
                     this.open = false;
 
-                    // Dispatch event for transaction form
                     window.dispatchEvent(new CustomEvent('category-selected', {
                         detail: {
                             categoryId: category.id,
@@ -385,7 +409,6 @@
                     this.isSearching = false;
                     this.open = true;
 
-                    // Dispatch event
                     window.dispatchEvent(new CustomEvent('category-selected', {
                         detail: {
                             categoryId: null,
@@ -402,15 +425,12 @@
                 },
 
                 filteredChildren() {
-                    // Use the pre-sorted flat list from backend
                     const allChildren = this.allCategoriesSorted;
 
-                    // If not searching, return all children (already sorted by usage_count DESC)
                     if (!this.search || !this.isSearching) {
                         return allChildren;
                     }
 
-                    // Filter by search term (maintains usage_count order)
                     const searchLower = this.search.toLowerCase();
                     return allChildren.filter(child =>
                         child.name.toLowerCase().includes(searchLower)
@@ -419,13 +439,11 @@
 
                 init() {
                     if (this.selectedId) {
-                        // Find in the sorted list
                         const found = this.allCategoriesSorted.find(c => c.id === this.selectedId);
                         if (found) {
                             this.selectedName = found.name;
                             this.search = found.name;
 
-                            // Notify transaction form
                             window.dispatchEvent(new CustomEvent('category-selected', {
                                 detail: {
                                     categoryId: found.id,

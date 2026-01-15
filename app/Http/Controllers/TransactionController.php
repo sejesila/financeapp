@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreTransactionRequest;
 use App\Models\Account;
 use App\Models\Category;
+use App\Models\MobileMoneyTypeUsage;
 use App\Models\Transaction;
 use App\Services\TransactionService;
 use Carbon\Carbon;
@@ -31,8 +32,52 @@ class TransactionController extends Controller
         'Balance Adjustment',
     ];
 
-    // System categories that should be excluded from manual operations
+    // Transaction type options for each account type
+    private const MPESA_TRANSACTION_TYPES = [
+        'send_money' => 'Send Money',
+        'paybill' => 'PayBill',
+        'buy_goods' => 'Buy Goods/Till Number',
+        'pochi_la_biashara' => 'Pochi La Biashara',
+    ];
+
+    private const AIRTEL_TRANSACTION_TYPES = [
+        'send_money' => 'Send Money',
+        'paybill' => 'PayBill',
+        'buy_goods' => 'Buy Goods/Till Number',
+    ];
+
     protected TransactionService $transactionService;
+
+    /**
+     * Get transaction types sorted by usage count for a specific account type
+     */
+    private function getSortedTransactionTypes(string $accountType): array
+    {
+        $baseTypes = $accountType === 'mpesa' ? self::MPESA_TRANSACTION_TYPES : self::AIRTEL_TRANSACTION_TYPES;
+
+        // Get usage stats for the user's account type
+        $usageStats = MobileMoneyTypeUsage::where('user_id', Auth::id())
+            ->where('account_type', $accountType)
+            ->orderByDesc('usage_count')
+            ->pluck('usage_count', 'transaction_type')
+            ->toArray();
+
+        // Sort types by usage count (higher first), then by original order
+        $sortedTypes = [];
+        foreach ($baseTypes as $key => $label) {
+            $sortedTypes[] = [
+                'key' => $key,
+                'label' => $label,
+                'usageCount' => $usageStats[$key] ?? 0,
+            ];
+        }
+
+        usort($sortedTypes, function ($a, $b) {
+            return $b['usageCount'] <=> $a['usageCount'];
+        });
+
+        return $sortedTypes;
+    }
 
     public function __construct(TransactionService $transactionService)
     {
@@ -52,19 +97,16 @@ class TransactionController extends Controller
         $accountId = $request->get('account_id');
         $showFees = $request->get('show_fees', false);
 
-        // Calculate dynamic year/month ranges
         $minYear = Transaction::where('user_id', Auth::id())->min(DB::raw('YEAR(date)')) ?? date('Y');
         $maxYear = date('Y');
 
         $query = Transaction::with(['category', 'account', 'feeTransaction'])
             ->where('user_id', Auth::id());
 
-        // By default, exclude transaction fees from the main listing
         if (!$showFees) {
             $query->where('is_transaction_fee', false);
         }
 
-        // Apply filters
         if ($search) {
             $query->where('description', 'like', '%' . $search . '%');
         }
@@ -77,16 +119,13 @@ class TransactionController extends Controller
             $query->where('account_id', $accountId);
         }
 
-        // Apply date filters
         $query = $this->applyDateFilter($query, $filter, $startDate, $endDate);
 
         $transactions = $query->latest('date')->latest('id')->paginate(25)->withQueryString();
 
-        // Calculate totals
         $totals = $this->calculateTransactionTotals();
         $feeTotals = $this->calculateFeeTotals();
 
-        // Get categories and accounts for filters
         $categories = Category::where('user_id', Auth::id())
             ->orderBy('type')
             ->orderBy('name')
@@ -204,9 +243,6 @@ class TransactionController extends Controller
     }
 
     /**
-     * Get active accounts for the current user (excluding savings accounts)
-     */
-    /**
      * Get active accounts for the current user (excluding savings accounts and accounts with balance < 5)
      */
     private function getActiveAccounts()
@@ -225,14 +261,31 @@ class TransactionController extends Controller
     public function create()
     {
         $categoryData = $this->getCategoriesForForm();
-
         $accounts = $this->getActiveAccounts();
         $mpesaCosts = $this->getMpesaTransactionCosts();
         $airtelCosts = $this->getAirtelMoneyTransactionCosts();
 
+        // Get sorted transaction types for both account types
+        $mpesaTransactionTypes = $this->getSortedTransactionTypes('mpesa');
+        $airtelTransactionTypes = $this->getSortedTransactionTypes('airtel_money');
+
+        $defaultMpesaType = MobileMoneyTypeUsage::getMostUsedType(Auth::id(), 'mpesa') ?? 'send_money';
+        $defaultAirtelType = MobileMoneyTypeUsage::getMostUsedType(Auth::id(), 'airtel_money') ?? 'send_money';
+
+        $mpesaAccount = $accounts->where('type', 'mpesa')->first();
+
         return view('transactions.create', array_merge(
             $categoryData,
-            compact('accounts', 'mpesaCosts', 'airtelCosts')
+            compact(
+                'accounts',
+                'mpesaCosts',
+                'airtelCosts',
+                'mpesaTransactionTypes',
+                'airtelTransactionTypes',
+                'defaultMpesaType',
+                'defaultAirtelType',
+                'mpesaAccount'
+            )
         ));
     }
 
@@ -242,25 +295,21 @@ class TransactionController extends Controller
      */
     private function getCategoriesForForm()
     {
-        // Get all child categories sorted by usage frequency (this will be used for the dropdown)
         $allCategories = Category::where('user_id', Auth::id())
-            ->whereNotNull('parent_id') // Only child categories
+            ->whereNotNull('parent_id')
             ->where('is_active', true)
             ->whereNotIn('name', self::EXCLUDED_CATEGORIES)
             ->with(['parent' => function ($query) {
-                // Also exclude parent categories that are in excluded list
                 $query->whereNotIn('name', self::EXCLUDED_CATEGORIES);
             }])
             ->orderBy('usage_count', 'desc')
             ->orderBy('name')
             ->get();
 
-        // Filter out any categories whose parent is in the excluded list
         $allCategories = $allCategories->filter(function ($category) {
             return $category->parent && !in_array($category->parent->name, self::EXCLUDED_CATEGORIES);
         });
 
-        // Get parent categories for grouping (UI purposes)
         $parentCategories = Category::where('user_id', Auth::id())
             ->whereNull('parent_id')
             ->where('is_active', true)
@@ -268,7 +317,6 @@ class TransactionController extends Controller
             ->get()
             ->keyBy('id');
 
-        // Group categories by parent for structured display
         $categoryGroups = $parentCategories->map(function ($parent) use ($allCategories) {
             return [
                 'id' => $parent->id,
@@ -281,8 +329,6 @@ class TransactionController extends Controller
             return $group['children']->isNotEmpty();
         })->values();
 
-        // Convert allCategories to array for JSON serialization
-        // Only include the fields we need
         $allCategoriesArray = $allCategories->map(function ($category) {
             return [
                 'id' => $category->id,
@@ -297,7 +343,7 @@ class TransactionController extends Controller
     }
 
     /**
-     * M-Pesa transaction costs (Kenya) - for frontend display
+     * M-Pesa transaction costs (Kenya)
      */
     private function getMpesaTransactionCosts()
     {
@@ -367,7 +413,7 @@ class TransactionController extends Controller
     }
 
     /**
-     * Airtel Money transaction costs (Kenya) - for frontend display
+     * Airtel Money transaction costs (Kenya)
      */
     private function getAirtelMoneyTransactionCosts()
     {
@@ -413,8 +459,15 @@ class TransactionController extends Controller
 
             $transaction = $this->transactionService->createTransaction($validated);
 
-            // Increment category usage count
             Category::find($validated['category_id'])?->increment('usage_count');
+
+            if (isset($validated['mobile_money_type']) && in_array($account->type, ['mpesa', 'airtel_money'])) {
+                MobileMoneyTypeUsage::incrementUsage(
+                    Auth::id(),
+                    $account->type,
+                    $validated['mobile_money_type']
+                );
+            }
 
             $account->refresh();
 
@@ -472,7 +525,6 @@ class TransactionController extends Controller
     {
         $this->authorize('update', $transaction);
 
-        // Don't allow editing system-generated transactions
         if ($transaction->is_transaction_fee) {
             return redirect()->back()
                 ->with('error', 'System-generated transaction fees cannot be edited.');
@@ -483,15 +535,30 @@ class TransactionController extends Controller
         $mpesaCosts = $this->getMpesaTransactionCosts();
         $airtelCosts = $this->getAirtelMoneyTransactionCosts();
 
+        $mpesaTransactionTypes = $this->getSortedTransactionTypes('mpesa');
+        $airtelTransactionTypes = $this->getSortedTransactionTypes('airtel_money');
+
+        $defaultMpesaType = MobileMoneyTypeUsage::getMostUsedType(Auth::id(), 'mpesa') ?? 'send_money';
+        $defaultAirtelType = MobileMoneyTypeUsage::getMostUsedType(Auth::id(), 'airtel_money') ?? 'send_money';
+
+        $mpesaAccount = $accounts->where('type', 'mpesa')->first();
+
         return view('transactions.edit', array_merge(
             $categoryData,
-            compact('transaction', 'accounts', 'mpesaCosts', 'airtelCosts')
+            compact(
+                'transaction',
+                'accounts',
+                'mpesaCosts',
+                'airtelCosts',
+                'mpesaTransactionTypes',
+                'airtelTransactionTypes',
+                'defaultMpesaType',
+                'defaultAirtelType',
+                'mpesaAccount'
+            )
         ));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     /**
      * Update the specified resource in storage.
      */
@@ -506,14 +573,11 @@ class TransactionController extends Controller
             'category_id' => 'required|exists:categories,id',
             'account_id' => 'required|exists:accounts,id',
             'mobile_money_type' => 'nullable|in:send_money,paybill,buy_goods,pochi_la_biashara',
-            // Note: No idempotency_key for updates
         ]);
 
         try {
-            // Update transaction using service
             $updatedTransaction = $this->transactionService->updateTransaction($transaction, $validated);
 
-            // Increment category usage count if category changed
             if ($transaction->category_id != $validated['category_id']) {
                 $category = Category::find($validated['category_id']);
                 if ($category) {
@@ -536,7 +600,6 @@ class TransactionController extends Controller
     {
         $this->authorize('delete', $transaction);
 
-        // Don't allow deleting system-generated fees directly
         if ($transaction->is_transaction_fee) {
             return redirect()->back()
                 ->with('error', 'System-generated transaction fees cannot be deleted directly. Delete the main transaction instead.');
@@ -545,21 +608,16 @@ class TransactionController extends Controller
         DB::beginTransaction();
 
         try {
-            // Store account for balance update
             $account = $transaction->account;
 
-            // If this transaction has a related fee, delete it too
             if ($transaction->related_fee_transaction_id) {
                 $feeTransaction = Transaction::find($transaction->related_fee_transaction_id);
                 if ($feeTransaction) {
-                    $feeTransaction->delete(); // Soft delete
+                    $feeTransaction->delete();
                 }
             }
 
-            // Soft delete the main transaction
             $transaction->delete();
-
-            // Recalculate account balance
             $account->updateBalance();
 
             DB::commit();
@@ -587,10 +645,8 @@ class TransactionController extends Controller
         DB::beginTransaction();
 
         try {
-            // Restore the transaction
             $transaction->restore();
 
-            // Restore related fee if exists
             if ($transaction->related_fee_transaction_id) {
                 $feeTransaction = Transaction::onlyTrashed()->find($transaction->related_fee_transaction_id);
                 if ($feeTransaction) {
@@ -598,7 +654,6 @@ class TransactionController extends Controller
                 }
             }
 
-            // Recalculate account balance
             $transaction->account->updateBalance();
 
             DB::commit();
@@ -628,7 +683,6 @@ class TransactionController extends Controller
         try {
             $account = $transaction->account;
 
-            // Force delete related fee
             if ($transaction->related_fee_transaction_id) {
                 $feeTransaction = Transaction::onlyTrashed()->find($transaction->related_fee_transaction_id);
                 if ($feeTransaction) {
@@ -636,10 +690,8 @@ class TransactionController extends Controller
                 }
             }
 
-            // Permanently delete
             $transaction->forceDelete();
 
-            // Recalculate balance
             if ($account) {
                 $account->updateBalance();
             }
@@ -655,6 +707,3 @@ class TransactionController extends Controller
         }
     }
 }
-
-
-
