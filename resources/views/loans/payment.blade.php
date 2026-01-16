@@ -22,17 +22,24 @@
                 $facilitationFee = $loan->principal_amount * 0.09;
                 $remainingInterest = $facilitationFee - $totalInterestPaid;
             }
-
-            // Get all active accounts for payment
-            $accounts = \App\Models\Account::where('user_id', Auth::id())
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get();
         @endphp
 
         @if(session('error'))
             <div class="bg-red-100 text-red-700 p-4 rounded mb-6">
                 {{ session('error') }}
+            </div>
+        @endif
+
+        @if($accounts->isEmpty())
+            <div class="bg-yellow-100 text-yellow-800 p-4 rounded mb-6">
+                <p class="font-semibold">⚠️ No Eligible Accounts Found</p>
+                <p class="text-sm mt-2">
+                    You need an account with at least KES {{ number_format($minRequiredBalance ?? 0, 0) }}
+                    (25% of outstanding balance) to make a payment.
+                </p>
+                <p class="text-sm mt-1">
+                    Note: Savings accounts cannot be used for loan payments.
+                </p>
             </div>
         @endif
 
@@ -106,7 +113,8 @@
                     id="payment_account_id"
                     class="w-full px-4 py-3 border border-gray-300 rounded-lg text-base @error('payment_account_id') border-red-500 @enderror"
                     required
-                    onchange="updateAccountBalance()">
+                    onchange="updateAccountBalance()"
+                    {{ $accounts->isEmpty() ? 'disabled' : '' }}>
                     <option value="">Select account to pay from</option>
                     @foreach($accounts as $account)
                         <option value="{{ $account->id }}"
@@ -118,11 +126,18 @@
                     @endforeach
                 </select>
                 <p class="text-xs text-gray-500 mt-2" id="selected_account_balance">
-                    @if($loan->account)
-                        Available balance: KES {{ number_format($loan->account->current_balance, 0, '.', ',') }}
+                    @if($accounts->isNotEmpty())
+                        @if($loan->account && $accounts->contains('id', $loan->account_id))
+                            Available balance: KES {{ number_format($loan->account->current_balance, 0, '.', ',') }}
+                        @else
+                            Select an account to see available balance
+                        @endif
                     @else
-                        Select an account to see available balance
+                        Top up an account to at least KES {{ number_format($minRequiredBalance ?? 0, 0) }} to proceed
                     @endif
+                </p>
+                <p class="text-xs text-blue-600 mt-1">
+                    💡 Only accounts with at least 25% of the payment amount are shown (savings accounts excluded)
                 </p>
                 @error('payment_account_id')
                 <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
@@ -147,6 +162,7 @@
                         class="flex-1 w-full px-4 py-3 border border-gray-300 rounded-lg text-lg @error('payment_amount') border-red-500 @enderror"
                         placeholder="Enter payment amount"
                         required
+                        {{ $accounts->isEmpty() ? 'disabled' : '' }}
                     >
                 </div>
                 <p class="text-xs text-gray-500 mt-2">Maximum: KES {{ number_format($loan->balance, 0, '.', ',') }}</p>
@@ -157,11 +173,13 @@
                 <!-- Quick Amount Buttons -->
                 <div class="mt-3 flex flex-col sm:flex-row gap-2 w-full">
                     <button type="button" onclick="setPaymentAmount({{ $remainingInterest }})"
-                            class="w-full sm:w-auto px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
+                            class="w-full sm:w-auto px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                        {{ $accounts->isEmpty() ? 'disabled' : '' }}>
                         Interest Only (KES {{ number_format(max(0, $remainingInterest), 0) }})
                     </button>
                     <button type="button" onclick="setPaymentAmount({{ $loan->balance }})"
-                            class="w-full sm:w-auto px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200">
+                            class="w-full sm:w-auto px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
+                        {{ $accounts->isEmpty() ? 'disabled' : '' }}>
                         Full Balance (KES {{ number_format($loan->balance, 0) }})
                     </button>
                 </div>
@@ -240,7 +258,7 @@
                 </div>
 
                 <div class="mt-3 flex items-center">
-                    <input type="checkbox" id="manual_override" class="mr-2">
+                    <input type="checkbox" id="manual_override" class="mr-2" {{ $accounts->isEmpty() ? 'disabled' : '' }}>
                     <label for="manual_override" class="text-sm text-gray-700 cursor-pointer">
                         Enable manual allocation (unlock fields)
                     </label>
@@ -260,6 +278,7 @@
                     max="{{ date('Y-m-d') }}"
                     class="w-full px-4 py-2 border border-gray-300 rounded @error('payment_date') border-red-500 @enderror"
                     required
+                    {{ $accounts->isEmpty() ? 'disabled' : '' }}
                 >
                 @error('payment_date')
                 <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
@@ -277,14 +296,16 @@
                     rows="3"
                     class="w-full px-4 py-2 border border-gray-300 rounded"
                     placeholder="e.g., Partial payment, reference number, etc."
+                    {{ $accounts->isEmpty() ? 'disabled' : '' }}
                 >{{ old('notes') }}</textarea>
             </div>
 
             <!-- Submit Buttons -->
             <div class="flex flex-col sm:flex-row gap-4">
                 <button type="submit"
-                        class="w-full sm:flex-1 bg-green-600 text-white px-6 py-3 rounded hover:bg-green-700 font-semibold text-lg">
-                    Record Payment
+                        {{ $accounts->isEmpty() ? 'disabled' : '' }}
+                        class="w-full sm:flex-1 {{ $accounts->isEmpty() ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700' }} text-white px-6 py-3 rounded font-semibold text-lg">
+                    {{ $accounts->isEmpty() ? 'No Eligible Accounts' : 'Record Payment' }}
                 </button>
                 <a href="{{ route('loans.show', $loan) }}"
                    class="w-full sm:flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded hover:bg-gray-400 font-semibold text-center">
