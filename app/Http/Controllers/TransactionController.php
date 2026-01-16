@@ -30,6 +30,7 @@ class TransactionController extends Controller
         'Facility Fee Refund',
         'Transaction Fees',
         'Balance Adjustment',
+        'Rolling Funds'
     ];
 
     // Transaction type options for each account type

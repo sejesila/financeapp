@@ -230,6 +230,7 @@ class AccountController extends Controller
         Cache::forget("account.{$accountId}.stats");
     }
 
+
     public function transferForm()
     {
         if (auth()->user()->accounts()->count() < 2) {
@@ -244,7 +245,7 @@ class AccountController extends Controller
             ->where('current_balance', '>=', 1)
             ->get();
 
-        // All active accounts can be destinations
+        // All active accounts can be destinations (will be filtered in the view based on source)
         $destinationAccounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
             ->get();

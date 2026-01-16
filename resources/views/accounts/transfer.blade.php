@@ -91,6 +91,11 @@
                     @error('to_account_id')
                     <p class="text-red-500 text-sm mt-2">{{ $message }}</p>
                     @enderror
+
+                    <!-- Bank transfer restriction notice -->
+                    <p x-show="fromAccountType === 'bank'" class="text-xs text-blue-600 dark:text-blue-400 mt-2">
+                        💡 Bank transfers are only available to M-Pesa and Airtel Money accounts
+                    </p>
                 </div>
 
                 <!-- Amount -->
@@ -349,25 +354,59 @@
                 },
 
                 updateDestinationOptions() {
+                    const fromAccount = this.getAccount(this.fromAccountId);
                     const toSelect = document.getElementById('to_account_id');
                     if (!toSelect) return;
 
                     Array.from(toSelect.options).forEach(option => {
                         if (!option.value) return;
 
-                        option.disabled = option.value === this.fromAccountId;
-                        option.hidden = option.value === this.fromAccountId;
+                        const optionType = option.dataset.type;
+
+                        // Disable same account
+                        if (option.value === this.fromAccountId) {
+                            option.disabled = true;
+                            option.hidden = true;
+                            return;
+                        }
+
+                        // If source is bank, only allow mpesa and airtel_money
+                        if (fromAccount && fromAccount.type === 'bank') {
+                            if (optionType === 'mpesa' || optionType === 'airtel_money') {
+                                option.disabled = false;
+                                option.hidden = false;
+                            } else {
+                                option.disabled = true;
+                                option.hidden = true;
+                            }
+                        } else {
+                            // For non-bank sources, all accounts except self are available
+                            option.disabled = false;
+                            option.hidden = false;
+                        }
                     });
 
-                    if (this.toAccountId === this.fromAccountId) {
+                    // Auto-select M-Pesa if source is bank and no destination is selected
+                    if (fromAccount && fromAccount.type === 'bank' && !this.toAccountId) {
+                        const mpesaOption = Array.from(toSelect.options).find(opt =>
+                            opt.dataset.type === 'mpesa' && opt.value !== this.fromAccountId
+                        );
+                        if (mpesaOption) {
+                            this.toAccountId = mpesaOption.value;
+                        }
+                    }
+
+                    // Clear selection if currently selected account is now disabled
+                    const currentOption = toSelect.querySelector(`option[value="${this.toAccountId}"]`);
+                    if (currentOption && (currentOption.disabled || currentOption.hidden)) {
                         this.toAccountId = '';
                     }
                 },
 
                 init() {
                     this.$nextTick(() => {
-                        this.calculateFee();
                         this.updateDestinationOptions();
+                        this.calculateFee();
                     });
                 }
             }

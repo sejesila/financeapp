@@ -53,6 +53,18 @@ class ClientFundController extends Controller
             'notes' => 'nullable|string',
         ]);
 
+        // Verify the account belongs to the user and is the correct type
+        $account = Account::where('id', $request->account_id)
+            ->where('user_id', Auth::id())
+            ->whereIn('type', ['mpesa', 'bank'])
+            ->first();
+
+        if (!$account) {
+            return back()
+                ->withInput()
+                ->withErrors(['account_id' => 'Client funds can only be received in M-Pesa or Bank accounts.']);
+        }
+
         DB::beginTransaction();
         try {
             // Get or create "Client Funds" liability category
@@ -108,7 +120,6 @@ class ClientFundController extends Controller
             DB::commit();
 
             // Update account balance AFTER commit
-            $account = Account::find($request->account_id);
             $account->updateBalance();
 
             return redirect()
@@ -123,8 +134,10 @@ class ClientFundController extends Controller
 
     public function create()
     {
+        // Only M-Pesa and Bank accounts can receive client funds
         $accounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
+            ->whereIn('type', ['mpesa', 'bank'])
             ->get();
 
         return view('client-funds.create', compact('accounts'));
@@ -289,14 +302,19 @@ class ClientFundController extends Controller
     /**
      * Show the form for editing basic client fund details
      */
+    /**
+     * Show the form for editing basic client fund details
+     */
     public function edit(ClientFund $clientFund)
     {
         if ($clientFund->user_id !== Auth::id()) {
             abort(403);
         }
 
+        // Only M-Pesa and Bank accounts can be used for client funds
         $accounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
+            ->whereIn('type', ['mpesa', 'bank'])
             ->get();
 
         return view('client-funds.edit', compact('clientFund', 'accounts'));

@@ -23,6 +23,19 @@
                 </div>
             @endif
 
+            @if($accounts->isEmpty())
+                <div class="bg-yellow-100 text-yellow-800 p-4 rounded mb-6">
+                    <p class="font-semibold">⚠️ No Eligible Accounts Found</p>
+                    <p class="text-sm mt-2">
+                        Client funds can only be received in M-Pesa or Bank accounts.
+                        Please create one of these account types first.
+                    </p>
+                    <a href="{{ route('accounts.create') }}" class="text-blue-600 hover:text-blue-800 text-sm font-semibold mt-3 inline-block">
+                        → Create Account
+                    </a>
+                </div>
+            @endif
+
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6">
                 <div class="mb-6">
                     <h3 class="text-base sm:text-lg font-semibold mb-2">What is Client Fund Management?</h3>
@@ -48,6 +61,7 @@
                             placeholder="e.g., John Doe, ABC Company, My Workplace"
                             class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded px-3 sm:px-4 py-2 text-sm focus:outline-none focus:border-indigo-500"
                             required
+                            {{ $accounts->isEmpty() ? 'disabled' : '' }}
                         >
                         <p class="text-xs text-gray-500 mt-1">Who sent you this money?</p>
                     </div>
@@ -58,8 +72,8 @@
                             Fund Type <span class="text-red-500">*</span>
                         </label>
                         <div class="space-y-3">
-                            <label class="flex items-start p-3 border dark:border-gray-600 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
-                                   onclick="document.getElementById('commission').checked = true">
+                            <label class="flex items-start p-3 border dark:border-gray-600 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 {{ $accounts->isEmpty() ? 'opacity-50 cursor-not-allowed' : '' }}"
+                                   onclick="if (!{{ $accounts->isEmpty() ? 'true' : 'false' }}) document.getElementById('commission').checked = true">
                                 <input
                                     type="radio"
                                     name="type"
@@ -68,6 +82,7 @@
                                     {{ old('type') === 'commission' ? 'checked' : '' }}
                                     class="mt-1"
                                     required
+                                    {{ $accounts->isEmpty() ? 'disabled' : '' }}
                                 >
                                 <div class="ml-3">
                                     <span class="font-semibold text-sm">💰 With Profit/Commission</span>
@@ -77,8 +92,8 @@
                                 </div>
                             </label>
 
-                            <label class="flex items-start p-3 border dark:border-gray-600 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
-                                   onclick="document.getElementById('no_profit').checked = true">
+                            <label class="flex items-start p-3 border dark:border-gray-600 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 {{ $accounts->isEmpty() ? 'opacity-50 cursor-not-allowed' : '' }}"
+                                   onclick="if (!{{ $accounts->isEmpty() ? 'true' : 'false' }}) document.getElementById('no_profit').checked = true">
                                 <input
                                     type="radio"
                                     name="type"
@@ -87,6 +102,7 @@
                                     {{ old('type') === 'no_profit' ? 'checked' : '' }}
                                     class="mt-1"
                                     required
+                                    {{ $accounts->isEmpty() ? 'disabled' : '' }}
                                 >
                                 <div class="ml-3">
                                     <span class="font-semibold text-sm">🔄 No Profit</span>
@@ -112,6 +128,7 @@
                             placeholder="100000"
                             class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded px-3 sm:px-4 py-2 text-sm focus:outline-none focus:border-indigo-500"
                             required
+                            {{ $accounts->isEmpty() ? 'disabled' : '' }}
                         >
                         <p class="text-xs text-gray-500 mt-1">How much did the client send you?</p>
                     </div>
@@ -126,15 +143,20 @@
                             id="account_id"
                             class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded px-3 sm:px-4 py-2 text-sm focus:outline-none focus:border-indigo-500"
                             required
+                            {{ $accounts->isEmpty() ? 'disabled' : '' }}
                         >
-                            <option value="">Select Account</option>
+                            <option value="">{{ $accounts->isEmpty() ? 'No eligible accounts available' : 'Select Account' }}</option>
                             @foreach($accounts as $account)
                                 <option value="{{ $account->id }}" {{ old('account_id') == $account->id ? 'selected' : '' }}>
+                                    @if($account->type == 'mpesa') 📱 @endif
+                                    @if($account->type == 'bank') 🏦 @endif
                                     {{ $account->name }} (KES {{ number_format($account->current_balance, 0, '.', ',') }})
                                 </option>
                             @endforeach
                         </select>
-                        <p class="text-xs text-gray-500 mt-1">Which account did you receive the money in?</p>
+                        <p class="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                            💡 Client funds can only be received in M-Pesa or Bank accounts
+                        </p>
                     </div>
 
                     <!-- Purpose -->
@@ -150,6 +172,7 @@
                             placeholder="e.g., Laptop purchase, Office supplies, Event planning"
                             class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded px-3 sm:px-4 py-2 text-sm focus:outline-none focus:border-indigo-500"
                             required
+                            {{ $accounts->isEmpty() ? 'disabled' : '' }}
                         >
                         <p class="text-xs text-gray-500 mt-1">What will you use this money for?</p>
                     </div>
@@ -166,6 +189,7 @@
                             value="{{ old('received_date', date('Y-m-d')) }}"
                             class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded px-3 sm:px-4 py-2 text-sm focus:outline-none focus:border-indigo-500"
                             required
+                            {{ $accounts->isEmpty() ? 'disabled' : '' }}
                         >
                     </div>
 
@@ -180,6 +204,7 @@
                             rows="3"
                             placeholder="Any additional details about this transaction..."
                             class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded px-3 sm:px-4 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                            {{ $accounts->isEmpty() ? 'disabled' : '' }}
                         >{{ old('notes') }}</textarea>
                     </div>
 
@@ -191,9 +216,10 @@
                         </a>
                         <button
                             type="submit"
-                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded focus:outline-none text-sm w-full sm:w-auto"
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded focus:outline-none text-sm w-full sm:w-auto {{ $accounts->isEmpty() ? 'opacity-50 cursor-not-allowed' : '' }}"
+                            {{ $accounts->isEmpty() ? 'disabled' : '' }}
                         >
-                            Record Client Fund
+                            {{ $accounts->isEmpty() ? 'No Eligible Accounts' : 'Record Client Fund' }}
                         </button>
                     </div>
                 </form>
