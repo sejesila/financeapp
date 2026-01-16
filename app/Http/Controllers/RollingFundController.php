@@ -138,7 +138,7 @@ class RollingFundController extends Controller
                 'stake_amount' => $validated['stake_amount'],
                 'winnings' => null,
                 'status' => 'pending',
-                
+
             ]);
 
             // Get or create expense category for Rolling Funds

@@ -447,6 +447,12 @@ class LoanController extends Controller implements HasMiddleware
     /**
      * Show repayment form
      */
+    /**
+     * Show repayment form
+     */
+    /**
+     * Show repayment form
+     */
     public function paymentForm(Loan $loan)
     {
         $this->authorize('makePayment', $loan);
@@ -461,7 +467,18 @@ class LoanController extends Controller implements HasMiddleware
             $loan->interest_amount
         );
 
-        return view('loans.payment', compact('loan', 'repayment'));
+        // Calculate minimum required balance (25% of outstanding balance)
+        $minRequiredBalance = $loan->balance * 0.25;
+
+        // Get accounts with sufficient balance, excluding savings accounts
+        $accounts = Account::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->where('type', '!=', 'savings')
+            ->where('current_balance', '>=', $minRequiredBalance)
+            ->orderBy('name')
+            ->get();
+
+        return view('loans.payment', compact('loan', 'repayment', 'accounts', 'minRequiredBalance'));
     }
 
     /**
