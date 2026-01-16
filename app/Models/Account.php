@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class Account extends Model
@@ -103,150 +104,99 @@ class Account extends Model
      *         - Transfers Out
      *         + Transfers In
      */
+    /**
+     * Optimized balance calculation using database aggregation
+     * Performance: O(1) - Single query regardless of row count
+     */
     public function updateBalance()
     {
-        $activeTransactions = $this->transactions()
+        // ✅ SINGLE QUERY - Let database do the heavy lifting
+        $stats = $this->transactions()
             ->whereNull('deleted_at')
-            ->with('category')
-            ->get();
+            ->join('categories', 'transactions.category_id', '=', 'categories.id')
+            ->selectRaw("
+            -- Regular Income (excluding loan credits and adjustments)
+            SUM(CASE
+                WHEN categories.type = 'income'
+                AND categories.name NOT IN ('Loan Fees Refund', 'Facility Fee Refund', 'Balance Adjustment')
+                THEN transactions.amount
+                ELSE 0
+            END) as total_income,
 
-        // System categories to exclude from certain calculations
-        $systemCategories = [
-            'Loan Receipt',
-            'Loan Repayment',
-            'Excise Duty',
-            'Loan Fees Refund',
-            'Facility Fee Refund',
-            'Transaction Fees',
-            'Balance Adjustment',
-            'Client Funds', // Liability tracking
-        ];
+            -- Loan Credits (early repayment refunds)
+            SUM(CASE
+                WHEN categories.name IN ('Loan Fees Refund', 'Facility Fee Refund')
+                THEN transactions.amount
+                ELSE 0
+            END) as loan_credits,
 
-        // ✅ INCOME - All income EXCEPT loan credits and balance adjustments
-        $totalIncome = $activeTransactions
-            ->filter(function($t) use ($systemCategories) {
-                if ($t->category->type !== 'income') {
-                    return false;
-                }
-                // Exclude loan credit transactions (refunds/cashbacks)
-                if (in_array($t->category->name, ['Loan Fees Refund', 'Facility Fee Refund'])) {
-                    return false;
-                }
-                // Exclude balance adjustments
-                if ($t->category->name === 'Balance Adjustment') {
-                    return false;
-                }
-                return true;
-            })
-            ->sum('amount');
+            -- Loan Disbursements (money borrowed)
+            SUM(CASE
+                WHEN categories.type = 'liability'
+                AND categories.name = 'Loan Receipt'
+                THEN transactions.amount
+                ELSE 0
+            END) as loan_disbursements,
 
-        // ✅ LOAN CREDITS - Money refunded from early repayment
-        $loanCredits = $activeTransactions
-            ->filter(function($t) {
-                return in_array($t->category->name, ['Loan Fees Refund', 'Facility Fee Refund']);
-            })
-            ->sum('amount');
+            -- Client Funds Received (positive liability)
+            SUM(CASE
+                WHEN categories.type = 'liability'
+                AND categories.name = 'Client Funds'
+                AND transactions.amount > 0
+                THEN transactions.amount
+                ELSE 0
+            END) as client_funds_received,
 
-        // ✅ LOAN DISBURSEMENTS - Money you borrowed (increases balance)
-        // This is the principal amount you receive (full amount)
-        $loanDisbursements = $activeTransactions
-            ->filter(function($t) {
-                if ($t->category->type !== 'liability') {
-                    return false;
-                }
-                if ($t->category->name !== 'Loan Receipt') {
-                    return false;
-                }
-                return true;
-            })
-            ->sum('amount');
+            -- Client Funds Reduction (negative liability)
+            SUM(CASE
+                WHEN categories.type = 'liability'
+                AND categories.name = 'Client Funds'
+                AND transactions.amount < 0
+                THEN ABS(transactions.amount)
+                ELSE 0
+            END) as client_funds_reduction,
 
-        // NOTE: Excise Duty on M-Shwari is tracked separately as EXPENSE
-        // It's NOT part of the loan amount, just a fee deducted upfront
+            -- All Expenses
+            SUM(CASE
+                WHEN categories.type = 'expense'
+                THEN transactions.amount
+                ELSE 0
+            END) as total_expenses,
 
-        // ✅ CLIENT FUNDS RECEIVED - Liability (money from client)
-        $clientFundsReceived = $activeTransactions
-            ->filter(function($t) {
-                if ($t->category->type !== 'liability') {
-                    return false;
-                }
-                if ($t->category->name !== 'Client Funds') {
-                    return false;
-                }
-                return $t->amount > 0; // Only positive (receipts)
-            })
-            ->sum('amount');
+            -- Balance Adjustments (can be positive or negative)
+            SUM(CASE
+                WHEN categories.name = 'Balance Adjustment'
+                THEN transactions.amount
+                ELSE 0
+            END) as balance_adjustments
+        ")
+            ->first();
 
-        // ✅ CLIENT FUNDS REDUCTION - Liability reduction (expenses/profits from client work)
-        $clientFundsReduction = abs($activeTransactions
-            ->filter(function($t) {
-                if ($t->category->type !== 'liability') {
-                    return false;
-                }
-                if ($t->category->name !== 'Client Funds') {
-                    return false;
-                }
-                return $t->amount < 0; // Only negative (reductions)
-            })
-            ->sum('amount'));
+        // ✅ EFFICIENT TRANSFER QUERIES - Use aggregation
+        $transferStats = DB::table('transfers')
+            ->selectRaw('
+            SUM(CASE WHEN from_account_id = ? THEN amount ELSE 0 END) as transfers_out,
+            SUM(CASE WHEN to_account_id = ? THEN amount ELSE 0 END) as transfers_in
+        ', [$this->id, $this->id])
+            ->first();
 
-        // ✅ EXPENSES - All expenses (including loan repayments, excise duty, etc)
-        $totalExpenses = $activeTransactions
-            ->filter(function($t) {
-                if ($t->category->type !== 'expense') {
-                    return false;
-                }
-                // Include ALL expenses: loan repayments, fees, client spending, regular expenses
-                return true;
-            })
-            ->sum('amount');
-
-        // ✅ BALANCE ADJUSTMENTS - Manual balance corrections
-        $balanceAdjustments = $activeTransactions
-            ->filter(function($t) {
-                if ($t->category->name !== 'Balance Adjustment') {
-                    return false;
-                }
-                // If positive, it's income; if negative, it's expense
-                return true;
-            })
-            ->sum('amount');
-
-        // ✅ TRANSFERS - Between your own accounts
-        $transfersOut = $this->transfersFrom()->sum('amount');
-        $transfersIn = $this->transfersTo()->sum('amount');
-
-        // ✅ FINAL BALANCE CALCULATION
+        // ✅ CALCULATE BALANCE - Simple arithmetic
         $newBalance = (float) $this->initial_balance
-            + $totalIncome              // Regular income (salary, commissions, etc)
-            + $loanDisbursements        // Money you borrowed
-            + $clientFundsReceived      // Money client gave you
-            - $clientFundsReduction     // Already counted when client spending/profit recorded
-            + $loanCredits              // Early repayment refunds
-            - $totalExpenses            // All spending (includes loan repayments, excise, client spending)
-            + $balanceAdjustments       // Manual adjustments
-            - $transfersOut             // Money sent to other accounts
-            + $transfersIn;             // Money received from other accounts
+            + ($stats->total_income ?? 0)
+            + ($stats->loan_disbursements ?? 0)
+            + ($stats->client_funds_received ?? 0)
+            - ($stats->client_funds_reduction ?? 0)
+            + ($stats->loan_credits ?? 0)
+            - ($stats->total_expenses ?? 0)
+            + ($stats->balance_adjustments ?? 0)
+            - ($transferStats->transfers_out ?? 0)
+            + ($transferStats->transfers_in ?? 0);
 
-//        \Log::info('UpdateBalance Calculation', [
-//            'account_id' => $this->id,
-//            'account_name' => $this->name,
-//            'initial_balance' => $this->initial_balance,
-//            'regular_income' => $totalIncome,
-//            'loan_disbursements' => $loanDisbursements,
-//            'client_funds_received' => $clientFundsReceived,
-//            'client_funds_reduction' => $clientFundsReduction,
-//            'loan_credits' => $loanCredits,
-//            'total_expenses' => $totalExpenses,
-//            'balance_adjustments' => $balanceAdjustments,
-//            'transfers_out' => $transfersOut,
-//            'transfers_in' => $transfersIn,
-//            'new_balance' => $newBalance,
-//            'total_transactions' => $activeTransactions->count(),
-//        ]);
-
+        // ✅ SINGLE UPDATE - No additional queries
+        $this->timestamps = false; // Don't update timestamps for balance recalc
         $this->current_balance = $newBalance;
         $this->save();
+        $this->timestamps = true;
     }
 
     /**
