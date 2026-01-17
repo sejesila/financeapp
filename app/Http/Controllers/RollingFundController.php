@@ -114,16 +114,8 @@ class RollingFundController extends Controller
             return back()->withErrors(['account_id' => 'Invalid account selected.']);
         }
 
-        // Calculate fees if M-Pesa
-        $transactionFee = 0;
-        if ($account->type === 'mpesa') {
-            $transactionFee = $this->calculatePaybillFee($validated['stake_amount']);
-        }
-
-        $totalDeduction = $validated['stake_amount'] + $transactionFee;
-
-        // Check sufficient balance
-        if ($account->current_balance < $totalDeduction) {
+        // Check sufficient balance (no fee deduction)
+        if ($account->current_balance < $validated['stake_amount']) {
             return back()->withErrors(['stake_amount' => 'Insufficient balance in account.']);
         }
 
@@ -138,13 +130,12 @@ class RollingFundController extends Controller
                 'stake_amount' => $validated['stake_amount'],
                 'winnings' => null,
                 'status' => 'pending',
-
             ]);
 
             // Get or create expense category for Rolling Funds
             $category = $this->getOrCreateCategory('expense', 'Rolling Funds', 'Entertainment');
 
-            // Create expense transaction for the stake
+            // Create expense transaction for the stake (no fee)
             Transaction::create([
                 'user_id' => auth()->id(),
                 'account_id' => $validated['account_id'],
@@ -156,23 +147,6 @@ class RollingFundController extends Controller
                 'payment_method' => 'Rolling Funds',
                 'is_transaction_fee' => false,
             ]);
-
-            // Create transaction fee if applicable
-            if ($transactionFee > 0) {
-                $feeCategory = $this->getOrCreateCategory('expense', 'Transaction Fees', 'Fees');
-
-                Transaction::create([
-                    'user_id' => auth()->id(),
-                    'account_id' => $validated['account_id'],
-                    'category_id' => $feeCategory->id,
-                    'date' => $validated['date'],
-                    'period_date' => $validated['date'],
-                    'amount' => $transactionFee,
-                    'description' => 'M-Pesa PayBill Fee - Rolling Funds',
-                    'payment_method' => 'Rolling Funds',
-                    'is_transaction_fee' => true,
-                ]);
-            }
 
             DB::commit();
 
@@ -193,49 +167,13 @@ class RollingFundController extends Controller
         }
     }
 
-    private function calculatePaybillFee($amount)
-    {
-        $costs = $this->getPaybillCosts();
-
-        foreach ($costs as $tier) {
-            if ($amount >= $tier['min'] && $amount <= $tier['max']) {
-                return $tier['cost'];
-            }
-        }
-
-        return end($costs)['cost'] ?? 0;
-    }
-
-    private function getPaybillCosts()
-    {
-        return [
-            ['min' => 1, 'max' => 49, 'cost' => 0],
-            ['min' => 50, 'max' => 100, 'cost' => 0],
-            ['min' => 101, 'max' => 500, 'cost' => 7],
-            ['min' => 501, 'max' => 1000, 'cost' => 13],
-            ['min' => 1001, 'max' => 1500, 'cost' => 23],
-            ['min' => 1501, 'max' => 2500, 'cost' => 33],
-            ['min' => 2501, 'max' => 3500, 'cost' => 53],
-            ['min' => 3501, 'max' => 5000, 'cost' => 57],
-            ['min' => 5001, 'max' => 7500, 'cost' => 61],
-            ['min' => 7501, 'max' => 10000, 'cost' => 67],
-            ['min' => 10001, 'max' => 15000, 'cost' => 77],
-            ['min' => 15001, 'max' => 20000, 'cost' => 87],
-            ['min' => 20001, 'max' => 35000, 'cost' => 97],
-            ['min' => 35001, 'max' => 50000, 'cost' => 107],
-            ['min' => 50001, 'max' => 150000, 'cost' => 112],
-        ];
-    }
-
     public function create()
     {
         $accounts = Account::where('user_id', auth()->id())
             ->where('is_active', true)
             ->get();
 
-        $paybillCosts = $this->getPaybillCosts();
-
-        return view('rolling-funds.create', compact('accounts', 'paybillCosts'));
+        return view('rolling-funds.create', compact('accounts'));
     }
 
     private function getOrCreateCategory($type, $name, $parentName)
