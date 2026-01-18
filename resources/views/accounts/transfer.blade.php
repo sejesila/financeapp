@@ -96,6 +96,11 @@
                     <p x-show="fromAccountType === 'bank'" class="text-xs text-blue-600 dark:text-blue-400 mt-2">
                         💡 Bank transfers are only available to M-Pesa and Airtel Money accounts
                     </p>
+
+                    <!-- Mshwari transfer restriction notice -->
+                    <p x-show="fromAccountType === 'savings'" class="text-xs text-blue-600 dark:text-blue-400 mt-2">
+                        💡 Mshwari transfers are only available to M-Pesa accounts
+                    </p>
                 </div>
 
                 <!-- Amount -->
@@ -379,15 +384,26 @@
                                 option.disabled = true;
                                 option.hidden = true;
                             }
-                        } else {
-                            // For non-bank sources, all accounts except self are available
+                        }
+                        // If source is savings (Mshwari), only allow mpesa
+                        else if (fromAccount && fromAccount.type === 'savings') {
+                            if (optionType === 'mpesa') {
+                                option.disabled = false;
+                                option.hidden = false;
+                            } else {
+                                option.disabled = true;
+                                option.hidden = true;
+                            }
+                        }
+                        else {
+                            // For non-bank/non-savings sources, all accounts except self are available
                             option.disabled = false;
                             option.hidden = false;
                         }
                     });
 
-                    // Auto-select M-Pesa if source is bank and no destination is selected
-                    if (fromAccount && fromAccount.type === 'bank' && !this.toAccountId) {
+                    // Auto-select M-Pesa if source is bank/savings and no destination is selected
+                    if (fromAccount && (fromAccount.type === 'bank' || fromAccount.type === 'savings') && !this.toAccountId) {
                         const mpesaOption = Array.from(toSelect.options).find(opt =>
                             opt.dataset.type === 'mpesa' && opt.value !== this.fromAccountId
                         );
