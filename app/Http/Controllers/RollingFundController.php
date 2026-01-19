@@ -37,6 +37,29 @@ class RollingFundController extends Controller
                 $rollingFund->where('status', 'completed')
                     ->whereColumn('winnings', '<', 'stake_amount');
                 break;
+            case 'break_even':
+                $rollingFund->where('status', 'completed')
+                    ->whereColumn('winnings', '=', 'stake_amount');
+                break;
+            case 'high_wins':
+                // High wins: profit of 50% or more
+                $rollingFund->where('status', 'completed')
+                    ->whereRaw('(winnings - stake_amount) >= (stake_amount * 0.5)');
+                break;
+            case 'significant_losses':
+                // Significant losses: loss of 50% or more
+                $rollingFund->where('status', 'completed')
+                    ->whereRaw('(stake_amount - winnings) >= (stake_amount * 0.5)');
+                break;
+            case 'last_7_days':
+                $rollingFund->where('date', '>=', now()->subDays(7));
+                break;
+            case 'last_30_days':
+                $rollingFund->where('date', '>=', now()->subDays(30));
+                break;
+            case 'last_90_days':
+                $rollingFund->where('date', '>=', now()->subDays(90));
+                break;
             case 'this_month':
                 $rollingFund->whereMonth('date', now()->month)
                     ->whereYear('date', now()->year);
@@ -44,9 +67,17 @@ class RollingFundController extends Controller
             case 'this_year':
                 $rollingFund->whereYear('date', now()->year);
                 break;
+            case 'custom_range':
+                if ($request->has('date_from') && $request->date_from) {
+                    $rollingFund->where('date', '>=', $request->date_from);
+                }
+                if ($request->has('date_to') && $request->date_to) {
+                    $rollingFund->where('date', '<=', $request->date_to);
+                }
+                break;
         }
 
-        $wagers = $rollingFund->paginate(15);
+        $wagers = $rollingFund->paginate(15)->appends($request->except('page'));
 
         // Calculate statistics (only for completed wagers)
         $completedSessions = RollingFund::where('user_id', auth()->id())

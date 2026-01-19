@@ -194,14 +194,14 @@
             @if($stats['pending_count'] > 0)
                 <div class="relative bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-2xl shadow-md overflow-hidden border-2 border-amber-300 dark:border-amber-700">
                     <div class="absolute top-0 right-0 w-64 h-64 bg-amber-400/10 rounded-full -mr-32 -mt-32"></div>
-                    <div class="relative p-6">
-                        <div class="flex items-center justify-between gap-4">
-                            <div class="flex items-start gap-4 flex-1">
-                                <div class="w-14 h-14 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
-                                    <span class="text-3xl">⏳</span>
+                    <div class="relative p-4 sm:p-6">
+                        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                            <div class="flex items-start gap-3 sm:gap-4 flex-1 w-full">
+                                <div class="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
+                                    <span class="text-2xl sm:text-3xl">⏳</span>
                                 </div>
-                                <div>
-                                    <p class="text-lg font-bold text-amber-900 dark:text-amber-300 mb-1">
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-base sm:text-lg font-bold text-amber-900 dark:text-amber-300 mb-1">
                                         {{ $stats['pending_count'] }} Pending Session{{ $stats['pending_count'] > 1 ? 's' : '' }}
                                     </p>
                                     <p class="text-sm text-amber-700 dark:text-amber-400">
@@ -213,7 +213,7 @@
                                 </div>
                             </div>
                             <a href="{{ route('rolling-funds.index', ['filter' => 'pending']) }}"
-                               class="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-sm font-bold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 flex-shrink-0">
+                               class="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-sm font-bold shadow-lg hover:shadow-xl transition-all duration-300 text-center flex-shrink-0">
                                 View All
                             </a>
                         </div>
@@ -223,9 +223,9 @@
 
             <!-- Filters Section -->
             <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-100 dark:border-gray-700">
-                <div class="p-5 border-b border-gray-200 dark:border-gray-700">
+                <div class="p-4 sm:p-5 border-b border-gray-200 dark:border-gray-700">
                     <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-xl flex items-center justify-center">
+                        <div class="w-10 h-10 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-xl flex items-center justify-center flex-shrink-0">
                             <svg class="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
                             </svg>
@@ -236,54 +236,130 @@
                         </div>
                     </div>
                 </div>
-                <div class="p-5">
-                    <div class="flex flex-wrap gap-2">
-                        <a href="{{ route('rolling-funds.index') }}"
-                           class="px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 {{ $filter === 'all' ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md transform scale-105' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
-                            All Sessions
-                        </a>
-                        <a href="{{ route('rolling-funds.index', ['filter' => 'pending']) }}"
-                           class="px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-1.5 {{ $filter === 'pending' ? 'bg-amber-500 text-white shadow-md transform scale-105' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
-                            <span>⏳</span> Pending
-                        </a>
-                        <a href="{{ route('rolling-funds.index', ['filter' => 'wins']) }}"
-                           class="px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-1.5 {{ $filter === 'wins' ? 'bg-green-500 text-white shadow-md transform scale-105' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
-                            <span>📈</span> Positive
-                        </a>
-                        <a href="{{ route('rolling-funds.index', ['filter' => 'losses']) }}"
-                           class="px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-1.5 {{ $filter === 'losses' ? 'bg-red-500 text-white shadow-md transform scale-105' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
-                            <span>📉</span> Negative
-                        </a>
-                        <a href="{{ route('rolling-funds.index', ['filter' => 'this_month']) }}"
-                           class="px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-1.5 {{ $filter === 'this_month' ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md transform scale-105' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
-                            <span>📅</span> This Month
-                        </a>
-                        <a href="{{ route('rolling-funds.index', ['filter' => 'this_year']) }}"
-                           class="px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-1.5 {{ $filter === 'this_year' ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md transform scale-105' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
-                            <span>📆</span> This Year
-                        </a>
+                <div class="p-4 sm:p-5 space-y-4 sm:space-y-5">
+                    <!-- Status Filters -->
+                    <div>
+                        <p class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Status</p>
+                        <div class="flex flex-wrap gap-2">
+                            <a href="{{ route('rolling-funds.index') }}"
+                               class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 {{ $filter === 'all' ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
+                                All Sessions
+                            </a>
+                            <a href="{{ route('rolling-funds.index', ['filter' => 'pending']) }}"
+                               class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 flex items-center gap-1.5 {{ $filter === 'pending' ? 'bg-amber-500 text-white shadow-md' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
+                                <span>⏳</span> Pending
+                            </a>
+                            <a href="{{ route('rolling-funds.index', ['filter' => 'completed']) }}"
+                               class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 flex items-center gap-1.5 {{ $filter === 'completed' ? 'bg-blue-500 text-white shadow-md' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
+                                <span>✓</span> Completed
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Time-based Filters -->
+                    <div>
+                        <p class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Time Period</p>
+                        <div class="flex flex-wrap gap-2">
+                            <a href="{{ route('rolling-funds.index', ['filter' => 'last_7_days']) }}"
+                               class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 flex items-center gap-1.5 {{ $filter === 'last_7_days' ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
+                                <span>📅</span> <span class="hidden xs:inline">Last</span> 7d
+                            </a>
+                            <a href="{{ route('rolling-funds.index', ['filter' => 'last_30_days']) }}"
+                               class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 flex items-center gap-1.5 {{ $filter === 'last_30_days' ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
+                                <span>📅</span> <span class="hidden xs:inline">Last</span> 30d
+                            </a>
+                            <a href="{{ route('rolling-funds.index', ['filter' => 'last_90_days']) }}"
+                               class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 flex items-center gap-1.5 {{ $filter === 'last_90_days' ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
+                                <span>📅</span> <span class="hidden xs:inline">Last</span> 90d
+                            </a>
+                            <a href="{{ route('rolling-funds.index', ['filter' => 'this_month']) }}"
+                               class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 flex items-center gap-1.5 {{ $filter === 'this_month' ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
+                                <span>📅</span> This Month
+                            </a>
+                            <a href="{{ route('rolling-funds.index', ['filter' => 'this_year']) }}"
+                               class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 flex items-center gap-1.5 {{ $filter === 'this_year' ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
+                                <span>📆</span> This Year
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Performance Filters -->
+                    <div>
+                        <p class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Performance</p>
+                        <div class="flex flex-wrap gap-2">
+                            <a href="{{ route('rolling-funds.index', ['filter' => 'wins']) }}"
+                               class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 flex items-center gap-1.5 {{ $filter === 'wins' ? 'bg-green-500 text-white shadow-md' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
+                                <span>📈</span> Positive
+                            </a>
+                            <a href="{{ route('rolling-funds.index', ['filter' => 'losses']) }}"
+                               class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 flex items-center gap-1.5 {{ $filter === 'losses' ? 'bg-red-500 text-white shadow-md' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
+                                <span>📉</span> Negative
+                            </a>
+                            <a href="{{ route('rolling-funds.index', ['filter' => 'break_even']) }}"
+                               class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 flex items-center gap-1.5 {{ $filter === 'break_even' ? 'bg-gray-500 text-white shadow-md' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
+                                <span>➖</span> Break Even
+                            </a>
+                            <a href="{{ route('rolling-funds.index',['filter' => 'high_wins']) }}"
+                               class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 flex items-center gap-1.5 {{ $filter === 'high_wins' ? 'bg-emerald-500 text-white shadow-md' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
+                                <span>🚀</span> High Wins
+                            </a>
+                            <a href="{{ route('rolling-funds.index', ['filter' => 'significant_losses']) }}"
+                               class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 flex items-center gap-1.5 {{ $filter === 'significant_losses' ? 'bg-rose-500 text-white shadow-md' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
+                                <span>⚠️</span> Big Losses
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Custom Date Range -->
+                    <div>
+                        <p class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Custom Range</p>
+                        <form method="GET" action="{{ route('rolling-funds.index') }}" class="flex flex-col sm:flex-row flex-wrap gap-2 items-stretch sm:items-end">
+                            <input type="hidden" name="filter" value="custom_range">
+                            <div class="flex-1 min-w-[140px]">
+                                <label class="text-xs text-gray-600 dark:text-gray-400 font-medium block mb-1">From</label>
+                                <input type="date" name="date_from" value="{{ request('date_from') }}"
+                                       class="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                            </div>
+                            <div class="flex-1 min-w-[140px]">
+                                <label class="text-xs text-gray-600 dark:text-gray-400 font-medium block mb-1">To</label>
+                                <input type="date" name="date_to" value="{{ request('date_to') }}"
+                                       class="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                            </div>
+                            <div class="flex gap-2">
+                                <button type="submit"
+                                        class="flex-1 sm:flex-none px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-300">
+                                    Apply
+                                </button>
+                                @if($filter === 'custom_range')
+                                    <a href="{{ route('rolling-funds.index') }}"
+                                       class="flex-1 sm:flex-none px-4 py-2 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded-lg text-sm font-semibold transition-all duration-300 text-center">
+                                        Clear
+                                    </a>
+                                @endif
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
 
             <!-- Sessions List -->
             <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-md overflow-hidden border border-gray-100 dark:border-gray-700">
-                <div class="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800/50">
+                <div class="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800/50">
                     <div class="flex items-center justify-between flex-wrap gap-3">
                         <div class="flex items-center gap-3">
-                            <div class="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                                <span class="text-2xl">📊</span>
+                            <div class="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
+                                <span class="text-xl sm:text-2xl">📊</span>
                             </div>
                             <div>
-                                <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">
+                                <h3 class="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100">
                                     Session History
                                 </h3>
-                                <p class="text-sm text-gray-500 dark:text-gray-400">
+                                <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                                     {{ $wagers->total() }} session{{ $wagers->total() !== 1 ? 's' : '' }} recorded
                                 </p>
                             </div>
                         </div>
-                        @if($wagers->total() > 0)
+                        @if($wagers->hasPages())
                             <div class="text-right">
                                 <p class="text-xs text-gray-500 dark:text-gray-400 font-medium">
                                     Page {{ $wagers->currentPage() }} of {{ $wagers->lastPage() }}
@@ -295,11 +371,11 @@
 
                 <div class="divide-y divide-gray-100 dark:divide-gray-700">
                     @forelse($wagers as $wager)
-                        <div class="group p-6 hover:bg-gradient-to-r hover:from-gray-50 hover:to-transparent dark:hover:from-gray-700/20 dark:hover:to-transparent transition-all duration-200">
-                            <div class="flex items-start justify-between gap-6">
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex items-center gap-3 mb-3 flex-wrap">
-                                        <div class="w-10 h-10 rounded-xl flex items-center justify-center shadow-md {{ $wager->status === 'pending' ? 'bg-gradient-to-br from-amber-400 to-orange-500' : ($wager->isWin() ? 'bg-gradient-to-br from-green-500 to-emerald-600' : ($wager->outcome === 'break_even' ? 'bg-gradient-to-br from-gray-400 to-gray-500' : 'bg-gradient-to-br from-red-500 to-rose-600')) }}">
+                        <div class="group p-4 sm:p-6 hover:bg-gradient-to-r hover:from-gray-50 hover:to-transparent dark:hover:from-gray-700/20 dark:hover:to-transparent transition-all duration-200">
+                            <div class="flex flex-col lg:flex-row items-start lg:items-start justify-between gap-4 lg:gap-6">
+                                <div class="flex-1 min-w-0 w-full">
+                                    <div class="flex items-start gap-3 mb-3 flex-wrap">
+                                        <div class="w-10 h-10 rounded-xl flex items-center justify-center shadow-md flex-shrink-0 {{ $wager->status === 'pending' ? 'bg-gradient-to-br from-amber-400 to-orange-500' : ($wager->isWin() ? 'bg-gradient-to-br from-green-500 to-emerald-600' : ($wager->outcome === 'break_even' ? 'bg-gradient-to-br from-gray-400 to-gray-500' : 'bg-gradient-to-br from-red-500 to-rose-600')) }}">
                                             <span class="text-xl">
                                                 @if($wager->status === 'pending')
                                                     ⏳
@@ -312,13 +388,13 @@
                                                 @endif
                                             </span>
                                         </div>
-                                        <div class="flex-1">
-                                            <div class="flex items-center gap-2 flex-wrap">
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex flex-wrap items-center gap-2">
                                                 <a href="{{ route('rolling-funds.show', $wager) }}"
-                                                   class="font-bold text-base text-gray-900 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                                                   class="font-bold text-sm sm:text-base text-gray-900 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors break-words">
                                                     {{ $wager->platform ?? 'Rolling Funds' }}
                                                 </a>
-                                                <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2.5 py-1 rounded-lg">
+                                                <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2.5 py-1 rounded-lg whitespace-nowrap">
                                                     {{ $wager->date->format('M d, Y') }}
                                                 </span>
                                                 @if($wager->status === 'pending')
@@ -334,13 +410,13 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="space-y-2 ml-13">
-                                        <div class="flex items-center gap-4 text-sm">
+                                    <div class="space-y-2 ml-0 sm:ml-13">
+                                        <div class="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm">
                                             <div class="flex items-center gap-2">
                                                 <span class="text-gray-500 dark:text-gray-400 font-medium">Invested:</span>
                                                 <span class="font-bold text-gray-900 dark:text-gray-100">KES {{ number_format($wager->stake_amount, 0) }}</span>
                                             </div>
-                                            <span class="text-gray-400">•</span>
+                                            <span class="text-gray-400 hidden sm:inline">•</span>
                                             <div class="flex items-center gap-2">
                                                 <span class="text-gray-500 dark:text-gray-400 font-medium">Returns:</span>
                                                 @if($wager->status === 'completed')
@@ -358,10 +434,10 @@
                                     </div>
                                 </div>
 
-                                <div class="text-right flex-shrink-0">
+                                <div class="w-full lg:w-auto lg:text-right flex-shrink-0">
                                     @if($wager->status === 'completed')
                                         <div class="bg-gradient-to-br {{ $wager->net_result >= 0 ? 'from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20' : 'from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20' }} rounded-xl p-4 shadow-sm">
-                                            <p class="text-2xl font-bold {{ $wager->net_result >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
+                                            <p class="text-xl sm:text-2xl font-bold {{ $wager->net_result >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
                                                 {{ $wager->net_result >= 0 ? '+' : '' }}{{ number_format($wager->net_result, 0) }}
                                             </p>
                                             <p class="text-xs font-bold {{ $wager->net_result >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }} mt-1">
@@ -371,7 +447,7 @@
                                         </div>
                                     @else
                                         <div class="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-xl p-4 shadow-sm">
-                                            <p class="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                                            <p class="text-xl sm:text-2xl font-bold text-amber-600 dark:text-amber-400">
                                                 Pending
                                             </p>
                                             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -382,7 +458,7 @@
                                 </div>
                             </div>
 
-                            <div class="mt-4 flex gap-3 ml-13">
+                            <div class="mt-4 flex flex-wrap gap-3 ml-0 sm:ml-13">
                                 <a href="{{ route('rolling-funds.show', $wager) }}"
                                    class="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors group">
                                     View Details
@@ -414,20 +490,20 @@
                             </div>
                         </div>
                     @empty
-                        <div class="p-16 text-center">
+                        <div class="p-12 sm:p-16 text-center">
                             <div class="mb-6">
-                                <div class="w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-3xl flex items-center justify-center mx-auto shadow-lg">
-                                    <span class="text-5xl">📊</span>
+                                <div class="w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-3xl flex items-center justify-center mx-auto shadow-lg">
+                                    <span class="text-4xl sm:text-5xl">📊</span>
                                 </div>
                             </div>
-                            <h3 class="text-xl font-bold text-gray-800 dark:text-gray-200 mb-2">
+                            <h3 class="text-lg sm:text-xl font-bold text-gray-800 dark:text-gray-200 mb-2">
                                 No Sessions Yet
                             </h3>
-                            <p class="text-gray-500 dark:text-gray-400 text-base mb-6 max-w-md mx-auto">
+                            <p class="text-sm sm:text-base text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
                                 Start tracking your rolling funds investments to monitor your performance and returns.
                             </p>
                             <a href="{{ route('rolling-funds.create') }}"
-                               class="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-8 py-3.5 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+                               class="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl font-bold text-sm shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                                 </svg>
@@ -438,7 +514,7 @@
                 </div>
 
                 @if($wagers->hasPages())
-                    <div class="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                    <div class="p-4 sm:p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
                         {{ $wagers->links() }}
                     </div>
                 @endif
@@ -489,6 +565,13 @@
 
         .dark ::-webkit-scrollbar-thumb:hover {
             background: rgba(55, 65, 81, 0.7);
+        }
+
+        /* Extra small breakpoint for xs: prefix */
+        @media (min-width: 475px) {
+            .xs\:inline {
+                display: inline;
+            }
         }
     </style>
 </x-app-layout>
