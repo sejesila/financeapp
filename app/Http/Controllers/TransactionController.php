@@ -67,7 +67,7 @@ class TransactionController extends Controller
         $sortedTypes = [];
         foreach ($baseTypes as $key => $label) {
             $sortedTypes[] = [
-                'key' => $key,
+                'key' => $key,+
                 'label' => $label,
                 'usageCount' => $usageStats[$key] ?? 0,
             ];
