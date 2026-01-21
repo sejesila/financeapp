@@ -29,31 +29,53 @@ class LoanController extends Controller implements HasMiddleware
         $this->authorize('viewAny', Loan::class);
 
         $filter = $request->get('filter', 'active');
-        $year = $request->get('year');
+        $period = $request->get('period');
+        $startDate = $request->get('start_date');
+        $endDate = $request->get('end_date');
 
         $minYear = Loan::where('user_id', Auth::id())->min(DB::raw('YEAR(disbursed_date)'));
         $minYear = $minYear ?? date('Y');
         $maxYear = date('Y');
 
-        $activeLoansQuery = Loan::with('account')
+        // Get active loans
+        $activeLoansQuery = Loan::with(['account', 'payments'])
             ->where('user_id', Auth::id())
             ->where('status', 'active');
 
-        if ($year && $filter === 'active') {
-            $activeLoansQuery->whereYear('disbursed_date', $year);
-        }
-
         $activeLoans = $activeLoansQuery->orderBy('disbursed_date', 'desc')->get();
 
-        $paidLoansQuery = Loan::with('account')
+        // Get paid loans
+        $paidLoansQuery = Loan::with(['account', 'payments'])
             ->where('user_id', Auth::id())
             ->where('status', 'paid');
 
-        if ($year) {
-            $paidLoansQuery->whereYear('repaid_date', $year);
+        // Apply period filtering to paid loans
+        if ($period) {
+            switch ($period) {
+                case 'this_month':
+                    $paidLoansQuery->whereMonth('repaid_date', now()->month)
+                        ->whereYear('repaid_date', now()->year);
+                    break;
+                case 'last_month':
+                    $lastMonth = now()->subMonth();
+                    $paidLoansQuery->whereMonth('repaid_date', $lastMonth->month)
+                        ->whereYear('repaid_date', $lastMonth->year);
+                    break;
+                case 'this_year':
+                    $paidLoansQuery->whereYear('repaid_date', now()->year);
+                    break;
+                case 'last_year':
+                    $paidLoansQuery->whereYear('repaid_date', now()->year - 1);
+                    break;
+                case 'custom':
+                    if ($startDate && $endDate) {
+                        $paidLoansQuery->whereBetween('repaid_date', [$startDate, $endDate]);
+                    }
+                    break;
+            }
         }
 
-        $limit = ($filter === 'all_paid' || $year) ? null : 10;
+        $limit = ($filter === 'all_paid' || $period) ? null : 10;
 
         if ($limit) {
             $paidLoansQuery->limit($limit);
@@ -73,7 +95,9 @@ class LoanController extends Controller implements HasMiddleware
             'activeLoans',
             'paidLoans',
             'filter',
-            'year',
+            'period',
+            'startDate',
+            'endDate',
             'minYear',
             'maxYear',
             'accounts'
