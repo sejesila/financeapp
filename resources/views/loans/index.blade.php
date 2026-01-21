@@ -119,9 +119,9 @@
                     elseif($loan->loan_type === 'kcb_mpesa') {
                         $totalInterestPaid += ($loan->interest_amount ?? 0) + ($loan->facility_fee ?? 0);
                     }
-                    // For custom loans: custom interest
+                    // For custom loans: use interest_amount field (which stores custom_interest_amount)
                     else {
-                        $totalInterestPaid += ($loan->custom_interest_amount ?? 0);
+                        $totalInterestPaid += ($loan->interest_amount ?? 0);
                     }
                 }
 
@@ -205,7 +205,7 @@
                                     } elseif($loan->loan_type === 'kcb_mpesa') {
                                         $interestFees = ($loan->interest_amount ?? 0) + ($loan->facility_fee ?? 0);
                                     } else {
-                                        $interestFees = $loan->custom_interest_amount ?? 0;
+                                        $interestFees = $loan->interest_amount ?? 0;
                                     }
                                 @endphp
                                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
