@@ -37,14 +37,14 @@ class LoanController extends Controller implements HasMiddleware
         $minYear = $minYear ?? date('Y');
         $maxYear = date('Y');
 
-        // Get active loans
+        // Get active loans (no pagination for active loans - usually small number)
         $activeLoansQuery = Loan::with(['account', 'payments'])
             ->where('user_id', Auth::id())
             ->where('status', 'active');
 
         $activeLoans = $activeLoansQuery->orderBy('disbursed_date', 'desc')->get();
 
-        // Get paid loans
+        // Get paid loans with pagination
         $paidLoansQuery = Loan::with(['account', 'payments'])
             ->where('user_id', Auth::id())
             ->where('status', 'paid');
@@ -75,16 +75,10 @@ class LoanController extends Controller implements HasMiddleware
             }
         }
 
-        $limit = ($filter === 'all_paid' || $period) ? null : 10;
+        $paidLoansQuery->orderBy('repaid_date', 'desc')->orderBy('updated_at', 'desc');
 
-        if ($limit) {
-            $paidLoansQuery->limit($limit);
-        }
-
-        $paidLoans = $paidLoansQuery
-            ->orderBy('repaid_date', 'desc')
-            ->orderBy('updated_at', 'desc')
-            ->get();
+        // Paginate paid loans - show 15 per page
+        $paidLoans = $paidLoansQuery->paginate(15)->withQueryString();
 
         $accounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
@@ -494,15 +488,27 @@ class LoanController extends Controller implements HasMiddleware
         // Calculate minimum required balance (25% of outstanding balance)
         $minRequiredBalance = $loan->balance * 0.25;
 
-        // Get accounts with sufficient balance, excluding savings accounts
-        $accounts = Account::where('user_id', Auth::id())
+        // Determine loan type
+        $loanType = $loan->loan_type ?? $this->detectLoanType($loan->source);
+
+        // Get accounts based on loan type
+        $accountsQuery = Account::where('user_id', Auth::id())
             ->where('is_active', true)
             ->where('type', '!=', 'savings')
-            ->where('current_balance', '>=', $minRequiredBalance)
-            ->orderBy('name')
-            ->get();
+            ->where('current_balance', '>=', $minRequiredBalance);
 
-        return view('loans.payment', compact('loan', 'repayment', 'accounts', 'minRequiredBalance'));
+        // For M-Shwari and KCB M-Pesa loans, only allow mobile money accounts
+        if ($loanType === 'mshwari' || $loanType === 'kcb_mpesa') {
+            $accountsQuery->where('type', 'mobile_money');
+        }
+        // For other loans, allow mobile_money, bank, and cash accounts
+        else {
+            $accountsQuery->whereIn('type', ['mobile_money', 'bank', 'cash']);
+        }
+
+        $accounts = $accountsQuery->orderBy('name')->get();
+
+        return view('loans.payment', compact('loan', 'repayment', 'accounts', 'minRequiredBalance', 'loanType'));
     }
 
     /**

@@ -343,6 +343,11 @@
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- Pagination Links -->
+                    <div class="mt-4">
+                        {{ $paidLoans->links() }}
+                    </div>
                 </div>
             @elseif($period)
                 <div class="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-8 text-center">
