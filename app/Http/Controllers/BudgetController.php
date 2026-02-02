@@ -45,17 +45,36 @@ class BudgetController extends Controller
                 return $b->category_id . '-' . $b->month;
             });
 
-        // Compute actual totals grouped by category & month using period_date
+        // ✅ FIXED: Compute actual totals excluding client fund transactions
+        // Key insight: Client fund expenses are pass-through (not YOUR expenses)
+        // But client fund profits (income) should be counted (that's YOUR money)
         $actualsQuery = Transaction::query()
             ->selectRaw('category_id, MONTH(COALESCE(period_date, date)) as month, SUM(amount) as total')
             ->where('user_id', Auth::id())
             ->whereYear(DB::raw('COALESCE(period_date, date)'), $year)
+            ->where(function($q) {
+                // Include regular transactions (not related to client funds)
+                $q->where(function($q2) {
+                    $q2->where('payment_method', '!=', 'Client Fund')
+                        ->where('payment_method', '!=', 'Client Commission')
+                        ->orWhereNull('payment_method');
+                })
+                    // OR include client fund profit income (payment_method = 'Client Commission' AND type = 'income')
+                    ->orWhereExists(function($query) {
+                        $query->select(DB::raw(1))
+                            ->from('categories')
+                            ->whereColumn('categories.id', 'transactions.category_id')
+                            ->where('categories.type', 'income')
+                            ->where('transactions.payment_method', 'Client Commission');
+                    });
+            })
             ->whereHas('category', function ($q) {
                 $q->whereIn('type', ['income', 'expense'])
                     ->whereNotIn('name', [
                         'Loan Disbursement',
                         'Loan Receipt',
-                        'Balance Adjustment'
+                        'Balance Adjustment',
+                        'Client Funds'  // ✅ Exclude liability category
                     ]);
             })
             ->groupBy('category_id', DB::raw('MONTH(COALESCE(period_date, date))'))
@@ -103,6 +122,7 @@ class BudgetController extends Controller
 
         // Get loan statistics for the year
         $loanStats = $this->getLoanStats($year);
+
         // Get accounts for the FAB component
         $accounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
