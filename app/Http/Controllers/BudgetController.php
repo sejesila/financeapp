@@ -86,7 +86,7 @@ class BudgetController extends Controller
             $actuals[$row->category_id][$row->month] = (float)$row->total;
         }
 
-        // Calculate yearly totals for income categories
+        // Calculate yearly totals for income categories and filter out those with no transactions
         $incomeCategories = $incomeCategories->map(function ($category) use ($actuals, $budgets) {
             $yearlyTotal = 0;
             $yearlyBudget = 0;
@@ -101,9 +101,13 @@ class BudgetController extends Controller
                 ? round(($yearlyTotal / $yearlyBudget) * 100, 1)
                 : 0;
             return $category;
-        })->sortByDesc('yearly_total');
+        })
+            ->filter(function ($category) {
+                return $category->yearly_total > 0; // Only show categories with transactions
+            })
+            ->sortByDesc('yearly_total');
 
-        // Calculate yearly totals for expense categories
+        // Calculate yearly totals for expense categories and filter out those with no transactions
         $expenseCategories = $expenseCategories->map(function ($category) use ($actuals, $budgets) {
             $yearlyTotal = 0;
             $yearlyBudget = 0;
@@ -118,7 +122,11 @@ class BudgetController extends Controller
                 ? round(($yearlyTotal / $yearlyBudget) * 100, 1)
                 : 0;
             return $category;
-        })->sortByDesc('yearly_total');
+        })
+            ->filter(function ($category) {
+                return $category->yearly_total > 0; // Only show categories with transactions
+            })
+            ->sortByDesc('yearly_total');
 
         // Get loan statistics for the year
         $loanStats = $this->getLoanStats($year);
