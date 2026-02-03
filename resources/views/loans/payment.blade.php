@@ -46,11 +46,7 @@
                     @endif
                 </p>
                 <p class="text-sm mt-1">
-                    You need an account with at least KES {{ number_format($minRequiredBalance ?? 0, 0) }}
-                    (25% of outstanding balance) to make a payment.
-                </p>
-                <p class="text-sm mt-1">
-                    Note: Savings accounts cannot be used for loan payments.
+                    Please create an active account to make a payment.
                 </p>
             </div>
         @endif
@@ -152,19 +148,7 @@
                     @endforeach
                 </select>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-2" id="selected_account_balance">
-                    @if($accounts->isNotEmpty())
-                        @if($loan->account && $accounts->contains('id', $loan->account_id))
-                            Available balance: KES {{ number_format($loan->account->current_balance, 0, '.', ',') }}
-                        @else
-                            Select an account to see available balance
-                        @endif
-                    @else
-                        @if($loanType === 'mshwari' || $loanType === 'kcb_mpesa')
-                            Top up your M-Pesa account to at least KES {{ number_format($minRequiredBalance ?? 0, 0) }} to proceed
-                        @else
-                            Top up an account (M-Pesa, Bank, or Cash) to at least KES {{ number_format($minRequiredBalance ?? 0, 0) }} to proceed
-                        @endif
-                    @endif
+                    Select an account to see available balance
                 </p>
                 <p class="text-xs text-blue-600 dark:text-blue-400 mt-1">
                     💡 {{ ucfirst($loanTypeLabel) }} loans: {{ $allowedAccountTypes }}
@@ -351,17 +335,13 @@
             const accountSelect = document.getElementById('payment_account_id');
             const balanceDisplay = document.getElementById('selected_account_balance');
 
-            if (!accountSelect || !balanceDisplay) {
-                console.error('Required elements not found');
-                return;
-            }
+            if (!accountSelect || !balanceDisplay) return;
 
             const selectedOption = accountSelect.options[accountSelect.selectedIndex];
 
             if (!selectedOption || !selectedOption.value) {
                 balanceDisplay.textContent = 'Select an account to see available balance';
-                balanceDisplay.classList.remove('text-red-500');
-                balanceDisplay.classList.add('text-gray-500', 'dark:text-gray-400');
+                balanceDisplay.className = 'text-xs text-gray-500 dark:text-gray-400 mt-2';
                 return;
             }
 
@@ -373,12 +353,7 @@
                     maximumFractionDigits: 0
                 });
                 balanceDisplay.textContent = `Available balance: KES ${formattedBalance}`;
-                balanceDisplay.classList.remove('text-red-500');
-                balanceDisplay.classList.add('text-gray-500', 'dark:text-gray-400');
-            } else {
-                balanceDisplay.textContent = 'Select an account to see available balance';
-                balanceDisplay.classList.remove('text-red-500');
-                balanceDisplay.classList.add('text-gray-500', 'dark:text-gray-400');
+                balanceDisplay.className = 'text-xs text-gray-500 dark:text-gray-400 mt-2';
             }
         }
 
@@ -399,8 +374,6 @@
 
             let interestPortion = Math.min(paymentAmount, remainingInterest);
             let principalPortion = Math.max(0, paymentAmount - interestPortion);
-
-            // Cap principal portion to remaining principal
             principalPortion = Math.min(principalPortion, remainingPrincipal);
 
             document.getElementById('interest_portion').value = interestPortion.toFixed(2);
@@ -413,55 +386,7 @@
             })}`;
         }
 
-        // Enable manual override
-        const manualOverrideCheckbox = document.getElementById('manual_override');
-        if (manualOverrideCheckbox) {
-            manualOverrideCheckbox.addEventListener('change', function() {
-                const interestInput = document.getElementById('interest_portion');
-                const principalInput = document.getElementById('principal_portion');
-
-                if (this.checked) {
-                    interestInput.removeAttribute('readonly');
-                    principalInput.removeAttribute('readonly');
-                    interestInput.classList.remove('bg-gray-50', 'dark:bg-gray-700');
-                    principalInput.classList.remove('bg-gray-50', 'dark:bg-gray-700');
-                    interestInput.classList.add('bg-white', 'dark:bg-gray-800');
-                    principalInput.classList.add('bg-white', 'dark:bg-gray-800');
-                } else {
-                    interestInput.setAttribute('readonly', true);
-                    principalInput.setAttribute('readonly', true);
-                    interestInput.classList.add('bg-gray-50', 'dark:bg-gray-700');
-                    principalInput.classList.add('bg-gray-50', 'dark:bg-gray-700');
-                    interestInput.classList.remove('bg-white', 'dark:bg-gray-800');
-                    principalInput.classList.remove('bg-white', 'dark:bg-gray-800');
-                    calculatePaymentAllocation();
-                }
-            });
-        }
-
-        // Auto-calculate on payment amount change
-        const paymentAmountInput = document.getElementById('payment_amount');
-        if (paymentAmountInput) {
-            paymentAmountInput.addEventListener('input', function() {
-                const manualOverride = document.getElementById('manual_override');
-                if (!manualOverride || !manualOverride.checked) {
-                    calculatePaymentAllocation();
-                }
-            });
-        }
-
-        // Manual allocation change updates total
-        const interestPortionInput = document.getElementById('interest_portion');
-        const principalPortionInput = document.getElementById('principal_portion');
-
-        if (interestPortionInput) {
-            interestPortionInput.addEventListener('input', updateTotal);
-        }
-
-        if (principalPortionInput) {
-            principalPortionInput.addEventListener('input', updateTotal);
-        }
-
+        // Update total when manual portions change
         function updateTotal() {
             const interestPortion = parseFloat(document.getElementById('interest_portion').value) || 0;
             const principalPortion = parseFloat(document.getElementById('principal_portion').value) || 0;
@@ -473,14 +398,64 @@
             })}`;
         }
 
-        // Add event listener to dropdown
-        const accountSelect = document.getElementById('payment_account_id');
-        if (accountSelect) {
-            accountSelect.addEventListener('change', updateAccountBalance);
-        }
-
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
+            // Add event listener to dropdown
+            const accountSelect = document.getElementById('payment_account_id');
+            if (accountSelect) {
+                accountSelect.addEventListener('change', updateAccountBalance);
+            }
+
+            // Enable manual override
+            const manualOverrideCheckbox = document.getElementById('manual_override');
+            if (manualOverrideCheckbox) {
+                manualOverrideCheckbox.addEventListener('change', function() {
+                    const interestInput = document.getElementById('interest_portion');
+                    const principalInput = document.getElementById('principal_portion');
+
+                    if (this.checked) {
+                        interestInput.removeAttribute('readonly');
+                        principalInput.removeAttribute('readonly');
+                        interestInput.classList.remove('bg-gray-50', 'dark:bg-gray-700');
+                        principalInput.classList.remove('bg-gray-50', 'dark:bg-gray-700');
+                        interestInput.classList.add('bg-white', 'dark:bg-gray-800');
+                        principalInput.classList.add('bg-white', 'dark:bg-gray-800');
+                    } else {
+                        interestInput.setAttribute('readonly', true);
+                        principalInput.setAttribute('readonly', true);
+                        interestInput.classList.add('bg-gray-50', 'dark:bg-gray-700');
+                        principalInput.classList.add('bg-gray-50', 'dark:bg-gray-700');
+                        interestInput.classList.remove('bg-white', 'dark:bg-gray-800');
+                        principalInput.classList.remove('bg-white', 'dark:bg-gray-800');
+                        calculatePaymentAllocation();
+                    }
+                });
+            }
+
+            // Auto-calculate on payment amount change
+            const paymentAmountInput = document.getElementById('payment_amount');
+            if (paymentAmountInput) {
+                paymentAmountInput.addEventListener('input', function() {
+                    const manualOverride = document.getElementById('manual_override');
+                    if (!manualOverride || !manualOverride.checked) {
+                        calculatePaymentAllocation();
+                    }
+                });
+            }
+
+            // Manual allocation change updates total
+            const interestPortionInput = document.getElementById('interest_portion');
+            const principalPortionInput = document.getElementById('principal_portion');
+
+            if (interestPortionInput) {
+                interestPortionInput.addEventListener('input', updateTotal);
+            }
+
+            if (principalPortionInput) {
+                principalPortionInput.addEventListener('input', updateTotal);
+            }
+
+            // Initial update
             updateAccountBalance();
             calculatePaymentAllocation();
         });

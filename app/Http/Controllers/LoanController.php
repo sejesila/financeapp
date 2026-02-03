@@ -485,17 +485,13 @@ class LoanController extends Controller implements HasMiddleware
             $loan->interest_amount
         );
 
-        // Calculate minimum required balance (25% of outstanding balance)
-        $minRequiredBalance = $loan->balance * 0.25;
-
         // Determine loan type
         $loanType = $loan->loan_type ?? $this->detectLoanType($loan->source);
 
-        // Get accounts based on loan type
+        // Get accounts based on loan type - NO MINIMUM BALANCE CHECK
         $accountsQuery = Account::where('user_id', Auth::id())
             ->where('is_active', true)
-            ->where('type', '!=', 'savings')
-            ->where('current_balance', '>=', $minRequiredBalance);
+            ->where('type', '!=', 'savings');
 
         // For M-Shwari and KCB M-Pesa loans, only allow mobile money accounts
         if ($loanType === 'mshwari' || $loanType === 'kcb_mpesa') {
@@ -508,8 +504,12 @@ class LoanController extends Controller implements HasMiddleware
 
         $accounts = $accountsQuery->orderBy('name')->get();
 
+        // Optional: Set minRequiredBalance to 0 or null since we're not using it
+        $minRequiredBalance = 0;
+
         return view('loans.payment', compact('loan', 'repayment', 'accounts', 'minRequiredBalance', 'loanType'));
     }
+
 
     /**
      * Record loan payment with early repayment credit (within 10 days)
