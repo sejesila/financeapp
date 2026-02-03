@@ -165,63 +165,6 @@ class AccountController extends Controller
         return redirect()->route('accounts.index')->with('success', 'Account deleted successfully!');
     }
 
-//    public function adjustBalance(Request $request, Account $account)
-//    {
-//        // Verify ownership
-//        if ($account->user_id !== Auth::id()) {
-//            abort(403, 'Unauthorized access to this account.');
-//        }
-//
-//        $request->validate([
-//            'initial_balance' => 'required|numeric',
-//        ]);
-//
-//        $currentBalance = $account->current_balance;
-//        $targetBalance = $request->initial_balance;
-//        $difference = $targetBalance - $currentBalance;
-//
-//        if ($difference == 0) {
-//            return back()->with('success', 'Balance already matches the entered value.');
-//        }
-//
-//        $category = Category::firstOrCreate(
-//            [
-//                'name' => 'Balance Adjustment',
-//                'user_id' => Auth::id()
-//            ],
-//            [
-//                'type' => $difference > 0 ? 'income' : 'expense'
-//            ]
-//        );
-//
-//        Transaction::create([
-//            'user_id' => Auth::id(),
-//            'date' => now()->toDateString(),
-//            'period_date' => now()->toDateString(),
-//            'description' => "Balance adjustment for {$account->name}",
-//            'amount' => abs($difference),
-//            'category_id' => $category->id,
-//            'account_id' => $account->id,
-//            'payment_method' => match ($account->type) {
-//                'cash' => 'Cash',
-//                'mpesa' => 'Mpesa',
-//                'airtel_money' => 'Airtel Money',
-//                'bank' => 'Bank Transfer',
-//                'savings' => 'Savings',
-//                default => 'Cash'
-//            }
-//        ]);
-//
-//        $account->updateBalance();
-//
-//        // Clear cache after balance adjustment
-//        $this->clearAccountCache($account->id);
-//
-//        return redirect()
-//            ->route('accounts.edit', $account)
-//            ->with('success', 'Balance adjusted successfully.');
-//    }
-
     /**
      * Clear account statistics cache
      */
@@ -533,6 +476,7 @@ class AccountController extends Controller
             'Loan Fees Refund',
             'Facility Fee Refund',
             'Balance Adjustment',
+            'Rolling Funds', // Exclude Rolling Funds from top-up
         ];
 
         // Excluded parent categories (we only want their children)
@@ -614,6 +558,7 @@ class AccountController extends Controller
             'Loan Fees Refund',
             'Facility Fee Refund',
             'Balance Adjustment',
+            'Rolling Funds', // Also prevent in topUp method
         ];
 
         if (in_array($category->name, $systemCategories)) {
