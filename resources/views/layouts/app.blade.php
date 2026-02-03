@@ -44,6 +44,11 @@
         </div>
     </div>
 
+    <!-- Hidden logout form -->
+    <form id="logoutForm" method="POST" action="{{ route('logout') }}" style="display: none;">
+        @csrf
+    </form>
+
     <!-- Navigation -->
     <nav class="bg-white dark:bg-gray-800 shadow mb-6 transition-colors duration-200">
         <div class="container mx-auto px-4 py-4">
@@ -137,7 +142,7 @@
                                 Client Funds
                             </a>
                             <a href="{{ route('rolling-funds.index') }}"
-                               class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('client-funds*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                               class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('rolling-funds*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
                                 Odds & Ends
                             </a>
                             <a href="{{ route('profile.edit') }}" class="block px-4 py-3 text-base text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border-b dark:border-gray-700 rounded-t-lg transition">
@@ -238,7 +243,7 @@
                             Client Funds
                         </a>
                         <a href="{{ route('rolling-funds.index') }}"
-                           class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('client-funds*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                           class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('rolling-funds*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
                             Odds & Ends
                         </a>
 
@@ -361,11 +366,11 @@
         });
     }
 
-    // Session Timeout Management
+    // Session Timeout Management - 1 MINUTE TIMEOUT
     (function() {
-        const sessionLifetime = {{ config('session.lifetime') }} * 60 * 1000;
-        const warningTime = 5 * 60 * 1000;
-        const pingInterval = 5 * 60 * 1000;
+        const sessionLifetime = 1 * 60 * 1000; // 1 minute in milliseconds
+        const warningTime = 30 * 1000; // Show warning 30 seconds before expiry
+        const pingInterval = 30 * 1000; // Ping server every 30 seconds
         let timeoutWarning;
         let sessionTimeout;
         let countdownInterval;
@@ -376,16 +381,22 @@
             lastActivity = Date.now();
             clearTimeout(timeoutWarning);
             clearTimeout(sessionTimeout);
+            clearInterval(countdownInterval);
 
+            // Set warning to appear 30 seconds before session expires
             timeoutWarning = setTimeout(showWarning, sessionLifetime - warningTime);
+
+            // Set actual session timeout
             sessionTimeout = setTimeout(logout, sessionLifetime);
         }
 
         function showWarning() {
             const modal = document.getElementById('timeoutWarning');
-            modal.classList.remove('hidden');
+            if (modal) {
+                modal.classList.remove('hidden');
+            }
 
-            let secondsLeft = 300;
+            let secondsLeft = 30; // 30 seconds warning
             updateCountdown(secondsLeft);
 
             countdownInterval = setInterval(() => {
@@ -400,23 +411,37 @@
         }
 
         function updateCountdown(seconds) {
-            const minutes = Math.floor(seconds / 60);
-            const secs = seconds % 60;
-            document.getElementById('countdown').textContent =
-                `${minutes}:${secs.toString().padStart(2, '0')}`;
+            const countdownElement = document.getElementById('countdown');
+            if (countdownElement) {
+                const minutes = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                countdownElement.textContent = `${minutes}:${secs.toString().padStart(2, '0')}`;
+            }
         }
 
         function hideWarning() {
             clearInterval(countdownInterval);
-            document.getElementById('timeoutWarning').classList.add('hidden');
+            const modal = document.getElementById('timeoutWarning');
+            if (modal) {
+                modal.classList.add('hidden');
+            }
         }
 
         function logout() {
+            // Clear all timers
             clearTimeout(timeoutWarning);
             clearTimeout(sessionTimeout);
             clearInterval(countdownInterval);
             clearInterval(pingTimer);
-            window.location.href = '{{ route('session.expired') }}';
+
+            // Submit the hidden logout form
+            const logoutForm = document.getElementById('logoutForm');
+            if (logoutForm) {
+                logoutForm.submit();
+            } else {
+                // Fallback to redirect if form not found
+                window.location.href = '{{ route('logout') }}';
+            }
         }
 
         function stayLoggedIn() {
@@ -425,6 +450,8 @@
         }
 
         function pingServer(userInitiated = false) {
+            // Only ping if session.ping route exists
+            @if(Route::has('session.ping'))
             fetch('{{ route('session.ping') }}', {
                 method: 'POST',
                 headers: {
@@ -435,7 +462,7 @@
                 credentials: 'same-origin'
             })
                 .then(response => {
-                    if (response.status === 401) {
+                    if (response.status === 401 || response.status === 419) {
                         logout();
                     } else if (userInitiated) {
                         resetTimer();
@@ -443,29 +470,52 @@
                 })
                 .catch(error => {
                     console.error('Session ping failed:', error);
+                    if (userInitiated) {
+                        // If ping fails but user clicked "Stay Logged In", still reset timer
+                        resetTimer();
+                    }
                 });
+            @else
+            // If route doesn't exist, just reset timer on user interaction
+            if (userInitiated) {
+                resetTimer();
+            }
+            @endif
         }
 
+        // Track user activity
         const events = ['mousedown', 'keypress', 'scroll', 'touchstart', 'click'];
         events.forEach(event => {
             document.addEventListener(event, () => {
                 const now = Date.now();
+                // Only reset if more than 10 seconds since last activity
                 if (now - lastActivity > 10000) {
                     resetTimer();
                 }
             }, { passive: true });
         });
 
-        document.getElementById('stayLoggedIn')?.addEventListener('click', stayLoggedIn);
-        document.getElementById('logoutNow')?.addEventListener('click', logout);
+        // Button event listeners
+        const stayLoggedInBtn = document.getElementById('stayLoggedIn');
+        if (stayLoggedInBtn) {
+            stayLoggedInBtn.addEventListener('click', stayLoggedIn);
+        }
 
+        const logoutNowBtn = document.getElementById('logoutNow');
+        if (logoutNowBtn) {
+            logoutNowBtn.addEventListener('click', logout);
+        }
+
+        // Periodic ping to keep session alive
         pingTimer = setInterval(() => {
             pingServer(false);
         }, pingInterval);
 
+        // Initialize timers
         resetTimer();
         pingServer(false);
 
+        // Handle CSRF token expiration
         const originalFetch = window.fetch;
         window.fetch = function(...args) {
             return originalFetch.apply(this, args).then(response => {
@@ -473,7 +523,7 @@
                     if (confirm('Your session has expired. Reload the page to continue?')) {
                         window.location.reload();
                     } else {
-                        window.location.href = '{{ route('login') }}';
+                        logout();
                     }
                 }
                 return response;
