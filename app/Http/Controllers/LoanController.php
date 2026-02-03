@@ -495,7 +495,7 @@ class LoanController extends Controller implements HasMiddleware
 
         // For M-Shwari and KCB M-Pesa loans, only allow mobile money accounts
         if ($loanType === 'mshwari' || $loanType === 'kcb_mpesa') {
-            $accountsQuery->where('type', 'mobile_money');
+            $accountsQuery->where('type', 'mpesa');
         }
         // For other loans, allow mobile_money, bank, and cash accounts
         else {
@@ -504,8 +504,7 @@ class LoanController extends Controller implements HasMiddleware
 
         $accounts = $accountsQuery->orderBy('name')->get();
 
-        // Optional: Set minRequiredBalance to 0 or null since we're not using it
-        $minRequiredBalance = 0;
+        $minRequiredBalance = $loan->balance * 0.25;
 
         return view('loans.payment', compact('loan', 'repayment', 'accounts', 'minRequiredBalance', 'loanType'));
     }
