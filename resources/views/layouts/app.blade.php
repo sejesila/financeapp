@@ -366,11 +366,11 @@
         });
     }
 
-    // Session Timeout Management - 1 MINUTE TIMEOUT
+    // Session Timeout Management - 3 MINUTE TIMEOUT
     (function() {
-        const sessionLifetime = 1 * 60 * 1000; // 1 minute in milliseconds
+        const sessionLifetime = 3 * 60 * 1000; // 3 minutes in milliseconds
         const warningTime = 30 * 1000; // Show warning 30 seconds before expiry
-        const pingInterval = 30 * 1000; // Ping server every 30 seconds
+        const pingInterval = 60 * 1000; // Ping server every 60 seconds
         let timeoutWarning;
         let sessionTimeout;
         let countdownInterval;
