@@ -49,37 +49,6 @@ class TransactionController extends Controller
 
     protected TransactionService $transactionService;
 
-    /**
-     * Get transaction types sorted by usage count for a specific account type
-     */
-    private function getSortedTransactionTypes(string $accountType): array
-    {
-        $baseTypes = $accountType === 'mpesa' ? self::MPESA_TRANSACTION_TYPES : self::AIRTEL_TRANSACTION_TYPES;
-
-        // Get usage stats for the user's account type
-        $usageStats = MobileMoneyTypeUsage::where('user_id', Auth::id())
-            ->where('account_type', $accountType)
-            ->orderByDesc('usage_count')
-            ->pluck('usage_count', 'transaction_type')
-            ->toArray();
-
-        // Sort types by usage count (higher first), then by original order
-        $sortedTypes = [];
-        foreach ($baseTypes as $key => $label) {
-            $sortedTypes[] = [
-                'key' => $key,
-                'label' => $label,
-                'usageCount' => $usageStats[$key] ?? 0,
-            ];
-        }
-
-        usort($sortedTypes, function ($a, $b) {
-            return $b['usageCount'] <=> $a['usageCount'];
-        });
-
-        return $sortedTypes;
-    }
-
     public function __construct(TransactionService $transactionService)
     {
         $this->transactionService = $transactionService;
@@ -443,6 +412,37 @@ class TransactionController extends Controller
                 ['min' => 1, 'max' => 150000, 'cost' => 0],
             ],
         ];
+    }
+
+    /**
+     * Get transaction types sorted by usage count for a specific account type
+     */
+    private function getSortedTransactionTypes(string $accountType): array
+    {
+        $baseTypes = $accountType === 'mpesa' ? self::MPESA_TRANSACTION_TYPES : self::AIRTEL_TRANSACTION_TYPES;
+
+        // Get usage stats for the user's account type
+        $usageStats = MobileMoneyTypeUsage::where('user_id', Auth::id())
+            ->where('account_type', $accountType)
+            ->orderByDesc('usage_count')
+            ->pluck('usage_count', 'transaction_type')
+            ->toArray();
+
+        // Sort types by usage count (higher first), then by original order
+        $sortedTypes = [];
+        foreach ($baseTypes as $key => $label) {
+            $sortedTypes[] = [
+                'key' => $key,
+                'label' => $label,
+                'usageCount' => $usageStats[$key] ?? 0,
+            ];
+        }
+
+        usort($sortedTypes, function ($a, $b) {
+            return $b['usageCount'] <=> $a['usageCount'];
+        });
+
+        return $sortedTypes;
     }
 
     /**

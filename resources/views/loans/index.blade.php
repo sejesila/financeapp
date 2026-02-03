@@ -10,9 +10,6 @@
 
             <!-- Filters -->
             <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <p class="text-gray-600 dark:text-gray-400 text-sm">
-                    Loans are automatically created when you top up your account via M-Pesa
-                </p>
 
                 <form method="GET" action="{{ route('loans.index') }}" class="flex flex-wrap gap-2 items-center">
                     <!-- Period Filter -->

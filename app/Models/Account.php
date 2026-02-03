@@ -85,29 +85,6 @@ class Account extends Model
         return $this->hasMany(ClientFund::class);
     }
 
-    /**
-     * Complete balance calculation with ALL system features:
-     * - Regular transactions (income/expense)
-     * - Transfers (between accounts)
-     * - Loans (disbursement and repayment)
-     * - Client funds (tracking separate from main balance)
-     * - Transaction fees
-     * - Balance adjustments
-     *
-     * Formula:
-     * Balance = Initial Balance
-     *         + Income (salary, side gigs, etc) - EXCLUDES loan credits
-     *         + Loan Disbursements (money borrowed)
-     *         + Client Funds Received (liability)
-     *         - Expenses (all spending)
-     *         - Loan Repayments (money paid back)
-     *         - Transfers Out
-     *         + Transfers In
-     */
-    /**
-     * Optimized balance calculation using database aggregation
-     * Performance: O(1) - Single query regardless of row count
-     */
     public function updateBalance()
     {
         // ✅ SINGLE QUERY - Let database do the heavy lifting
