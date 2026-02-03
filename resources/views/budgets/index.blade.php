@@ -185,6 +185,31 @@
                                 </span>
                             </div>
                         </div>
+
+                        {{-- Savings Withdrawal Context (Mobile) --}}
+                        @php
+                            $savingsUsed = $savingsWithdrawals[$m]->total ?? 0;
+                        @endphp
+                        @if($savingsUsed > 0)
+                            <div class="bg-purple-50 dark:bg-purple-900/20 rounded-lg shadow-sm p-3 border border-purple-200 dark:border-purple-800">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    <span class="text-xs font-semibold text-purple-800 dark:text-purple-200">
+                                        Savings Used
+                                    </span>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs text-purple-700 dark:text-purple-300">
+                                        Withdrawn from savings
+                                    </span>
+                                    <span class="font-bold text-purple-600 dark:text-purple-400">
+                                        {{ number_format($savingsUsed, 0) }}
+                                    </span>
+                                </div>
+                            </div>
+                        @endif
                     </div>
                 @endfor
             </div>
@@ -206,6 +231,15 @@
                         {{ number_format($expenseCategories->sum('yearly_total'), 0) }}
                     </span>
                 </div>
+
+                @if($savingsWithdrawals->sum('total') > 0)
+                    <div class="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-gray-700">
+                        <span class="text-sm text-purple-600 dark:text-purple-400">Savings Used</span>
+                        <span class="font-bold text-purple-600 dark:text-purple-400">
+                            {{ number_format($savingsWithdrawals->sum('total'), 0) }}
+                        </span>
+                    </div>
+                @endif
 
                 <div class="flex items-center justify-between pt-2">
                     <span class="font-semibold text-gray-800 dark:text-gray-200">Net Income</span>
@@ -385,9 +419,53 @@
                             </span>
                         </td>
                     </tr>
+
+                    {{-- SAVINGS WITHDRAWALS (Context Row) --}}
+                    @if($savingsWithdrawals->count() > 0)
+                        <tr class="bg-purple-50 dark:bg-purple-900/20 border-t-2 border-purple-200 dark:border-purple-800">
+                            <td class="px-3 py-2 text-sm italic text-purple-700 dark:text-purple-300 flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                Savings Used
+                            </td>
+                            @for($m = 1; $m <= 12; $m++)
+                                @php
+                                    $savingsUsed = $savingsWithdrawals[$m]->total ?? 0;
+                                @endphp
+                                <td class="px-2 py-2 text-center text-sm">
+                                    @if($savingsUsed > 0)
+                                        <span class="text-purple-600 dark:text-purple-400 font-medium">
+                                            {{ number_format($savingsUsed, 0) }}
+                                        </span>
+                                    @else
+                                        <span class="text-gray-400">—</span>
+                                    @endif
+                                </td>
+                            @endfor
+                            <td class="px-3 py-2 text-center bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 font-semibold text-sm">
+                                {{ number_format($savingsWithdrawals->sum('total'), 0) }}
+                            </td>
+                        </tr>
+                    @endif
                     </tbody>
                 </table>
             </div>
+
+            {{-- Info Box --}}
+            @if($savingsWithdrawals->count() > 0)
+                <div class="rounded-md border-l-4 border-purple-500 bg-purple-50 dark:bg-purple-900/20 p-4 text-sm text-purple-800 dark:text-purple-200">
+                    <div class="flex items-start gap-2">
+                        <svg class="w-5 h-5 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <div>
+                            <strong>About Savings Withdrawals:</strong>
+                            <p class="mt-1">The "Savings Used" row shows money withdrawn from your savings accounts. This is not counted as income (to avoid double-counting), but helps explain months where expenses exceed current income.</p>
+                        </div>
+                    </div>
+                </div>
+            @endif
         </div>
 
         {{-- Liabilities --}}

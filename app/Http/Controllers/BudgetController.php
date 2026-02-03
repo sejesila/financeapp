@@ -131,6 +131,19 @@ class BudgetController extends Controller
         // Get loan statistics for the year
         $loanStats = $this->getLoanStats($year);
 
+        // Get savings withdrawals by month for context
+        $savingsWithdrawals = DB::table('transfers')
+            ->join('accounts as from_acc', 'transfers.from_account_id', '=', 'from_acc.id')
+            ->join('accounts as to_acc', 'transfers.to_account_id', '=', 'to_acc.id')
+            ->where('transfers.user_id', Auth::id())
+            ->whereYear('transfers.date', $year)
+            ->where('from_acc.type', 'savings')
+            ->where('to_acc.type', '!=', 'savings')
+            ->selectRaw('MONTH(transfers.date) as month, SUM(transfers.amount) as total')
+            ->groupBy('month')
+            ->get()
+            ->keyBy('month');
+
         // Get accounts for the FAB component
         $accounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
@@ -145,6 +158,7 @@ class BudgetController extends Controller
             'year',
             'currentMonth',
             'loanStats',
+            'savingsWithdrawals',
             'minYear',
             'maxYear',
             'accounts'
