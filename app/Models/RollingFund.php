@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class RollingFund extends Model
 {
@@ -33,18 +35,80 @@ class RollingFund extends Model
         'outcome',
     ];
 
-    // Relationships
-    public function user()
+    // =====================================================================
+    // RELATIONSHIPS
+    // =====================================================================
+
+    /**
+     * Get the user that owns this rolling fund
+     */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    public function account()
+    /**
+     * Get the account for this rolling fund
+     */
+    public function account(): BelongsTo
     {
         return $this->belongsTo(Account::class);
     }
 
-    // Accessors
+    /**
+     * Get all transactions linked to this rolling fund
+     *
+     * @return HasMany
+     */
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(Transaction::class, 'rolling_fund_id');
+    }
+
+    /**
+     * Get transactions with relationships loaded and ready for display
+     * Excludes soft-deleted transactions and orders by date
+     *
+     * This is the primary method to use for querying related transactions
+     * as it handles all the scope and eager-loading issues automatically.
+     */
+    public function relatedTransactions()
+    {
+        return $this->transactions()
+            ->with(['category', 'account'])
+            ->withoutTrashed()
+            ->orderBy('date', 'desc')
+            ->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * Get only the stake (expense) transaction
+     * This is the "Rolling Funds Out" transaction
+     */
+    public function stakeTransaction()
+    {
+        return $this->transactions()
+            ->where('description', 'Rolling Funds Out')
+            ->withoutTrashed()
+            ->first();
+    }
+
+    /**
+     * Get only the returns (income) transaction
+     * This is the "Rolling Funds Returns" transaction
+     */
+    public function returnsTransaction()
+    {
+        return $this->transactions()
+            ->where('description', 'like', 'Rolling Funds Returns%')
+            ->withoutTrashed()
+            ->first();
+    }
+
+    // =====================================================================
+    // ACCESSORS
+    // =====================================================================
+
     public function getNetResultAttribute()
     {
         if ($this->status === 'pending' || is_null($this->winnings)) {
@@ -75,23 +139,38 @@ class RollingFund extends Model
         return 'break_even';
     }
 
-    // Helper methods
-    public function isWin()
+    // =====================================================================
+    // HELPER METHODS
+    // =====================================================================
+
+    /**
+     * Check if this rolling fund is a winning session
+     */
+    public function isWin(): bool
     {
         return $this->status === 'completed' && $this->winnings > $this->stake_amount;
     }
 
-    public function isLoss()
+    /**
+     * Check if this rolling fund is a losing session
+     */
+    public function isLoss(): bool
     {
         return $this->status === 'completed' && $this->winnings < $this->stake_amount;
     }
 
-    public function isBreakEven()
+    /**
+     * Check if this rolling fund broke even
+     */
+    public function isBreakEven(): bool
     {
         return $this->status === 'completed' && $this->winnings == $this->stake_amount;
     }
 
-    public function isPending()
+    /**
+     * Check if this rolling fund is still pending
+     */
+    public function isPending(): bool
     {
         return $this->status === 'pending';
     }

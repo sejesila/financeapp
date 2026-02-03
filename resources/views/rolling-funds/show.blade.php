@@ -264,12 +264,13 @@
                 </div>
                 <div class="space-y-3">
                     @php
-                        // ✅ FIXED: Simple and reliable query using rolling_fund_id foreign key
-                        $relatedTransactions = \App\Models\Transaction::where('rolling_fund_id', $rollingFund->id)
-                            ->with('category')
-                            ->orderBy('date', 'desc')
-                            ->orderBy('created_at', 'desc')
-                            ->get();
+                        // ✅ FIXED: Use model relationship with proper scope handling
+                        // This method is defined in the RollingFund model and handles:
+                        // - Loading category and account relationships
+                        // - Excluding soft-deleted transactions
+                        // - Proper ordering by date and creation time
+                        // - Proper query building without direct global scope issues
+                        $relatedTransactions = $rollingFund->relatedTransactions()->get();
                     @endphp
 
                     @forelse($relatedTransactions as $transaction)
@@ -314,7 +315,6 @@
                     @endforelse
                 </div>
             </div>
-
             <!-- Actions -->
             <div class="flex gap-3 justify-end">
                 <form action="{{ route('rolling-funds.destroy', $rollingFund) }}" method="POST"
