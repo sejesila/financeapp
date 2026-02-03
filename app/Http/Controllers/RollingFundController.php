@@ -166,7 +166,7 @@ class RollingFundController extends Controller
             // Get or create expense category for Rolling Funds
             $category = $this->getOrCreateCategory('expense', 'Rolling Funds', 'Entertainment');
 
-            // Create expense transaction for the stake (no fee)
+            // ✅ Create expense transaction for the stake (with rolling_fund_id link)
             Transaction::create([
                 'user_id' => auth()->id(),
                 'account_id' => $validated['account_id'],
@@ -177,6 +177,7 @@ class RollingFundController extends Controller
                 'description' => 'Rolling Funds Out',
                 'payment_method' => 'Rolling Funds',
                 'is_transaction_fee' => false,
+                'rolling_fund_id' => $rollingFund->id, // ✅ Link to rolling fund
             ]);
 
             DB::commit();
@@ -289,7 +290,7 @@ class RollingFundController extends Controller
 
             $rollingFund->save();
 
-            // If there were winnings, record income transaction
+            // ✅ If there were winnings, record income transaction (with rolling_fund_id link)
             if ($validated['winnings'] > 0) {
                 $incomeCategory = $this->getOrCreateCategory('income', 'Rolling Funds', 'Other Income');
 
@@ -303,6 +304,7 @@ class RollingFundController extends Controller
                     'description' => 'Rolling Funds Returns - ' . ($rollingFund->platform ?? 'Session'),
                     'payment_method' => 'Rolling Funds',
                     'is_transaction_fee' => false,
+                    'rolling_fund_id' => $rollingFund->id, // ✅ Link to rolling fund
                 ]);
             }
 
@@ -342,23 +344,8 @@ class RollingFundController extends Controller
         try {
             DB::beginTransaction();
 
-            // Delete related transactions
-            Transaction::where('user_id', auth()->id())
-                ->where('account_id', $rollingFund->account_id)
-                ->where(function ($query) use ($rollingFund) {
-                    $query->where('date', $rollingFund->date);
-                    if ($rollingFund->completed_date) {
-                        $query->orWhere('date', $rollingFund->completed_date);
-                    }
-                })
-                ->where(function ($query) {
-                    $query->where('payment_method', 'Rolling Funds')
-                        ->orWhere(function ($subQuery) {
-                            $subQuery->where('is_transaction_fee', true)
-                                ->where('description', 'like', '%Rolling Funds%');
-                        });
-                })
-                ->delete();
+            // ✅ NEW APPROACH: Delete by rolling_fund_id (much simpler and more reliable)
+            Transaction::where('rolling_fund_id', $rollingFund->id)->delete();
 
             $rollingFund->delete();
 

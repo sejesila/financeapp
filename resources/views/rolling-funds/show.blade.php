@@ -264,21 +264,8 @@
                 </div>
                 <div class="space-y-3">
                     @php
-                        $relatedTransactions = \App\Models\Transaction::where('user_id', auth()->id())
-                            ->where('account_id', $rollingFund->account_id)
-                            ->where(function($query) use ($rollingFund) {
-                                $query->where('date', $rollingFund->date);
-                                if ($rollingFund->status === 'completed' && $rollingFund->completed_date) {
-                                    $query->orWhere('date', $rollingFund->completed_date);
-                                }
-                            })
-                            ->where(function($query) {
-                                $query->where('payment_method', 'Rolling Funds')
-                                    ->orWhere(function($subQuery) {
-                                        $subQuery->where('is_transaction_fee', true)
-                                            ->where('description', 'like', '%Rolling Funds%');
-                                    });
-                            })
+                        // ✅ FIXED: Simple and reliable query using rolling_fund_id foreign key
+                        $relatedTransactions = \App\Models\Transaction::where('rolling_fund_id', $rollingFund->id)
                             ->with('category')
                             ->orderBy('date', 'desc')
                             ->orderBy('created_at', 'desc')
