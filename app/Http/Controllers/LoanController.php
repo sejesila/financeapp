@@ -463,13 +463,7 @@ class LoanController extends Controller implements HasMiddleware
     }
 
     /**
-     * Show repayment form
-     */
-    /**
-     * Show repayment form
-     */
-    /**
-     * Show repayment form
+     * Show repayment form - M-Shwari and KCB M-Pesa must repay from same M-Pesa account
      */
     public function paymentForm(Loan $loan)
     {
@@ -488,35 +482,39 @@ class LoanController extends Controller implements HasMiddleware
         // Determine loan type
         $loanType = $loan->loan_type ?? $this->detectLoanType($loan->source);
 
-        // Get accounts based on loan type - NO MINIMUM BALANCE CHECK
-        $accountsQuery = Account::where('user_id', Auth::id())
-            ->where('is_active', true)
-            ->where('type', '!=', 'savings');
-
-        // For M-Shwari and KCB M-Pesa loans, only allow mobile money accounts
+        // For M-Shwari and KCB M-Pesa loans, MUST use the same M-Pesa account that received the loan
         if ($loanType === 'mshwari' || $loanType === 'kcb_mpesa') {
-            $accountsQuery->where('type', 'mpesa');
+            // Get ONLY the loan's disbursement account (must be M-Pesa)
+            $loanAccount = Account::where('id', $loan->account_id)
+                ->where('user_id', Auth::id())
+                ->where('is_active', true)
+                ->where('type', 'mpesa')
+                ->first();
+
+            if (!$loanAccount) {
+                return back()->with('error', 'The M-Pesa account that received this loan is not available. Please ensure the account is active.');
+            }
+
+            // Only this account is allowed
+            $accounts = collect([$loanAccount]);
+            $isAccountLocked = true; // Flag to make dropdown immutable
         }
         // For other loans, allow mobile_money, bank, and cash accounts
         else {
-            $accountsQuery->whereIn('type', ['mobile_money', 'bank', 'cash']);
+            $accounts = Account::where('user_id', Auth::id())
+                ->where('is_active', true)
+                ->where('type', '!=', 'savings')
+                ->whereIn('type', ['mpesa', 'bank', 'cash'])
+                ->orderBy('name')
+                ->get();
+
+            $isAccountLocked = false;
         }
 
-        $accounts = $accountsQuery->orderBy('name')->get();
+        $minRequiredBalance = 0;
 
-        $minRequiredBalance = $loan->balance * 0.25;
-
-        return view('loans.payment', compact('loan', 'repayment', 'accounts', 'minRequiredBalance', 'loanType'));
+        return view('loans.payment', compact('loan', 'repayment', 'accounts', 'minRequiredBalance', 'loanType', 'isAccountLocked'));
     }
-
-
-    /**
-     * Record loan payment with early repayment credit (within 10 days)
-     */
-    /**
-     * Record loan payment with early repayment credit (within 10 days)
-     * Updated to support payment from any account
-     */
 
 
     /**
@@ -562,11 +560,8 @@ class LoanController extends Controller implements HasMiddleware
     }
 
     /**
-     * Delete loan (only active loans with no payments)
-     */
-    /**
      * Record loan payment with early repayment credit (within 10 days)
-     * Updated to support payment from any account
+     * M-Shwari and KCB M-Pesa must be paid from the same M-Pesa account
      */
     public function recordPayment(Request $request, Loan $loan)
     {
@@ -596,6 +591,14 @@ class LoanController extends Controller implements HasMiddleware
 
             if ($paymentAccount->user_id !== Auth::id()) {
                 throw new Exception("Unauthorized access to this account.");
+            }
+
+            // ✅ ENFORCE: For M-Shwari and KCB M-Pesa, payment MUST come from the same M-Pesa account
+            $loanType = $loan->loan_type ?? $this->detectLoanType($loan->source);
+
+            if (($loanType === 'mshwari' || $loanType === 'kcb_mpesa') && $paymentAccount->id !== $loan->account_id) {
+                $loanAccountName = Account::find($loan->account_id)->name ?? 'the original M-Pesa account';
+                throw new Exception("M-Shwari and KCB M-Pesa loans must be repaid from {$loanAccountName} (the same account that received the loan).");
             }
 
             if ($paymentAccount->current_balance < $paymentAmount) {
@@ -658,7 +661,6 @@ class LoanController extends Controller implements HasMiddleware
             $loan->save();
 
             $earlyRepaymentCredit = 0;
-            $loanType = $loan->loan_type ?? $this->detectLoanType($loan->source);
 
             // Handle early repayment credit (goes to loan's original account)
             if ($loan->balance <= 0) {

@@ -24,9 +24,19 @@
             }
 
             // Determine what accounts are allowed
-            $allowedAccountTypes = ($loanType === 'mshwari' || $loanType === 'kcb_mpesa')
-                ? 'M-Pesa accounts only'
-                : 'M-Pesa, Bank, or Cash accounts';
+            $loanTypeLabel = match($loanType) {
+                'kcb_mpesa' => 'KCB M-Pesa',
+                'other' => 'Other',
+                default => 'M-Shwari',
+            };
+
+            if (isset($isAccountLocked) && $isAccountLocked) {
+                $allowedAccountTypes = 'Must use the same M-Pesa account that received the loan';
+            } else {
+                $allowedAccountTypes = ($loanType === 'mshwari' || $loanType === 'kcb_mpesa')
+                    ? 'M-Pesa accounts only'
+                    : 'M-Pesa, Bank, or Cash accounts';
+            }
         @endphp
 
         @if(session('error'))
@@ -40,13 +50,13 @@
                 <p class="font-semibold">⚠️ No Eligible Accounts Found</p>
                 <p class="text-sm mt-2">
                     @if($loanType === 'mshwari' || $loanType === 'kcb_mpesa')
-                        {{ ucfirst($loanType === 'mshwari' ? 'M-Shwari' : 'KCB M-Pesa') }} loans can only be paid from M-Pesa accounts.
+                        {{ ucfirst($loanTypeLabel) }} loans can only be paid from the same M-Pesa account that received the loan.
                     @else
                         This loan can be paid from M-Pesa, Bank, or Cash accounts.
                     @endif
                 </p>
                 <p class="text-sm mt-1">
-                    Please create an active account to make a payment.
+                    Please ensure the account is active.
                 </p>
             </div>
         @endif
@@ -58,11 +68,6 @@
                     <p class="text-sm text-gray-600 dark:text-gray-400 uppercase">Loan Source</p>
                     <p class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ $loan->source }}</p>
                     @php
-                        $loanTypeLabel = match($loanType) {
-                            'kcb_mpesa' => 'KCB M-Pesa',
-                            'other' => 'Other',
-                            default => 'M-Shwari',
-                        };
                         $loanTypeColor = match($loanType) {
                             'kcb_mpesa' => 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300',
                             'other' => 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300',
@@ -130,14 +135,19 @@
             <div>
                 <label for="payment_account_id" class="block text-gray-700 dark:text-gray-300 font-semibold mb-2">
                     Pay From Account <span class="text-red-500">*</span>
+                    @if(isset($isAccountLocked) && $isAccountLocked)
+                        <span class="text-xs font-normal text-gray-500 dark:text-gray-400">(Fixed - Cannot be changed)</span>
+                    @endif
                 </label>
                 <select
                     name="payment_account_id"
                     id="payment_account_id"
-                    class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-lg text-base @error('payment_account_id') border-red-500 @enderror"
+                    class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-lg text-base @error('payment_account_id') border-red-500 @enderror {{ (isset($isAccountLocked) && $isAccountLocked) ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : '' }}"
                     required
-                    {{ $accounts->isEmpty() ? 'disabled' : '' }}>
-                    <option value="">Select account to pay from</option>
+                    {{ $accounts->isEmpty() || (isset($isAccountLocked) && $isAccountLocked) ? 'disabled' : '' }}>
+                    @if(!isset($isAccountLocked) || !$isAccountLocked)
+                        <option value="">Select account to pay from</option>
+                    @endif
                     @foreach($accounts as $account)
                         <option value="{{ $account->id }}"
                                 data-balance="{{ $account->current_balance }}"
@@ -147,12 +157,22 @@
                         </option>
                     @endforeach
                 </select>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-2" id="selected_account_balance">
-                    Select an account to see available balance
-                </p>
-                <p class="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                    💡 {{ ucfirst($loanTypeLabel) }} loans: {{ $allowedAccountTypes }}
-                </p>
+
+                @if(isset($isAccountLocked) && $isAccountLocked)
+                    <!-- Hidden input to ensure the value is submitted even when disabled -->
+                    <input type="hidden" name="payment_account_id" value="{{ $loan->account_id }}">
+                    <p class="text-xs text-orange-600 dark:text-orange-400 mt-2 font-medium">
+                        🔒 {{ ucfirst($loanTypeLabel) }} loans must be repaid from the same M-Pesa account that received the loan.
+                    </p>
+                @else
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-2" id="selected_account_balance">
+                        Select an account to see available balance
+                    </p>
+                    <p class="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                        💡 {{ ucfirst($loanTypeLabel) }} loans: {{ $allowedAccountTypes }}
+                    </p>
+                @endif
+
                 @error('payment_account_id')
                 <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                 @enderror
@@ -400,9 +420,9 @@
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
-            // Add event listener to dropdown
+            // Add event listener to dropdown (only if not locked)
             const accountSelect = document.getElementById('payment_account_id');
-            if (accountSelect) {
+            if (accountSelect && !accountSelect.disabled) {
                 accountSelect.addEventListener('change', updateAccountBalance);
             }
 
