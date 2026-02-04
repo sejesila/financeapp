@@ -459,10 +459,6 @@
                         <svg class="w-5 h-5 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
-                        <div>
-                            <strong>About Savings Withdrawals:</strong>
-                            <p class="mt-1">The "Savings Used" row shows money withdrawn from your savings accounts. This is not counted as income (to avoid double-counting), but helps explain months where expenses exceed current income.</p>
-                        </div>
                     </div>
                 </div>
             @endif
@@ -501,10 +497,6 @@
                         {{ number_format($loanStats['active_balance']) }}
                     </p>
                 </div>
-            </div>
-
-            <div class="rounded-md border-l-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 p-3 text-xs text-yellow-800 dark:text-yellow-200">
-                <strong>Note:</strong> Loans are not income. Repayments and interest are included as expenses.
             </div>
         </section>
 

@@ -9,6 +9,7 @@ use App\Models\Transfer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 
 class AccountController extends Controller
 {
@@ -57,7 +58,13 @@ class AccountController extends Controller
             'type' => 'required|string',
             'initial_balance' => 'required|numeric|min:0',
             'notes' => 'nullable|string',
+            'logo' => 'nullable|image|mimes:jpeg,jpg,png,gif,svg|max:2048',
         ]);
+
+        $logoPath = null;
+        if ($request->hasFile('logo')) {
+            $logoPath = $request->file('logo')->store('account-logos', 'public');
+        }
 
         $account = Account::create([
             'user_id' => Auth::id(),
@@ -66,6 +73,7 @@ class AccountController extends Controller
             'initial_balance' => $request->initial_balance,
             'current_balance' => $request->initial_balance,
             'notes' => $request->notes,
+            'logo_path' => $logoPath,
         ]);
 
         return redirect()->route('accounts.index')->with('success', 'Account created successfully!');
@@ -129,7 +137,7 @@ class AccountController extends Controller
             abort(403, 'Unauthorized access to this account.');
         }
 
-        return view('accounts.show', compact('account'));
+        return view('accounts.edit', compact('account'));
     }
 
     public function update(Request $request, Account $account)
@@ -141,13 +149,34 @@ class AccountController extends Controller
 
         $request->validate([
             'name' => 'required|string|max:255',
-            'type' => 'required|string',
             'notes' => 'nullable|string',
+            'logo' => 'nullable|image|mimes:jpeg,jpg,png,gif,svg|max:2048',
+            'remove_logo' => 'nullable|boolean',
         ]);
 
-        $account->update($request->only(['name', 'type', 'notes']));
+        $updateData = $request->only(['name', 'notes']);
 
-        return redirect()->route('accounts.index')->with('success', 'Account updated successfully!');
+        // Handle logo upload
+        if ($request->hasFile('logo')) {
+            // Delete old logo if exists
+            if ($account->logo_path) {
+                Storage::disk('public')->delete($account->logo_path);
+            }
+
+            // Store new logo
+            $updateData['logo_path'] = $request->file('logo')->store('account-logos', 'public');
+        }
+        // Handle logo removal
+        elseif ($request->has('remove_logo') && $request->remove_logo) {
+            if ($account->logo_path) {
+                Storage::disk('public')->delete($account->logo_path);
+            }
+            $updateData['logo_path'] = null;
+        }
+
+        $account->update($updateData);
+
+        return redirect()->route('accounts.show', $account)->with('success', 'Account updated successfully!');
     }
 
     public function destroy(Account $account)
@@ -159,6 +188,11 @@ class AccountController extends Controller
 
         if ($account->transactions()->count() > 0) {
             return redirect()->back()->with('error', 'Cannot delete account with existing transactions.');
+        }
+
+        // Delete logo if exists
+        if ($account->logo_path) {
+            Storage::disk('public')->delete($account->logo_path);
         }
 
         $account->delete();

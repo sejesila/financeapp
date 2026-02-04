@@ -259,7 +259,6 @@
                 @else
                     <div class="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-8 text-center">
                         <p class="text-gray-500 dark:text-gray-400 text-lg">No active loans</p>
-                        <p class="text-gray-600 dark:text-gray-500 text-sm mt-2">Loans are created when you top up your account using M-Pesa</p>
                     </div>
                 @endif
             </div>
