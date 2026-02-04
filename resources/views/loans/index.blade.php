@@ -309,7 +309,7 @@
                                     } elseif($loan->loan_type === 'kcb_mpesa') {
                                         $interestFees = ($loan->interest_amount ?? 0) + ($loan->facility_fee ?? 0);
                                     } else {
-                                        $interestFees = $loan->custom_interest_amount ?? 0;
+                                       $interestFees = $loan->interest_amount ?? 0;
                                     }
                                 @endphp
                                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
