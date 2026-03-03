@@ -57,13 +57,35 @@
                 <p class="text-xs mt-1 opacity-90">
                     Across {{ $accounts->count() + $savingsAccounts->count() }} {{ Str::plural('account', $accounts->count() + $savingsAccounts->count()) }}
                 </p>
+                <!-- AFTER -->
+                <!-- AFTER -->
                 @if($totalSavings > 0)
-                    <div class="mt-3 pt-3 border-t border-white/30 balance-hidden">
-                        <p class="text-xs opacity-90">Savings Balance</p>
-                        <p class="text-lg font-semibold">
-                            <span class="balance-amount hidden">KES {{ number_format($totalSavings, 0, '.', ',') }}</span>
-                            <span class="balance-placeholder">KES ••••••</span>
-                        </p>
+                    <div class="mt-3 pt-3 border-t border-white/30">
+                        <p class="text-xs opacity-90 mb-1">Savings Balance</p>
+
+                        {{-- Locked state --}}
+                        <div id="acct-savings-locked">
+                            <button onclick="openAcctPinModal()"
+                                    class="mt-1 flex items-center gap-2 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-medium transition-all">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                </svg>
+                                Tap to reveal savings
+                            </button>
+                        </div>
+
+                        {{-- Unlocked state --}}
+                        <div id="acct-savings-unlocked" class="hidden">
+                            <p class="text-lg font-semibold mt-1">
+                                KES {{ number_format($totalSavings, 0, '.', ',') }}
+                            </p>
+                            <button onclick="acctLockSavings()" class="mt-1 text-xs opacity-70 hover:opacity-100 flex items-center gap-1 transition-opacity">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                </svg>
+                                Lock
+                            </button>
+                        </div>
                     </div>
                 @endif
             </div>
@@ -124,6 +146,7 @@
                                     </div>
 
                                     <!-- Balance -->
+                                    <!-- AFTER (restore regular balance display for non-savings accounts) -->
                                     <div class="mb-3 balance-hidden">
                                         <p class="text-xs text-gray-600 dark:text-gray-400">Available Balance</p>
                                         <p class="text-xl font-bold {{ $account->current_balance >= 0 ? 'text-green-600' : 'text-red-600' }}">
@@ -206,12 +229,26 @@
                                     </div>
 
                                     <!-- Balance -->
-                                    <div class="mb-3 balance-hidden">
-                                        <p class="text-xs text-gray-600 dark:text-gray-400">Saved Amount</p>
-                                        <p class="text-xl font-bold text-green-600 dark:text-green-400">
-                                            <span class="balance-amount hidden">KES {{ number_format($account->current_balance, 0, '.', ',') }}</span>
-                                            <span class="balance-placeholder">KES ••••••</span>
-                                        </p>
+                                    <!-- AFTER -->
+                                    <div class="mb-3">
+                                        <p class="text-xs text-gray-600 dark:text-gray-400 mb-1">Saved Amount</p>
+
+                                        {{-- Locked --}}
+                                        <div class="savings-card-locked-{{ $loop->index }}">
+                                            <p class="text-sm text-gray-400 dark:text-gray-500 italic flex items-center gap-1">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                                </svg>
+                                                PIN protected
+                                            </p>
+                                        </div>
+
+                                        {{-- Unlocked --}}
+                                        <div class="savings-card-unlocked-{{ $loop->index }} hidden">
+                                            <p class="text-xl font-bold text-green-600 dark:text-green-400">
+                                                KES {{ number_format($account->current_balance, 0, '.', ',') }}
+                                            </p>
+                                        </div>
                                     </div>
 
                                     @if($account->notes)
@@ -284,9 +321,162 @@
     </div>
 
     <script>
-        // Load visibility state from localStorage
+        const SAVINGS_PIN_KEY = 'savings_pin_hash';
+        const SAVINGS_UNLOCKED_KEY = 'savings_unlocked_until';
+        const UNLOCK_DURATION_MS = 5 * 60 * 1000;
+
+        function hashPin(pin) {
+            let hash = 0;
+            const salted = 'savings_' + pin + '_lock';
+            for (let i = 0; i < salted.length; i++) {
+                hash = ((hash << 5) - hash) + salted.charCodeAt(i);
+                hash |= 0;
+            }
+            return hash.toString();
+        }
+
+        // ===================== PIN UNLOCK MODAL =====================
+        let acctPinEntry = '';
+
+        function openAcctPinModal() {
+            acctPinEntry = '';
+            updateAcctUnlockDots(0);
+            document.getElementById('acct-pin-error').classList.add('hidden');
+            document.getElementById('acct-pin-unlock-modal').classList.remove('hidden');
+        }
+
+        function closeAcctPinModal() {
+            acctPinEntry = '';
+            updateAcctUnlockDots(0);
+            document.getElementById('acct-pin-unlock-modal').classList.add('hidden');
+        }
+
+        function acctPinInput(key) {
+            if (key === '⌫') {
+                acctPinEntry = acctPinEntry.slice(0, -1);
+            } else if (acctPinEntry.length < 4) {
+                acctPinEntry += key;
+            }
+
+            updateAcctUnlockDots(acctPinEntry.length);
+
+            if (acctPinEntry.length === 4) {
+                setTimeout(() => {
+                    if (hashPin(acctPinEntry) === localStorage.getItem(SAVINGS_PIN_KEY)) {
+                        document.getElementById('acct-pin-error').classList.add('hidden');
+                        localStorage.setItem(SAVINGS_UNLOCKED_KEY, (Date.now() + UNLOCK_DURATION_MS).toString());
+                        closeAcctPinModal();
+                        showAcctSavingsUnlocked();
+                    } else {
+                        document.getElementById('acct-pin-error').classList.remove('hidden');
+                        acctPinEntry = '';
+                        updateAcctUnlockDots(0);
+                    }
+                }, 150);
+            }
+        }
+
+        function updateAcctUnlockDots(count) {
+            document.querySelectorAll('.acct-unlock-dot').forEach((dot, i) => {
+                dot.classList.toggle('bg-teal-500', i < count);
+                dot.classList.toggle('border-teal-500', i < count);
+                dot.classList.toggle('border-gray-300', i >= count);
+                dot.classList.toggle('dark:border-gray-600', i >= count);
+            });
+        }
+
+        function showAcctSavingsUnlocked() {
+            document.getElementById('acct-savings-locked').classList.add('hidden');
+            document.getElementById('acct-savings-unlocked').classList.remove('hidden');
+
+            document.querySelectorAll('[class*="savings-card-locked-"]').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('[class*="savings-card-unlocked-"]').forEach(el => el.classList.remove('hidden'));
+
+            const remaining = parseInt(localStorage.getItem(SAVINGS_UNLOCKED_KEY)) - Date.now();
+            if (remaining > 0) setTimeout(() => acctLockSavings(), remaining);
+        }
+
+        function acctLockSavings() {
+            localStorage.removeItem(SAVINGS_UNLOCKED_KEY);
+            acctPinEntry = '';
+
+            document.getElementById('acct-savings-locked').classList.remove('hidden');
+            document.getElementById('acct-savings-unlocked').classList.add('hidden');
+
+            document.querySelectorAll('[class*="savings-card-locked-"]').forEach(el => el.classList.remove('hidden'));
+            document.querySelectorAll('[class*="savings-card-unlocked-"]').forEach(el => el.classList.add('hidden'));
+        }
+
+        function initAccountsSavingsPin() {
+            const savedPin = localStorage.getItem(SAVINGS_PIN_KEY);
+            const unlockedUntil = localStorage.getItem(SAVINGS_UNLOCKED_KEY);
+
+            if (!savedPin) {
+                document.getElementById('acct-pin-setup-modal').classList.remove('hidden');
+                return;
+            }
+
+            if (unlockedUntil && Date.now() < parseInt(unlockedUntil)) {
+                showAcctSavingsUnlocked();
+            }
+        }
+
+        // ===================== PIN SETUP =====================
+        let acctSetupStage = 'first';
+        let acctFirstPin = '';
+        let acctSetupEntry = '';
+
+        function acctSetupPinInput(key) {
+            if (key === '⌫') {
+                acctSetupEntry = acctSetupEntry.slice(0, -1);
+            } else if (acctSetupEntry.length < 4) {
+                acctSetupEntry += key;
+            }
+
+            document.querySelectorAll('.acct-setup-dot').forEach((dot, i) => {
+                dot.classList.toggle('bg-indigo-500', i < acctSetupEntry.length);
+                dot.classList.toggle('border-indigo-500', i < acctSetupEntry.length);
+                dot.classList.toggle('border-gray-300', i >= acctSetupEntry.length);
+            });
+
+            if (acctSetupEntry.length === 4) {
+                setTimeout(() => {
+                    if (acctSetupStage === 'first') {
+                        acctFirstPin = acctSetupEntry;
+                        acctSetupEntry = '';
+                        acctSetupStage = 'confirm';
+                        document.getElementById('acct-setup-subtitle').textContent = 'Confirm your 4-digit PIN';
+                        document.querySelectorAll('.acct-setup-dot').forEach(d => {
+                            d.classList.remove('bg-indigo-500', 'border-indigo-500');
+                            d.classList.add('border-gray-300');
+                        });
+                    } else {
+                        if (acctSetupEntry === acctFirstPin) {
+                            localStorage.setItem(SAVINGS_PIN_KEY, hashPin(acctSetupEntry));
+                            document.getElementById('acct-pin-setup-modal').classList.add('hidden');
+                            document.getElementById('acct-setup-error').classList.add('hidden');
+                            acctSetupEntry = '';
+                            acctSetupStage = 'first';
+                            acctFirstPin = '';
+                        } else {
+                            document.getElementById('acct-setup-error').classList.remove('hidden');
+                            acctSetupEntry = '';
+                            acctSetupStage = 'first';
+                            acctFirstPin = '';
+                            document.getElementById('acct-setup-subtitle').textContent = 'Create a 4-digit PIN to protect your savings balance';
+                            document.querySelectorAll('.acct-setup-dot').forEach(d => {
+                                d.classList.remove('bg-indigo-500', 'border-indigo-500');
+                                d.classList.add('border-gray-300');
+                            });
+                        }
+                    }
+                }, 150);
+            }
+        }
+
+        // ===================== REGULAR BALANCE TOGGLE =====================
         let balancesVisible = localStorage.getItem('balancesVisible') === 'true';
-        let lowBalanceAccountsVisible = localStorage.getItem('lowBalanceAccountsVisible') === 'false'; // default to hidden
+        let lowBalanceAccountsVisible = localStorage.getItem('lowBalanceAccountsVisible') === 'true';
 
         function toggleBalances() {
             balancesVisible = !balancesVisible;
@@ -301,60 +491,109 @@
         }
 
         function updateBalanceVisibility() {
-            const balanceContainers = document.querySelectorAll('.balance-hidden');
-            const toggleIcon = document.getElementById('toggle-icon');
-            const toggleText = document.getElementById('toggle-text');
-
-            balanceContainers.forEach(container => {
+            document.querySelectorAll('.balance-hidden').forEach(container => {
                 const amount = container.querySelector('.balance-amount');
                 const placeholder = container.querySelector('.balance-placeholder');
-
-                if (balancesVisible) {
-                    amount.classList.remove('hidden');
-                    placeholder.classList.add('hidden');
-                } else {
-                    amount.classList.add('hidden');
-                    placeholder.classList.remove('hidden');
+                if (amount && placeholder) {
+                    amount.classList.toggle('hidden', !balancesVisible);
+                    placeholder.classList.toggle('hidden', balancesVisible);
                 }
             });
-
-            if (balancesVisible) {
-                toggleIcon.textContent = '🙈';
-                toggleText.textContent = 'Hide';
-            } else {
-                toggleIcon.textContent = '👁️';
-                toggleText.textContent = 'Show';
-            }
+            document.getElementById('toggle-icon').textContent = balancesVisible ? '🙈' : '👁️';
+            document.getElementById('toggle-text').textContent = balancesVisible ? 'Hide' : 'Show';
         }
 
         function updateLowBalanceAccountsVisibility() {
-            const lowBalanceAccounts = document.querySelectorAll('.low-balance-account');
-            const toggleIcon = document.getElementById('toggle-accounts-icon');
-            const toggleText = document.getElementById('toggle-accounts-text');
-
-            lowBalanceAccounts.forEach(account => {
-                if (lowBalanceAccountsVisible) {
-                    account.classList.remove('hidden');
-                } else {
-                    account.classList.add('hidden');
-                }
-            });
-
-            if (lowBalanceAccountsVisible) {
-                toggleIcon.textContent = '🙈';
-                toggleText.textContent = 'Hide accounts with low balance';
-            } else {
-                toggleIcon.textContent = '👁️';
-                toggleText.textContent = 'Show accounts with low balance';
-            }
+            document.querySelectorAll('.low-balance-account').forEach(el => el.classList.toggle('hidden', !lowBalanceAccountsVisible));
+            document.getElementById('toggle-accounts-icon').textContent = lowBalanceAccountsVisible ? '🙈' : '👁️';
+            document.getElementById('toggle-accounts-text').textContent = lowBalanceAccountsVisible
+                ? 'Hide accounts with low balance'
+                : 'Show accounts with low balance';
         }
 
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             updateBalanceVisibility();
             updateLowBalanceAccountsVisibility();
+            initAccountsSavingsPin();
         });
     </script>
 
     <x-floating-action-button :quickAccount="$allAccounts->first()" />
+    {{-- PIN Setup Modal --}}
+    {{-- PIN Unlock Modal --}}
+    <div id="acct-pin-unlock-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 w-80 mx-4">
+            <div class="text-center mb-5">
+                <div class="w-14 h-14 bg-teal-100 dark:bg-teal-900 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <svg class="w-7 h-7 text-teal-600 dark:text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Savings PIN</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Enter your 4-digit PIN to reveal savings</p>
+            </div>
+
+            <div class="flex justify-center gap-3 mb-5">
+                @for($i = 0; $i < 4; $i++)
+                    <div class="w-4 h-4 rounded-full border-2 border-gray-300 dark:border-gray-600 acct-unlock-dot"></div>
+                @endfor
+            </div>
+
+            <div class="grid grid-cols-3 gap-2">
+                @foreach([1,2,3,4,5,6,7,8,9,'',0,'⌫'] as $key)
+                    @if($key === '')
+                        <div></div>
+                    @else
+                        <button onclick="acctPinInput('{{ $key }}')"
+                                class="py-3 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 active:scale-95 text-gray-800 dark:text-white font-semibold text-base transition-all duration-150">
+                            {{ $key }}
+                        </button>
+                    @endif
+                @endforeach
+            </div>
+
+            <p id="acct-pin-error" class="text-xs text-red-500 text-center mt-3 hidden">Incorrect PIN. Try again.</p>
+            <button onclick="closeAcctPinModal()"
+                    class="mt-4 w-full text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+                Cancel
+            </button>
+        </div>
+    </div>
+
+    {{-- PIN Setup Modal --}}
+    <div id="acct-pin-setup-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 w-80 mx-4">
+            <div class="text-center mb-5">
+                <div class="w-14 h-14 bg-teal-100 dark:bg-teal-900 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <svg class="w-7 h-7 text-teal-600 dark:text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Set Savings PIN</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1" id="acct-setup-subtitle">Create a 4-digit PIN to protect your savings balance</p>
+            </div>
+            <div class="flex justify-center gap-3 mb-5">
+                @for($i = 0; $i < 4; $i++)
+                    <div class="w-4 h-4 rounded-full border-2 border-gray-300 dark:border-gray-600 acct-setup-dot"></div>
+                @endfor
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+                @foreach([1,2,3,4,5,6,7,8,9,'',0,'⌫'] as $key)
+                    @if($key === '')
+                        <div></div>
+                    @else
+                        <button onclick="acctSetupPinInput('{{ $key }}')"
+                                class="py-3 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 active:scale-95 text-gray-800 dark:text-white font-semibold text-base transition-all duration-150">
+                            {{ $key }}
+                        </button>
+                    @endif
+                @endforeach
+            </div>
+            <p id="acct-setup-error" class="text-xs text-red-500 text-center mt-3 hidden">PINs do not match. Try again.</p>
+            <button onclick="document.getElementById('acct-pin-setup-modal').classList.add('hidden')"
+                    class="mt-4 w-full text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+                Cancel
+            </button>
+        </div>
+    </div>
 </x-app-layout>
