@@ -27,8 +27,7 @@ class AccountController extends Controller
             ->where('type', 'savings')
             ->get();
 
-        // Calculate total net worth (all accounts)
-        $totalBalance = $accounts->sum('current_balance') + $savingsAccounts->sum('current_balance');
+        $totalBalance = $accounts->sum('current_balance'); // Regular accounts only
 
         // Calculate savings total separately
         $totalSavings = $savingsAccounts->sum('current_balance');

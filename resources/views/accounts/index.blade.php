@@ -42,52 +42,80 @@
             @endforeach
 
             <!-- Total Balance Card -->
-            <div class="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-4 sm:p-6 rounded-lg shadow-lg mb-4">
-                <div class="flex items-center justify-between mb-2">
-                    <p class="text-xs sm:text-sm font-semibold">Total Cash</p>
-                    <button onclick="toggleBalances()" class="text-white/80 hover:text-white text-xs flex items-center gap-1">
-                        <span id="toggle-icon">👁️</span>
-                        <span id="toggle-text">Show</span>
-                    </button>
+            <!-- AFTER -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+
+                {{-- Total Cash Card --}}
+                <div class="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-4 sm:p-6 rounded-lg shadow-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-xs sm:text-sm font-semibold">💳 Total Cash</p>
+                        <button onclick="toggleBalances()" class="text-white/80 hover:text-white text-xs flex items-center gap-1">
+                            <span id="toggle-icon">👁️</span>
+                            <span id="toggle-text">Show</span>
+                        </button>
+                    </div>
+                    <p class="text-2xl sm:text-3xl lg:text-4xl font-bold balance-hidden">
+                        <span class="balance-amount hidden">KES {{ number_format($totalBalance, 0, '.', ',') }}</span>
+                        <span class="balance-placeholder">KES ••••••</span>
+                    </p>
+                    <p class="text-xs mt-1 opacity-90">
+                        Across {{ $accounts->count() }} {{ Str::plural('account', $accounts->count()) }}
+                    </p>
                 </div>
-                <p class="text-2xl sm:text-3xl lg:text-4xl font-bold balance-hidden">
-                    <span class="balance-amount hidden">KES {{ number_format($totalBalance, 0, '.', ',') }}</span>
-                    <span class="balance-placeholder">KES ••••••</span>
-                </p>
-                <p class="text-xs mt-1 opacity-90">
-                    Across {{ $accounts->count() + $savingsAccounts->count() }} {{ Str::plural('account', $accounts->count() + $savingsAccounts->count()) }}
-                </p>
-                <!-- AFTER -->
-                <!-- AFTER -->
-                @if($totalSavings > 0)
-                    <div class="mt-3 pt-3 border-t border-white/30">
-                        <p class="text-xs opacity-90 mb-1">Savings Balance</p>
+
+                {{-- Savings Card --}}
+                @if($savingsAccounts->count() > 0)
+                    <div class="bg-gradient-to-r from-teal-500 to-emerald-600 text-white p-4 sm:p-6 rounded-lg shadow-lg">
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="text-xs sm:text-sm font-semibold">💰 Total Savings</p>
+                            <div id="acct-savings-locked-btn">
+                                <button onclick="openAcctPinModal()"
+                                        class="text-white/80 hover:text-white text-xs flex items-center gap-1">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                    </svg>
+                                    Unlock
+                                </button>
+                            </div>
+                            <div id="acct-savings-locked-btn-hide" class="hidden">
+                                <button onclick="acctLockSavings()"
+                                        class="text-white/80 hover:text-white text-xs flex items-center gap-1">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                              d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/>
+                                    </svg>
+                                    Lock
+                                </button>
+                            </div>
+                        </div>
 
                         {{-- Locked state --}}
                         <div id="acct-savings-locked">
-                            <button onclick="openAcctPinModal()"
-                                    class="mt-1 flex items-center gap-2 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-medium transition-all">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                            <p class="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-widest opacity-60">
+                                KES ••••••
+                            </p>
+                            <p class="text-xs mt-1 opacity-70 flex items-center gap-1">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                                 </svg>
-                                Tap to reveal savings
-                            </button>
+                                PIN required to view
+                            </p>
                         </div>
 
                         {{-- Unlocked state --}}
                         <div id="acct-savings-unlocked" class="hidden">
-                            <p class="text-lg font-semibold mt-1">
+                            <p class="text-2xl sm:text-3xl lg:text-4xl font-bold">
                                 KES {{ number_format($totalSavings, 0, '.', ',') }}
                             </p>
-                            <button onclick="acctLockSavings()" class="mt-1 text-xs opacity-70 hover:opacity-100 flex items-center gap-1 transition-opacity">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                                </svg>
-                                Lock
-                            </button>
+                            <p class="text-xs mt-1 opacity-90">
+                                Across {{ $savingsAccounts->count() }} {{ Str::plural('account', $savingsAccounts->count()) }}
+                            </p>
                         </div>
                     </div>
                 @endif
+
             </div>
 
             <!-- Show/Hide Low Balance Accounts Toggle -->
@@ -385,13 +413,14 @@
             });
         }
 
+        // AFTER
         function showAcctSavingsUnlocked() {
             document.getElementById('acct-savings-locked').classList.add('hidden');
             document.getElementById('acct-savings-unlocked').classList.remove('hidden');
-
+            document.getElementById('acct-savings-locked-btn').classList.add('hidden');
+            document.getElementById('acct-savings-locked-btn-hide').classList.remove('hidden');
             document.querySelectorAll('[class*="savings-card-locked-"]').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('[class*="savings-card-unlocked-"]').forEach(el => el.classList.remove('hidden'));
-
             const remaining = parseInt(localStorage.getItem(SAVINGS_UNLOCKED_KEY)) - Date.now();
             if (remaining > 0) setTimeout(() => acctLockSavings(), remaining);
         }
@@ -399,10 +428,10 @@
         function acctLockSavings() {
             localStorage.removeItem(SAVINGS_UNLOCKED_KEY);
             acctPinEntry = '';
-
             document.getElementById('acct-savings-locked').classList.remove('hidden');
             document.getElementById('acct-savings-unlocked').classList.add('hidden');
-
+            document.getElementById('acct-savings-locked-btn').classList.remove('hidden');
+            document.getElementById('acct-savings-locked-btn-hide').classList.add('hidden');
             document.querySelectorAll('[class*="savings-card-locked-"]').forEach(el => el.classList.remove('hidden'));
             document.querySelectorAll('[class*="savings-card-unlocked-"]').forEach(el => el.classList.add('hidden'));
         }
