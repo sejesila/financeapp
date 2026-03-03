@@ -452,16 +452,6 @@
                 </table>
             </div>
 
-            {{-- Info Box --}}
-            @if($savingsWithdrawals->count() > 0)
-                <div class="rounded-md border-l-4 border-purple-500 bg-purple-50 dark:bg-purple-900/20 p-4 text-sm text-purple-800 dark:text-purple-200">
-                    <div class="flex items-start gap-2">
-                        <svg class="w-5 h-5 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                    </div>
-                </div>
-            @endif
         </div>
 
         {{-- Liabilities --}}

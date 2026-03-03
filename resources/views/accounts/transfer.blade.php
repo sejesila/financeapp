@@ -91,16 +91,6 @@
                     @error('to_account_id')
                     <p class="text-red-500 text-sm mt-2">{{ $message }}</p>
                     @enderror
-
-                    <!-- Bank transfer restriction notice -->
-                    <p x-show="fromAccountType === 'bank'" class="text-xs text-blue-600 dark:text-blue-400 mt-2">
-                        💡 Bank transfers are only available to M-Pesa and Airtel Money accounts
-                    </p>
-
-                    <!-- Mshwari transfer restriction notice -->
-                    <p x-show="fromAccountType === 'savings'" class="text-xs text-blue-600 dark:text-blue-400 mt-2">
-                        💡 Mshwari transfers are only available to M-Pesa accounts
-                    </p>
                 </div>
 
                 <!-- Amount -->
