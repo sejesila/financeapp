@@ -443,9 +443,7 @@
                                     @endif
                                 </td>
                             @endfor
-                            <td class="px-3 py-2 text-center bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 font-semibold text-sm">
-                                {{ number_format($savingsWithdrawals->sum('total'), 0) }}
-                            </td>
+
                         </tr>
                     @endif
                     </tbody>

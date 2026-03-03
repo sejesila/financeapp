@@ -19,9 +19,26 @@ class DashboardController extends Controller
 
         // ============ FINANCIAL DASHBOARD DATA ============
 
+        // AFTER
         $totalAssets = Account::where('is_active', true)
             ->where('user_id', $userId)
+            ->whereIn('type', ['cash', 'mpesa', 'airtel_money', 'bank'])
             ->sum('current_balance');
+
+        $totalSavings = Account::where('is_active', true)
+            ->where('user_id', $userId)
+            ->where('type', 'savings')
+            ->sum('current_balance');
+
+        $accounts = Account::where('is_active', true)
+            ->where('user_id', $userId)
+            ->whereIn('type', ['cash', 'mpesa', 'airtel_money', 'bank'])
+            ->get();
+
+        $savingsAccounts = Account::where('is_active', true)
+            ->where('user_id', $userId)
+            ->where('type', 'savings')
+            ->get();
 
         $totalLiabilities = Loan::where('status', 'active')
             ->where('user_id', $userId)
@@ -29,10 +46,6 @@ class DashboardController extends Controller
 
         $netWorth = $totalAssets - $totalLiabilities;
         $debtToAssetRatio = $totalAssets > 0 ? ($totalLiabilities / $totalAssets) * 100 : 0;
-
-        $accounts = Account::where('is_active', true)
-            ->where('user_id', $userId)
-            ->get();
 
         $activeLoans = Loan::where('status', 'active')
             ->where('user_id', $userId)
@@ -173,7 +186,8 @@ class DashboardController extends Controller
             'monthlyComparisonPercent',
             'recentTransactions',
             'budgets',
-            'accounts'
+            'totalSavings',
+            'savingsAccounts',
         ));
     }
 }
