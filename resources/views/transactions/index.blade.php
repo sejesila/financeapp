@@ -166,16 +166,15 @@
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
             @php
                 $stats = [
-                    ['Today', $totalToday, 'blue'],
-                    ['Yesterday', $totalYesterday, 'orange'],
                     ['This Week', $totalThisWeek, 'green'],
                     ['Last Week', $totalLastWeek, 'yellow'],
                     ['This Month', $totalThisMonth, 'teal'],
                     ['Last Month', $totalLastMonth, 'pink'],
+                    ['This Year', $totalThisYear ?? 0, 'indigo'],
+                    ['Last Year', $totalLastYear ?? 0, 'orange'],
                     ['All Time', $totalAll, 'purple'],
                 ];
             @endphp
-
             @foreach($stats as [$label, $value, $color])
                 <div class="bg-{{ $color }}-100 p-3 rounded-lg border border-{{ $color }}-300">
                     <h3 class="text-xs font-semibold text-{{ $color }}-800 mb-1">{{ $label }}</h3>

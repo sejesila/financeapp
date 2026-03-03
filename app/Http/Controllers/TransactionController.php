@@ -166,14 +166,13 @@ class TransactionController extends Controller
     /**
      * Calculate transaction totals for a given query
      */
+    // AFTER
     private function calculateTransactionTotals()
     {
         $baseQuery = Transaction::where('user_id', Auth::id())
             ->where('is_transaction_fee', false);
 
         return [
-            'totalToday' => (clone $baseQuery)->whereDate('date', today())->sum('amount'),
-            'totalYesterday' => (clone $baseQuery)->whereDate('date', today()->subDay())->sum('amount'),
             'totalThisWeek' => (clone $baseQuery)->whereBetween('date', [
                 now()->startOfWeek(),
                 now()->endOfWeek()
@@ -189,6 +188,12 @@ class TransactionController extends Controller
             'totalLastMonth' => (clone $baseQuery)
                 ->whereMonth('date', now()->subMonth()->month)
                 ->whereYear('date', now()->subMonth()->year)
+                ->sum('amount'),
+            'totalThisYear' => (clone $baseQuery)
+                ->whereYear('date', now()->year)
+                ->sum('amount'),
+            'totalLastYear' => (clone $baseQuery)
+                ->whereYear('date', now()->subYear()->year)
                 ->sum('amount'),
             'totalAll' => (clone $baseQuery)->sum('amount'),
         ];
