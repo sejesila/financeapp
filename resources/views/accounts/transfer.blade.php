@@ -50,7 +50,10 @@
                                 @elseif($account->type == 'bank') 🏦
                                 @elseif($account->type == 'savings') 💰
                                 @endif
-                                {{ $account->name }} ({{ number_format($account->current_balance, 0, '.', ',') }})
+                                {{ $account->name }}
+                                @if($account->type !== 'savings')
+                                    ({{ number_format($account->current_balance, 0, '.', ',') }})
+                                @endif
                             </option>
                         @endforeach
                     </select>
@@ -84,7 +87,10 @@
                                 @elseif($account->type == 'bank') 🏦
                                 @elseif($account->type == 'savings') 💰
                                 @endif
-                                {{ $account->name }} ({{ number_format($account->current_balance, 0, '.', ',') }})
+                                {{ $account->name }}
+                                @if($account->type !== 'savings')
+                                    ({{ number_format($account->current_balance, 0, '.', ',') }})
+                                @endif
                             </option>
                         @endforeach
                     </select>
@@ -273,7 +279,6 @@
                 },
 
                 getWithdrawalFee(amount, accountType) {
-                    // Return 0 if amount is invalid or below minimum
                     if (!amount || amount < 50) {
                         return 0;
                     }
@@ -301,12 +306,10 @@
                         }
                     }
 
-                    // If amount exceeds all tiers, return the highest tier cost
                     return amount > 250000 ? 309 : 0;
                 },
 
                 getPayBillFee(amount, accountType) {
-                    // Return 0 if amount is invalid or zero
                     if (!amount || amount <= 0) {
                         return 0;
                     }
@@ -344,7 +347,6 @@
                         }
                     }
 
-                    // If amount exceeds all tiers, return the highest tier cost
                     return amount > 250000 ? 108 : 0;
                 },
 
