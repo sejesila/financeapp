@@ -374,9 +374,9 @@
     // Session Timeout Management - 3 MINUTE TIMEOUT
     // FIX: Wrapped in DOMContentLoaded to ensure logout form is available before any ping runs
     document.addEventListener('DOMContentLoaded', function () {
-        const sessionLifetime = 3 * 60 * 1000; // 3 minutes in milliseconds
-        const warningTime = 30 * 1000; // Show warning 30 seconds before expiry
-        const pingInterval = 60 * 1000; // Ping server every 60 seconds
+        const sessionLifetime = 120 * 60 * 1000; // 120 minutes, matches SESSION_LIFETIME
+        const warningTime = 2* 60 * 1000; // warn 2 minutes before expiry
+        const pingInterval = 10* 60 * 1000; // Ping server every 10 minutes
         let timeoutWarning;
         let sessionTimeout;
         let countdownInterval;
@@ -507,13 +507,15 @@
         }
 
         // Periodic ping to keep session alive
-        pingTimer = setInterval(() => {
-            pingServer(false);
-        }, pingInterval);
+        setTimeout(() => {
+            pingTimer = setInterval(() => {
+                pingServer(false);
+            }, pingInterval);
+        }, pingInterval); // wait one full interval before starting
 
         // Initialize timers
         resetTimer();
-        pingServer(false);
+       // pingServer(false);
 
         // FIX: window.fetch override now correctly re-throws errors for non-419 failures
         // so other fetch calls in the app are not silently broken
