@@ -22,7 +22,6 @@
                         </a>
                     @endif
 
-                    {{-- Only show Add Account button if total accounts is less than 7 --}}
                     @if (($accounts->count() + $savingsAccounts->count()) < 7)
                         <a href="{{ route('accounts.create') }}"
                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm text-center w-full sm:w-auto">
@@ -41,8 +40,7 @@
                 @endif
             @endforeach
 
-            <!-- Total Balance Card -->
-            <!-- AFTER -->
+            <!-- Total Balance Cards -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
 
                 {{-- Total Cash Card --}}
@@ -137,13 +135,10 @@
                     </h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
                         @foreach($accounts as $account)
-                            @php
-                                $isLowBalance = $account->current_balance < 1;
-                            @endphp
-                            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md {{ $isLowBalance ? 'low-balance-account hidden' : '' }} {{ $isLowBalance ? 'opacity-60' : '' }}">
+                            @php $isLowBalance = $account->current_balance < 1; @endphp
+                            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md {{ $isLowBalance ? 'low-balance-account hidden opacity-60' : '' }}">
                                 <div class="p-4">
 
-                                    <!-- Low Balance Badge -->
                                     @if($isLowBalance)
                                         <div class="mb-2">
                                             <span class="inline-block bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">
@@ -152,7 +147,6 @@
                                         </div>
                                     @endif
 
-                                    <!-- Header -->
                                     <div class="flex items-center gap-3 mb-3">
                                         <div class="w-10 h-10 rounded-full flex items-center justify-center bg-gray-100">
                                             @if(strtolower($account->type) === 'bank')
@@ -165,7 +159,6 @@
                                                 <span class="font-bold text-gray-700">{{ substr($account->name, 0, 1) }}</span>
                                             @endif
                                         </div>
-
                                         <div class="min-w-0">
                                             <h3 class="font-semibold text-sm text-gray-800 dark:text-gray-200 truncate">
                                                 {{ $account->name }}
@@ -173,8 +166,6 @@
                                         </div>
                                     </div>
 
-                                    <!-- Balance -->
-                                    <!-- AFTER (restore regular balance display for non-savings accounts) -->
                                     <div class="mb-3 balance-hidden">
                                         <p class="text-xs text-gray-600 dark:text-gray-400">Available Balance</p>
                                         <p class="text-xl font-bold {{ $account->current_balance >= 0 ? 'text-green-600' : 'text-red-600' }}">
@@ -189,13 +180,11 @@
                                         </p>
                                     @endif
 
-                                    <!-- Actions -->
                                     <div class="flex flex-col sm:flex-row gap-2">
                                         <a href="{{ route('accounts.show', $account) }}"
                                            class="flex-1 bg-blue-500 text-white text-center py-2 rounded hover:bg-blue-600 text-xs sm:text-sm">
                                             View
                                         </a>
-
                                         <a href="{{ route('accounts.topup', $account) }}"
                                            class="flex-1 bg-green-500 text-white text-center py-2 rounded hover:bg-green-600 text-xs sm:text-sm">
                                             Top Up
@@ -217,13 +206,10 @@
                     </h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
                         @foreach($savingsAccounts as $account)
-                            @php
-                                $isLowBalance = $account->current_balance < 1;
-                            @endphp
-                            <div class="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg shadow-md border-2 border-green-200 dark:border-green-700 {{ $isLowBalance ? 'low-balance-account hidden' : '' }} {{ $isLowBalance ? 'opacity-60' : '' }}">
+                            @php $isLowBalance = $account->current_balance < 1; @endphp
+                            <div class="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg shadow-md border-2 border-green-200 dark:border-green-700 {{ $isLowBalance ? 'low-balance-account hidden opacity-60' : '' }}">
                                 <div class="p-4">
 
-                                    <!-- Low Balance Badge -->
                                     @if($isLowBalance)
                                         <div class="mb-2">
                                             <span class="inline-block bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">
@@ -232,7 +218,6 @@
                                         </div>
                                     @endif
 
-                                    <!-- Header -->
                                     <div class="flex items-center gap-3 mb-3">
                                         <div class="w-10 h-10 rounded-full flex items-center justify-center bg-green-100 dark:bg-green-800">
                                             @if(str_contains(strtolower($account->name), 'mshwari'))
@@ -245,19 +230,14 @@
                                                 <span class="text-green-700 dark:text-green-300 font-bold">💵</span>
                                             @endif
                                         </div>
-
                                         <div class="min-w-0">
                                             <h3 class="font-semibold text-sm text-gray-800 dark:text-gray-200 truncate">
                                                 {{ $account->name }}
                                             </h3>
-                                            <p class="text-xs text-green-600 dark:text-green-400">
-                                                Savings Account
-                                            </p>
+                                            <p class="text-xs text-green-600 dark:text-green-400">Savings Account</p>
                                         </div>
                                     </div>
 
-                                    <!-- Balance -->
-                                    <!-- AFTER -->
                                     <div class="mb-3">
                                         <p class="text-xs text-gray-600 dark:text-gray-400 mb-1">Saved Amount</p>
 
@@ -285,13 +265,11 @@
                                         </p>
                                     @endif
 
-                                    <!-- Actions -->
                                     <div class="flex flex-col sm:flex-row gap-2">
-                                        <a href="{{ route('accounts.show', $account) }}"
-                                           class="flex-1 bg-green-500 text-white text-center py-2 rounded hover:bg-green-600 text-xs sm:text-sm">
+                                        <button onclick="openSavingsViewPinModal('{{ route('accounts.show', $account) }}')"
+                                                class="flex-1 bg-green-500 text-white text-center py-2 rounded hover:bg-green-600 text-xs sm:text-sm">
                                             View
-                                        </a>
-
+                                        </button>
                                         <a href="{{ route('accounts.topup', $account) }}"
                                            class="flex-1 bg-emerald-500 text-white text-center py-2 rounded hover:bg-emerald-600 text-xs sm:text-sm">
                                             Deposit
@@ -321,10 +299,7 @@
             <!-- Recent Transfers -->
             @if($recentTransfers->count())
                 <div class="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow-md">
-                    <h3 class="text-base sm:text-lg font-semibold mb-4">
-                        Recent Transfers
-                    </h3>
-
+                    <h3 class="text-base sm:text-lg font-semibold mb-4">Recent Transfers</h3>
                     <div class="space-y-3">
                         @foreach($recentTransfers as $transfer)
                             <div class="flex flex-col sm:flex-row sm:justify-between gap-2 p-3 bg-gray-50 dark:bg-gray-700 rounded">
@@ -363,7 +338,7 @@
             return hash.toString();
         }
 
-        // ===================== PIN UNLOCK MODAL =====================
+        // ===================== PIN UNLOCK MODAL (balance reveal) =====================
         let acctPinEntry = '';
 
         function openAcctPinModal() {
@@ -413,7 +388,6 @@
             });
         }
 
-        // AFTER
         function showAcctSavingsUnlocked() {
             document.getElementById('acct-savings-locked').classList.add('hidden');
             document.getElementById('acct-savings-unlocked').classList.remove('hidden');
@@ -540,6 +514,65 @@
                 : 'Show accounts with low balance';
         }
 
+        // ===================== SAVINGS VIEW PIN =====================
+        let savingsViewPinEntry = '';
+        let savingsViewTarget = '';
+
+        function openSavingsViewPinModal(url) {
+            // If already unlocked, navigate directly
+            const unlockedUntil = localStorage.getItem(SAVINGS_UNLOCKED_KEY);
+            if (unlockedUntil && Date.now() < parseInt(unlockedUntil)) {
+                window.location.href = url;
+                return;
+            }
+
+            savingsViewTarget = url;
+            savingsViewPinEntry = '';
+            updateSavingsViewDots(0);
+            document.getElementById('savings-view-pin-error').classList.add('hidden');
+            document.getElementById('savings-view-pin-modal').classList.remove('hidden');
+        }
+
+        function closeSavingsViewPinModal() {
+            savingsViewPinEntry = '';
+            savingsViewTarget = '';
+            updateSavingsViewDots(0);
+            document.getElementById('savings-view-pin-modal').classList.add('hidden');
+        }
+
+        function savingsViewPinInput(key) {
+            if (key === '⌫') {
+                savingsViewPinEntry = savingsViewPinEntry.slice(0, -1);
+            } else if (savingsViewPinEntry.length < 4) {
+                savingsViewPinEntry += key;
+            }
+
+            updateSavingsViewDots(savingsViewPinEntry.length);
+
+            if (savingsViewPinEntry.length === 4) {
+                setTimeout(() => {
+                    if (hashPin(savingsViewPinEntry) === localStorage.getItem(SAVINGS_PIN_KEY)) {
+                        localStorage.setItem(SAVINGS_UNLOCKED_KEY, (Date.now() + UNLOCK_DURATION_MS).toString());
+                        closeSavingsViewPinModal();
+                        window.location.href = savingsViewTarget;
+                    } else {
+                        document.getElementById('savings-view-pin-error').classList.remove('hidden');
+                        savingsViewPinEntry = '';
+                        updateSavingsViewDots(0);
+                    }
+                }, 150);
+            }
+        }
+
+        function updateSavingsViewDots(count) {
+            document.querySelectorAll('.savings-view-dot').forEach((dot, i) => {
+                dot.classList.toggle('bg-green-500', i < count);
+                dot.classList.toggle('border-green-500', i < count);
+                dot.classList.toggle('border-gray-300', i >= count);
+                dot.classList.toggle('dark:border-gray-600', i >= count);
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', function () {
             updateBalanceVisibility();
             updateLowBalanceAccountsVisibility();
@@ -548,8 +581,8 @@
     </script>
 
     <x-floating-action-button :quickAccount="$allAccounts->first()" />
-    {{-- PIN Setup Modal --}}
-    {{-- PIN Unlock Modal --}}
+
+    {{-- PIN Unlock Modal (balance reveal on index) --}}
     <div id="acct-pin-unlock-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden">
         <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 w-80 mx-4">
             <div class="text-center mb-5">
@@ -561,13 +594,11 @@
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">Savings PIN</h3>
                 <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Enter your 4-digit PIN to reveal savings</p>
             </div>
-
             <div class="flex justify-center gap-3 mb-5">
                 @for($i = 0; $i < 4; $i++)
                     <div class="w-4 h-4 rounded-full border-2 border-gray-300 dark:border-gray-600 acct-unlock-dot"></div>
                 @endfor
             </div>
-
             <div class="grid grid-cols-3 gap-2">
                 @foreach([1,2,3,4,5,6,7,8,9,'',0,'⌫'] as $key)
                     @if($key === '')
@@ -580,7 +611,6 @@
                     @endif
                 @endforeach
             </div>
-
             <p id="acct-pin-error" class="text-xs text-red-500 text-center mt-3 hidden">Incorrect PIN. Try again.</p>
             <button onclick="closeAcctPinModal()"
                     class="mt-4 w-full text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
@@ -599,7 +629,9 @@
                     </svg>
                 </div>
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">Set Savings PIN</h3>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1" id="acct-setup-subtitle">Create a 4-digit PIN to protect your savings balance</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1" id="acct-setup-subtitle">
+                    Create a 4-digit PIN to protect your savings balance
+                </p>
             </div>
             <div class="flex justify-center gap-3 mb-5">
                 @for($i = 0; $i < 4; $i++)
@@ -625,4 +657,42 @@
             </button>
         </div>
     </div>
+
+    {{-- Savings View PIN Modal --}}
+    <div id="savings-view-pin-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 w-80 mx-4">
+            <div class="text-center mb-5">
+                <div class="w-14 h-14 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <svg class="w-7 h-7 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Savings PIN</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Enter your PIN to view this account</p>
+            </div>
+            <div class="flex justify-center gap-3 mb-5">
+                @for($i = 0; $i < 4; $i++)
+                    <div class="w-4 h-4 rounded-full border-2 border-gray-300 dark:border-gray-600 savings-view-dot"></div>
+                @endfor
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+                @foreach([1,2,3,4,5,6,7,8,9,'',0,'⌫'] as $key)
+                    @if($key === '')
+                        <div></div>
+                    @else
+                        <button onclick="savingsViewPinInput('{{ $key }}')"
+                                class="py-3 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 active:scale-95 text-gray-800 dark:text-white font-semibold text-base transition-all duration-150">
+                            {{ $key }}
+                        </button>
+                    @endif
+                @endforeach
+            </div>
+            <p id="savings-view-pin-error" class="text-xs text-red-500 text-center mt-3 hidden">Incorrect PIN. Try again.</p>
+            <button onclick="closeSavingsViewPinModal()"
+                    class="mt-4 w-full text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+                Cancel
+            </button>
+        </div>
+    </div>
+
 </x-app-layout>
