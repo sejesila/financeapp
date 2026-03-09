@@ -91,44 +91,78 @@ class AccountController extends Controller
         }
 
         $search = request('search');
+        $activeTab = request('tab', 'transactions');
 
+        // ── Sorting for transactions ──────────────────────────────────
+        $txSort      = request('tx_sort', 'date');
+        $txDirection = request('tx_dir', 'desc');
+        $allowedTxSorts = ['date', 'description', 'amount'];
+        if (!in_array($txSort, $allowedTxSorts)) $txSort = 'date';
+        $txDirection = $txDirection === 'asc' ? 'asc' : 'desc';
+
+        // ── Sorting for top-ups ───────────────────────────────────────
+        $topSort      = request('top_sort', 'date');
+        $topDirection = request('top_dir', 'desc');
+        $allowedTopSorts = ['date', 'description', 'amount'];
+        if (!in_array($topSort, $allowedTopSorts)) $topSort = 'date';
+        $topDirection = $topDirection === 'asc' ? 'asc' : 'desc';
+
+        // ── Transactions query ────────────────────────────────────────
         $transactionQuery = $account->transactions()
             ->with(['category.parent', 'feeTransaction'])
+            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
             ->select([
-                'id',
-                'date',
-                'description',
-                'amount',
-                'category_id',
-                'account_id',
-                'is_transaction_fee',
-                'related_fee_transaction_id',
+                'id', 'date', 'description', 'amount',
+                'category_id', 'account_id',
+                'is_transaction_fee', 'related_fee_transaction_id',
             ]);
 
-        if ($search) {
+        if ($search && $activeTab === 'transactions') {
             $transactionQuery->where(function ($q) use ($search) {
                 $q->where('description', 'like', '%' . $search . '%')
-                    ->orWhere('amount', 'like', '%' . $search . '%');
+                    ->orWhereRaw('CAST(amount AS CHAR) LIKE ?', ['%' . $search . '%']);
             });
         }
 
         $transactions = $transactionQuery
-            ->latest('date')
-            ->latest('id')
-            ->paginate(20)
+            ->orderBy($txSort, $txDirection)
+            ->when($txSort === 'date', fn($q) => $q->orderBy('id', $txDirection))
+            ->paginate(20, ['*'], 'tx_page')
             ->appends(request()->query());
 
+        // ── Top-ups query ─────────────────────────────────────────────
+        $topUpQuery = $account->transactions()
+            ->with(['category'])
+            ->whereHas('category', fn($q) => $q->whereIn('type', ['income', 'liability']))
+            ->select([
+                'id', 'date', 'description', 'amount',
+                'category_id', 'account_id',
+            ]);
+
+        if ($search && $activeTab === 'topups') {
+            $topUpQuery->where(function ($q) use ($search) {
+                $q->where('description', 'like', '%' . $search . '%')
+                    ->orWhereRaw('CAST(amount AS CHAR) LIKE ?', ['%' . $search . '%']);
+            });
+        }
+
+        $topUps = $topUpQuery
+            ->orderBy($topSort, $topDirection)
+            ->when($topSort === 'date', fn($q) => $q->orderBy('id', $topDirection))
+            ->paginate(20, ['*'], 'top_page')
+            ->appends(request()->query());
+
+        // ── Stats ─────────────────────────────────────────────────────
         $stats = $account->transactions()
             ->selectRaw('
-                COUNT(*) as total_transactions,
-                SUM(CASE WHEN categories.type = "income" THEN amount ELSE 0 END) as total_income,
-                SUM(CASE WHEN categories.type = "expense" THEN amount ELSE 0 END) as total_expenses,
-                SUM(CASE
-                    WHEN MONTH(date) = ? AND YEAR(date) = ?
-                    THEN amount
-                    ELSE 0
-                END) as this_month_total
-            ', [now()->month, now()->year])
+            COUNT(*) as total_transactions,
+            SUM(CASE WHEN categories.type = "income" THEN amount ELSE 0 END) as total_income,
+            SUM(CASE WHEN categories.type = "expense" THEN amount ELSE 0 END) as total_expenses,
+            SUM(CASE
+                WHEN MONTH(date) = ? AND YEAR(date) = ?
+                THEN amount ELSE 0
+            END) as this_month_total
+        ', [now()->month, now()->year])
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->first();
 
@@ -140,11 +174,17 @@ class AccountController extends Controller
         return view('accounts.show', compact(
             'account',
             'transactions',
+            'topUps',
             'totalTransactions',
             'totalIncome',
             'totalExpenses',
             'thisMonthTotal',
-            'search'
+            'search',
+            'activeTab',
+            'txSort',
+            'txDirection',
+            'topSort',
+            'topDirection'
         ));
     }
 

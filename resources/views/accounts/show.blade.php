@@ -20,7 +20,6 @@
                 </div>
             @endif
 
-            {{-- Errors --}}
             @if($errors->any())
                 <div class="bg-red-100 text-red-700 p-4 rounded-lg mb-6">
                     <ul class="list-disc list-inside">
@@ -48,12 +47,15 @@
                         </div>
                         <div>
                             <h2 class="text-2xl font-bold text-gray-900 dark:text-white">{{ $account->name }}</h2>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 capitalize mt-1">
+                                {{ str_replace('_', ' ', $account->type) }} Account
+                            </p>
                         </div>
                     </div>
-{{--                    <a href="{{ route('accounts.edit', $account) }}"--}}
-{{--                       class="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 text-sm font-medium">--}}
-{{--                        Edit--}}
-{{--                    </a>--}}
+                    <a href="{{ route('accounts.edit', $account) }}"
+                       class="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 text-sm font-medium">
+                        Edit
+                    </a>
                 </div>
 
                 @if($account->notes)
@@ -72,7 +74,6 @@
                         <p class="text-4xl font-bold {{ $account->current_balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
                             KES {{ number_format($account->current_balance, 0, '.', ',') }}
                         </p>
-
                         @if($account->current_balance < 0)
                             <p class="text-sm text-red-600 dark:text-red-400 mt-2 flex items-center gap-1">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -82,12 +83,17 @@
                             </p>
                         @endif
                     </div>
-
                     <a href="{{ route('accounts.topup', $account) }}"
                        class="bg-green-600 text-white px-6 py-2.5 rounded-lg hover:bg-green-700 transition text-center font-medium shadow-md">
                         + Top Up Account
                     </a>
                 </div>
+                <p class="text-xs text-gray-600 dark:text-gray-400 mt-4 flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Balances are calculated automatically from transactions.
+                </p>
             </div>
 
             {{-- Transaction Statistics --}}
@@ -97,10 +103,9 @@
                         ['label' => 'Total Transactions', 'value' => number_format($totalTransactions),            'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', 'color' => 'blue'],
                         ['label' => 'Total Income',        'value' => 'KES ' . number_format($totalIncome, 0),    'icon' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'green'],
                         ['label' => 'Total Expenses',      'value' => 'KES ' . number_format($totalExpenses, 0),  'icon' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'red'],
-                        ['label' => 'This Month',          'value' => 'KES ' . number_format($thisMonthTotal, 0), 'icon' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',                                                                                                                                                                                                                                                                   'color' => 'purple'],
+                        ['label' => 'This Month',          'value' => 'KES ' . number_format($thisMonthTotal, 0), 'icon' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', 'color' => 'purple'],
                     ];
                 @endphp
-
                 @foreach($stats as $stat)
                     <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
                         <div class="flex items-center justify-between mb-2">
@@ -116,34 +121,61 @@
                 @endforeach
             </div>
 
-            {{-- Transaction History --}}
+            {{-- Tabs + Search --}}
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                    <h3 class="font-bold text-xl text-gray-900 dark:text-white">Transaction History</h3>
-                    <a href="{{ route('transactions.index', ['account_id' => $account->id]) }}"
-                       class="text-sm text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 font-medium whitespace-nowrap">
-                        View All →
+
+                {{-- Tab Bar --}}
+                <div class="flex border-b border-gray-200 dark:border-gray-700 mb-5 gap-1">
+                    <a href="{{ request()->fullUrlWithQuery(['tab' => 'transactions', 'tx_page' => 1]) }}"
+                       class="px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors
+                              {{ $activeTab === 'transactions'
+                                  ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
+                                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200' }}">
+                        Transactions
+                        <span class="ml-1.5 px-1.5 py-0.5 text-xs rounded-full
+                                     {{ $activeTab === 'transactions' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400' }}">
+                            {{ number_format($transactions->total()) }}
+                        </span>
                     </a>
+                    <a href="{{ request()->fullUrlWithQuery(['tab' => 'topups', 'top_page' => 1]) }}"
+                       class="px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors
+                              {{ $activeTab === 'topups'
+                                  ? 'border-green-600 text-green-600 dark:text-green-400 dark:border-green-400'
+                                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200' }}">
+                        Top Up History
+                        <span class="ml-1.5 px-1.5 py-0.5 text-xs rounded-full
+                                     {{ $activeTab === 'topups' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400' }}">
+                            {{ number_format($topUps->total()) }}
+                        </span>
+                    </a>
+
+                    {{-- View All (transactions tab only) --}}
+                    @if($activeTab === 'transactions')
+                        <a href="{{ route('transactions.index', ['account_id' => $account->id]) }}"
+                           class="ml-auto text-sm text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 font-medium self-center whitespace-nowrap">
+                            View All →
+                        </a>
+                    @endif
                 </div>
 
                 {{-- Search Bar --}}
                 <form method="GET" action="{{ route('accounts.show', $account) }}" class="mb-5">
+                    <input type="hidden" name="tab" value="{{ $activeTab }}">
                     <div class="relative">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
                             </svg>
                         </div>
                         <input type="text"
                                name="search"
                                value="{{ $search ?? '' }}"
-                               placeholder="Search transactions..."
+                               placeholder="Search by description or amount..."
                                class="w-full pl-9 pr-10 py-2 text-sm rounded-lg border border-gray-300
                                       dark:border-gray-600 dark:bg-gray-700 dark:text-white
                                       focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                         @if(!empty($search))
-                            <a href="{{ route('accounts.show', $account) }}"
+                            <a href="{{ route('accounts.show', array_merge(['account' => $account->id], ['tab' => $activeTab])) }}"
                                class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -153,102 +185,227 @@
                     </div>
                     @if(!empty($search))
                         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
-                            Showing results for
-                            "<span class="font-medium text-gray-700 dark:text-gray-300">{{ $search }}</span>"
-                            — {{ number_format($transactions->total()) }} {{ Str::plural('result', $transactions->total()) }}
+                            Results for "<span class="font-medium text-gray-700 dark:text-gray-300">{{ $search }}</span>"
+                            — {{ number_format($activeTab === 'transactions' ? $transactions->total() : $topUps->total()) }}
+                            {{ Str::plural('result', $activeTab === 'transactions' ? $transactions->total() : $topUps->total()) }}
                         </p>
                     @endif
                 </form>
 
-                @if($transactions->count() > 0)
-                    <div class="space-y-2">
-                        @foreach($transactions as $txn)
-                            <a href="{{ route('transactions.show', $txn) }}"
-                               class="block p-4 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-700 transition group">
-                                <div class="flex justify-between items-start gap-4">
-                                    <div class="flex-1 min-w-0">
-                                        <div class="flex items-center gap-2 mb-1">
-                                            <span class="text-lg">{{ $txn->category->icon ?? '💰' }}</span>
-                                            <p class="font-semibold text-gray-900 dark:text-white truncate">
-                                                @if(!empty($search))
-                                                    {!! str_ireplace(
-                                                        $search,
-                                                        '<mark class="bg-yellow-100 dark:bg-yellow-800 text-gray-900 dark:text-white rounded px-0.5">' . e($search) . '</mark>',
-                                                        e($txn->description)
-                                                    ) !!}
-                                                @else
-                                                    {{ $txn->description }}
+                {{-- ═══════════ TRANSACTIONS TAB ═══════════ --}}
+                @if($activeTab === 'transactions')
+                    @php
+                        $txColumns = [
+                            'date'        => 'Date',
+                            'description' => 'Description',
+                            'amount'      => 'Amount',
+                        ];
+                    @endphp
+
+                    @if($transactions->count() > 0)
+                        <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                                <tr>
+                                    @foreach($txColumns as $col => $label)
+                                        @php
+                                            $isActive = $txSort === $col;
+                                            $newDir   = ($isActive && $txDirection === 'asc') ? 'desc' : 'asc';
+                                            $url      = request()->fullUrlWithQuery([
+                                                'tab'      => 'transactions',
+                                                'tx_sort'  => $col,
+                                                'tx_dir'   => $newDir,
+                                                'tx_page'  => 1,
+                                            ]);
+                                        @endphp
+                                        <th class="px-4 py-3 text-left font-medium">
+                                            <a href="{{ $url }}"
+                                               class="inline-flex items-center gap-1 hover:text-indigo-600 transition-colors group">
+                                                {{ $label }}
+                                                <span class="text-xs">
+                                                        @if($isActive)
+                                                        <span class="text-indigo-600 font-bold">{{ $txDirection === 'asc' ? '↑' : '↓' }}</span>
+                                                    @else
+                                                        <span class="text-gray-400 group-hover:text-indigo-400">↕</span>
+                                                    @endif
+                                                    </span>
+                                            </a>
+                                        </th>
+                                    @endforeach
+                                    <th class="px-4 py-3 text-left font-medium hidden sm:table-cell">Category</th>
+                                </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                                @foreach($transactions as $txn)
+                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors {{ $txn->is_transaction_fee ? 'bg-yellow-50 dark:bg-yellow-900/10' : '' }}">
+                                        <td class="px-4 py-3 whitespace-nowrap text-gray-600 dark:text-gray-400 text-xs">
+                                            {{ $txn->date->format('M d, Y') }}
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <div class="flex items-center gap-2">
+                                                <span>{{ $txn->category->icon ?? '💸' }}</span>
+                                                <span class="text-gray-900 dark:text-white font-medium">
+                                                        @if(!empty($search))
+                                                        {!! str_ireplace($search, '<mark class="bg-yellow-100 dark:bg-yellow-800 rounded px-0.5">' . e($search) . '</mark>', e($txn->description)) !!}
+                                                    @else
+                                                        {{ $txn->description }}
+                                                    @endif
+                                                    </span>
+                                                @if($txn->is_transaction_fee)
+                                                    <span class="px-1.5 py-0.5 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 rounded text-xs">Fee</span>
                                                 @endif
-                                            </p>
-                                        </div>
-                                        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
-                                            <span class="flex items-center gap-1">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                                                </svg>
-                                                {{ $txn->date->format('M d, Y') }}
-                                            </span>
-                                            <span class="flex items-center gap-1">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
-                                                </svg>
-                                                {{ $txn->category->name }}
-                                            </span>
-                                            @if($txn->is_transaction_fee)
-                                                <span class="px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 rounded-full text-xs font-medium">
-                                                    Fee
-                                                </span>
+                                            </div>
+                                            @if($txn->feeTransaction)
+                                                <p class="text-xs text-gray-400 mt-0.5 ml-6">+{{ number_format($txn->feeTransaction->amount, 0) }} fee</p>
                                             @endif
-                                        </div>
-                                    </div>
-                                    <div class="text-right flex-shrink-0">
-                                        <span class="text-lg font-bold {{ $txn->category->type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
-                                            {{ $txn->category->type === 'income' ? '+' : '-' }}{{ number_format($txn->amount, 0, '.', ',') }}
-                                        </span>
-                                        @if($txn->feeTransaction)
-                                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                                +{{ number_format($txn->feeTransaction->amount, 0) }} fee
-                                            </p>
-                                        @endif
-                                    </div>
-                                </div>
-                            </a>
-                        @endforeach
-                    </div>
+                                        </td>
+                                        <td class="px-4 py-3 whitespace-nowrap font-semibold text-red-600 dark:text-red-400">
+                                            @if(!empty($search))
+                                                {!! str_ireplace($search, '<mark class="bg-yellow-100 dark:bg-yellow-800 rounded px-0.5">' . e($search) . '</mark>', e(number_format($txn->amount, 0))) !!}
+                                            @else
+                                                −{{ number_format($txn->amount, 0) }}
+                                            @endif
+                                        </td>
+                                        <td class="px-4 py-3 hidden sm:table-cell">
+                                                <span class="inline-flex rounded-full px-2 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
+                                                    {{ $txn->category->name }}
+                                                </span>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-4">{{ $transactions->links() }}</div>
 
-                    {{-- Pagination --}}
-                    <div class="mt-6">
-                        {{ $transactions->links() }}
-                    </div>
+                    @else
+                        <div class="text-center py-12">
+                            @if(!empty($search))
+                                <svg class="w-12 h-12 mx-auto text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
+                                </svg>
+                                <p class="text-gray-500 font-medium mb-1">No transactions found</p>
+                                <p class="text-gray-400 text-sm">No match for "{{ $search }}"</p>
+                                <a href="{{ route('accounts.show', ['account' => $account, 'tab' => 'transactions']) }}"
+                                   class="inline-block mt-3 text-sm text-indigo-600 hover:underline">Clear search</a>
+                            @else
+                                <svg class="w-12 h-12 mx-auto text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                                </svg>
+                                <p class="text-gray-500 font-medium mb-1">No transactions yet</p>
+                                <a href="{{ route('transactions.create') }}"
+                                   class="inline-block mt-2 bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700 transition text-sm">
+                                    Add Transaction
+                                </a>
+                            @endif
+                        </div>
+                    @endif
 
+                    {{-- ═══════════ TOP UPS TAB ═══════════ --}}
                 @else
-                    <div class="text-center py-12">
-                        @if(!empty($search))
-                            <svg class="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
-                            </svg>
-                            <p class="text-gray-500 dark:text-gray-400 text-lg font-medium mb-2">No results found</p>
-                            <p class="text-gray-400 dark:text-gray-500 text-sm mb-4">
-                                No transactions matching "<span class="font-medium">{{ $search }}</span>"
-                            </p>
-                            <a href="{{ route('accounts.show', $account) }}"
-                               class="inline-block bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition text-sm">
-                                Clear search
-                            </a>
-                        @else
-                            <svg class="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                            </svg>
-                            <p class="text-gray-500 dark:text-gray-400 text-lg font-medium mb-2">No transactions yet</p>
-                            <p class="text-gray-400 dark:text-gray-500 text-sm mb-4">Start by adding a transaction or topping up your account</p>
-                            <a href="{{ route('accounts.topup', $account) }}"
-                               class="inline-block bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition">
-                                Add Transaction
-                            </a>
-                        @endif
-                    </div>
+                    @php
+                        $topColumns = [
+                            'date'        => 'Date',
+                            'description' => 'Description',
+                            'amount'      => 'Amount',
+                        ];
+                    @endphp
+
+                    @if($topUps->count() > 0)
+                        <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                                <tr>
+                                    @foreach($topColumns as $col => $label)
+                                        @php
+                                            $isActive = $topSort === $col;
+                                            $newDir   = ($isActive && $topDirection === 'asc') ? 'desc' : 'asc';
+                                            $url      = request()->fullUrlWithQuery([
+                                                'tab'      => 'topups',
+                                                'top_sort' => $col,
+                                                'top_dir'  => $newDir,
+                                                'top_page' => 1,
+                                            ]);
+                                        @endphp
+                                        <th class="px-4 py-3 text-left font-medium">
+                                            <a href="{{ $url }}"
+                                               class="inline-flex items-center gap-1 hover:text-green-600 transition-colors group">
+                                                {{ $label }}
+                                                <span class="text-xs">
+                                                        @if($isActive)
+                                                        <span class="text-green-600 font-bold">{{ $topDirection === 'asc' ? '↑' : '↓' }}</span>
+                                                    @else
+                                                        <span class="text-gray-400 group-hover:text-green-400">↕</span>
+                                                    @endif
+                                                    </span>
+                                            </a>
+                                        </th>
+                                    @endforeach
+                                    <th class="px-4 py-3 text-left font-medium hidden sm:table-cell">Category</th>
+                                </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                                @foreach($topUps as $txn)
+                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                        <td class="px-4 py-3 whitespace-nowrap text-gray-600 dark:text-gray-400 text-xs">
+                                            {{ $txn->date->format('M d, Y') }}
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <div class="flex items-center gap-2">
+                                                <span>{{ $txn->category->icon ?? '💰' }}</span>
+                                                <span class="text-gray-900 dark:text-white font-medium">
+                                                        @if(!empty($search))
+                                                        {!! str_ireplace($search, '<mark class="bg-yellow-100 dark:bg-yellow-800 rounded px-0.5">' . e($search) . '</mark>', e($txn->description)) !!}
+                                                    @else
+                                                        {{ $txn->description }}
+                                                    @endif
+                                                    </span>
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-3 whitespace-nowrap font-semibold text-green-600 dark:text-green-400">
+                                            @if(!empty($search))
+                                                {!! str_ireplace($search, '<mark class="bg-yellow-100 dark:bg-yellow-800 rounded px-0.5">' . e($search) . '</mark>', e(number_format($txn->amount, 0))) !!}
+                                            @else
+                                                +{{ number_format($txn->amount, 0) }}
+                                            @endif
+                                        </td>
+                                        <td class="px-4 py-3 hidden sm:table-cell">
+                                                <span class="inline-flex rounded-full px-2 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                                                    {{ $txn->category->name }}
+                                                </span>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-4">{{ $topUps->links() }}</div>
+
+                    @else
+                        <div class="text-center py-12">
+                            @if(!empty($search))
+                                <svg class="w-12 h-12 mx-auto text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
+                                </svg>
+                                <p class="text-gray-500 font-medium mb-1">No top-ups found</p>
+                                <p class="text-gray-400 text-sm">No match for "{{ $search }}"</p>
+                                <a href="{{ route('accounts.show', ['account' => $account, 'tab' => 'topups']) }}"
+                                   class="inline-block mt-3 text-sm text-green-600 hover:underline">Clear search</a>
+                            @else
+                                <svg class="w-12 h-12 mx-auto text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <p class="text-gray-500 font-medium mb-1">No top-ups yet</p>
+                                <a href="{{ route('accounts.topup', $account) }}"
+                                   class="inline-block mt-2 bg-green-600 text-white px-5 py-2 rounded-lg hover:bg-green-700 transition text-sm">
+                                    Top Up Now
+                                </a>
+                            @endif
+                        </div>
+                    @endif
                 @endif
-            </div>
+
+            </div>{{-- end card --}}
 
         </div>
     </div>
