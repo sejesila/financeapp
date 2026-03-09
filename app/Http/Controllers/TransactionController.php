@@ -67,31 +67,56 @@ class TransactionController extends Controller
         $accountId = $request->get('account_id');
         $showFees = $request->get('show_fees', false);
 
+        // Sorting
+        $sortColumn = $request->get('sort', 'date');
+        $sortDirection = $request->get('direction', 'desc');
+        $allowedSorts = ['date', 'description', 'amount', 'account', 'category'];
+        if (!in_array($sortColumn, $allowedSorts)) {
+            $sortColumn = 'date';
+        }
+        $sortDirection = $sortDirection === 'asc' ? 'asc' : 'desc';
+
         $minYear = Transaction::where('user_id', Auth::id())->min(DB::raw('YEAR(date)')) ?? date('Y');
         $maxYear = date('Y');
 
         $query = Transaction::with(['category', 'account', 'feeTransaction'])
-            ->where('user_id', Auth::id());
+            ->where('transactions.user_id', Auth::id());
 
         if (!$showFees) {
-            $query->where('is_transaction_fee', false);
+            $query->where('transactions.is_transaction_fee', false);
         }
 
         if ($search) {
-            $query->where('description', 'like', '%' . $search . '%');
+            $query->where('transactions.description', 'like', '%' . $search . '%');
         }
 
         if ($categoryId) {
-            $query->where('category_id', $categoryId);
+            $query->where('transactions.category_id', $categoryId);
         }
 
         if ($accountId) {
-            $query->where('account_id', $accountId);
+            $query->where('transactions.account_id', $accountId);
         }
 
         $query = $this->applyDateFilter($query, $filter, $startDate, $endDate);
 
-        $transactions = $query->latest('date')->latest('id')->paginate(25)->withQueryString();
+        // Apply sorting
+        if ($sortColumn === 'account') {
+            $query->leftJoin('accounts', 'transactions.account_id', '=', 'accounts.id')
+                ->orderBy('accounts.name', $sortDirection)
+                ->select('transactions.*');
+        } elseif ($sortColumn === 'category') {
+            $query->leftJoin('categories', 'transactions.category_id', '=', 'categories.id')
+                ->orderBy('categories.name', $sortDirection)
+                ->select('transactions.*');
+        } else {
+            $query->orderBy('transactions.' . $sortColumn, $sortDirection);
+            if ($sortColumn === 'date') {
+                $query->orderBy('transactions.id', $sortDirection);
+            }
+        }
+
+        $transactions = $query->paginate(25)->withQueryString();
 
         $totals = $this->calculateTransactionTotals();
         $feeTotals = $this->calculateFeeTotals();
@@ -116,13 +141,14 @@ class TransactionController extends Controller
                 'accountId',
                 'startDate',
                 'endDate',
-                'showFees'
+                'showFees',
+                'sortColumn',
+                'sortDirection'
             ),
             $totals,
             $feeTotals
         ));
     }
-
     /**
      * Apply date filters to a query based on filter type
      */

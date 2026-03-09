@@ -36,9 +36,8 @@
             <div id="balanceModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
                 <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-auto animate-fade-in">
                     <div class="p-6">
-                        {{-- Icon --}}
                         <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full
-                {{ session('transaction_type') === 'expense' ? 'bg-red-100 dark:bg-red-900/30' : (session('transaction_type') === 'liability' ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-green-100 dark:bg-green-900/30') }}">
+                            {{ session('transaction_type') === 'expense' ? 'bg-red-100 dark:bg-red-900/30' : (session('transaction_type') === 'liability' ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-green-100 dark:bg-green-900/30') }}">
                             @if(session('transaction_type') === 'expense')
                                 <svg class="h-6 w-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
@@ -54,39 +53,33 @@
                             @endif
                         </div>
 
-                        {{-- Title --}}
                         <h3 class="text-base font-bold text-gray-900 dark:text-white text-center mt-3">
                             Transaction Successful!
                         </h3>
 
-                        {{-- Account Name --}}
                         <p class="text-center text-gray-600 dark:text-gray-400 mt-2 text-sm font-medium">
                             {{ session('account_name') }}
                         </p>
 
-                        {{-- Balance Details --}}
                         <div class="mt-4 space-y-2 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
                             <div class="flex justify-between items-center">
                                 <span class="text-sm text-gray-600 dark:text-gray-400">Previous Balance:</span>
                                 <span class="font-semibold text-sm text-gray-900 dark:text-white">KES {{ session('old_balance') }}</span>
                             </div>
-
                             <div class="flex justify-between items-center">
                                 <span class="text-sm text-gray-600 dark:text-gray-400">Transaction:</span>
                                 <span class="font-semibold text-sm {{ session('transaction_type') === 'expense' ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400' }}">
-                            {{ session('transaction_type') === 'expense' ? '−' : '+' }} KES {{ session('transaction_amount') }}
-                        </span>
+                                    {{ session('transaction_type') === 'expense' ? '−' : '+' }} KES {{ session('transaction_amount') }}
+                                </span>
                             </div>
-
                             <div class="border-t border-gray-200 dark:border-gray-600 pt-2 flex justify-between items-center">
                                 <span class="text-sm font-bold text-gray-900 dark:text-white">New Balance:</span>
                                 <span class="font-bold text-lg {{ floatval(str_replace(',', '', session('new_balance'))) < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400' }}">
-                            KES {{ session('new_balance') }}
-                        </span>
+                                    KES {{ session('new_balance') }}
+                                </span>
                             </div>
                         </div>
 
-                        {{-- Close Button --}}
                         <div class="mt-4">
                             <button id="closeModal"
                                     class="w-full px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors">
@@ -99,18 +92,10 @@
 
             <style>
                 @keyframes fadeIn {
-                    from {
-                        opacity: 0;
-                        transform: scale(0.95);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: scale(1);
-                    }
+                    from { opacity: 0; transform: scale(0.95); }
+                    to { opacity: 1; transform: scale(1); }
                 }
-                .animate-fade-in {
-                    animation: fadeIn 0.2s ease-out;
-                }
+                .animate-fade-in { animation: fadeIn 0.2s ease-out; }
             </style>
 
             <script>
@@ -119,47 +104,20 @@
                     const closeBtn = document.getElementById('closeModal');
 
                     function closeModal() {
-                        // Add fade-out animation
                         modal.style.transition = 'opacity 0.5s ease-out';
                         modal.style.opacity = '0';
-
-                        // Hide after animation completes
-                        setTimeout(function() {
-                            modal.style.display = 'none';
-                        }, 1000);
+                        setTimeout(function() { modal.style.display = 'none'; }, 1000);
                     }
 
                     if (modal && closeBtn) {
-                        // Set initial opacity for smooth transition
                         modal.style.opacity = '1';
-
-                        // Auto-close after 1 second
-                        setTimeout(function() {
-                            closeModal();
-                        }, 1000);
-
-                        // Close on button click (if user clicks before auto-close)
-                        closeBtn.addEventListener('click', function() {
-                            closeModal();
-                        });
-
-                        // Close on outside click
-                        modal.addEventListener('click', function(e) {
-                            if (e.target === modal) {
-                                closeModal();
-                            }
-                        });
-
-                        // Close on Escape key
-                        document.addEventListener('keydown', function(e) {
-                            if (e.key === 'Escape') {
-                                closeModal();
-                            }
-                        });
+                        setTimeout(closeModal, 1000);
+                        closeBtn.addEventListener('click', closeModal);
+                        modal.addEventListener('click', function(e) { if (e.target === modal) closeModal(); });
+                        document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeModal(); });
                     }
                 });
             </script>
-
         @endif
 
         {{-- Summary Cards --}}
@@ -188,36 +146,16 @@
         {{-- Transaction Fees Summary --}}
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h3 class="text-xs font-semibold text-yellow-800 mb-1">💸 Fees Today</h3>
-                        <p class="text-xl font-bold text-yellow-900">
-                            {{ number_format($totalFeesToday, 0, '.', ',') }}
-                        </p>
-                    </div>
-                </div>
+                <h3 class="text-xs font-semibold text-yellow-800 mb-1">💸 Fees Today</h3>
+                <p class="text-xl font-bold text-yellow-900">{{ number_format($totalFeesToday, 0, '.', ',') }}</p>
             </div>
-
             <div class="bg-orange-50 p-4 rounded-lg border border-orange-200">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h3 class="text-xs font-semibold text-orange-800 mb-1">💸 Fees This Month</h3>
-                        <p class="text-xl font-bold text-orange-900">
-                            {{ number_format($totalFeesThisMonth, 0, '.', ',') }}
-                        </p>
-                    </div>
-                </div>
+                <h3 class="text-xs font-semibold text-orange-800 mb-1">💸 Fees This Month</h3>
+                <p class="text-xl font-bold text-orange-900">{{ number_format($totalFeesThisMonth, 0, '.', ',') }}</p>
             </div>
-
             <div class="bg-red-50 p-4 rounded-lg border border-red-200">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h3 class="text-xs font-semibold text-red-800 mb-1">💸 Total Fees</h3>
-                        <p class="text-xl font-bold text-red-900">
-                            {{ number_format($totalFeesAll, 0, '.', ',') }}
-                        </p>
-                    </div>
-                </div>
+                <h3 class="text-xs font-semibold text-red-800 mb-1">💸 Total Fees</h3>
+                <p class="text-xl font-bold text-red-900">{{ number_format($totalFeesAll, 0, '.', ',') }}</p>
             </div>
         </div>
 
@@ -236,7 +174,7 @@
                     'last_month' => 'Last Month',
                     'this_year' => 'This Year',
                 ] as $key => $label)
-                    <a href="{{ route('transactions.index', ['filter' => $key]) }}"
+                    <a href="{{ route('transactions.index', array_merge(request()->except('filter', 'page'), ['filter' => $key])) }}"
                        class="px-3 py-1.5 sm:px-4 sm:py-2 rounded-md
                        {{ $filter === $key
                             ? 'bg-indigo-600 text-white'
@@ -264,12 +202,13 @@
                     Advanced Filters
                 </summary>
 
-                <form method="GET"
-                      action="{{ route('transactions.index') }}"
+                <form method="GET" action="{{ route('transactions.index') }}"
                       class="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
                     <input type="hidden" name="filter" value="custom">
                     <input type="hidden" name="show_fees" value="{{ $showFees ? '1' : '0' }}">
+                    <input type="hidden" name="sort" value="{{ $sortColumn }}">
+                    <input type="hidden" name="direction" value="{{ $sortDirection }}">
 
                     <div>
                         <label class="block text-xs font-medium mb-1">Search</label>
@@ -279,8 +218,7 @@
 
                     <div>
                         <label class="block text-xs font-medium mb-1">Category</label>
-                        <select name="category_id"
-                                class="w-full rounded-md border-gray-300 text-sm">
+                        <select name="category_id" class="w-full rounded-md border-gray-300 text-sm">
                             <option value="">All</option>
                             @foreach($categories as $category)
                                 <option value="{{ $category->id }}" @selected($categoryId == $category->id)>
@@ -292,8 +230,7 @@
 
                     <div>
                         <label class="block text-xs font-medium mb-1">Account</label>
-                        <select name="account_id"
-                                class="w-full rounded-md border-gray-300 text-sm">
+                        <select name="account_id" class="w-full rounded-md border-gray-300 text-sm">
                             <option value="">All</option>
                             @foreach($accounts as $account)
                                 <option value="{{ $account->id }}" @selected($accountId == $account->id)>
@@ -331,11 +268,39 @@
             <table class="w-full text-sm">
                 <thead class="bg-gray-100 text-gray-700">
                 <tr>
-                    <th class="px-3 py-2 text-left">Date</th>
-                    <th class="px-3 py-2 text-left">Description</th>
-                    <th class="px-3 py-2 text-right">Amount</th>
-                    <th class="px-3 py-2 text-left hidden sm:table-cell">Account</th>
-                    <th class="px-3 py-2 text-left hidden md:table-cell">Category</th>
+                    @php
+                        $columns = [
+                            'date'        => ['Date',        'px-3 py-2 text-left'],
+                            'description' => ['Description', 'px-3 py-2 text-left'],
+                            'amount'      => ['Amount',      'px-3 py-2 text-right'],
+                            'account'     => ['Account',     'px-3 py-2 text-left hidden sm:table-cell'],
+                            'category'    => ['Category',    'px-3 py-2 text-left hidden md:table-cell'],
+                        ];
+                    @endphp
+
+                    @foreach($columns as $col => [$label, $thClass])
+                        @php
+                            $isActive = $sortColumn === $col;
+                            $newDir = ($isActive && $sortDirection === 'asc') ? 'desc' : 'asc';
+                            $sortUrl = request()->fullUrlWithQuery(['sort' => $col, 'direction' => $newDir, 'page' => 1]);
+                        @endphp
+                        <th class="{{ $thClass }}">
+                            <a href="{{ $sortUrl }}"
+                               class="inline-flex items-center gap-1 hover:text-indigo-600 transition-colors group">
+                                {{ $label }}
+                                <span class="text-xs leading-none">
+                                    @if($isActive)
+                                        <span class="text-indigo-600 font-bold">
+                                            {{ $sortDirection === 'asc' ? '↑' : '↓' }}
+                                        </span>
+                                    @else
+                                        <span class="text-gray-400 group-hover:text-indigo-400">↕</span>
+                                    @endif
+                                </span>
+                            </a>
+                        </th>
+                    @endforeach
+
                     <th class="px-3 py-2 text-center">Action</th>
                 </tr>
                 </thead>
@@ -403,9 +368,7 @@
                         <td colspan="6" class="px-4 py-6 text-center text-gray-500">
                             No transactions found.
                             <a href="{{ route('transactions.create') }}"
-                               class="text-indigo-600 hover:underline ml-1">
-                                Add one
-                            </a>
+                               class="text-indigo-600 hover:underline ml-1">Add one</a>
                         </td>
                     </tr>
                 @endforelse
@@ -424,11 +387,11 @@
                 </p>
             </div>
         @endif
-        {{-- Pagination - Improved for Mobile and Desktop --}}
+
+        {{-- Pagination --}}
         <div class="pt-4 border-t">
             @if($transactions->hasPages())
                 <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
-                    {{-- Results Summary --}}
                     <div class="text-sm text-gray-700 dark:text-gray-300 order-2 sm:order-1">
                         <p>
                             Showing
@@ -440,8 +403,6 @@
                             transactions
                         </p>
                     </div>
-
-                    {{-- Pagination Links --}}
                     <div class="order-1 sm:order-2 w-full sm:w-auto">
                         <div class="flex justify-center sm:justify-end">
                             {{ $transactions->onEachSide(1)->links() }}
@@ -449,7 +410,6 @@
                     </div>
                 </div>
             @else
-                {{-- Show summary even when no pagination --}}
                 <div class="text-sm text-gray-700 dark:text-gray-300 text-center">
                     <p>
                         Showing
@@ -460,152 +420,52 @@
             @endif
         </div>
 
-        {{-- Custom Pagination Styles for Better Mobile Experience --}}
         <style>
-            /* Hide Laravel's default "Showing X to Y of Z results" text */
-            nav[role="navigation"] p.text-sm {
-                display: none !important;
-            }
-
-            /* Pagination Container */
-            nav[role="navigation"] {
-                width: 100%;
-            }
-
-            nav[role="navigation"] > div {
-                display: flex;
-                align-items: center;
-                gap: 0.25rem;
-            }
-
-            /* Pagination Links Base Styles */
+            nav[role="navigation"] p.text-sm { display: none !important; }
+            nav[role="navigation"] { width: 100%; }
+            nav[role="navigation"] > div { display: flex; align-items: center; gap: 0.25rem; }
             nav[role="navigation"] a,
             nav[role="navigation"] span {
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                min-width: 2.5rem;
-                padding: 0.5rem 0.75rem;
-                font-size: 0.875rem;
-                font-weight: 500;
-                border: 1px solid #e5e7eb;
-                border-radius: 0.375rem;
-                transition: all 0.2s;
+                display: inline-flex; align-items: center; justify-content: center;
+                min-width: 2.5rem; padding: 0.5rem 0.75rem;
+                font-size: 0.875rem; font-weight: 500;
+                border: 1px solid #e5e7eb; border-radius: 0.375rem; transition: all 0.2s;
             }
-
-            /* Links (clickable pages) */
-            nav[role="navigation"] a {
-                background-color: white;
-                color: #374151;
-                text-decoration: none;
-            }
-
+            nav[role="navigation"] a { background-color: white; color: #374151; text-decoration: none; }
             nav[role="navigation"] a:hover:not([rel="prev"]):not([rel="next"]) {
-                background-color: #f3f4f6 !important;
-                border-color: #d1d5db !important;
-                color: #111827 !important;
+                background-color: #f3f4f6 !important; border-color: #d1d5db !important; color: #111827 !important;
             }
-
-            /* Active Page - More Subtle Styling */
             nav[role="navigation"] span[aria-current="page"] {
-                background-color: #e5e7eb !important;
-                border-color: #d1d5db !important;
-                color: #111827 !important;
-                font-weight: 600;
+                background-color: #e5e7eb !important; border-color: #d1d5db !important;
+                color: #111827 !important; font-weight: 600;
             }
-
-            /* Disabled State */
             nav[role="navigation"] span[aria-disabled="true"] {
-                background-color: #f9fafb;
-                color: #d1d5db;
-                cursor: not-allowed;
-                opacity: 0.6;
+                background-color: #f9fafb; color: #d1d5db; cursor: not-allowed; opacity: 0.6;
             }
-
-            /* Previous/Next Buttons */
-            nav[role="navigation"] a[rel="prev"],
-            nav[role="navigation"] a[rel="next"] {
-                padding: 0.5rem 1rem;
-                font-weight: 500;
+            nav[role="navigation"] a[rel="prev"], nav[role="navigation"] a[rel="next"] { padding: 0.5rem 1rem; font-weight: 500; }
+            nav[role="navigation"] a[rel="prev"]:hover, nav[role="navigation"] a[rel="next"]:hover {
+                background-color: #4f46e5 !important; border-color: #4f46e5 !important; color: white !important;
             }
-
-            nav[role="navigation"] a[rel="prev"]:hover,
-            nav[role="navigation"] a[rel="next"]:hover {
-                background-color: #4f46e5 !important;
-                border-color: #4f46e5 !important;
-                color: white !important;
-            }
-
-            /* Ellipsis */
-            nav[role="navigation"] span[aria-disabled="true"]:not([role]) {
-                border: none;
-                background: transparent;
-                padding: 0.5rem 0.25rem;
-            }
-
-            /* Mobile Responsive */
+            nav[role="navigation"] span[aria-disabled="true"]:not([role]) { border: none; background: transparent; padding: 0.5rem 0.25rem; }
             @media (max-width: 640px) {
-                /* Hide page numbers on mobile, show only prev/next and current */
-                nav[role="navigation"] a[href]:not([rel="prev"]):not([rel="next"]) {
-                    display: none !important;
+                nav[role="navigation"] a[href]:not([rel="prev"]):not([rel="next"]) { display: none !important; }
+                nav[role="navigation"] span[aria-current="page"] { display: inline-flex !important; }
+                nav[role="navigation"] span[aria-disabled="true"]:not([role]) { display: none !important; }
+                nav[role="navigation"] a[rel="prev"], nav[role="navigation"] a[rel="next"] {
+                    padding: 0.625rem 1rem !important; font-size: 0.875rem !important; flex: 1; max-width: 120px;
                 }
-
-                /* Keep current page visible */
-                nav[role="navigation"] span[aria-current="page"] {
-                    display: inline-flex !important;
-                }
-
-                /* Hide ellipsis on mobile */
-                nav[role="navigation"] span[aria-disabled="true"]:not([role]) {
-                    display: none !important;
-                }
-
-                /* Make prev/next buttons larger on mobile */
-                nav[role="navigation"] a[rel="prev"],
-                nav[role="navigation"] a[rel="next"] {
-                    padding: 0.625rem 1rem !important;
-                    font-size: 0.875rem !important;
-                    flex: 1;
-                    max-width: 120px;
-                }
-
-                /* Center pagination on mobile */
-                nav[role="navigation"] > div {
-                    justify-content: center !important;
-                    gap: 0.5rem;
-                }
+                nav[role="navigation"] > div { justify-content: center !important; gap: 0.5rem; }
             }
-
-            @media (min-width: 641px) {
-                /* Desktop: Show all elements */
-                nav[role="navigation"] > div {
-                    justify-content: flex-end;
-                }
-            }
-
-            /* Dark Mode Support */
+            @media (min-width: 641px) { nav[role="navigation"] > div { justify-content: flex-end; } }
             @media (prefers-color-scheme: dark) {
-                nav[role="navigation"] a {
-                    background-color: #374151;
-                    color: #e5e7eb;
-                    border-color: #4b5563;
-                }
-
+                nav[role="navigation"] a { background-color: #374151; color: #e5e7eb; border-color: #4b5563; }
                 nav[role="navigation"] a:hover:not([rel="prev"]):not([rel="next"]) {
-                    background-color: #4b5563 !important;
-                    border-color: #6b7280 !important;
+                    background-color: #4b5563 !important; border-color: #6b7280 !important;
                 }
-
                 nav[role="navigation"] span[aria-current="page"] {
-                    background-color: #4b5563 !important;
-                    border-color: #6b7280 !important;
-                    color: #f3f4f6 !important;
+                    background-color: #4b5563 !important; border-color: #6b7280 !important; color: #f3f4f6 !important;
                 }
-
-                nav[role="navigation"] span[aria-disabled="true"] {
-                    background-color: #1f2937;
-                    color: #6b7280;
-                }
+                nav[role="navigation"] span[aria-disabled="true"] { background-color: #1f2937; color: #6b7280; }
             }
         </style>
 
