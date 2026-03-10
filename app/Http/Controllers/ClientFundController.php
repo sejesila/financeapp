@@ -14,15 +14,28 @@ use Illuminate\Support\Facades\DB;
 
 class ClientFundController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $clientFunds = ClientFund::where('user_id', Auth::id())
+        $clientFilter = $request->get('client');
+
+        // ── Paginated funds list (filtered if client selected) ────────
+        $query = ClientFund::where('user_id', Auth::id())
             ->with('account')
             ->orderBy('status')
-            ->orderBy('received_date', 'desc')
-            ->paginate(15);
+            ->orderBy('received_date', 'desc');
 
-        $allClientFunds = ClientFund::where('user_id', Auth::id())->get();
+        if ($clientFilter) {
+            $query->where('client_name', $clientFilter);
+        }
+
+        $clientFunds = $query->paginate(15)->withQueryString();
+
+        // ── Summary cards (reflects filter if active) ─────────────────
+        $summaryQuery = ClientFund::where('user_id', Auth::id());
+        if ($clientFilter) {
+            $summaryQuery->where('client_name', $clientFilter);
+        }
+        $allClientFunds = $summaryQuery->get();
 
         $summary = [
             'total_received' => $allClientFunds->sum('amount_received'),
@@ -31,7 +44,7 @@ class ClientFundController extends Controller
             'total_balance'  => $allClientFunds->where('status', '!=', 'completed')->sum('balance'),
         ];
 
-        // Per-client totals
+        // ── Per-client totals (always global, for the summary table) ──
         $clientTotals = ClientFund::where('user_id', Auth::id())
             ->selectRaw('
             client_name,
@@ -55,7 +68,8 @@ class ClientFundController extends Controller
             'clientFunds',
             'summary',
             'allAccounts',
-            'clientTotals'
+            'clientTotals',
+            'clientFilter'
         ));
     }
 
