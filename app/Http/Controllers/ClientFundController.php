@@ -56,7 +56,7 @@ class ClientFundController extends Controller
             SUM(CASE WHEN status != "completed" THEN balance ELSE 0 END) as pending_balance
         ')
             ->groupBy('client_name')
-            ->orderByRaw('SUM(amount_received) DESC')
+            ->orderByRaw('COUNT(*) DESC, SUM(amount_received) DESC')
             ->get();
 
         $allAccounts = Account::where('user_id', Auth::id())
