@@ -16,29 +16,47 @@ class ClientFundController extends Controller
 {
     public function index()
     {
-        // Get paginated client funds
         $clientFunds = ClientFund::where('user_id', Auth::id())
             ->with('account')
             ->orderBy('status')
             ->orderBy('received_date', 'desc')
             ->paginate(15);
 
-        // Calculate summary from all records (not just paginated)
         $allClientFunds = ClientFund::where('user_id', Auth::id())->get();
 
         $summary = [
             'total_received' => $allClientFunds->sum('amount_received'),
-            'total_spent' => $allClientFunds->sum('amount_spent'),
-            'total_profit' => $allClientFunds->sum('profit_amount'),
-            'total_balance' => $allClientFunds->where('status', '!=', 'completed')->sum('balance'),
+            'total_spent'    => $allClientFunds->sum('amount_spent'),
+            'total_profit'   => $allClientFunds->sum('profit_amount'),
+            'total_balance'  => $allClientFunds->where('status', '!=', 'completed')->sum('balance'),
         ];
-        // Get all accounts for the FAB component
+
+        // Per-client totals
+        $clientTotals = ClientFund::where('user_id', Auth::id())
+            ->selectRaw('
+            client_name,
+            COUNT(*) as total_entries,
+            SUM(amount_received) as total_received,
+            SUM(amount_spent) as total_spent,
+            SUM(profit_amount) as total_profit,
+            SUM(balance) as total_balance,
+            SUM(CASE WHEN status != "completed" THEN balance ELSE 0 END) as pending_balance
+        ')
+            ->groupBy('client_name')
+            ->orderByRaw('SUM(amount_received) DESC')
+            ->get();
+
         $allAccounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
 
-        return view('client-funds.index', compact('clientFunds', 'summary', 'allAccounts'));
+        return view('client-funds.index', compact(
+            'clientFunds',
+            'summary',
+            'allAccounts',
+            'clientTotals'
+        ));
     }
 
     public function store(Request $request)

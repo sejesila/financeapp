@@ -56,6 +56,108 @@
                     </p>
                 </div>
             </div>
+                {{-- Per-Client Summary --}}
+                @if($clientTotals->count() > 0)
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mb-6">
+                        <div class="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                            <h3 class="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200">
+                                Per-Client Summary
+                            </h3>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">
+                {{ $clientTotals->count() }} {{ Str::plural('client', $clientTotals->count()) }}
+            </span>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-medium">Client</th>
+                                    <th class="px-4 py-3 text-center font-medium hidden sm:table-cell">Entries</th>
+                                    <th class="px-4 py-3 text-right font-medium">Received</th>
+                                    <th class="px-4 py-3 text-right font-medium hidden md:table-cell">Spent</th>
+                                    <th class="px-4 py-3 text-right font-medium hidden md:table-cell">Profit</th>
+                                    <th class="px-4 py-3 text-right font-medium">Pending</th>
+                                </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                                @foreach($clientTotals as $client)
+                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                        <td class="px-4 py-3">
+                                            <div class="font-semibold text-gray-900 dark:text-white">
+                                                {{ $client->client_name }}
+                                            </div>
+                                            {{-- Show spent/profit inline on mobile --}}
+                                            <div class="md:hidden text-xs text-gray-500 mt-0.5">
+                                                Spent: <span class="text-orange-600 font-medium">{{ number_format($client->total_spent, 0) }}</span>
+                                                @if($client->total_profit > 0)
+                                                    · Profit: <span class="text-green-600 font-medium">{{ number_format($client->total_profit, 0) }}</span>
+                                                @endif
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-3 text-center hidden sm:table-cell">
+                                <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 text-xs font-semibold">
+                                    {{ $client->total_entries }}
+                                </span>
+                                        </td>
+                                        <td class="px-4 py-3 text-right font-semibold text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                                            {{ number_format($client->total_received, 0) }}
+                                        </td>
+                                        <td class="px-4 py-3 text-right text-orange-600 dark:text-orange-400 whitespace-nowrap hidden md:table-cell">
+                                            {{ number_format($client->total_spent, 0) }}
+                                        </td>
+                                        <td class="px-4 py-3 text-right whitespace-nowrap hidden md:table-cell">
+                                            @if($client->total_profit > 0)
+                                                <span class="text-green-600 dark:text-green-400 font-medium">
+                                        {{ number_format($client->total_profit, 0) }}
+                                    </span>
+                                            @else
+                                                <span class="text-gray-400">—</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-4 py-3 text-right whitespace-nowrap">
+                                            @if($client->pending_balance > 0)
+                                                <span class="font-bold text-purple-600 dark:text-purple-400">
+                                        {{ number_format($client->pending_balance, 0) }}
+                                    </span>
+                                            @else
+                                                <span class="inline-flex items-center gap-1 text-green-600 dark:text-green-400 text-xs font-medium">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                        </svg>
+                                        Settled
+                                    </span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                                </tbody>
+
+                                {{-- Totals Footer --}}
+                                <tfoot class="bg-gray-50 dark:bg-gray-700 border-t-2 border-gray-200 dark:border-gray-600">
+                                <tr>
+                                    <td class="px-4 py-3 font-bold text-gray-900 dark:text-white">
+                                        Total
+                                    </td>
+                                    <td class="px-4 py-3 hidden sm:table-cell"></td>
+                                    <td class="px-4 py-3 text-right font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                                        {{ number_format($clientTotals->sum('total_received'), 0) }}
+                                    </td>
+                                    <td class="px-4 py-3 text-right font-bold text-orange-600 dark:text-orange-400 whitespace-nowrap hidden md:table-cell">
+                                        {{ number_format($clientTotals->sum('total_spent'), 0) }}
+                                    </td>
+                                    <td class="px-4 py-3 text-right font-bold text-green-600 dark:text-green-400 whitespace-nowrap hidden md:table-cell">
+                                        {{ number_format($clientTotals->sum('total_profit'), 0) }}
+                                    </td>
+                                    <td class="px-4 py-3 text-right font-bold text-purple-600 dark:text-purple-400 whitespace-nowrap">
+                                        {{ number_format($clientTotals->sum('pending_balance'), 0) }}
+                                    </td>
+                                </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                @endif
 
             <!-- Client Funds List -->
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
