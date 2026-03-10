@@ -62,7 +62,7 @@
                 </div>
             </div>
 
-            {{-- Per-Client Summary (hidden when filtering a specific client) --}}
+            {{-- Per-Client Summary (only when not filtering) --}}
             @if(!$clientFilter && $clientTotals->count() > 0)
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mb-6">
                     <div class="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
@@ -162,10 +162,26 @@
                         </table>
                     </div>
                 </div>
+
+                {{-- Empty state when no clients yet --}}
+            @elseif(!$clientFilter && $clientTotals->count() === 0)
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center mb-6">
+                    <svg class="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    <p class="text-gray-500 dark:text-gray-400 text-lg font-medium mb-2">No client funds recorded yet</p>
+                    <p class="text-gray-400 dark:text-gray-500 text-sm mb-4">Start by recording your first client fund</p>
+                    <a href="{{ route('client-funds.create') }}"
+                       class="inline-block bg-indigo-600 text-white px-6 py-2 rounded text-sm hover:bg-indigo-700 transition">
+                        Record Your First Client Fund
+                    </a>
+                </div>
             @endif
 
-            {{-- Active Filter Banner --}}
+            {{-- Filtered Client Funds List (only when a client is selected) --}}
             @if($clientFilter)
+
+                {{-- Filter Banner --}}
                 <div class="mb-4 flex items-center justify-between bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 rounded-lg px-4 py-3">
                     <p class="text-sm text-indigo-700 dark:text-indigo-300">
                         Showing funds for <span class="font-bold">{{ $clientFilter }}</span>
@@ -176,102 +192,94 @@
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                         </svg>
-                        Clear filter
+                        Back to all clients
                     </a>
                 </div>
-            @endif
 
-            {{-- Client Funds List --}}
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                <div class="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700">
-                    <h3 class="text-base sm:text-lg font-semibold">
-                        {{ $clientFilter ? "Funds — {$clientFilter}" : 'All Client Funds' }}
-                    </h3>
-                </div>
+                {{-- Funds List --}}
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                    <div class="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700">
+                        <h3 class="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200">
+                            Funds — {{ $clientFilter }}
+                        </h3>
+                    </div>
 
-                @forelse($clientFunds as $fund)
-                    <div class="p-3 sm:p-4 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                        <div class="flex flex-col gap-3">
+                    @forelse($clientFunds as $fund)
+                        <div class="p-3 sm:p-4 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                            <div class="flex flex-col gap-3">
 
-                            {{-- Top: Name & Badges --}}
-                            <div class="flex-1">
-                                <div class="flex flex-wrap items-center gap-2 mb-2">
-                                    <h4 class="font-semibold text-sm sm:text-base text-gray-800 dark:text-gray-200">
-                                        {{ $fund->client_name }}
-                                    </h4>
-                                    <span class="px-2 py-1 text-xs rounded-full whitespace-nowrap
-                                        {{ $fund->status === 'completed' ? 'bg-green-100 text-green-700' : '' }}
-                                        {{ $fund->status === 'pending'   ? 'bg-yellow-100 text-yellow-700' : '' }}
-                                        {{ $fund->status === 'partial'   ? 'bg-blue-100 text-blue-700' : '' }}">
-                                        {{ ucfirst($fund->status) }}
-                                    </span>
-                                    <span class="px-2 py-1 text-xs rounded-full whitespace-nowrap
-                                        {{ $fund->type === 'commission' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700' }}">
-                                        {{ $fund->type === 'commission' ? '💰 Profit' : '🔄 No Profit' }}
-                                    </span>
-                                </div>
-                                <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-1">{{ $fund->purpose }}</p>
-                                <p class="text-xs text-gray-500">
-                                    {{ $fund->received_date->format('M d, Y') }} · {{ $fund->account->name }}
-                                </p>
-                            </div>
-
-                            {{-- Financial Summary --}}
-                            <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-x-4 gap-y-2 text-xs sm:text-sm">
-                                <div>
-                                    <span class="text-gray-600 dark:text-gray-400">Received:</span>
-                                    <span class="font-semibold ml-1">KES {{ number_format($fund->amount_received, 0, '.', ',') }}</span>
-                                </div>
-                                <div>
-                                    <span class="text-gray-600 dark:text-gray-400">Spent:</span>
-                                    <span class="font-semibold text-orange-600 ml-1">KES {{ number_format($fund->amount_spent, 0, '.', ',') }}</span>
-                                </div>
-                                @if($fund->type === 'commission')
-                                    <div>
-                                        <span class="text-gray-600 dark:text-gray-400">Profit:</span>
-                                        <span class="font-semibold text-green-600 ml-1">KES {{ number_format($fund->profit_amount, 0, '.', ',') }}</span>
+                                {{-- Top: Badges & Meta --}}
+                                <div class="flex-1">
+                                    <div class="flex flex-wrap items-center gap-2 mb-2">
+                                        <span class="px-2 py-1 text-xs rounded-full whitespace-nowrap
+                                            {{ $fund->status === 'completed' ? 'bg-green-100 text-green-700' : '' }}
+                                            {{ $fund->status === 'pending'   ? 'bg-yellow-100 text-yellow-700' : '' }}
+                                            {{ $fund->status === 'partial'   ? 'bg-blue-100 text-blue-700' : '' }}">
+                                            {{ ucfirst($fund->status) }}
+                                        </span>
+                                        <span class="px-2 py-1 text-xs rounded-full whitespace-nowrap
+                                            {{ $fund->type === 'commission' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700' }}">
+                                            {{ $fund->type === 'commission' ? '💰 Profit' : '🔄 No Profit' }}
+                                        </span>
                                     </div>
-                                @endif
-                                <div>
-                                    <span class="text-gray-600 dark:text-gray-400">Balance:</span>
-                                    <span class="font-bold text-purple-600 ml-1">KES {{ number_format($fund->balance, 0, '.', ',') }}</span>
+                                    <p class="text-sm font-medium text-gray-800 dark:text-gray-200 mb-1">{{ $fund->purpose }}</p>
+                                    <p class="text-xs text-gray-500">
+                                        {{ $fund->received_date->format('M d, Y') }} · {{ $fund->account->name }}
+                                    </p>
                                 </div>
-                            </div>
 
-                            {{-- Action --}}
-                            <div>
-                                <a href="{{ route('client-funds.show', $fund) }}"
-                                   class="inline-block bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-xs sm:text-sm text-center w-full sm:w-auto">
-                                    View Details
-                                </a>
+                                {{-- Financial Summary --}}
+                                <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-x-4 gap-y-2 text-xs sm:text-sm">
+                                    <div>
+                                        <span class="text-gray-600 dark:text-gray-400">Received:</span>
+                                        <span class="font-semibold ml-1">KES {{ number_format($fund->amount_received, 0, '.', ',') }}</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-600 dark:text-gray-400">Spent:</span>
+                                        <span class="font-semibold text-orange-600 ml-1">KES {{ number_format($fund->amount_spent, 0, '.', ',') }}</span>
+                                    </div>
+                                    @if($fund->type === 'commission')
+                                        <div>
+                                            <span class="text-gray-600 dark:text-gray-400">Profit:</span>
+                                            <span class="font-semibold text-green-600 ml-1">KES {{ number_format($fund->profit_amount, 0, '.', ',') }}</span>
+                                        </div>
+                                    @endif
+                                    <div>
+                                        <span class="text-gray-600 dark:text-gray-400">Balance:</span>
+                                        <span class="font-bold text-purple-600 ml-1">KES {{ number_format($fund->balance, 0, '.', ',') }}</span>
+                                    </div>
+                                </div>
+
+                                {{-- Action --}}
+                                <div>
+                                    <a href="{{ route('client-funds.show', $fund) }}"
+                                       class="inline-block bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-xs sm:text-sm text-center w-full sm:w-auto">
+                                        View Details
+                                    </a>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                @empty
-                    <div class="p-8 text-center">
-                        @if($clientFilter)
-                            <p class="text-gray-500 text-sm mb-3">No funds found for <span class="font-semibold">{{ $clientFilter }}</span>.</p>
+                    @empty
+                        <div class="p-8 text-center">
+                            <p class="text-gray-500 text-sm mb-3">
+                                No funds found for <span class="font-semibold">{{ $clientFilter }}</span>.
+                            </p>
                             <a href="{{ route('client-funds.index') }}"
                                class="inline-block bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded text-sm hover:bg-gray-200 transition">
-                                View All Funds
+                                Back to All Clients
                             </a>
-                        @else
-                            <p class="text-gray-500 text-sm mb-4">No client funds recorded yet.</p>
-                            <a href="{{ route('client-funds.create') }}"
-                               class="inline-block bg-indigo-600 text-white px-6 py-2 rounded text-sm">
-                                Record Your First Client Fund
-                            </a>
-                        @endif
-                    </div>
-                @endforelse
+                        </div>
+                    @endforelse
 
-                {{-- Pagination --}}
-                @if($clientFunds->hasPages())
-                    <div class="p-4 border-t border-gray-100 dark:border-gray-700">
-                        {{ $clientFunds->links() }}
-                    </div>
-                @endif
-            </div>
+                    {{-- Pagination --}}
+                    @if($clientFunds->hasPages())
+                        <div class="p-4 border-t border-gray-100 dark:border-gray-700">
+                            {{ $clientFunds->links() }}
+                        </div>
+                    @endif
+                </div>
+
+            @endif
 
         </div>
     </div>
