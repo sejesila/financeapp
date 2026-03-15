@@ -65,6 +65,9 @@ class RollingFundController extends Controller
             case 'this_year':
                 $rollingFund->whereYear('date', now()->year);
                 break;
+            case 'last_year':
+                $rollingFund->whereYear('date', now()->subYear()->year);
+                break;
             case 'custom_range':
                 if ($request->has('date_from') && $request->date_from) {
                     $rollingFund->where('date', '>=', $request->date_from);
@@ -123,6 +126,9 @@ class RollingFundController extends Controller
                     break;
                 case 'this_year':
                     $query->whereYear('date', now()->year);
+                    break;
+                case 'last_year':
+                    $query->whereYear('date', now()->subYear()->year);
                     break;
                 case 'custom_range':
                     if ($request->has('date_from') && $request->date_from) {
