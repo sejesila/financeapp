@@ -56,7 +56,7 @@
                 </div>
             @endif
 
-            <!-- Key Metrics - Enhanced Grid -->
+            <!-- Key Metrics -->
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
                 <!-- Total Invested Card -->
                 <div class="group relative bg-white dark:bg-gray-800 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 dark:border-gray-700">
@@ -135,57 +135,6 @@
                             {{ $stats['win_rate'] }}%
                         </p>
                         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium">{{ $stats['wins'] }}W / {{ $stats['losses'] }}L</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Performance Highlights -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
-                <!-- Best Session -->
-                <div class="relative bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl shadow-lg overflow-hidden">
-                    <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-                    <div class="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full -ml-12 -mb-12"></div>
-                    <div class="relative p-6">
-                        <div class="flex items-start justify-between mb-4">
-                            <div>
-                                <div class="flex items-center gap-2 mb-2">
-                                    <span class="text-3xl">🏆</span>
-                                    <p class="text-sm font-bold text-white/90 uppercase tracking-wide">Best Session</p>
-                                </div>
-                                <p class="text-4xl font-bold text-white mb-1">
-                                    +{{ number_format($stats['biggest_win'], 0) }}
-                                </p>
-                                <p class="text-sm text-white/80 font-medium">KES</p>
-                            </div>
-                            <div class="text-6xl opacity-20">📈</div>
-                        </div>
-                        <div class="mt-4 pt-4 border-t border-white/20">
-                            <p class="text-xs text-white/70 uppercase tracking-wide font-semibold">Maximum Gain</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Worst Session -->
-                <div class="relative bg-gradient-to-br from-red-500 to-rose-600 rounded-2xl shadow-lg overflow-hidden">
-                    <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-                    <div class="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full -ml-12 -mb-12"></div>
-                    <div class="relative p-6">
-                        <div class="flex items-start justify-between mb-4">
-                            <div>
-                                <div class="flex items-center gap-2 mb-2">
-                                    <span class="text-3xl">⚠️</span>
-                                    <p class="text-sm font-bold text-white/90 uppercase tracking-wide">Worst Session</p>
-                                </div>
-                                <p class="text-4xl font-bold text-white mb-1">
-                                    {{ number_format($stats['biggest_loss'], 0) }}
-                                </p>
-                                <p class="text-sm text-white/80 font-medium">KES</p>
-                            </div>
-                            <div class="text-6xl opacity-20">📉</div>
-                        </div>
-                        <div class="mt-4 pt-4 border-t border-white/20">
-                            <p class="text-xs text-white/70 uppercase tracking-wide font-semibold">Maximum Loss</p>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -525,53 +474,18 @@
 
     <style>
         @keyframes slide-in {
-            from {
-                transform: translateX(-100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
+            from { transform: translateX(-100%); opacity: 0; }
+            to   { transform: translateX(0);     opacity: 1; }
         }
+        .animate-slide-in { animation: slide-in 0.3s ease-out; }
 
-        .animate-slide-in {
-            animation: slide-in 0.3s ease-out;
-        }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(156,163,175,0.5); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(107,114,128,0.7); }
+        .dark ::-webkit-scrollbar-thumb { background: rgba(75,85,99,0.5); }
+        .dark ::-webkit-scrollbar-thumb:hover { background: rgba(55,65,81,0.7); }
 
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: rgba(156, 163, 175, 0.5);
-            border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(107, 114, 128, 0.7);
-        }
-
-        /* Dark mode scrollbar */
-        .dark ::-webkit-scrollbar-thumb {
-            background: rgba(75, 85, 99, 0.5);
-        }
-
-        .dark ::-webkit-scrollbar-thumb:hover {
-            background: rgba(55, 65, 81, 0.7);
-        }
-
-        /* Extra small breakpoint for xs: prefix */
-        @media (min-width: 475px) {
-            .xs\:inline {
-                display: inline;
-            }
-        }
+        @media (min-width: 475px) { .xs\:inline { display: inline; } }
     </style>
 </x-app-layout>

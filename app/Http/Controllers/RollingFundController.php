@@ -42,12 +42,10 @@ class RollingFundController extends Controller
                     ->whereColumn('winnings', '=', 'stake_amount');
                 break;
             case 'high_wins':
-                // High wins: profit of 50% or more
                 $rollingFund->where('status', 'completed')
                     ->whereRaw('(winnings - stake_amount) >= (stake_amount * 0.5)');
                 break;
             case 'significant_losses':
-                // Significant losses: loss of 50% or more
                 $rollingFund->where('status', 'completed')
                     ->whereRaw('(stake_amount - winnings) >= (stake_amount * 0.5)');
                 break;
@@ -79,52 +77,87 @@ class RollingFundController extends Controller
 
         $wagers = $rollingFund->paginate(15)->appends($request->except('page'));
 
-        // Calculate statistics (only for completed wagers)
-        $completedSessions = RollingFund::where('user_id', auth()->id())
-            ->where('status', 'completed')
-            ->get();
+        // --- Stats: scoped to the same filter/period ---
 
-        // Fix: Use filter() with closures for proper comparison
-        $wins = $completedSessions->filter(function ($wager) {
-            return $wager->winnings > $wager->stake_amount;
-        })->count();
+        // Completed sessions for the active filter
+        $completedQuery = RollingFund::where('user_id', auth()->id())
+            ->where('status', 'completed');
 
-        $losses = $completedSessions->filter(function ($wager) {
-            return $wager->winnings < $wager->stake_amount;
-        })->count();
+        // All sessions (any status) for the active filter — used for total_staked
+        $allQuery = RollingFund::where('user_id', auth()->id());
 
-        $breakEven = $completedSessions->filter(function ($wager) {
-            return $wager->winnings == $wager->stake_amount;
-        })->count();
+        // Apply the same period/performance constraints to both queries
+        $applyPeriod = function ($query) use ($filter, $request) {
+            switch ($filter) {
+                case 'pending':
+                    // No completed sessions when filtering by pending
+                    $query->whereRaw('0 = 1');
+                    break;
+                case 'wins':
+                    $query->whereColumn('winnings', '>', 'stake_amount');
+                    break;
+                case 'losses':
+                    $query->whereColumn('winnings', '<', 'stake_amount');
+                    break;
+                case 'break_even':
+                    $query->whereColumn('winnings', '=', 'stake_amount');
+                    break;
+                case 'high_wins':
+                    $query->whereRaw('(winnings - stake_amount) >= (stake_amount * 0.5)');
+                    break;
+                case 'significant_losses':
+                    $query->whereRaw('(stake_amount - winnings) >= (stake_amount * 0.5)');
+                    break;
+                case 'last_7_days':
+                    $query->where('date', '>=', now()->subDays(7));
+                    break;
+                case 'last_30_days':
+                    $query->where('date', '>=', now()->subDays(30));
+                    break;
+                case 'last_90_days':
+                    $query->where('date', '>=', now()->subDays(90));
+                    break;
+                case 'this_month':
+                    $query->whereMonth('date', now()->month)
+                        ->whereYear('date', now()->year);
+                    break;
+                case 'this_year':
+                    $query->whereYear('date', now()->year);
+                    break;
+                case 'custom_range':
+                    if ($request->has('date_from') && $request->date_from) {
+                        $query->where('date', '>=', $request->date_from);
+                    }
+                    if ($request->has('date_to') && $request->date_to) {
+                        $query->where('date', '<=', $request->date_to);
+                    }
+                    break;
+                // 'all' and 'completed' need no extra constraint
+            }
+        };
 
-        // Calculate biggest win and loss properly
-        $biggestWin = 0;
-        $biggestLoss = 0;
+        $applyPeriod($completedQuery);
+        $applyPeriod($allQuery);
 
-        if ($completedSessions->count() > 0) {
-            $biggestWin = $completedSessions->map(function ($wager) {
-                return $wager->winnings - $wager->stake_amount;
-            })->max() ?? 0;
+        $completedSessions = $completedQuery->get();
 
-            $biggestLoss = $completedSessions->map(function ($wager) {
-                return $wager->winnings - $wager->stake_amount;
-            })->min() ?? 0;
-        }
+        $wins     = $completedSessions->filter(fn($w) => $w->winnings > $w->stake_amount)->count();
+        $losses   = $completedSessions->filter(fn($w) => $w->winnings < $w->stake_amount)->count();
+        $breakEven = $completedSessions->filter(fn($w) => $w->winnings == $w->stake_amount)->count();
 
         $stats = [
-            'total_staked' => RollingFund::where('user_id', auth()->id())->sum('stake_amount'),
-            'total_winnings' => $completedSessions->sum('winnings'),
+            'total_staked'    => $allQuery->sum('stake_amount'),
+            'total_winnings'  => $completedSessions->sum('winnings'),
             'net_profit_loss' => $completedSessions->sum('winnings') - $completedSessions->sum('stake_amount'),
-            'wins' => $wins,
-            'losses' => $losses,
-            'break_even' => $breakEven,
-            'win_rate' => $completedSessions->count() > 0
+            'wins'            => $wins,
+            'losses'          => $losses,
+            'break_even'      => $breakEven,
+            'win_rate'        => $completedSessions->count() > 0
                 ? round(($wins / $completedSessions->count()) * 100, 1)
                 : 0,
-            'biggest_win' => $biggestWin,
-            'biggest_loss' => $biggestLoss,
-            'pending_count' => RollingFund::where('user_id', auth()->id())->where('status', 'pending')->count(),
-            'pending_amount' => RollingFund::where('user_id', auth()->id())->where('status', 'pending')->sum('stake_amount'),
+            // Pending counts are always global (not period-scoped) so the alert banner is always accurate
+            'pending_count'   => RollingFund::where('user_id', auth()->id())->where('status', 'pending')->count(),
+            'pending_amount'  => RollingFund::where('user_id', auth()->id())->where('status', 'pending')->sum('stake_amount'),
         ];
 
         return view('rolling-funds.index', compact('wagers', 'stats', 'filter'));
@@ -140,12 +173,10 @@ class RollingFundController extends Controller
 
         $account = Account::findOrFail($validated['account_id']);
 
-        // Check if account belongs to user
         if ($account->user_id !== auth()->id()) {
             return back()->withErrors(['account_id' => 'Invalid account selected.']);
         }
 
-        // Check sufficient balance (no fee deduction)
         if ($account->current_balance < $validated['stake_amount']) {
             return back()->withErrors(['stake_amount' => 'Insufficient balance in account.']);
         }
@@ -153,36 +184,32 @@ class RollingFundController extends Controller
         try {
             DB::beginTransaction();
 
-            // Create rolling fund record with pending status
             $rollingFund = RollingFund::create([
-                'user_id' => auth()->id(),
-                'account_id' => $validated['account_id'],
-                'date' => $validated['date'],
+                'user_id'      => auth()->id(),
+                'account_id'   => $validated['account_id'],
+                'date'         => $validated['date'],
                 'stake_amount' => $validated['stake_amount'],
-                'winnings' => null,
-                'status' => 'pending',
+                'winnings'     => null,
+                'status'       => 'pending',
             ]);
 
-            // Get or create expense category for Rolling Funds
             $category = $this->getOrCreateCategory('expense', 'Rolling Funds', 'Entertainment');
 
-            // ✅ Create expense transaction for the stake (with rolling_fund_id link)
             Transaction::create([
-                'user_id' => auth()->id(),
-                'account_id' => $validated['account_id'],
-                'category_id' => $category->id,
-                'date' => $validated['date'],
-                'period_date' => $validated['date'],
-                'amount' => $validated['stake_amount'],
-                'description' => 'Rolling Funds Out',
-                'payment_method' => 'Rolling Funds',
+                'user_id'            => auth()->id(),
+                'account_id'         => $validated['account_id'],
+                'category_id'        => $category->id,
+                'date'               => $validated['date'],
+                'period_date'        => $validated['date'],
+                'amount'             => $validated['stake_amount'],
+                'description'        => 'Rolling Funds Out',
+                'payment_method'     => 'Rolling Funds',
                 'is_transaction_fee' => false,
-                'rolling_fund_id' => $rollingFund->id, // ✅ Link to rolling fund
+                'rolling_fund_id'    => $rollingFund->id,
             ]);
 
             DB::commit();
 
-            // Update account balance AFTER commit
             $account->updateBalance();
 
             return redirect()->route('rolling-funds.show', $rollingFund)
@@ -191,7 +218,7 @@ class RollingFundController extends Controller
         } catch (Exception $e) {
             DB::rollBack();
             Log::error('Rolling Fund Store Error: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString(),
+                'trace'   => $e->getTraceAsString(),
                 'user_id' => auth()->id(),
             ]);
             return back()->withErrors(['error' => 'Failed to record investment: ' . $e->getMessage()])
@@ -224,18 +251,18 @@ class RollingFundController extends Controller
 
             if (!$parentCategory) {
                 $parentCategory = Category::create([
-                    'user_id' => auth()->id(),
-                    'name' => $parentName,
-                    'type' => $type,
+                    'user_id'   => auth()->id(),
+                    'name'      => $parentName,
+                    'type'      => $type,
                     'is_active' => true,
                 ]);
             }
 
             $category = Category::create([
-                'user_id' => auth()->id(),
+                'user_id'   => auth()->id(),
                 'parent_id' => $parentCategory->id,
-                'name' => $name,
-                'type' => $type,
+                'name'      => $name,
+                'type'      => $type,
                 'is_active' => true,
             ]);
         }
@@ -245,7 +272,6 @@ class RollingFundController extends Controller
 
     public function show(RollingFund $rollingFund)
     {
-        // Check ownership
         if ($rollingFund->user_id !== auth()->id()) {
             abort(403);
         }
@@ -257,31 +283,27 @@ class RollingFundController extends Controller
 
     public function recordOutcome(Request $request, RollingFund $rollingFund)
     {
-        // Check ownership
         if ($rollingFund->user_id !== auth()->id()) {
             abort(403);
         }
 
-        // Check if already completed
         if ($rollingFund->status === 'completed') {
             return back()->with('error', 'This wager outcome has already been recorded.');
         }
 
         $validated = $request->validate([
-            'winnings' => 'required|numeric|min:0',
+            'winnings'       => 'required|numeric|min:0',
             'completed_date' => 'required|date|after_or_equal:' . $rollingFund->date->format('Y-m-d') . '|before_or_equal:today',
-            'outcome_notes' => 'nullable|string|max:1000',
+            'outcome_notes'  => 'nullable|string|max:1000',
         ]);
 
         try {
             DB::beginTransaction();
 
-            // Update rolling fund with outcome
-            $rollingFund->winnings = $validated['winnings'];
-            $rollingFund->status = 'completed';
+            $rollingFund->winnings       = $validated['winnings'];
+            $rollingFund->status         = 'completed';
             $rollingFund->completed_date = $validated['completed_date'];
 
-            // Append outcome notes to existing notes
             if (!empty($validated['outcome_notes'])) {
                 $rollingFund->notes = $rollingFund->notes
                     ? $rollingFund->notes . "\n\nOutcome: " . $validated['outcome_notes']
@@ -290,27 +312,25 @@ class RollingFundController extends Controller
 
             $rollingFund->save();
 
-            // ✅ If there were winnings, record income transaction (with rolling_fund_id link)
             if ($validated['winnings'] > 0) {
                 $incomeCategory = $this->getOrCreateCategory('income', 'Rolling Funds', 'Other Income');
 
                 Transaction::create([
-                    'user_id' => auth()->id(),
-                    'account_id' => $rollingFund->account_id,
-                    'category_id' => $incomeCategory->id,
-                    'date' => $validated['completed_date'],
-                    'period_date' => $validated['completed_date'],
-                    'amount' => $validated['winnings'],
-                    'description' => 'Rolling Funds Returns - ' . ($rollingFund->platform ?? 'Session'),
-                    'payment_method' => 'Rolling Funds',
+                    'user_id'            => auth()->id(),
+                    'account_id'         => $rollingFund->account_id,
+                    'category_id'        => $incomeCategory->id,
+                    'date'               => $validated['completed_date'],
+                    'period_date'        => $validated['completed_date'],
+                    'amount'             => $validated['winnings'],
+                    'description'        => 'Rolling Funds Returns - ' . ($rollingFund->platform ?? 'Session'),
+                    'payment_method'     => 'Rolling Funds',
                     'is_transaction_fee' => false,
-                    'rolling_fund_id' => $rollingFund->id, // ✅ Link to rolling fund
+                    'rolling_fund_id'    => $rollingFund->id,
                 ]);
             }
 
             DB::commit();
 
-            // Update account balance AFTER commit
             $account = Account::findOrFail($rollingFund->account_id);
             $account->updateBalance();
 
@@ -327,7 +347,7 @@ class RollingFundController extends Controller
         } catch (Exception $e) {
             DB::rollBack();
             Log::error('Rolling Fund Record Outcome Error: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString(),
+                'trace'           => $e->getTraceAsString(),
                 'rolling_fund_id' => $rollingFund->id,
             ]);
             return back()->with('error', 'Failed to record outcome: ' . $e->getMessage());
@@ -336,7 +356,6 @@ class RollingFundController extends Controller
 
     public function destroy(RollingFund $rollingFund)
     {
-        // Check ownership
         if ($rollingFund->user_id !== auth()->id()) {
             abort(403);
         }
@@ -344,14 +363,11 @@ class RollingFundController extends Controller
         try {
             DB::beginTransaction();
 
-            // ✅ NEW APPROACH: Delete by rolling_fund_id (much simpler and more reliable)
             Transaction::where('rolling_fund_id', $rollingFund->id)->delete();
-
             $rollingFund->delete();
 
             DB::commit();
 
-            // Update account balance AFTER commit
             $account = Account::findOrFail($rollingFund->account_id);
             $account->updateBalance();
 
@@ -361,7 +377,7 @@ class RollingFundController extends Controller
         } catch (Exception $e) {
             DB::rollBack();
             Log::error('Rolling Fund Destroy Error: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString(),
+                'trace'           => $e->getTraceAsString(),
                 'rolling_fund_id' => $rollingFund->id,
             ]);
             return back()->with('error', 'Failed to delete wager: ' . $e->getMessage());
