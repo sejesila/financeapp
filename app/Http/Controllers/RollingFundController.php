@@ -82,18 +82,14 @@ class RollingFundController extends Controller
 
         // --- Stats: scoped to the same filter/period ---
 
-        // Completed sessions for the active filter
         $completedQuery = RollingFund::where('user_id', auth()->id())
             ->where('status', 'completed');
 
-        // All sessions (any status) for the active filter — used for total_staked
         $allQuery = RollingFund::where('user_id', auth()->id());
 
-        // Apply the same period/performance constraints to both queries
         $applyPeriod = function ($query) use ($filter, $request) {
             switch ($filter) {
                 case 'pending':
-                    // No completed sessions when filtering by pending
                     $query->whereRaw('0 = 1');
                     break;
                 case 'wins':
@@ -138,7 +134,6 @@ class RollingFundController extends Controller
                         $query->where('date', '<=', $request->date_to);
                     }
                     break;
-                // 'all' and 'completed' need no extra constraint
             }
         };
 
@@ -147,8 +142,8 @@ class RollingFundController extends Controller
 
         $completedSessions = $completedQuery->get();
 
-        $wins     = $completedSessions->filter(fn($w) => $w->winnings > $w->stake_amount)->count();
-        $losses   = $completedSessions->filter(fn($w) => $w->winnings < $w->stake_amount)->count();
+        $wins      = $completedSessions->filter(fn($w) => $w->winnings > $w->stake_amount)->count();
+        $losses    = $completedSessions->filter(fn($w) => $w->winnings < $w->stake_amount)->count();
         $breakEven = $completedSessions->filter(fn($w) => $w->winnings == $w->stake_amount)->count();
 
         $stats = [
@@ -161,9 +156,8 @@ class RollingFundController extends Controller
             'win_rate'        => $completedSessions->count() > 0
                 ? round(($wins / $completedSessions->count()) * 100, 1)
                 : 0,
-            // Pending counts are always global (not period-scoped) so the alert banner is always accurate
-            'pending_count'   => RollingFund::where('user_id', auth()->id())->where('status', 'pending')->count(),
-            'pending_amount'  => RollingFund::where('user_id', auth()->id())->where('status', 'pending')->sum('stake_amount'),
+            'pending_count'  => RollingFund::where('user_id', auth()->id())->where('status', 'pending')->count(),
+            'pending_amount' => RollingFund::where('user_id', auth()->id())->where('status', 'pending')->sum('stake_amount'),
         ];
 
         return view('rolling-funds.index', compact('wagers', 'stats', 'filter'));
@@ -172,8 +166,8 @@ class RollingFundController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'date' => 'required|date|before_or_equal:today',
-            'account_id' => 'required|exists:accounts,id',
+            'date'         => 'required|date|before_or_equal:today',
+            'account_id'   => 'required|exists:accounts,id',
             'stake_amount' => 'required|numeric|min:0.01',
         ]);
 
@@ -325,8 +319,8 @@ class RollingFundController extends Controller
                     'user_id'            => auth()->id(),
                     'account_id'         => $rollingFund->account_id,
                     'category_id'        => $incomeCategory->id,
-                    'date'               => $validated['completed_date'],
-                    'period_date'        => $validated['completed_date'],
+                    'date'               => $validated['completed_date'], // actual completion date for audit trail
+                    'period_date'        => $rollingFund->date,           // attributed to stake month for budget consistency
                     'amount'             => $validated['winnings'],
                     'description'        => 'Rolling Funds Returns - ' . ($rollingFund->platform ?? 'Session'),
                     'payment_method'     => 'Rolling Funds',
