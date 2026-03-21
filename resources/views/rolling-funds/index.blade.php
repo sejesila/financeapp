@@ -29,7 +29,7 @@
     <div class="py-6 sm:py-10 px-4 sm:px-6 lg:px-8">
         <div class="max-w-7xl mx-auto space-y-6">
 
-            <!-- Alert Messages -->
+            {{-- ── Alert Messages ─────────────────────────────────────────── --}}
             @if(session('success'))
                 <div class="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-l-4 border-green-500 dark:border-green-400 p-4 rounded-xl shadow-md animate-slide-in">
                     <div class="flex items-start gap-3">
@@ -56,7 +56,246 @@
                 </div>
             @endif
 
-            <!-- Key Metrics -->
+            {{-- Bankroll warning (80% threshold hit on last store) --}}
+            @if(session('bankroll_warning'))
+                <div class="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 border-l-4 border-orange-500 dark:border-orange-400 p-4 rounded-xl shadow-md animate-slide-in">
+                    <div class="flex items-start gap-3">
+                        <div class="w-8 h-8 bg-orange-500 dark:bg-orange-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="text-sm font-bold text-orange-800 dark:text-orange-300">⚠️ Bankroll Warning</p>
+                            <p class="text-sm text-orange-700 dark:text-orange-400 mt-0.5">{{ session('bankroll_warning') }}</p>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            {{-- ═══════════════════════════════════════════════════════════════
+                 BANKROLL MANAGEMENT PANEL
+            ═══════════════════════════════════════════════════════════════ --}}
+            @php
+                $usagePercent    = $limit->exists ? $limit->monthlyUsagePercent() : null;
+                $stakedSoFar     = $limit->exists ? $limit->monthlyStakedSoFar()  : 0;
+                $monthlyRemain   = $limit->exists ? $limit->monthlyRemaining()     : null;
+                $limitActive     = $limit->exists && $limit->is_active;
+
+                // Determine progress-bar colour
+                $barColor = 'bg-green-500';
+                if ($usagePercent !== null) {
+                    if ($usagePercent >= 100)      $barColor = 'bg-red-500';
+                    elseif ($usagePercent >= 80)   $barColor = 'bg-orange-500';
+                    elseif ($usagePercent >= 60)   $barColor = 'bg-yellow-500';
+                }
+            @endphp
+
+            <div x-data="{ open: {{ $errors->has('monthly_stake_limit') || $errors->has('single_stake_limit') ? 'true' : 'false' }} }"
+                 class="bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden">
+
+                {{-- Panel header / toggle --}}
+                <button @click="open = !open"
+                        type="button"
+                        class="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors duration-200 text-left">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-gradient-to-br from-violet-500 to-fuchsia-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
+                            <span class="text-xl">🛡️</span>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-gray-900 dark:text-gray-100 text-sm sm:text-base">Bankroll Management</h3>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                @if($limitActive && $limit->monthly_stake_limit)
+                                    This month: KES {{ number_format($stakedSoFar, 0) }}
+                                    / {{ number_format($limit->monthly_stake_limit, 0) }}
+                                    @if($usagePercent !== null)
+                                        &nbsp;·&nbsp;
+                                        <span class="{{ $usagePercent >= 100 ? 'text-red-600 dark:text-red-400 font-bold' : ($usagePercent >= 80 ? 'text-orange-600 dark:text-orange-400 font-bold' : 'text-gray-500 dark:text-gray-400') }}">
+                                            {{ $usagePercent }}% used
+                                        </span>
+                                    @endif
+                                @elseif($limitActive)
+                                    Per-session cap active
+                                @else
+                                    No limits set — click to configure
+                                @endif
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 flex-shrink-0">
+                        {{-- Status badge --}}
+                        @if($limitActive)
+                            <span class="hidden sm:inline text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 px-2.5 py-1 rounded-full">
+                                Active
+                            </span>
+                        @else
+                            <span class="hidden sm:inline text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2.5 py-1 rounded-full">
+                                Inactive
+                            </span>
+                        @endif
+                        <svg class="w-5 h-5 text-gray-400 transition-transform duration-300"
+                             :class="open ? 'rotate-180' : ''"
+                             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </div>
+                </button>
+
+                {{-- Progress bar (always visible when limit set & active) --}}
+                @if($limitActive && $limit->monthly_stake_limit && $usagePercent !== null)
+                    <div class="px-4 sm:px-5 -mt-1">
+                        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                            <div class="{{ $barColor }} h-2 rounded-full transition-all duration-500"
+                                 style="width: {{ min(100, $usagePercent) }}%"></div>
+                        </div>
+                    </div>
+                @endif
+
+                {{-- Expandable body --}}
+                <div x-show="open"
+                     x-transition:enter="transition ease-out duration-200"
+                     x-transition:enter-start="opacity-0 -translate-y-2"
+                     x-transition:enter-end="opacity-100 translate-y-0"
+                     x-transition:leave="transition ease-in duration-150"
+                     x-transition:leave-start="opacity-100 translate-y-0"
+                     x-transition:leave-end="opacity-0 -translate-y-2"
+                     class="border-t border-gray-200 dark:border-gray-700">
+
+                    {{-- Current-month stats strip --}}
+                    @if($limitActive && $limit->monthly_stake_limit)
+                        <div class="grid grid-cols-3 divide-x divide-gray-200 dark:divide-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                            <div class="p-3 sm:p-4 text-center">
+                                <p class="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide mb-1">Staked</p>
+                                <p class="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100">
+                                    KES {{ number_format($stakedSoFar, 0) }}
+                                </p>
+                            </div>
+                            <div class="p-3 sm:p-4 text-center">
+                                <p class="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide mb-1">Remaining</p>
+                                <p class="text-base sm:text-lg font-bold {{ ($monthlyRemain !== null && $monthlyRemain <= 0) ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400' }}">
+                                    KES {{ $monthlyRemain !== null ? number_format($monthlyRemain, 0) : '∞' }}
+                                </p>
+                            </div>
+                            <div class="p-3 sm:p-4 text-center">
+                                <p class="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide mb-1">Budget</p>
+                                <p class="text-base sm:text-lg font-bold text-indigo-600 dark:text-indigo-400">
+                                    KES {{ number_format($limit->monthly_stake_limit, 0) }}
+                                </p>
+                            </div>
+                        </div>
+                    @endif
+
+                    {{-- ── Limit settings form ──────────────────────────────── --}}
+                    <form method="POST" action="{{ route('rolling-funds.save-limits') }}"
+                          class="p-4 sm:p-6 space-y-5">
+                        @csrf
+
+                        {{-- Enable / disable toggle --}}
+                        <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/40 rounded-xl">
+                            <div>
+                                <p class="text-sm font-bold text-gray-900 dark:text-gray-100">Enable bankroll limits</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Turn off to bypass all limits temporarily</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="hidden" name="is_active" value="0">
+                                <input type="checkbox" name="is_active" value="1" class="sr-only peer"
+                                    {{ ($limit->exists && $limit->is_active) || !$limit->exists ? 'checked' : '' }}>
+                                <div class="w-11 h-6 bg-gray-300 dark:bg-gray-600 peer-checked:bg-indigo-600 rounded-full peer
+                                            after:content-[''] after:absolute after:top-0.5 after:left-0.5
+                                            after:bg-white after:rounded-full after:h-5 after:w-5
+                                            after:transition-all peer-checked:after:translate-x-5
+                                            transition-colors duration-200"></div>
+                            </label>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {{-- Monthly stake limit --}}
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">
+                                    Monthly Stake Limit
+                                    <span class="text-xs font-normal text-gray-500 dark:text-gray-400">(KES)</span>
+                                </label>
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500 dark:text-gray-400 font-semibold text-sm pointer-events-none">
+                                        KES
+                                    </span>
+                                    <input type="number"
+                                           name="monthly_stake_limit"
+                                           min="0"
+                                           step="100"
+                                           placeholder="e.g. 5000"
+                                           value="{{ old('monthly_stake_limit', $limit->monthly_stake_limit ?? '') }}"
+                                           class="w-full pl-12 pr-4 py-2.5 bg-white dark:bg-gray-700 border @error('monthly_stake_limit') border-red-500 @else border-gray-300 dark:border-gray-600 @enderror rounded-xl text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+                                </div>
+                                @error('monthly_stake_limit')
+                                <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                                @enderror
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    Max total you can stake in one calendar month. Leave blank for no limit.
+                                </p>
+                            </div>
+
+                            {{-- Single stake limit --}}
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">
+                                    Max Per Session
+                                    <span class="text-xs font-normal text-gray-500 dark:text-gray-400">(KES)</span>
+                                </label>
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500 dark:text-gray-400 font-semibold text-sm pointer-events-none">
+                                        KES
+                                    </span>
+                                    <input type="number"
+                                           name="single_stake_limit"
+                                           min="0"
+                                           step="100"
+                                           placeholder="e.g. 1000"
+                                           value="{{ old('single_stake_limit', $limit->single_stake_limit ?? '') }}"
+                                           class="w-full pl-12 pr-4 py-2.5 bg-white dark:bg-gray-700 border @error('single_stake_limit') border-red-500 @else border-gray-300 dark:border-gray-600 @enderror rounded-xl text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+                                </div>
+                                @error('single_stake_limit')
+                                <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                                @enderror
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    Max you can stake in a single session. Leave blank for no limit.
+                                </p>
+                            </div>
+                        </div>
+
+                        {{-- Behaviour info pills --}}
+                        <div class="flex flex-wrap gap-2">
+                            <div class="flex items-center gap-1.5 text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 px-3 py-1.5 rounded-full font-semibold">
+                                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                </svg>
+                                Warning at 80%
+                            </div>
+                            <div class="flex items-center gap-1.5 text-xs bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 px-3 py-1.5 rounded-full font-semibold">
+                                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M13.477 14.89A6 6 0 015.11 6.524L13.477 14.89zm1.414-1.414L6.524 5.11A6 6 0 0114.89 13.476zM18 10a8 8 0 11-16 0 8 8 0 0116 0z" clip-rule="evenodd"/>
+                                </svg>
+                                Blocked at 100%
+                            </div>
+                            <div class="flex items-center gap-1.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-3 py-1.5 rounded-full font-semibold">
+                                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/>
+                                </svg>
+                                Resets each month
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end">
+                            <button type="submit"
+                                    class="px-6 py-2.5 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white rounded-xl text-sm font-bold shadow-md hover:shadow-lg transition-all duration-300">
+                                Save Limits
+                            </button>
+                        </div>
+                    </form>
+
+                </div>{{-- /expandable body --}}
+            </div>{{-- /bankroll panel --}}
+
+            {{-- ── Key Metrics ──────────────────────────────────────────────── --}}
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
                 <!-- Total Invested Card -->
                 <div class="group relative bg-white dark:bg-gray-800 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 dark:border-gray-700">
@@ -66,14 +305,10 @@
                             <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform duration-300">
                                 <span class="text-2xl">💼</span>
                             </div>
-                            <div class="text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded-lg">
-                                TOTAL
-                            </div>
+                            <div class="text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded-lg">TOTAL</div>
                         </div>
                         <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Total Invested</p>
-                        <p class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
-                            {{ number_format($stats['total_staked'], 0) }}
-                        </p>
+                        <p class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">{{ number_format($stats['total_staked'], 0) }}</p>
                         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium">KES</p>
                     </div>
                 </div>
@@ -86,14 +321,10 @@
                             <div class="w-12 h-12 bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform duration-300">
                                 <span class="text-2xl">💰</span>
                             </div>
-                            <div class="text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 px-2 py-1 rounded-lg">
-                                RETURNS
-                            </div>
+                            <div class="text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 px-2 py-1 rounded-lg">RETURNS</div>
                         </div>
                         <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Total Returns</p>
-                        <p class="text-2xl sm:text-3xl font-bold text-emerald-600 dark:text-emerald-400">
-                            {{ number_format($stats['total_winnings'], 0) }}
-                        </p>
+                        <p class="text-2xl sm:text-3xl font-bold text-emerald-600 dark:text-emerald-400">{{ number_format($stats['total_winnings'], 0) }}</p>
                         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium">KES</p>
                     </div>
                 </div>
@@ -126,20 +357,16 @@
                             <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform duration-300">
                                 <span class="text-2xl">🎯</span>
                             </div>
-                            <div class="text-xs font-semibold text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/30 px-2 py-1 rounded-lg">
-                                RATE
-                            </div>
+                            <div class="text-xs font-semibold text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/30 px-2 py-1 rounded-lg">RATE</div>
                         </div>
                         <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Success Rate</p>
-                        <p class="text-2xl sm:text-3xl font-bold text-purple-600 dark:text-purple-400">
-                            {{ $stats['win_rate'] }}%
-                        </p>
+                        <p class="text-2xl sm:text-3xl font-bold text-purple-600 dark:text-purple-400">{{ $stats['win_rate'] }}%</p>
                         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium">{{ $stats['wins'] }}W / {{ $stats['losses'] }}L</p>
                     </div>
                 </div>
             </div>
 
-            <!-- Pending Sessions Alert -->
+            {{-- ── Pending Sessions Alert ───────────────────────────────────── --}}
             @if($stats['pending_count'] > 0)
                 <div class="relative bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-2xl shadow-md overflow-hidden border-2 border-amber-300 dark:border-amber-700">
                     <div class="absolute top-0 right-0 w-64 h-64 bg-amber-400/10 rounded-full -mr-32 -mt-32"></div>
@@ -170,7 +397,7 @@
                 </div>
             @endif
 
-            <!-- Filters Section -->
+            {{-- ── Filters Section ─────────────────────────────────────────── --}}
             <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-100 dark:border-gray-700">
                 <div class="p-4 sm:p-5 border-b border-gray-200 dark:border-gray-700">
                     <div class="flex items-center gap-3">
@@ -186,7 +413,6 @@
                     </div>
                 </div>
                 <div class="p-4 sm:p-5 space-y-4 sm:space-y-5">
-                    <!-- Status Filters -->
                     <div>
                         <p class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Status</p>
                         <div class="flex flex-wrap gap-2">
@@ -205,7 +431,6 @@
                         </div>
                     </div>
 
-                    <!-- Time-based Filters -->
                     <div>
                         <p class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Time Period</p>
                         <div class="flex flex-wrap gap-2">
@@ -236,7 +461,6 @@
                         </div>
                     </div>
 
-                    <!-- Performance Filters -->
                     <div>
                         <p class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Performance</p>
                         <div class="flex flex-wrap gap-2">
@@ -252,7 +476,7 @@
                                class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 flex items-center gap-1.5 {{ $filter === 'break_even' ? 'bg-gray-500 text-white shadow-md' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
                                 <span>➖</span> Break Even
                             </a>
-                            <a href="{{ route('rolling-funds.index',['filter' => 'high_wins']) }}"
+                            <a href="{{ route('rolling-funds.index', ['filter' => 'high_wins']) }}"
                                class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 flex items-center gap-1.5 {{ $filter === 'high_wins' ? 'bg-emerald-500 text-white shadow-md' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
                                 <span>🚀</span> High Wins
                             </a>
@@ -263,7 +487,6 @@
                         </div>
                     </div>
 
-                    <!-- Custom Date Range -->
                     <div>
                         <p class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Custom Range</p>
                         <form method="GET" action="{{ route('rolling-funds.index') }}" class="flex flex-col sm:flex-row flex-wrap gap-2 items-stretch sm:items-end">
@@ -295,7 +518,7 @@
                 </div>
             </div>
 
-            <!-- Sessions List -->
+            {{-- ── Sessions List ───────────────────────────────────────────── --}}
             <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-md overflow-hidden border border-gray-100 dark:border-gray-700">
                 <div class="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800/50">
                     <div class="flex items-center justify-between flex-wrap gap-3">
@@ -304,20 +527,16 @@
                                 <span class="text-xl sm:text-2xl">📊</span>
                             </div>
                             <div>
-                                <h3 class="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100">
-                                    Session History
-                                </h3>
+                                <h3 class="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100">Session History</h3>
                                 <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                                     {{ $wagers->total() }} session{{ $wagers->total() !== 1 ? 's' : '' }} recorded
                                 </p>
                             </div>
                         </div>
                         @if($wagers->hasPages())
-                            <div class="text-right">
-                                <p class="text-xs text-gray-500 dark:text-gray-400 font-medium">
-                                    Page {{ $wagers->currentPage() }} of {{ $wagers->lastPage() }}
-                                </p>
-                            </div>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                                Page {{ $wagers->currentPage() }} of {{ $wagers->lastPage() }}
+                            </p>
                         @endif
                     </div>
                 </div>
@@ -330,14 +549,10 @@
                                     <div class="flex items-start gap-3 mb-3 flex-wrap">
                                         <div class="w-10 h-10 rounded-xl flex items-center justify-center shadow-md flex-shrink-0 {{ $wager->status === 'pending' ? 'bg-gradient-to-br from-amber-400 to-orange-500' : ($wager->isWin() ? 'bg-gradient-to-br from-green-500 to-emerald-600' : ($wager->outcome === 'break_even' ? 'bg-gradient-to-br from-gray-400 to-gray-500' : 'bg-gradient-to-br from-red-500 to-rose-600')) }}">
                                             <span class="text-xl">
-                                                @if($wager->status === 'pending')
-                                                    ⏳
-                                                @elseif($wager->isWin())
-                                                    📈
-                                                @elseif($wager->outcome === 'break_even')
-                                                    ➖
-                                                @else
-                                                    📉
+                                                @if($wager->status === 'pending') ⏳
+                                                @elseif($wager->isWin()) 📈
+                                                @elseif($wager->outcome === 'break_even') ➖
+                                                @else 📉
                                                 @endif
                                             </span>
                                         </div>
@@ -351,9 +566,7 @@
                                                     {{ $wager->date->format('M d, Y') }}
                                                 </span>
                                                 @if($wager->status === 'pending')
-                                                    <span class="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-3 py-1 rounded-full font-bold">
-                                                        Pending
-                                                    </span>
+                                                    <span class="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-3 py-1 rounded-full font-bold">Pending</span>
                                                 @endif
                                                 @if($wager->account)
                                                     <span class="text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-3 py-1 rounded-full font-semibold">
@@ -379,11 +592,6 @@
                                                 @endif
                                             </div>
                                         </div>
-                                        @if($wager->game_type)
-                                            <p class="text-xs text-gray-500 dark:text-gray-400">
-                                                <span class="font-semibold">Type:</span> {{ $wager->game_type }}
-                                            </p>
-                                        @endif
                                     </div>
                                 </div>
 
@@ -400,12 +608,8 @@
                                         </div>
                                     @else
                                         <div class="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-xl p-4 shadow-sm">
-                                            <p class="text-xl sm:text-2xl font-bold text-amber-600 dark:text-amber-400">
-                                                Pending
-                                            </p>
-                                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                                Awaiting outcome
-                                            </p>
+                                            <p class="text-xl sm:text-2xl font-bold text-amber-600 dark:text-amber-400">Pending</p>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Awaiting outcome</p>
                                         </div>
                                     @endif
                                 </div>
@@ -449,9 +653,7 @@
                                     <span class="text-4xl sm:text-5xl">📊</span>
                                 </div>
                             </div>
-                            <h3 class="text-lg sm:text-xl font-bold text-gray-800 dark:text-gray-200 mb-2">
-                                No Sessions Yet
-                            </h3>
+                            <h3 class="text-lg sm:text-xl font-bold text-gray-800 dark:text-gray-200 mb-2">No Sessions Yet</h3>
                             <p class="text-sm sm:text-base text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
                                 Start tracking your rolling funds investments to monitor your performance and returns.
                             </p>
@@ -482,14 +684,12 @@
             to   { transform: translateX(0);     opacity: 1; }
         }
         .animate-slide-in { animation: slide-in 0.3s ease-out; }
-
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(156,163,175,0.5); border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(107,114,128,0.7); }
         .dark ::-webkit-scrollbar-thumb { background: rgba(75,85,99,0.5); }
         .dark ::-webkit-scrollbar-thumb:hover { background: rgba(55,65,81,0.7); }
-
         @media (min-width: 475px) { .xs\:inline { display: inline; } }
     </style>
 </x-app-layout>

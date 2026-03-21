@@ -149,6 +149,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [RollingFundController::class, 'index'])->name('index');
         Route::get('/create', [RollingFundController::class, 'create'])->name('create');
         Route::post('/', [RollingFundController::class, 'store'])->name('store');
+        Route::post('/limits', [RollingFundController::class, 'saveLimits'])->name('save-limits'); // ← NEW
         Route::get('/{rollingFund}', [RollingFundController::class, 'show'])->name('show');
         Route::post('/{rollingFund}/record-outcome', [RollingFundController::class, 'recordOutcome'])->name('record-outcome');
         Route::delete('/{rollingFund}', [RollingFundController::class, 'destroy'])->name('destroy');

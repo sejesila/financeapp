@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Account;
 use App\Models\Category;
 use App\Models\RollingFund;
+use App\Models\RollingFundLimit;
 use App\Models\Transaction;
 use Exception;
 use Illuminate\Http\Request;
@@ -13,6 +14,10 @@ use Illuminate\Support\Facades\Log;
 
 class RollingFundController extends Controller
 {
+    // =========================================================================
+    // INDEX
+    // =========================================================================
+
     public function index(Request $request)
     {
         $filter = $request->get('filter', 'all');
@@ -160,8 +165,40 @@ class RollingFundController extends Controller
             'pending_amount' => RollingFund::where('user_id', auth()->id())->where('status', 'pending')->sum('stake_amount'),
         ];
 
-        return view('rolling-funds.index', compact('wagers', 'stats', 'filter'));
+        // --- Bankroll limit for the inline widget ---
+        $limit = RollingFundLimit::firstOrNew(['user_id' => auth()->id()]);
+
+        return view('rolling-funds.index', compact('wagers', 'stats', 'filter', 'limit'));
     }
+
+    // =========================================================================
+    // SAVE BANKROLL LIMITS (inline form on index)
+    // =========================================================================
+
+    public function saveLimits(Request $request)
+    {
+        $validated = $request->validate([
+            'monthly_stake_limit' => 'nullable|numeric|min:0',
+            'single_stake_limit'  => 'nullable|numeric|min:0',
+            'is_active'           => 'boolean',
+        ]);
+
+        // Treat empty strings as null
+        $validated['monthly_stake_limit'] = $validated['monthly_stake_limit'] ?: null;
+        $validated['single_stake_limit']  = $validated['single_stake_limit'] ?: null;
+        $validated['is_active']           = $request->boolean('is_active', true);
+
+        RollingFundLimit::updateOrCreate(
+            ['user_id' => auth()->id()],
+            $validated
+        );
+
+        return back()->with('success', 'Bankroll limits updated.');
+    }
+
+    // =========================================================================
+    // STORE — with bankroll guard
+    // =========================================================================
 
     public function store(Request $request)
     {
@@ -180,6 +217,26 @@ class RollingFundController extends Controller
         if ($account->current_balance < $validated['stake_amount']) {
             return back()->withErrors(['stake_amount' => 'Insufficient balance in account.']);
         }
+
+        // ── Bankroll guard ────────────────────────────────────────────────────
+        $limit = RollingFundLimit::where('user_id', auth()->id())->first();
+
+        if ($limit && $limit->is_active) {
+            $status  = $limit->checkStake((float) $validated['stake_amount']);
+            $message = $limit->checkMessage((float) $validated['stake_amount']);
+
+            if ($status === 'blocked') {
+                return back()
+                    ->withErrors(['stake_amount' => $message])
+                    ->withInput();
+            }
+
+            // 'warning' — store a flash and proceed
+            if ($status === 'warning') {
+                session()->flash('bankroll_warning', $message);
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────────
 
         try {
             DB::beginTransaction();
@@ -226,49 +283,25 @@ class RollingFundController extends Controller
         }
     }
 
+    // =========================================================================
+    // CREATE
+    // =========================================================================
+
     public function create()
     {
         $accounts = Account::where('user_id', auth()->id())
             ->where('is_active', true)
             ->get();
 
-        return view('rolling-funds.create', compact('accounts'));
+        // Pass limit so the create view can show per-session cap hint
+        $limit = RollingFundLimit::where('user_id', auth()->id())->first();
+
+        return view('rolling-funds.create', compact('accounts', 'limit'));
     }
 
-    private function getOrCreateCategory($type, $name, $parentName)
-    {
-        $category = Category::where('user_id', auth()->id())
-            ->where('type', $type)
-            ->where('name', $name)
-            ->first();
-
-        if (!$category) {
-            $parentCategory = Category::where('user_id', auth()->id())
-                ->where('type', $type)
-                ->whereNull('parent_id')
-                ->where('name', $parentName)
-                ->first();
-
-            if (!$parentCategory) {
-                $parentCategory = Category::create([
-                    'user_id'   => auth()->id(),
-                    'name'      => $parentName,
-                    'type'      => $type,
-                    'is_active' => true,
-                ]);
-            }
-
-            $category = Category::create([
-                'user_id'   => auth()->id(),
-                'parent_id' => $parentCategory->id,
-                'name'      => $name,
-                'type'      => $type,
-                'is_active' => true,
-            ]);
-        }
-
-        return $category;
-    }
+    // =========================================================================
+    // SHOW
+    // =========================================================================
 
     public function show(RollingFund $rollingFund)
     {
@@ -280,6 +313,10 @@ class RollingFundController extends Controller
 
         return view('rolling-funds.show', compact('rollingFund'));
     }
+
+    // =========================================================================
+    // RECORD OUTCOME
+    // =========================================================================
 
     public function recordOutcome(Request $request, RollingFund $rollingFund)
     {
@@ -319,8 +356,8 @@ class RollingFundController extends Controller
                     'user_id'            => auth()->id(),
                     'account_id'         => $rollingFund->account_id,
                     'category_id'        => $incomeCategory->id,
-                    'date'               => $validated['completed_date'], // actual completion date for audit trail
-                    'period_date'        => $rollingFund->date,           // attributed to stake month for budget consistency
+                    'date'               => $validated['completed_date'],
+                    'period_date'        => $rollingFund->date,
                     'amount'             => $validated['winnings'],
                     'description'        => 'Rolling Funds Returns - ' . ($rollingFund->platform ?? 'Session'),
                     'payment_method'     => 'Rolling Funds',
@@ -354,6 +391,10 @@ class RollingFundController extends Controller
         }
     }
 
+    // =========================================================================
+    // DESTROY
+    // =========================================================================
+
     public function destroy(RollingFund $rollingFund)
     {
         if ($rollingFund->user_id !== auth()->id()) {
@@ -382,5 +423,44 @@ class RollingFundController extends Controller
             ]);
             return back()->with('error', 'Failed to delete wager: ' . $e->getMessage());
         }
+    }
+
+    // =========================================================================
+    // PRIVATE HELPERS
+    // =========================================================================
+
+    private function getOrCreateCategory($type, $name, $parentName)
+    {
+        $category = Category::where('user_id', auth()->id())
+            ->where('type', $type)
+            ->where('name', $name)
+            ->first();
+
+        if (!$category) {
+            $parentCategory = Category::where('user_id', auth()->id())
+                ->where('type', $type)
+                ->whereNull('parent_id')
+                ->where('name', $parentName)
+                ->first();
+
+            if (!$parentCategory) {
+                $parentCategory = Category::create([
+                    'user_id'   => auth()->id(),
+                    'name'      => $parentName,
+                    'type'      => $type,
+                    'is_active' => true,
+                ]);
+            }
+
+            $category = Category::create([
+                'user_id'   => auth()->id(),
+                'parent_id' => $parentCategory->id,
+                'name'      => $name,
+                'type'      => $type,
+                'is_active' => true,
+            ]);
+        }
+
+        return $category;
     }
 }
