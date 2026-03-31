@@ -123,9 +123,9 @@
                     </p>
                 </div>
 
-                <!-- Transaction Fee Display -->
+                <!-- Transaction Fee Display: Mobile Money Withdrawal / PayBill -->
                 <div
-                    x-show="showFee && transactionFee > 0"
+                    x-show="showFee && transactionFee > 0 && feeType !== 'atm'"
                     x-transition
                     :class="feeType === 'withdrawal' ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800' : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'"
                     class="border rounded p-3 mb-4"
@@ -150,6 +150,30 @@
                     </div>
                 </div>
 
+                <!-- Transaction Fee Display: ATM Withdrawal (Bank → Cash) -->
+                <div
+                    x-show="showFee && feeType === 'atm'"
+                    x-transition
+                    class="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded p-3 mb-4"
+                >
+                    <div class="flex items-start gap-2">
+                        <svg class="w-5 h-5 flex-shrink-0 mt-0.5 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
+                        </svg>
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between">
+                                <p class="text-sm font-medium text-orange-800 dark:text-orange-200">
+                                    ATM Withdrawal Fee
+                                </p>
+                                <span class="text-lg font-bold text-orange-800 dark:text-orange-200" x-text="'KES ' + transactionFee.toFixed(2)"></span>
+                            </div>
+                            <p class="text-xs mt-1 text-orange-700 dark:text-orange-300">
+                                Flat charge: KES 33.00 + 15% excise duty (KES 4.95) = KES 37.95, deducted from <span x-text="fromAccountName"></span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Total Deduction Display -->
                 <div
                     x-show="showFee && transactionFee > 0"
@@ -163,7 +187,7 @@
                         <span class="text-lg font-bold text-indigo-800 dark:text-indigo-200" x-text="'KES ' + totalDeduction.toLocaleString()"></span>
                     </div>
                     <p class="text-xs text-indigo-600 dark:text-indigo-300 mt-1">
-                        Transfer: KES <span x-text="parseFloat(amount || 0).toLocaleString()"></span> + Fee: KES <span x-text="transactionFee.toLocaleString()"></span>
+                        Transfer: KES <span x-text="parseFloat(amount || 0).toLocaleString()"></span> + Fee: KES <span x-text="transactionFee.toFixed(2)"></span>
                     </p>
                 </div>
 
@@ -220,10 +244,13 @@
                 description: '{{ old('description') }}',
                 transactionFee: 0,
                 showFee: false,
-                feeType: null, // 'withdrawal' or 'paybill'
+                feeType: null, // 'withdrawal', 'paybill', or 'atm'
                 fromAccountType: '',
                 fromAccountName: '',
                 toAccountType: '',
+
+                // ATM fee: KES 33 flat + 15% excise duty = KES 37.95
+                ATM_FEE: 33 + (33 * 0.15),
 
                 get totalDeduction() {
                     return parseFloat(this.amount || 0) + this.transactionFee;
@@ -269,6 +296,12 @@
                         this.feeType = 'paybill';
                         this.transactionFee = this.getPayBillFee(parseFloat(this.amount), fromAccount.type);
                         this.showFee = this.transactionFee > 0;
+                    }
+                    // Bank to Cash = ATM withdrawal fee (flat KES 33 + 15% excise duty)
+                    else if (fromAccount.type === 'bank' && toAccount.type === 'cash') {
+                        this.feeType = 'atm';
+                        this.transactionFee = this.ATM_FEE;
+                        this.showFee = true;
                     }
                     // All other transfers = No fee
                     else {
@@ -367,9 +400,9 @@
                             return;
                         }
 
-                        // If source is bank, only allow mpesa and airtel_money
+                        // If source is bank, only allow mpesa, airtel_money, and cash (ATM)
                         if (fromAccount && fromAccount.type === 'bank') {
-                            if (optionType === 'mpesa' || optionType === 'airtel_money') {
+                            if (optionType === 'mpesa' || optionType === 'airtel_money' || optionType === 'cash') {
                                 option.disabled = false;
                                 option.hidden = false;
                             } else {

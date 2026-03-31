@@ -295,9 +295,10 @@ class AccountController extends Controller
             abort(403, 'Unauthorized access to one or both accounts.');
         }
 
-        $transactionFee      = 0;
-        $feeType             = null;
+        $transactionFee        = 0;
+        $feeType               = null;
         $isMobileMoneyTransfer = in_array($fromAccount->type, ['mpesa', 'airtel_money']);
+        $isBankToCash          = $fromAccount->type === 'bank' && $toAccount->type === 'cash';
 
         if ($isMobileMoneyTransfer) {
             if ($toAccount->type === 'cash') {
@@ -313,6 +314,9 @@ class AccountController extends Controller
                 $feeType        = 'paybill';
                 $transactionFee = $this->calculatePayBillFee($request->amount, $fromAccount->type);
             }
+        } elseif ($isBankToCash) {
+            $feeType        = 'atm';
+            $transactionFee = $this->calculateAtmFee();
         }
 
         $totalDeduction = $request->amount + $transactionFee;
@@ -322,9 +326,9 @@ class AccountController extends Controller
                 ->withInput()
                 ->withErrors(['amount' => "Insufficient balance in {$fromAccount->name}. Current balance: "
                     . number_format($fromAccount->current_balance, 0, '.', ',')
-                    . ", Required: " . number_format($totalDeduction, 0, '.', ',')
+                    . ", Required: " . number_format($totalDeduction, 2, '.', ',')
                     . " (Transfer: " . number_format($request->amount, 0, '.', ',')
-                    . " + Fee: " . number_format($transactionFee, 0, '.', ',') . ")"]);
+                    . " + Fee: " . number_format($transactionFee, 2, '.', ',') . ")"]);
         }
 
         Transfer::create([
@@ -352,6 +356,7 @@ class AccountController extends Controller
                 'payment_method'     => match ($fromAccount->type) {
                     'mpesa'        => 'Mpesa',
                     'airtel_money' => 'Airtel Money',
+                    'bank'         => 'Bank',
                     default        => 'Cash'
                 },
                 'is_transaction_fee' => true,
@@ -366,8 +371,13 @@ class AccountController extends Controller
 
         $successMessage = 'Transfer completed successfully!';
         if ($transactionFee > 0) {
-            $feeTypeName     = $feeType === 'withdrawal' ? 'Withdrawal' : 'PayBill';
-            $successMessage .= " ({$feeTypeName} fee: KES " . number_format($transactionFee, 0, '.', ',') . ')';
+            $feeTypeName = match ($feeType) {
+                'withdrawal' => 'Withdrawal',
+                'paybill'    => 'PayBill',
+                'atm'        => 'ATM Withdrawal',
+                default      => 'Transaction',
+            };
+            $successMessage .= " ({$feeTypeName} fee: KES " . number_format($transactionFee, 2, '.', ',') . ')';
         }
 
         return redirect()->route('accounts.index')->with('success', $successMessage);
@@ -447,15 +457,30 @@ class AccountController extends Controller
         return end($tiers)['cost'] ?? 0;
     }
 
+    /**
+     * ATM withdrawal fee: flat KES 33 + 15% excise duty on that charge.
+     * Total = 33 + (33 * 0.15) = 33 + 4.95 = KES 37.95
+     */
+    private function calculateAtmFee(): float
+    {
+        $baseFee    = 33.00;
+        $exciseDuty = $baseFee * 0.15;
+
+        return round($baseFee + $exciseDuty, 2); // 37.95
+    }
+
     private function getFeeDescription(
         Account $fromAccount,
         Account $toAccount,
         ?string $feeType,
         ?string $userDescription
     ): string {
-        $accountName  = $fromAccount->type === 'mpesa' ? 'M-Pesa' : 'Airtel Money';
-        $feeTypeName  = $feeType === 'withdrawal' ? 'withdrawal' : 'PayBill';
-        $baseDescription = "{$accountName} {$feeTypeName} fee";
+        $baseDescription = match ($feeType) {
+            'withdrawal' => ($fromAccount->type === 'mpesa' ? 'M-Pesa' : 'Airtel Money') . ' withdrawal fee',
+            'paybill'    => ($fromAccount->type === 'mpesa' ? 'M-Pesa' : 'Airtel Money') . ' PayBill fee',
+            'atm'        => 'ATM withdrawal fee (KES 33 + 15% excise duty)',
+            default      => 'Transaction fee',
+        };
 
         return $userDescription
             ? "{$baseDescription}: {$userDescription}"
