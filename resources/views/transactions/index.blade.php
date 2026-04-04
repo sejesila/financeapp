@@ -120,27 +120,42 @@
             </script>
         @endif
 
-        {{-- Summary Cards --}}
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-            @php
-                $stats = [
-                    ['This Week',  $totalThisWeek,  'green'],
-                    ['Last Week',  $totalLastWeek,  'yellow'],
-                    ['This Month', $totalThisMonth, 'teal'],
-                    ['Last Month', $totalLastMonth, 'pink'],
-                    ['This Year',  $totalThisYear,  'indigo'],
-                    ['Last Year',  $totalLastYear,  'orange'],
-                    ['All Time',   $totalAll,       'purple'],
-                ];
-            @endphp
-            @foreach($stats as [$label, $value, $color])
-                <div class="bg-{{ $color }}-100 p-3 rounded-lg border border-{{ $color }}-300">
-                    <h3 class="text-xs font-semibold text-{{ $color }}-800 mb-1">{{ $label }}</h3>
-                    <p class="text-lg sm:text-xl font-bold text-{{ $color }}-900">
-                        {{ number_format($value, 0, '.', ',') }}
-                    </p>
-                </div>
-            @endforeach
+        {{-- Period Stats --}}
+        <div class="overflow-x-auto rounded-lg border bg-white dark:bg-gray-800 dark:border-gray-700 shadow-sm">
+            <table class="w-full text-sm">
+                <thead>
+                <tr class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+                    <th class="px-4 py-2.5 text-left font-semibold text-xs uppercase tracking-wide">Period</th>
+                    <th class="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide text-green-700 dark:text-green-400">Money In</th>
+                    <th class="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide text-red-600 dark:text-red-400">Money Out</th>
+                    <th class="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">Net</th>
+                </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                @foreach($periodStats as $label => $data)
+                    @php $net = $data['net']; @endphp
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+                        <td class="px-4 py-2.5 font-medium text-gray-700 dark:text-gray-300 text-xs uppercase tracking-wide">
+                            {{ $label }}
+                        </td>
+                        <td class="px-4 py-2.5 text-right tabular-nums">
+                        <span class="text-green-700 dark:text-green-400 font-medium">
+                            {{ number_format($data['in'], 2) }}
+                        </span>
+                        </td>
+                        <td class="px-4 py-2.5 text-right tabular-nums">
+                        <span class="text-red-600 dark:text-red-400 font-medium">
+                            {{ number_format($data['out'], 2) }}
+                        </span>
+                        </td>
+                        <td class="px-4 py-2.5 text-right tabular-nums font-semibold
+                        {{ $net >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
+                            {{ $net >= 0 ? '+' : '−' }}{{ number_format(abs($net), 2) }}
+                        </td>
+                    </tr>
+                @endforeach
+                </tbody>
+            </table>
         </div>
 
         {{-- Transaction Fees Summary --}}

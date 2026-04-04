@@ -139,10 +139,14 @@ class TransactionController extends Controller
             ->get();
 
         $accounts = $this->getActiveAccounts();
+        $summary = $this->calculateSummary();
+        $periodStats = $this->calculatePeriodStats();
 
         return view('transactions.index', array_merge(
             compact(
                 'transactions',
+                'summary',
+                'periodStats',
                 'filter',
                 'minYear',
                 'maxYear',
@@ -160,6 +164,142 @@ class TransactionController extends Controller
             $totals,
             $feeTotals
         ));
+    }
+    private function calculateSummary(): array
+    {
+        // Non-split transactions — use DB::table to avoid Eloquent collection issues
+        $rows = DB::table('transactions')
+            ->join('categories', 'transactions.category_id', '=', 'categories.id')
+            ->where('transactions.user_id', Auth::id())
+            ->where('transactions.is_transaction_fee', false)
+            ->where('transactions.is_split', false)
+            ->whereNull('transactions.deleted_at')
+            ->selectRaw("
+            transactions.mobile_money_type,
+            categories.type as category_type,
+            SUM(transactions.amount) as total
+        ")
+            ->groupBy('transactions.mobile_money_type', 'categories.type')
+            ->get();
+
+        // Split transactions
+        $splitRows = DB::table('transaction_splits')
+            ->join('transactions', 'transaction_splits.transaction_id', '=', 'transactions.id')
+            ->join('categories', 'transactions.category_id', '=', 'categories.id')
+            ->where('transactions.user_id', Auth::id())
+            ->whereNull('transactions.deleted_at')
+            ->selectRaw("
+            transaction_splits.mobile_money_type,
+            categories.type as category_type,
+            SUM(transaction_splits.amount) as total
+        ")
+            ->groupBy('transaction_splits.mobile_money_type', 'categories.type')
+            ->get();
+
+        // Build unified totals using plain array operations — no Eloquent merge
+        $merged = [];
+
+        foreach ([$rows, $splitRows] as $collection) {
+            foreach ($collection as $row) {
+                $type = $row->mobile_money_type ?? 'other';
+                $dir  = $row->category_type === 'income' ? 'in' : 'out';
+
+                if (!isset($merged[$type])) {
+                    $merged[$type] = ['in' => 0, 'out' => 0];
+                }
+
+                $merged[$type][$dir] += (float) $row->total;
+            }
+        }
+
+        $typeLabels = [
+            'send_money'        => 'Send Money',
+            'paybill'           => 'Lipa Na M-Pesa (PayBill)',
+            'buy_goods'         => 'Lipa Na M-Pesa (Buy Goods)',
+            'pochi_la_biashara' => 'Pochi La Biashara',
+            'other'             => 'Others',
+        ];
+
+        $summary = [];
+        $knownKeys = array_keys($typeLabels);
+
+        foreach ($typeLabels as $key => $label) {
+            $summary[$key] = [
+                'label'    => $label,
+                'paid_in'  => $merged[$key]['in']  ?? 0,
+                'paid_out' => $merged[$key]['out'] ?? 0,
+            ];
+        }
+
+        // Any unrecognised mobile_money_type keys roll into Others
+        foreach ($merged as $key => $dirs) {
+            if (!in_array($key, $knownKeys)) {
+                $summary['other']['paid_in']  += $dirs['in']  ?? 0;
+                $summary['other']['paid_out'] += $dirs['out'] ?? 0;
+            }
+        }
+
+        return array_values($summary);
+    }
+    private function calculatePeriodStats(): array
+    {
+        // Single query using conditional aggregation for all periods at once
+        $result = DB::table('transactions')
+            ->join('categories', 'transactions.category_id', '=', 'categories.id')
+            ->where('transactions.user_id', Auth::id())
+            ->where('transactions.is_transaction_fee', false)
+            ->whereNull('transactions.deleted_at')
+            ->selectRaw("
+            SUM(CASE WHEN categories.type = 'income' AND DATE(transactions.date) = CURDATE() THEN transactions.amount ELSE 0 END) as today_in,
+            SUM(CASE WHEN categories.type = 'expense' AND DATE(transactions.date) = CURDATE() THEN transactions.amount ELSE 0 END) as today_out,
+
+            SUM(CASE WHEN categories.type = 'income' AND transactions.date BETWEEN ? AND ? THEN transactions.amount ELSE 0 END) as week_in,
+            SUM(CASE WHEN categories.type = 'expense' AND transactions.date BETWEEN ? AND ? THEN transactions.amount ELSE 0 END) as week_out,
+
+            SUM(CASE WHEN categories.type = 'income' AND transactions.date BETWEEN ? AND ? THEN transactions.amount ELSE 0 END) as last_week_in,
+            SUM(CASE WHEN categories.type = 'expense' AND transactions.date BETWEEN ? AND ? THEN transactions.amount ELSE 0 END) as last_week_out,
+
+            SUM(CASE WHEN categories.type = 'income' AND MONTH(transactions.date) = ? AND YEAR(transactions.date) = ? THEN transactions.amount ELSE 0 END) as month_in,
+            SUM(CASE WHEN categories.type = 'expense' AND MONTH(transactions.date) = ? AND YEAR(transactions.date) = ? THEN transactions.amount ELSE 0 END) as month_out,
+
+            SUM(CASE WHEN categories.type = 'income' AND MONTH(transactions.date) = ? AND YEAR(transactions.date) = ? THEN transactions.amount ELSE 0 END) as last_month_in,
+            SUM(CASE WHEN categories.type = 'expense' AND MONTH(transactions.date) = ? AND YEAR(transactions.date) = ? THEN transactions.amount ELSE 0 END) as last_month_out,
+
+            SUM(CASE WHEN categories.type = 'income' AND YEAR(transactions.date) = ? THEN transactions.amount ELSE 0 END) as year_in,
+            SUM(CASE WHEN categories.type = 'expense' AND YEAR(transactions.date) = ? THEN transactions.amount ELSE 0 END) as year_out,
+
+            SUM(CASE WHEN categories.type = 'income' THEN transactions.amount ELSE 0 END) as all_in,
+            SUM(CASE WHEN categories.type = 'expense' THEN transactions.amount ELSE 0 END) as all_out
+        ", [
+                now()->startOfWeek(),   now()->endOfWeek(),
+                now()->startOfWeek(),   now()->endOfWeek(),
+                now()->subWeek()->startOfWeek(), now()->subWeek()->endOfWeek(),
+                now()->subWeek()->startOfWeek(), now()->subWeek()->endOfWeek(),
+                now()->month,           now()->year,
+                now()->month,           now()->year,
+                now()->subMonth()->month, now()->subMonth()->year,
+                now()->subMonth()->month, now()->subMonth()->year,
+                now()->year,
+                now()->year,
+            ])
+            ->first();
+
+        $periods = [
+            'Today'      => ['in' => $result->today_in,      'out' => $result->today_out],
+            'This Week'  => ['in' => $result->week_in,        'out' => $result->week_out],
+            'Last Week'  => ['in' => $result->last_week_in,   'out' => $result->last_week_out],
+            'This Month' => ['in' => $result->month_in,       'out' => $result->month_out],
+            'Last Month' => ['in' => $result->last_month_in,  'out' => $result->last_month_out],
+            'This Year'  => ['in' => $result->year_in,        'out' => $result->year_out],
+            'All Time'   => ['in' => $result->all_in,         'out' => $result->all_out],
+        ];
+
+        foreach ($periods as &$data) {
+            $data['net'] = (float)$data['in'] - (float)$data['out'];
+        }
+        unset($data);
+
+        return $periods;
     }
     /**
      * Apply date filters to a query based on filter type
