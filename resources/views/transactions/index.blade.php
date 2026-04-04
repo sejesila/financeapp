@@ -121,56 +121,70 @@
         @endif
 
         {{-- Period Stats --}}
-        <div class="overflow-x-auto rounded-lg border bg-white dark:bg-gray-800 dark:border-gray-700 shadow-sm">
-            <table class="w-full text-sm">
-                <thead>
-                <tr class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
-                    <th class="px-4 py-2.5 text-left font-semibold text-xs uppercase tracking-wide">Period</th>
-                    <th class="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide text-green-700 dark:text-green-400">Money In</th>
-                    <th class="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide text-red-600 dark:text-red-400">Money Out</th>
-                    <th class="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">Net</th>
-                </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+        <div>
+            <p class="text-xs font-medium uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2.5">
+                Period Summary
+            </p>
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                 @foreach($periodStats as $label => $data)
                     @php $net = $data['net']; @endphp
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
-                        <td class="px-4 py-2.5 font-medium text-gray-700 dark:text-gray-300 text-xs uppercase tracking-wide">
+                    <div class="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-3.5">
+                        <p class="text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-400 mb-2.5">
                             {{ $label }}
-                        </td>
-                        <td class="px-4 py-2.5 text-right tabular-nums">
-                        <span class="text-green-700 dark:text-green-400 font-medium">
-                            {{ number_format($data['in'], 0) }}
-                        </span>
-                        </td>
-                        <td class="px-4 py-2.5 text-right tabular-nums">
-                        <span class="text-red-600 dark:text-red-400 font-medium">
-                            {{ number_format($data['out'], 0) }}
-                        </span>
-                        </td>
-                        <td class="px-4 py-2.5 text-right tabular-nums font-semibold
-                        {{ $net >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
-                            {{ $net >= 0 ? '+' : '−' }}{{ number_format(abs($net), 0) }}
-                        </td>
-                    </tr>
+                        </p>
+                        <div class="flex justify-between items-center mb-1.5">
+                            <span class="text-xs text-gray-700 dark:text-gray-300">In</span>
+                            <span class="text-xs font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
+                        {{ number_format($data['in'], 0) }}
+                    </span>
+                        </div>
+                        <div class="flex justify-between items-center mb-2.5">
+                            <span class="text-xs text-gray-700 dark:text-gray-300">Out</span>
+                            <span class="text-xs font-medium tabular-nums text-red-500 dark:text-red-400">
+                        {{ number_format($data['out'], 0) }}
+                    </span>
+                        </div>
+                        <div class="border-t border-gray-100 dark:border-gray-700 pt-2 flex justify-between items-center">
+                            <span class="text-xs font-medium text-gray-900 dark:text-gray-100">Net</span>
+                            <span class="text-sm font-medium tabular-nums {{ $net >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400' }}">
+                        {{ $net >= 0 ? '+' : '−' }}{{ number_format(abs($net), 0) }}
+                    </span>
+                        </div>
+                    </div>
                 @endforeach
-                </tbody>
-            </table>
+            </div>
         </div>
 
-        {{-- Transaction Fees Summary --}}
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div class="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                <h3 class="text-xs font-semibold text-yellow-800 dark:text-yellow-400 mb-1">💸 Fees This Month</h3>
-                <p class="text-xl font-bold text-yellow-900 dark:text-yellow-300">{{ number_format($totalFeesThisMonth, 0, '.', ',') }}</p>
-            </div>
-            <div class="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg border border-orange-200 dark:border-orange-800">
-                <h3 class="text-xs font-semibold text-orange-800 dark:text-orange-400 mb-1">💸 Fees Last Month</h3>
-                <p class="text-xl font-bold text-orange-900 dark:text-orange-300">{{ number_format($totalFeesLastMonth, 0, '.', ',') }}</p>
-            </div>
-            <div class="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
-                <h3 class="text-xs font-semibold text-red-800 dark:text-red-400 mb-1">💸 Total Fees</h3>
-                <p class="text-xl font-bold text-red-900 dark:text-red-300">{{ number_format($totalFeesAll, 0, '.', ',') }}</p>
+        {{-- Transaction Fees --}}
+        <div>
+            <p class="text-xs font-medium uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2.5">
+                Transaction Fees
+            </p>
+            <div class="grid grid-cols-3 gap-2">
+                <div class="bg-gray-50 dark:bg-gray-800/60 rounded-lg p-3">
+                    <p class="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+                        This month
+                    </p>
+                    <p class="text-xl font-medium text-gray-950 dark:text-gray-100 tabular-nums">
+                        {{ number_format($totalFeesThisMonth, 0) }}
+                    </p>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-800/60 rounded-lg p-3">
+                    <p class="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+                        Last month
+                    </p>
+                    <p class="text-xl font-medium text-gray-950 dark:text-gray-100 tabular-nums">
+                        {{ number_format($totalFeesLastMonth, 0) }}
+                    </p>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-800/60 rounded-lg p-3">
+                    <p class="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+                        All time
+                    </p>
+                    <p class="text-xl font-medium text-gray-950 dark:text-gray-100 tabular-nums">
+                        {{ number_format($totalFeesAll, 0) }}
+                    </p>
+                </div>
             </div>
         </div>
 
