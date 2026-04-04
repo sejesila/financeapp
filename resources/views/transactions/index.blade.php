@@ -140,17 +140,17 @@
                         </td>
                         <td class="px-4 py-2.5 text-right tabular-nums">
                         <span class="text-green-700 dark:text-green-400 font-medium">
-                            {{ number_format($data['in'], 2) }}
+                            {{ number_format($data['in'], 0) }}
                         </span>
                         </td>
                         <td class="px-4 py-2.5 text-right tabular-nums">
                         <span class="text-red-600 dark:text-red-400 font-medium">
-                            {{ number_format($data['out'], 2) }}
+                            {{ number_format($data['out'], 0) }}
                         </span>
                         </td>
                         <td class="px-4 py-2.5 text-right tabular-nums font-semibold
                         {{ $net >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
-                            {{ $net >= 0 ? '+' : '−' }}{{ number_format(abs($net), 2) }}
+                            {{ $net >= 0 ? '+' : '−' }}{{ number_format(abs($net), 0) }}
                         </td>
                     </tr>
                 @endforeach
