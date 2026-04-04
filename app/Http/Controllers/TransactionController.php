@@ -65,7 +65,7 @@ class TransactionController extends Controller
         $search        = $request->get('search');
         $categoryId    = $request->get('category_id');
         $accountId     = $request->get('account_id');
-        $showFees      = $request->boolean('show_fees');   // Bug 14 fix
+        $showFees      = $request->boolean('show_fees');
 
         // Sorting
         $allowedSorts  = ['date', 'description', 'amount', 'account', 'category'];
@@ -265,6 +265,9 @@ class TransactionController extends Controller
             SUM(CASE WHEN categories.type = 'income' AND MONTH(transactions.date) = ? AND YEAR(transactions.date) = ? THEN transactions.amount ELSE 0 END) as last_month_in,
             SUM(CASE WHEN categories.type = 'expense' AND MONTH(transactions.date) = ? AND YEAR(transactions.date) = ? THEN transactions.amount ELSE 0 END) as last_month_out,
 
+            SUM(CASE WHEN categories.type = 'income' AND YEAR(transactions.date) = ? THEN transactions.amount ELSE 0 END) as last_year_in,
+            SUM(CASE WHEN categories.type = 'expense' AND YEAR(transactions.date) = ? THEN transactions.amount ELSE 0 END) as last_year_out,
+
             SUM(CASE WHEN categories.type = 'income' AND YEAR(transactions.date) = ? THEN transactions.amount ELSE 0 END) as year_in,
             SUM(CASE WHEN categories.type = 'expense' AND YEAR(transactions.date) = ? THEN transactions.amount ELSE 0 END) as year_out,
 
@@ -281,17 +284,17 @@ class TransactionController extends Controller
                 now()->subMonth()->month, now()->subMonth()->year,
                 now()->year,
                 now()->year,
+                now()->subYear()->year,
+                now()->subYear()->year,
             ])
             ->first();
 
         $periods = [
-            'Today'      => ['in' => $result->today_in,      'out' => $result->today_out],
-            'This Week'  => ['in' => $result->week_in,        'out' => $result->week_out],
-            'Last Week'  => ['in' => $result->last_week_in,   'out' => $result->last_week_out],
-            'This Month' => ['in' => $result->month_in,       'out' => $result->month_out],
-            'Last Month' => ['in' => $result->last_month_in,  'out' => $result->last_month_out],
-            'This Year'  => ['in' => $result->year_in,        'out' => $result->year_out],
-            'All Time'   => ['in' => $result->all_in,         'out' => $result->all_out],
+            'This Month' => ['in' => $result->month_in,      'out' => $result->month_out],
+            'Last Month' => ['in' => $result->last_month_in, 'out' => $result->last_month_out],
+            'This Year'  => ['in' => $result->year_in,       'out' => $result->year_out],
+            'Last Year'  => ['in' => $result->last_year_in,  'out' => $result->last_year_out],
+            'All Time'   => ['in' => $result->all_in,        'out' => $result->all_out],
         ];
 
         foreach ($periods as &$data) {
@@ -386,10 +389,13 @@ class TransactionController extends Controller
             ->where('is_transaction_fee', true);
 
         return [
-            'totalFeesToday' => (clone $feeQuery)->whereDate('date', today())->sum('amount'),
             'totalFeesThisMonth' => (clone $feeQuery)
                 ->whereMonth('date', now()->month)
                 ->whereYear('date', now()->year)
+                ->sum('amount'),
+            'totalFeesLastMonth' => (clone $feeQuery)
+                ->whereMonth('date', now()->subMonth()->month)
+                ->whereYear('date', now()->subMonth()->year)
                 ->sum('amount'),
             'totalFeesAll' => (clone $feeQuery)->sum('amount'),
         ];

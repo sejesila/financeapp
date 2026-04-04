@@ -160,17 +160,17 @@
 
         {{-- Transaction Fees Summary --}}
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                <h3 class="text-xs font-semibold text-yellow-800 mb-1">💸 Fees Today</h3>
-                <p class="text-xl font-bold text-yellow-900">{{ number_format($totalFeesToday, 0, '.', ',') }}</p>
+            <div class="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                <h3 class="text-xs font-semibold text-yellow-800 dark:text-yellow-400 mb-1">💸 Fees This Month</h3>
+                <p class="text-xl font-bold text-yellow-900 dark:text-yellow-300">{{ number_format($totalFeesThisMonth, 0, '.', ',') }}</p>
             </div>
-            <div class="bg-orange-50 p-4 rounded-lg border border-orange-200">
-                <h3 class="text-xs font-semibold text-orange-800 mb-1">💸 Fees This Month</h3>
-                <p class="text-xl font-bold text-orange-900">{{ number_format($totalFeesThisMonth, 0, '.', ',') }}</p>
+            <div class="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg border border-orange-200 dark:border-orange-800">
+                <h3 class="text-xs font-semibold text-orange-800 dark:text-orange-400 mb-1">💸 Fees Last Month</h3>
+                <p class="text-xl font-bold text-orange-900 dark:text-orange-300">{{ number_format($totalFeesLastMonth, 0, '.', ',') }}</p>
             </div>
-            <div class="bg-red-50 p-4 rounded-lg border border-red-200">
-                <h3 class="text-xs font-semibold text-red-800 mb-1">💸 Total Fees</h3>
-                <p class="text-xl font-bold text-red-900">{{ number_format($totalFeesAll, 0, '.', ',') }}</p>
+            <div class="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
+                <h3 class="text-xs font-semibold text-red-800 dark:text-red-400 mb-1">💸 Total Fees</h3>
+                <p class="text-xl font-bold text-red-900 dark:text-red-300">{{ number_format($totalFeesAll, 0, '.', ',') }}</p>
             </div>
         </div>
 
