@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -27,15 +26,18 @@ class Transaction extends Model
         'related_fee_transaction_id',
         'fee_for_transaction_id',
         'is_transaction_fee',
+        'is_split',
     ];
 
     protected $casts = [
-        'date' => 'date',
-        'amount' => 'decimal:2',
-        'period_date' => 'date',
-        'is_reversal' => 'boolean',
+        'date'               => 'date',
+        'amount'             => 'decimal:2',
+        'period_date'        => 'date',
+        'is_reversal'        => 'boolean',
         'is_transaction_fee' => 'boolean',
+        'is_split'           => 'boolean',
     ];
+
     protected $dates = ['deleted_at'];
 
     protected static function booted()
@@ -47,6 +49,8 @@ class Transaction extends Model
             }
         });
     }
+
+    // ── Relationships ─────────────────────────────────────────────────────────
 
     public function user()
     {
@@ -63,76 +67,91 @@ class Transaction extends Model
         return $this->belongsTo(Account::class);
     }
 
-    /**
-     * Get the fee transaction associated with this main transaction
-     */
     public function feeTransaction()
     {
-        return $this->belongsTo(Transaction::class, 'related_fee_transaction_id')->withoutGlobalScope('ownedByUser');
+        return $this->belongsTo(Transaction::class, 'related_fee_transaction_id')
+            ->withoutGlobalScope('ownedByUser');
     }
 
-    /**
-     * Get the main transaction this fee belongs to
-     */
     public function mainTransaction()
     {
-        return $this->belongsTo(Transaction::class, 'fee_for_transaction_id')->withoutGlobalScope('ownedByUser');
+        return $this->belongsTo(Transaction::class, 'fee_for_transaction_id')
+            ->withoutGlobalScope('ownedByUser');
     }
 
-    /**
-     * Get the reversal transaction (if this was reversed)
-     */
     public function reversalTransaction()
     {
-        return $this->belongsTo(Transaction::class, 'reversed_by_transaction_id')->withoutGlobalScope('ownedByUser');
+        return $this->belongsTo(Transaction::class, 'reversed_by_transaction_id')
+            ->withoutGlobalScope('ownedByUser');
     }
 
-    /**
-     * Get the original transaction (if this is a reversal)
-     */
     public function originalTransaction()
     {
-        return $this->belongsTo(Transaction::class, 'reverses_transaction_id')->withoutGlobalScope('ownedByUser');
+        return $this->belongsTo(Transaction::class, 'reverses_transaction_id')
+            ->withoutGlobalScope('ownedByUser');
     }
 
+    public function splits()
+    {
+        return $this->hasMany(TransactionSplit::class);
+    }
+
+    // ── Accessors ─────────────────────────────────────────────────────────────
+
     /**
-     * Get total amount including fee
+     * Get total amount including all fees.
+     *
+     * - Non-split: main amount + single fee transaction (existing behaviour).
+     * - Split:     main amount + sum of each split's fee transaction.
+     * - Fee row:   just its own amount (no recursion).
      */
-    public function getTotalAmountAttribute()
+    public function getTotalAmountAttribute(): float
     {
         if ($this->is_transaction_fee) {
-            return $this->amount; // Fee transactions show only their amount
+            return (float) $this->amount;
         }
 
-        $total = $this->amount;
-        if ($this->feeTransaction) {
-            $total += $this->feeTransaction->amount;
+        $total = (float) $this->amount;
+
+        if ($this->is_split) {
+            // Bug 9 fix: sum fees from each split row, not from the parent
+            $splitFees = $this->splits->sum(function ($split) {
+                return $split->feeTransaction?->amount ?? 0;
+            });
+            $total += (float) $splitFees;
+        } elseif ($this->feeTransaction) {
+            $total += (float) $this->feeTransaction->amount;
         }
+
         return $total;
     }
 
+    // ── Helper methods ────────────────────────────────────────────────────────
+
     /**
-     * Check if this transaction has an associated fee
+     * Whether any fee was charged for this transaction.
+     * For splits, checks each split row's fee link.          // Bug 10 fix
      */
-    public function hasFee()
+    public function hasFee(): bool
     {
+        if ($this->is_split) {
+            return $this->splits->contains(
+                fn($split) => $split->related_fee_transaction_id !== null
+            );
+        }
+
         return $this->related_fee_transaction_id !== null;
     }
 
-    /**
-     * Scope to exclude transaction fees from queries
-     */
+    // ── Scopes ────────────────────────────────────────────────────────────────
+
     public function scopeWithoutFees($query)
     {
         return $query->where('is_transaction_fee', false);
     }
 
-    /**
-     * Scope to get only transaction fees
-     */
     public function scopeOnlyFees($query)
     {
         return $query->where('is_transaction_fee', true);
     }
 }
-

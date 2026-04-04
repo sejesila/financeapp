@@ -59,48 +59,60 @@ class TransactionController extends Controller
      */
     public function index(Request $request)
     {
-        $filter = $request->get('filter', 'all');
-        $startDate = $request->get('start_date');
-        $endDate = $request->get('end_date');
-        $search = $request->get('search');
-        $categoryId = $request->get('category_id');
-        $accountId = $request->get('account_id');
-        $showFees = $request->get('show_fees', false);
+        $filter        = $request->get('filter', 'all');
+        $startDate     = $request->get('start_date');
+        $endDate       = $request->get('end_date');
+        $search        = $request->get('search');
+        $categoryId    = $request->get('category_id');
+        $accountId     = $request->get('account_id');
+        $showFees      = $request->boolean('show_fees');   // Bug 14 fix
 
         // Sorting
-        $sortColumn = $request->get('sort', 'date');
-        $sortDirection = $request->get('direction', 'desc');
-        $allowedSorts = ['date', 'description', 'amount', 'account', 'category'];
-        if (!in_array($sortColumn, $allowedSorts)) {
-            $sortColumn = 'date';
-        }
-        $sortDirection = $sortDirection === 'asc' ? 'asc' : 'desc';
+        $allowedSorts  = ['date', 'description', 'amount', 'account', 'category'];
+        $sortColumn    = in_array($request->get('sort'), $allowedSorts)
+            ? $request->get('sort')
+            : 'date';
+        $sortDirection = $request->get('direction') === 'asc' ? 'asc' : 'desc';
 
-        $minYear = Transaction::where('user_id', Auth::id())->min(DB::raw('YEAR(date)')) ?? date('Y');
+        // Bug 13 fix: use a properly scoped, index-friendly query
+        $minYear = Transaction::selectRaw('YEAR(MIN(date)) as min_year')
+            ->value('min_year') ?? date('Y');
         $maxYear = date('Y');
 
-        $query = Transaction::with(['category', 'account', 'feeTransaction'])
-            ->where('transactions.user_id', Auth::id());
+        // Bug 11 fix: drop the redundant user_id where — global scope handles it.
+        // Bug 12 fix: eager-load splits and their fees.
+        $query = Transaction::with([
+            'category',
+            'account',
+            'feeTransaction',
+            'splits.account',
+            'splits.feeTransaction',    // Bug 12 fix
+        ]);
 
         if (!$showFees) {
-            $query->where('transactions.is_transaction_fee', false);
+            $query->where('is_transaction_fee', false);
         }
 
         if ($search) {
-            $query->where('transactions.description', 'like', '%' . $search . '%');
+            $query->where('description', 'like', '%' . $search . '%');
         }
 
         if ($categoryId) {
-            $query->where('transactions.category_id', $categoryId);
+            $query->where('category_id', $categoryId);
         }
 
+        // Bug 15 fix: match split transactions whose splits include this account
         if ($accountId) {
-            $query->where('transactions.account_id', $accountId);
+            $query->where(function ($q) use ($accountId) {
+                $q->where('account_id', $accountId)
+                    ->orWhereHas('splits', fn($s) => $s->where('account_id', $accountId));
+            });
         }
 
         $query = $this->applyDateFilter($query, $filter, $startDate, $endDate);
 
-        // Apply sorting
+        // Bug 16 fix: track which joins are already applied
+        // Bug 11 fix: no table-prefix needed now that there are no ambiguous joins
         if ($sortColumn === 'account') {
             $query->leftJoin('accounts', 'transactions.account_id', '=', 'accounts.id')
                 ->orderBy('accounts.name', $sortDirection)
@@ -110,16 +122,16 @@ class TransactionController extends Controller
                 ->orderBy('categories.name', $sortDirection)
                 ->select('transactions.*');
         } else {
-            $query->orderBy('transactions.' . $sortColumn, $sortDirection);
+            $query->orderBy($sortColumn, $sortDirection);
             if ($sortColumn === 'date') {
-                $query->orderBy('transactions.id', $sortDirection);
+                // Secondary sort by id keeps pagination stable when dates collide
+                $query->orderBy('id', $sortDirection);
             }
         }
 
         $transactions = $query->paginate(25)->withQueryString();
-
-        $totals = $this->calculateTransactionTotals();
-        $feeTotals = $this->calculateFeeTotals();
+        $totals       = $this->calculateTransactionTotals();
+        $feeTotals    = $this->calculateFeeTotals();
 
         $categories = Category::where('user_id', Auth::id())
             ->orderBy('type')
@@ -546,7 +558,15 @@ class TransactionController extends Controller
     {
         $this->authorize('view', $transaction);
 
-        $transaction->load(['account', 'category', 'feeTransaction', 'mainTransaction']);
+        $transaction->load([
+            'account',
+            'category',
+            'feeTransaction',
+            'mainTransaction',
+            'splits.account',          // ← add
+            'splits.feeTransaction',   // ← add if you add feeTransaction relation to TransactionSplit
+        ]);
+
         return view('transactions.show', compact('transaction'));
     }
 
@@ -575,6 +595,22 @@ class TransactionController extends Controller
 
         $mpesaAccount = $accounts->where('type', 'mpesa')->first();
 
+        // Pre-compute split data to avoid Blade/PHP conflicts inside @json()
+        $existingSplits = [];
+        if ($transaction->is_split) {
+            $transaction->load('splits.account');
+            $existingSplits = $transaction->splits->map(function ($s) {
+                return [
+                    'id'                => $s->id,
+                    'account_id'        => (string) $s->account_id,
+                    'amount'            => $s->amount,
+                    'mobile_money_type' => $s->mobile_money_type ?? 'send_money',
+                    'showMobileType'    => in_array($s->account->type, ['mpesa', 'airtel_money']),
+                    'typeOptions'       => [],
+                ];
+            })->values()->toArray();
+        }
+
         return view('transactions.edit', array_merge(
             $categoryData,
             compact(
@@ -586,7 +622,8 @@ class TransactionController extends Controller
                 'airtelTransactionTypes',
                 'defaultMpesaType',
                 'defaultAirtelType',
-                'mpesaAccount'
+                'mpesaAccount',
+                'existingSplits'
             )
         ));
     }

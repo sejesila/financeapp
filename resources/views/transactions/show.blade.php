@@ -69,13 +69,22 @@
                             {{ __('Account') }}
                         </dt>
                         <dd class="text-xs sm:text-sm">
-                            <a href="{{ route('accounts.show', $transaction->account) }}"
-                               class="inline-flex items-center text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-semibold transition-colors">
-                                {{ $transaction->account->name }}
-                                <svg class="w-3 h-3 sm:w-4 sm:h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                                </svg>
-                            </a>
+                            @if($transaction->is_split)
+                                <span class="inline-flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-semibold">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                </svg>
+                Split across {{ $transaction->splits->count() }} accounts
+            </span>
+                            @else
+                                <a href="{{ route('accounts.show', $transaction->account) }}"
+                                   class="inline-flex items-center text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-semibold transition-colors">
+                                    {{ $transaction->account->name }}
+                                    <svg class="w-3 h-3 sm:w-4 sm:h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                </a>
+                            @endif
                         </dd>
                     </div>
 
@@ -119,6 +128,59 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                                     </svg>
                                 </a>
+                            </dd>
+                        </div>
+                    @endif
+                    {{-- Split Payment Details --}}
+                    @if($transaction->is_split && $transaction->splits->isNotEmpty())
+                        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start py-2 sm:py-3 border-b border-gray-200 dark:border-gray-700">
+                            <dt class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 sm:mb-0 sm:pt-1">
+                                {{ __('Split Payments') }}
+                            </dt>
+                            <dd class="text-xs sm:text-sm">
+                                <div class="space-y-2">
+                                    @foreach($transaction->splits as $split)
+                                        <div class="flex items-center justify-between gap-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg px-3 py-2">
+                                            <div class="flex items-center gap-2">
+                            <span>
+                                @if($split->account->type == 'cash') 💵
+                                @elseif($split->account->type == 'mpesa') 📱
+                                @elseif($split->account->type == 'airtel_money') 📲
+                                @elseif($split->account->type == 'bank') 🏦
+                                @endif
+                            </span>
+                                                <div class="flex flex-col">
+                                <span class="font-medium text-gray-800 dark:text-gray-200">
+                                    {{ $split->account->name }}
+                                </span>
+                                                    @if($split->mobile_money_type)
+                                                        <span class="text-xs text-gray-500 dark:text-gray-400 capitalize">
+                                        {{ str_replace('_', ' ', $split->mobile_money_type) }}
+                                    </span>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                            <div class="flex flex-col items-end shrink-0">
+                            <span class="font-semibold text-gray-900 dark:text-white">
+                                KES {{ number_format($split->amount, 0, '.', ',') }}
+                            </span>
+                                                @if($split->related_fee_transaction_id)
+                                                    <span class="text-xs text-yellow-600 dark:text-yellow-400">
+                                    +{{ number_format(optional($split->feeTransaction)->amount ?? 0, 0) }} fee
+                                </span>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    @endforeach
+
+                                    {{-- Split total confirmation --}}
+                                    <div class="flex justify-between items-center pt-1 border-t border-gray-200 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400 px-1">
+                                        <span>Total across splits</span>
+                                        <span class="font-semibold text-gray-700 dark:text-gray-300">
+                        KES {{ number_format($transaction->splits->sum('amount'), 0, '.', ',') }}
+                    </span>
+                                    </div>
+                                </div>
                             </dd>
                         </div>
                     @endif
