@@ -167,18 +167,28 @@ class TransactionController extends Controller
     }
     private function calculateSummary(): array
     {
-        // Non-split transactions — use DB::table to avoid Eloquent collection issues
+        $excludedCategories = [
+            'Loan Disbursement',
+            'Loan Receipt',
+            'Balance Adjustment',
+            'Client Funds',
+            'Loans',
+            'Loan Repayment',
+            'Excise Duty',
+            'Loan Fees Refund',
+            'Facility Fee Refund',
+            'Transaction Fees',
+            'Rolling Funds',
+        ];
+
+        // Non-split transactions
         $rows = DB::table('transactions')
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('transactions.user_id', Auth::id())
             ->where('transactions.is_transaction_fee', false)
             ->where('transactions.is_split', false)
             ->whereNull('transactions.deleted_at')
-            ->whereNotIn('categories.name', [
-                'Loan Disbursement', 'Loan Receipt', 'Balance Adjustment',
-                'Client Funds', 'Loans', 'Loan Repayment', 'Excise Duty',
-                'Loan Fees Refund', 'Facility Fee Refund', 'Transaction Fees', 'Rolling Funds',
-            ])
+            ->whereNotIn('categories.name', $excludedCategories)
             ->whereIn('categories.type', ['income', 'expense'])
             ->selectRaw("
             transactions.mobile_money_type,
@@ -188,18 +198,14 @@ class TransactionController extends Controller
             ->groupBy('transactions.mobile_money_type', 'categories.type')
             ->get();
 
-        // Split transactions
+        // Split transactions — pull from transaction_splits for accurate amounts
         $splitRows = DB::table('transaction_splits')
             ->join('transactions', 'transaction_splits.transaction_id', '=', 'transactions.id')
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('transactions.user_id', Auth::id())
-            ->whereNotIn('categories.name', [
-                'Loan Disbursement', 'Loan Receipt', 'Balance Adjustment',
-                'Client Funds', 'Loans', 'Loan Repayment', 'Excise Duty',
-                'Loan Fees Refund', 'Facility Fee Refund', 'Transaction Fees', 'Rolling Funds',
-            ])
-            ->whereIn('categories.type', ['income', 'expense'])
             ->whereNull('transactions.deleted_at')
+            ->whereNotIn('categories.name', $excludedCategories)
+            ->whereIn('categories.type', ['income', 'expense'])
             ->selectRaw("
             transaction_splits.mobile_money_type,
             categories.type as category_type,
@@ -208,7 +214,7 @@ class TransactionController extends Controller
             ->groupBy('transaction_splits.mobile_money_type', 'categories.type')
             ->get();
 
-        // Build unified totals using plain array operations — no Eloquent merge
+        // Build unified totals
         $merged = [];
 
         foreach ([$rows, $splitRows] as $collection) {
@@ -273,54 +279,30 @@ class TransactionController extends Controller
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('transactions.user_id', Auth::id())
             ->where('transactions.is_transaction_fee', false)
-            ->where('transactions.is_split', false)          // avoid double-counting split parents
+            ->where('transactions.is_split', false)
             ->whereNull('transactions.deleted_at')
             ->whereNotIn('categories.name', $excludedCategories)
             ->whereIn('categories.type', ['income', 'expense'])
-            ->where(function ($q) {                           // exclude client fund pass-throughs
-                $q->where(function ($q2) {
-                    $q2->where('transactions.payment_method', '!=', 'Client Fund')
-                        ->where('transactions.payment_method', '!=', 'Client Commission')
-                        ->orWhereNull('transactions.payment_method');
-                })
-                    ->orWhere(function ($q2) {
-                        $q2->where('transactions.payment_method', 'Client Commission')
-                            ->where('categories.type', 'income');
-                    });
-            })
             ->selectRaw("
-            SUM(CASE WHEN categories.type = 'income' AND DATE(COALESCE(transactions.period_date, transactions.date)) = CURDATE() THEN transactions.amount ELSE 0 END) as today_in,
-            SUM(CASE WHEN categories.type = 'expense' AND DATE(COALESCE(transactions.period_date, transactions.date)) = CURDATE() THEN transactions.amount ELSE 0 END) as today_out,
+            SUM(CASE WHEN categories.type = 'income' AND MONTH(transactions.date) = ? AND YEAR(transactions.date) = ? THEN transactions.amount ELSE 0 END) as month_in,
+            SUM(CASE WHEN categories.type = 'expense' AND MONTH(transactions.date) = ? AND YEAR(transactions.date) = ? THEN transactions.amount ELSE 0 END) as month_out,
 
-            SUM(CASE WHEN categories.type = 'income' AND COALESCE(transactions.period_date, transactions.date) BETWEEN ? AND ? THEN transactions.amount ELSE 0 END) as week_in,
-            SUM(CASE WHEN categories.type = 'expense' AND COALESCE(transactions.period_date, transactions.date) BETWEEN ? AND ? THEN transactions.amount ELSE 0 END) as week_out,
+            SUM(CASE WHEN categories.type = 'income' AND MONTH(transactions.date) = ? AND YEAR(transactions.date) = ? THEN transactions.amount ELSE 0 END) as last_month_in,
+            SUM(CASE WHEN categories.type = 'expense' AND MONTH(transactions.date) = ? AND YEAR(transactions.date) = ? THEN transactions.amount ELSE 0 END) as last_month_out,
 
-            SUM(CASE WHEN categories.type = 'income' AND COALESCE(transactions.period_date, transactions.date) BETWEEN ? AND ? THEN transactions.amount ELSE 0 END) as last_week_in,
-            SUM(CASE WHEN categories.type = 'expense' AND COALESCE(transactions.period_date, transactions.date) BETWEEN ? AND ? THEN transactions.amount ELSE 0 END) as last_week_out,
+            SUM(CASE WHEN categories.type = 'income' AND YEAR(transactions.date) = ? THEN transactions.amount ELSE 0 END) as year_in,
+            SUM(CASE WHEN categories.type = 'expense' AND YEAR(transactions.date) = ? THEN transactions.amount ELSE 0 END) as year_out,
 
-            SUM(CASE WHEN categories.type = 'income' AND MONTH(COALESCE(transactions.period_date, transactions.date)) = ? AND YEAR(COALESCE(transactions.period_date, transactions.date)) = ? THEN transactions.amount ELSE 0 END) as month_in,
-            SUM(CASE WHEN categories.type = 'expense' AND MONTH(COALESCE(transactions.period_date, transactions.date)) = ? AND YEAR(COALESCE(transactions.period_date, transactions.date)) = ? THEN transactions.amount ELSE 0 END) as month_out,
-
-            SUM(CASE WHEN categories.type = 'income' AND MONTH(COALESCE(transactions.period_date, transactions.date)) = ? AND YEAR(COALESCE(transactions.period_date, transactions.date)) = ? THEN transactions.amount ELSE 0 END) as last_month_in,
-            SUM(CASE WHEN categories.type = 'expense' AND MONTH(COALESCE(transactions.period_date, transactions.date)) = ? AND YEAR(COALESCE(transactions.period_date, transactions.date)) = ? THEN transactions.amount ELSE 0 END) as last_month_out,
-
-            SUM(CASE WHEN categories.type = 'income' AND YEAR(COALESCE(transactions.period_date, transactions.date)) = ? THEN transactions.amount ELSE 0 END) as year_in,
-            SUM(CASE WHEN categories.type = 'expense' AND YEAR(COALESCE(transactions.period_date, transactions.date)) = ? THEN transactions.amount ELSE 0 END) as year_out,
-
-            SUM(CASE WHEN categories.type = 'income' AND YEAR(COALESCE(transactions.period_date, transactions.date)) = ? THEN transactions.amount ELSE 0 END) as last_year_in,
-            SUM(CASE WHEN categories.type = 'expense' AND YEAR(COALESCE(transactions.period_date, transactions.date)) = ? THEN transactions.amount ELSE 0 END) as last_year_out,
+            SUM(CASE WHEN categories.type = 'income' AND YEAR(transactions.date) = ? THEN transactions.amount ELSE 0 END) as last_year_in,
+            SUM(CASE WHEN categories.type = 'expense' AND YEAR(transactions.date) = ? THEN transactions.amount ELSE 0 END) as last_year_out,
 
             SUM(CASE WHEN categories.type = 'income' THEN transactions.amount ELSE 0 END) as all_in,
             SUM(CASE WHEN categories.type = 'expense' THEN transactions.amount ELSE 0 END) as all_out
         ", [
-                now()->startOfWeek(),            now()->endOfWeek(),
-                now()->startOfWeek(),            now()->endOfWeek(),
-                now()->subWeek()->startOfWeek(), now()->subWeek()->endOfWeek(),
-                now()->subWeek()->startOfWeek(), now()->subWeek()->endOfWeek(),
-                now()->month,                    now()->year,
-                now()->month,                    now()->year,
-                now()->subMonth()->month,        now()->subMonth()->year,
-                now()->subMonth()->month,        now()->subMonth()->year,
+                now()->month,             now()->year,
+                now()->month,             now()->year,
+                now()->subMonth()->month, now()->subMonth()->year,
+                now()->subMonth()->month, now()->subMonth()->year,
                 now()->year,
                 now()->year,
                 now()->subYear()->year,
