@@ -77,6 +77,7 @@ return [
     | set to any locale for which you plan to have translation strings.
     |
     */
+    'google_analytics_id' => env('G-ZQPW22HEMP'),
 
     'locale' => env('APP_LOCALE', 'en'),
 

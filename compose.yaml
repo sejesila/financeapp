@@ -1,3 +1,4 @@
+
 services:
     laravel.test:
         build:
@@ -5,7 +6,7 @@ services:
             dockerfile: Dockerfile
             args:
                 WWWGROUP: '${WWWGROUP}'
-        image: 'sail-8.3/app'
+        image: 'laravel.test'
         extra_hosts:
             - 'host.docker.internal:host-gateway'
         ports:
@@ -48,13 +49,13 @@ services:
             timeout: 5s
 
     mailpit:
-        image: axllent/mailpit
+        image: 'axllent/mailpit'
         ports:
             - '1025:1025'
             - '8025:8025'
         networks:
             - sail
-        restart: no
+        restart: unless-stopped
 
 networks:
     sail:

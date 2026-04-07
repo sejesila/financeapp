@@ -19,6 +19,15 @@
             document.documentElement.classList.remove('dark');
         }
     </script>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZQPW22HEMP"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'G-ZQPW22HEMP');
+    </script>
 </head>
 
 <body class="font-sans antialiased bg-gray-100 dark:bg-gray-900 min-h-screen transition-colors duration-200">
