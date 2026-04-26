@@ -26,6 +26,9 @@ class Loan extends Model
         'status',
         'notes',
         'loan_type',
+        'facility_fee',
+        'custom_interest_amount',
+        'is_custom',
 
     ];
 
@@ -39,6 +42,8 @@ class Loan extends Model
         'disbursed_date' => 'date',
         'due_date' => 'date',
         'repaid_date' => 'date',
+        'facility_fee' => 'decimal:2',
+        'custom_interest_amount' => 'decimal:2',
     ];
     public function user() {
         return $this->belongsTo(User::class);

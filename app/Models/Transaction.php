@@ -15,6 +15,7 @@ class Transaction extends Model
         'date',
         'description',
         'amount',
+        'type',
         'payment_method',
         'mobile_money_type',
         'category_id',

@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class LoanController extends Controller implements HasMiddleware
 {
@@ -37,19 +38,16 @@ class LoanController extends Controller implements HasMiddleware
         $minYear = $minYear ?? date('Y');
         $maxYear = date('Y');
 
-        // Get active loans (no pagination for active loans - usually small number)
         $activeLoansQuery = Loan::with(['account', 'payments'])
             ->where('user_id', Auth::id())
             ->where('status', 'active');
 
         $activeLoans = $activeLoansQuery->orderBy('disbursed_date', 'desc')->get();
 
-        // Get paid loans with pagination
         $paidLoansQuery = Loan::with(['account', 'payments'])
             ->where('user_id', Auth::id())
             ->where('status', 'paid');
 
-        // Apply period filtering to paid loans
         if ($period) {
             switch ($period) {
                 case 'this_month':
@@ -76,8 +74,6 @@ class LoanController extends Controller implements HasMiddleware
         }
 
         $paidLoansQuery->orderBy('repaid_date', 'desc')->orderBy('updated_at', 'desc');
-
-        // Paginate paid loans - show 15 per page
         $paidLoans = $paidLoansQuery->paginate(15)->withQueryString();
 
         $accounts = Account::where('user_id', Auth::id())
@@ -165,7 +161,7 @@ class LoanController extends Controller implements HasMiddleware
                 'disbursed_date' => $validated['disbursed_date'],
                 'due_date' => $dueDate,
                 'status' => 'active',
-                'notes' => $validated['notes'],
+                'notes' => $validated['notes'] ?? null,
                 'loan_type' => $loanType,
                 'is_custom' => $loanType === 'other',
             ];
@@ -184,6 +180,7 @@ class LoanController extends Controller implements HasMiddleware
                 $loanData['total_amount'] = $breakdown['total_repayment'];
                 $loanData['balance'] = $breakdown['total_repayment'];
             } else {
+                // mshwari
                 $loanData['interest_rate'] = null;
                 $loanData['interest_amount'] = null;
                 $loanData['facility_fee'] = null;
@@ -193,62 +190,45 @@ class LoanController extends Controller implements HasMiddleware
 
             $loan = Loan::create($loanData);
 
-            $loanCategory = Category::firstOrCreate(
-                ['name' => 'Loan Receipt', 'type' => 'liability', 'user_id' => Auth::id()],
-                ['name' => 'Loan Receipt', 'type' => 'liability']
-            );
+            $loanCategory = $this->firstOrCreateCategory('Loan Receipt', 'liability');
 
-            // ✅ FIX: Only KCB and Custom loans go directly as Loan Receipt
-            // M-Shwari loan needs to be split: principal + excise duty
             if ($loanType === 'kcb_mpesa' || $loanType === 'other') {
-                // These don't have excise duty, so single transaction for the full principal
                 Transaction::create([
                     'user_id' => Auth::id(),
                     'account_id' => $validated['account_id'],
                     'category_id' => $loanCategory->id,
+                    'type' => 'income',
                     'description' => "Loan disbursement from {$validated['source']}",
                     'amount' => $principalAmount,
                     'date' => $validated['disbursed_date'],
-                    'type' => 'loan_disbursement',
-                    'loan_id' => $loan->id,
                 ]);
-
             } else {
-                // ✅ M-SHWARI ONLY: Two separate transactions
-
-                // Transaction 1: Loan Receipt for FULL PRINCIPAL (what you owe)
+                // M-Shwari: two transactions (disbursement + excise duty)
                 Transaction::create([
                     'user_id' => Auth::id(),
                     'account_id' => $validated['account_id'],
                     'category_id' => $loanCategory->id,
+                    'type' => 'income',
                     'description' => "Loan disbursement from {$validated['source']}",
-                    'amount' => $principalAmount,  // FULL 1,000 - this is what you owe back
+                    'amount' => $principalAmount,
                     'date' => $validated['disbursed_date'],
-                    'type' => 'loan_disbursement',
-                    'loan_id' => $loan->id,
                 ]);
 
-                // Transaction 2: Excise Duty expense (deducted upfront)
-                $exciseCategory = Category::firstOrCreate(
-                    ['name' => 'Excise Duty', 'type' => 'expense', 'user_id' => Auth::id()],
-                    ['name' => 'Excise Duty', 'type' => 'expense']
-                );
+                $exciseCategory = $this->firstOrCreateCategory('Excise Duty', 'expense');
 
                 Transaction::create([
                     'user_id' => Auth::id(),
                     'account_id' => $validated['account_id'],
                     'category_id' => $exciseCategory->id,
+                    'type' => 'expense',
                     'description' => "Excise duty (1.5%) on loan from {$validated['source']}",
-                    'amount' => $breakdown['excise_duty'],  // 15
+                    'amount' => $breakdown['excise_duty'],
                     'date' => $validated['disbursed_date'],
-                    'type' => 'loan_charge',
-                    'loan_id' => $loan->id,
                 ]);
             }
 
             DB::commit();
 
-            // Update account balance AFTER transaction is committed
             $account->updateBalance();
 
             $depositAmount = $breakdown['deposit_amount'];
@@ -274,6 +254,10 @@ class LoanController extends Controller implements HasMiddleware
 
         } catch (Exception $e) {
             DB::rollBack();
+            Log::error('LoanController@store failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return back()->with('error', 'Failed to create loan: ' . $e->getMessage())->withInput();
         }
     }
@@ -382,7 +366,6 @@ class LoanController extends Controller implements HasMiddleware
     {
         $this->authorize('create', Loan::class);
 
-        // Get accounts - Allow mpesa, airtel_money for M-Shwari/KCB, and ALL active accounts for 'other' loans
         $accounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
             ->orderBy('name')
@@ -419,9 +402,6 @@ class LoanController extends Controller implements HasMiddleware
         return 'other';
     }
 
-    /**
-     * Show loan details
-     */
     public function show(Loan $loan)
     {
         $this->authorize('view', $loan);
@@ -462,9 +442,6 @@ class LoanController extends Controller implements HasMiddleware
         ];
     }
 
-    /**
-     * Show repayment form - M-Shwari and KCB M-Pesa must repay from same M-Pesa account
-     */
     public function paymentForm(Loan $loan)
     {
         $this->authorize('makePayment', $loan);
@@ -479,12 +456,9 @@ class LoanController extends Controller implements HasMiddleware
             $loan->interest_amount
         );
 
-        // Determine loan type
         $loanType = $loan->loan_type ?? $this->detectLoanType($loan->source);
 
-        // For M-Shwari and KCB M-Pesa loans, MUST use the same M-Pesa account that received the loan
         if ($loanType === 'mshwari' || $loanType === 'kcb_mpesa') {
-            // Get ONLY the loan's disbursement account (must be M-Pesa)
             $loanAccount = Account::where('id', $loan->account_id)
                 ->where('user_id', Auth::id())
                 ->where('is_active', true)
@@ -495,12 +469,9 @@ class LoanController extends Controller implements HasMiddleware
                 return back()->with('error', 'The M-Pesa account that received this loan is not available. Please ensure the account is active.');
             }
 
-            // Only this account is allowed
             $accounts = collect([$loanAccount]);
-            $isAccountLocked = true; // Flag to make dropdown immutable
-        }
-        // For other loans, allow mobile_money, bank, and cash accounts
-        else {
+            $isAccountLocked = true;
+        } else {
             $accounts = Account::where('user_id', Auth::id())
                 ->where('is_active', true)
                 ->where('type', '!=', 'savings')
@@ -516,10 +487,6 @@ class LoanController extends Controller implements HasMiddleware
         return view('loans.payment', compact('loan', 'repayment', 'accounts', 'minRequiredBalance', 'loanType', 'isAccountLocked'));
     }
 
-
-    /**
-     * Show loan edit form
-     */
     public function edit(Loan $loan)
     {
         $this->authorize('update', $loan);
@@ -536,9 +503,6 @@ class LoanController extends Controller implements HasMiddleware
         return view('loans.edit', compact('loan', 'accounts'));
     }
 
-    /**
-     * Update loan
-     */
     public function update(Request $request, Loan $loan)
     {
         $this->authorize('update', $loan);
@@ -560,8 +524,8 @@ class LoanController extends Controller implements HasMiddleware
     }
 
     /**
-     * Record loan payment with early repayment credit (within 10 days)
-     * M-Shwari and KCB M-Pesa must be paid from the same M-Pesa account
+     * Record loan payment with early repayment credit (within 10 days).
+     * M-Shwari and KCB M-Pesa must be paid from the same M-Pesa account.
      */
     public function recordPayment(Request $request, Loan $loan)
     {
@@ -586,14 +550,12 @@ class LoanController extends Controller implements HasMiddleware
             $paymentAmount = (float)$validated['payment_amount'];
             $paymentDate = $validated['payment_date'];
 
-            // Get the account to pay from
             $paymentAccount = Account::findOrFail($validated['payment_account_id']);
 
             if ($paymentAccount->user_id !== Auth::id()) {
                 throw new Exception("Unauthorized access to this account.");
             }
 
-            // ✅ ENFORCE: For M-Shwari and KCB M-Pesa, payment MUST come from the same M-Pesa account
             $loanType = $loan->loan_type ?? $this->detectLoanType($loan->source);
 
             if (($loanType === 'mshwari' || $loanType === 'kcb_mpesa') && $paymentAccount->id !== $loan->account_id) {
@@ -611,8 +573,8 @@ class LoanController extends Controller implements HasMiddleware
                 $loan->interest_amount
             );
 
-            $principalPortion = $validated['principal_portion'] ? (float)$validated['principal_portion'] : 0;
-            $interestPortion = $validated['interest_portion'] ? (float)$validated['interest_portion'] : 0;
+            $principalPortion = (float)($validated['principal_portion'] ?? 0);
+            $interestPortion = (float)($validated['interest_portion'] ?? 0);
 
             if ($principalPortion == 0 && $interestPortion == 0) {
                 $remainingInterest = $repayment['interest'] - (LoanPayment::where('loan_id', $loan->id)->sum('interest_portion') ?? 0);
@@ -620,24 +582,18 @@ class LoanController extends Controller implements HasMiddleware
                 $principalPortion = $paymentAmount - $interestPortion;
             }
 
-            $repaymentCategory = Category::firstOrCreate(
-                ['name' => 'Loan Repayment', 'type' => 'expense', 'user_id' => Auth::id()],
-                ['name' => 'Loan Repayment', 'type' => 'expense']
-            );
+            $repaymentCategory = $this->firstOrCreateCategory('Loan Repayment', 'expense');
 
-            // Create transaction from payment account
             $transaction = Transaction::create([
                 'user_id' => Auth::id(),
                 'account_id' => $paymentAccount->id,
                 'category_id' => $repaymentCategory->id,
+                'type' => 'expense',
                 'description' => "Loan repayment to {$loan->source}",
                 'amount' => $paymentAmount,
                 'date' => $paymentDate,
-                'type' => 'loan_payment',
-                'loan_id' => $loan->id,
             ]);
 
-            // Record loan payment
             LoanPayment::create([
                 'user_id' => Auth::id(),
                 'loan_id' => $loan->id,
@@ -647,7 +603,7 @@ class LoanController extends Controller implements HasMiddleware
                 'interest_portion' => $interestPortion,
                 'payment_date' => $paymentDate,
                 'transaction_id' => $transaction->id,
-                'notes' => $validated['notes'],
+                'notes' => $validated['notes'] ?? null,
             ]);
 
             $loan->amount_paid += $paymentAmount;
@@ -662,7 +618,6 @@ class LoanController extends Controller implements HasMiddleware
 
             $earlyRepaymentCredit = 0;
 
-            // Handle early repayment credit (goes to loan's original account)
             if ($loan->balance <= 0) {
                 $daysElapsed = Carbon::parse($loan->disbursed_date)->diffInDays(Carbon::parse($paymentDate));
 
@@ -670,55 +625,54 @@ class LoanController extends Controller implements HasMiddleware
                     $breakdown = $this->calculateMshwariBreakdown($loan->principal_amount);
                     $earlyRepaymentCredit = $breakdown['early_repayment_discount'];
 
-                    $loanFeesCategory = Category::firstOrCreate(
-                        ['name' => 'Loan Fees Refund', 'type' => 'income', 'user_id' => Auth::id()],
-                        ['name' => 'Loan Fees Refund', 'type' => 'income']
-                    );
+                    $loanFeesCategory = $this->firstOrCreateCategory('Loan Fees Refund', 'income');
 
                     Transaction::create([
                         'user_id' => Auth::id(),
                         'account_id' => $loan->account_id,
                         'category_id' => $loanFeesCategory->id,
+                        'type' => 'income',
                         'description' => "Early repayment credit - 20% of loan fees refunded (Repaid in {$daysElapsed} days from {$loan->source})",
                         'amount' => $earlyRepaymentCredit,
                         'date' => $paymentDate,
-                        'type' => 'loan_credit',
-                        'loan_id' => $loan->id,
                     ]);
 
                 } elseif ($loanType === 'kcb_mpesa' && $daysElapsed <= 10) {
                     $earlyRepaymentCredit = $loan->facility_fee ?? (($loan->principal_amount * 0.0176));
 
-                    $facilityFeeCategory = Category::firstOrCreate(
-                        ['name' => 'Facility Fee Refund', 'type' => 'income', 'user_id' => Auth::id()],
-                        ['name' => 'Facility Fee Refund', 'type' => 'income']
-                    );
+                    $facilityFeeCategory = $this->firstOrCreateCategory('Facility Fee Refund', 'income');
 
                     Transaction::create([
                         'user_id' => Auth::id(),
                         'account_id' => $loan->account_id,
                         'category_id' => $facilityFeeCategory->id,
+                        'type' => 'income',
                         'description' => "Early repayment cashback - Facility fee refunded (Repaid in {$daysElapsed} days from {$loan->source})",
                         'amount' => $earlyRepaymentCredit,
                         'date' => $paymentDate,
-                        'type' => 'loan_credit',
-                        'loan_id' => $loan->id,
                     ]);
                 }
             }
 
             DB::commit();
 
-            // Update both accounts AFTER commit
+            // Always update the payment account balance.
+            // Only update the loan's disbursement account separately when it differs,
+            // avoiding a redundant call and a potential null-reference on 'other' loan types.
             $paymentAccount->updateBalance();
-            $loanAccount = Account::find($loan->account_id);
-            $loanAccount->updateBalance();
+
+            if ($paymentAccount->id !== $loan->account_id) {
+                $loanDisbursementAccount = Account::find($loan->account_id);
+                if ($loanDisbursementAccount) {
+                    $loanDisbursementAccount->updateBalance();
+                }
+            }
 
             $successMessage = "Payment of KES " . number_format($paymentAmount, 0) . " recorded successfully from {$paymentAccount->name}!";
 
             if ($earlyRepaymentCredit > 0) {
                 $daysElapsed = Carbon::parse($loan->disbursed_date)->diffInDays(Carbon::parse($paymentDate));
-                $creditAccountName = Account::find($loan->account_id)->name;
+                $creditAccountName = Account::find($loan->account_id)->name ?? 'your account';
 
                 if ($loanType === 'kcb_mpesa') {
                     $successMessage .= " 🎉 You received an early repayment cashback of KES " . number_format($earlyRepaymentCredit, 0) . " (facility fee refunded) to {$creditAccountName} for repaying within {$daysElapsed} days!";
@@ -732,13 +686,16 @@ class LoanController extends Controller implements HasMiddleware
 
         } catch (Exception $e) {
             DB::rollBack();
+            Log::error('LoanController@recordPayment failed', [
+                'loan_id' => $loan->id,
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return back()->with('error', 'Payment failed: ' . $e->getMessage())->withInput();
         }
     }
 
-    /**
-     * Delete loan (only active loans with no payments)
-     */
     public function destroy(Loan $loan)
     {
         $this->authorize('delete', $loan);
@@ -754,24 +711,73 @@ class LoanController extends Controller implements HasMiddleware
         DB::beginTransaction();
 
         try {
-            // Delete all transactions associated with this loan
-            Transaction::where('loan_id', $loan->id)->delete();
+            $loanPayments = $loan->payments;
+            foreach ($loanPayments as $payment) {
+                if ($payment->transaction_id) {
+                    Transaction::where('id', $payment->transaction_id)->delete();
+                }
+                $payment->delete();
+            }
 
-            // Delete the loan
+            Transaction::where('user_id', Auth::id())
+                ->where('account_id', $loan->account_id)
+                ->where('date', $loan->disbursed_date)
+                ->where('description', 'LIKE', '%Loan disbursement%')
+                ->delete();
+
+            if ($loan->loan_type === 'mshwari') {
+                Transaction::where('user_id', Auth::id())
+                    ->where('account_id', $loan->account_id)
+                    ->where('date', $loan->disbursed_date)
+                    ->where('description', 'LIKE', '%Excise duty%')
+                    ->delete();
+            }
+
             $loan->delete();
 
             DB::commit();
 
-            // Update the account balance AFTER commit
             $account = Account::find($loan->account_id);
-            $account->updateBalance();
+            if ($account) {
+                $account->updateBalance();
+            }
 
             return redirect()->route('loans.index')
                 ->with('success', 'Loan deleted successfully');
 
         } catch (Exception $e) {
             DB::rollBack();
+            Log::error('LoanController@destroy failed', [
+                'loan_id' => $loan->id,
+                'error' => $e->getMessage(),
+            ]);
             return back()->with('error', 'Failed to delete loan: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Centralised Category lookup/creation.
+     *
+     * The categories table has a unique constraint on (user_id, parent_id, name).
+     * parent_id MUST be included in the search attributes so that firstOrCreate
+     * finds the correct row and does not attempt a duplicate insert when a category
+     * with the same name already exists under a different parent_id.
+     * Omitting parent_id from the search causes firstOrCreate to miss existing rows,
+     * then fail on the unique constraint insert — the exception is caught, the
+     * transaction is rolled back, and the caller's table appears empty.
+     */
+    private function firstOrCreateCategory(string $name, string $type): Category
+    {
+        return Category::firstOrCreate(
+            [
+                'user_id'   => Auth::id(),
+                'parent_id' => null,
+                'name'      => $name,
+            ],
+            [
+                'type'      => $type,
+                'is_active' => true,
+            ]
+        );
     }
 }
