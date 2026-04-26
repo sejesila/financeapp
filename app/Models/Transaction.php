@@ -1,6 +1,7 @@
 <?php
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
@@ -8,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 class Transaction extends Model
 {
     use SoftDeletes;
+    use HasFactory;
 
     protected $fillable = [
         'date',
@@ -48,6 +50,12 @@ class Transaction extends Model
                 $builder->where("{$table}.user_id", Auth::id());
             }
         });
+    }
+    public function resolveRouteBinding($value, $field = null)
+    {
+        return $this->withoutGlobalScopes()
+            ->where($field ?? $this->getRouteKeyName(), $value)
+            ->firstOrFail();
     }
 
     // ── Relationships ─────────────────────────────────────────────────────────

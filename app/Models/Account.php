@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Auth;
@@ -10,6 +11,7 @@ use Illuminate\Support\Str;
 
 class Account extends Model
 {
+    use HasFactory;
     protected $fillable = [
         'name',
         'slug',
@@ -18,6 +20,7 @@ class Account extends Model
         'current_balance',
         'currency',
         'notes',
+        'logo_path',
         'is_active',
         'user_id',
     ];
@@ -69,7 +72,12 @@ class Account extends Model
     {
         return 'slug';
     }
-
+    public function resolveRouteBinding($value, $field = null)
+    {
+        return $this->withoutGlobalScopes()
+            ->where($field ?? $this->getRouteKeyName(), $value)
+            ->firstOrFail();
+    }
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

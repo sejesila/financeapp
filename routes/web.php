@@ -1,6 +1,11 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request;
+use App\Models\User;
+use Illuminate\Auth\Events\Verified;
+use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use App\Http\Controllers\{
     AccountController,
     BudgetController,
@@ -14,11 +19,14 @@ use App\Http\Controllers\{
     RollingFundController,
     TransactionController
 };
-use App\Http\Controllers\Auth\{
-    AuthenticatedSessionController,
+use App\Http\Controllers\Auth\{AuthenticatedSessionController,
+    EmailVerificationNotificationController,
+    EmailVerificationPromptController,
+    NewPasswordController,
     PasswordController,
-    RegisteredUserController
-};
+    PasswordResetLinkController,
+    RegisteredUserController,
+    VerifyEmailController};
 
 /*
 |--------------------------------------------------------------------------
@@ -149,7 +157,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [RollingFundController::class, 'index'])->name('index');
         Route::get('/create', [RollingFundController::class, 'create'])->name('create');
         Route::post('/', [RollingFundController::class, 'store'])->name('store');
-        Route::post('/limits', [RollingFundController::class, 'saveLimits'])->name('save-limits'); // ← NEW
+        Route::post('/limits', [RollingFundController::class, 'saveLimits'])->name('save-limits');
         Route::get('/{rollingFund}', [RollingFundController::class, 'show'])->name('show');
         Route::post('/{rollingFund}/record-outcome', [RollingFundController::class, 'recordOutcome'])->name('record-outcome');
         Route::delete('/{rollingFund}', [RollingFundController::class, 'destroy'])->name('destroy');
@@ -179,6 +187,55 @@ Route::middleware('auth')->group(function () {
         Route::post('test-monthly', [EmailPreferenceController::class, 'sendTestMonthly'])->name('test-monthly');
         Route::post('send-custom', [EmailPreferenceController::class, 'sendCustom'])->name('send-custom');
     });
+
+    // ======================================================================
+    // Email Verification Routes
+    // ======================================================================
+    Route::get('/verify-email', EmailVerificationPromptController::class)
+        ->name('verification.notice');
+    Route::get('/verify-email/{id}/{hash}', VerifyEmailController::class)
+        ->middleware(['signed', 'throttle:6,1'])
+        ->name('verification.verify');
+    Route::post('/email/verification-notification', [EmailVerificationNotificationController::class, 'store'])
+        ->middleware('throttle:6,1')
+        ->name('verification.send');
+
+    // ======================================================================
+    // Password Confirmation Routes
+    // ======================================================================
+
+    Route::get('/confirm-password', function () {
+        return view('auth.confirm-password');
+    })->name('password.confirm');
+
+    Route::post('/confirm-password', function (Request $request) {
+        if (!Auth::guard('web')->validate([
+            'email' => $request->user()->email,
+            'password' => $request->password,
+        ])) {
+            return back()->withErrors(['password' => 'Invalid password']);
+        }
+
+        $request->session()->passwordConfirmed();
+        return redirect()->intended();
+    })->middleware('throttle:6,1')->name('password.confirm');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Password Reset Routes (Guest Only)
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware('guest')->group(function () {
+    Route::get('/forgot-password', [PasswordResetLinkController::class, 'create'])
+        ->name('password.request');
+    Route::post('/forgot-password', [PasswordResetLinkController::class, 'store'])
+        ->name('password.email');
+    Route::get('/reset-password/{token}', [NewPasswordController::class, 'create'])
+        ->name('password.reset');
+    Route::post('/reset-password', [NewPasswordController::class, 'store'])
+        ->name('password.store');
 });
 
 /*

@@ -207,7 +207,7 @@ class AccountController extends Controller
             'name'        => 'required|string|max:255',
             'notes'       => 'nullable|string',
             'logo'        => 'nullable|image|mimes:jpeg,jpg,png,gif,svg|max:2048',
-            'remove_logo' => 'nullable|boolean',
+            'remove_logo' => 'nullable',
         ]);
 
         $updateData = $request->only(['name', 'notes']);
@@ -288,8 +288,8 @@ class AccountController extends Controller
             'description'     => 'nullable|string',
         ]);
 
-        $fromAccount = Account::findOrFail($request->from_account_id);
-        $toAccount   = Account::findOrFail($request->to_account_id);
+        $fromAccount = Account::withoutGlobalScopes()->findOrFail($request->from_account_id);
+        $toAccount   = Account::withoutGlobalScopes()->findOrFail($request->to_account_id);
 
         if ($fromAccount->user_id !== Auth::id() || $toAccount->user_id !== Auth::id()) {
             abort(403, 'Unauthorized access to one or both accounts.');

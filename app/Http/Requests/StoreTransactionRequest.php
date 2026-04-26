@@ -21,11 +21,23 @@ class StoreTransactionRequest extends FormRequest
             'description'       => 'required|string',
             'amount'            => 'required|numeric|min:0.01',
             'category_id'       => 'required|exists:categories,id',
-            'account_id'        => $isSplit ? 'nullable' : 'required|exists:accounts,id',
-            'mobile_money_type' => 'nullable|in:send_money,paybill,buy_goods,pochi_la_biashara',
-            'splits'            => $isSplit ? 'required|array|min:2' : 'nullable',
-            'splits.*.account_id' => $isSplit ? 'required|exists:accounts,id' : 'nullable',
-            'splits.*.amount'     => $isSplit ? 'required|numeric|min:0.01' : 'nullable',
+            'account_id'        => $isSplit ? 'nullable' : [
+                'required',
+                'exists:accounts,id',
+                function ($attribute, $value, $fail) {
+                    $owned = \App\Models\Account::withoutGlobalScopes()
+                        ->where('id', $value)
+                        ->where('user_id', $this->user()->id)
+                        ->exists();
+                    if (!$owned) {
+                        $fail('The selected account does not belong to you.');
+                    }
+                },
+            ],
+            'mobile_money_type'          => 'nullable|in:send_money,paybill,buy_goods,pochi_la_biashara',
+            'splits'                     => $isSplit ? 'required|array|min:2' : 'nullable',
+            'splits.*.account_id'        => $isSplit ? 'required|exists:accounts,id' : 'nullable',
+            'splits.*.amount'            => $isSplit ? 'required|numeric|min:0.01' : 'nullable',
             'splits.*.mobile_money_type' => 'nullable|in:send_money,paybill,buy_goods,pochi_la_biashara',
         ];
     }
