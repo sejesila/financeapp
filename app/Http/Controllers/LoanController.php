@@ -655,10 +655,6 @@ class LoanController extends Controller implements HasMiddleware
             }
 
             DB::commit();
-
-            // Always update the payment account balance.
-            // Only update the loan's disbursement account separately when it differs,
-            // avoiding a redundant call and a potential null-reference on 'other' loan types.
             $paymentAccount->updateBalance();
 
             if ($paymentAccount->id !== $loan->account_id) {
@@ -755,17 +751,7 @@ class LoanController extends Controller implements HasMiddleware
         }
     }
 
-    /**
-     * Centralised Category lookup/creation.
-     *
-     * The categories table has a unique constraint on (user_id, parent_id, name).
-     * parent_id MUST be included in the search attributes so that firstOrCreate
-     * finds the correct row and does not attempt a duplicate insert when a category
-     * with the same name already exists under a different parent_id.
-     * Omitting parent_id from the search causes firstOrCreate to miss existing rows,
-     * then fail on the unique constraint insert — the exception is caught, the
-     * transaction is rolled back, and the caller's table appears empty.
-     */
+
     private function firstOrCreateCategory(string $name, string $type): Category
     {
         return Category::firstOrCreate(
