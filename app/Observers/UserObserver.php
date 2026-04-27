@@ -99,6 +99,7 @@ class UserObserver
                     ['name' => 'Third Party Purchase', 'icon' => '🔹'],
                 ],
             ],
+
             [
                 'name' => 'Income',
                 'type' => 'income',
@@ -106,9 +107,7 @@ class UserObserver
                 'children' => [
                     ['name' => 'Salary', 'icon' => '💼'],
                     ['name' => 'Side Income', 'icon' => '🏢'],
-                    //['name' => 'Freelance', 'icon' => '💻'],
-                    //['name' => 'Business', 'icon' => '🏪'],
-                    //['name' => 'Investment Returns', 'icon' => '📈'],
+                    ['name' => 'Sacco Dividends', 'icon' => '🏦'], // ← add this
                 ],
             ],
             [

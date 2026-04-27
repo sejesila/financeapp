@@ -9,6 +9,7 @@ use App\Models\Transfer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class AccountController extends Controller
@@ -90,21 +91,25 @@ class AccountController extends Controller
             abort(403, 'Unauthorized access to this account.');
         }
 
-        $search = request('search');
+        $search    = request('search');
         $activeTab = request('tab', 'transactions');
 
         // ── Sorting for transactions ──────────────────────────────────
-        $txSort      = request('tx_sort', 'date');
-        $txDirection = request('tx_dir', 'desc');
+        $txSort         = request('tx_sort', 'date');
+        $txDirection    = request('tx_dir', 'desc');
         $allowedTxSorts = ['date', 'description', 'amount'];
-        if (!in_array($txSort, $allowedTxSorts)) $txSort = 'date';
+        if (!in_array($txSort, $allowedTxSorts)) {
+            $txSort = 'date';
+        }
         $txDirection = $txDirection === 'asc' ? 'asc' : 'desc';
 
         // ── Sorting for top-ups ───────────────────────────────────────
-        $topSort      = request('top_sort', 'date');
-        $topDirection = request('top_dir', 'desc');
+        $topSort         = request('top_sort', 'date');
+        $topDirection    = request('top_dir', 'desc');
         $allowedTopSorts = ['date', 'description', 'amount'];
-        if (!in_array($topSort, $allowedTopSorts)) $topSort = 'date';
+        if (!in_array($topSort, $allowedTopSorts)) {
+            $topSort = 'date';
+        }
         $topDirection = $topDirection === 'asc' ? 'asc' : 'desc';
 
         // ── Transactions query ────────────────────────────────────────
@@ -155,14 +160,14 @@ class AccountController extends Controller
         // ── Stats ─────────────────────────────────────────────────────
         $stats = $account->transactions()
             ->selectRaw('
-            COUNT(*) as total_transactions,
-            SUM(CASE WHEN categories.type = "income" THEN amount ELSE 0 END) as total_income,
-            SUM(CASE WHEN categories.type = "expense" THEN amount ELSE 0 END) as total_expenses,
-            SUM(CASE
-                WHEN MONTH(date) = ? AND YEAR(date) = ?
-                THEN amount ELSE 0
-            END) as this_month_total
-        ', [now()->month, now()->year])
+                COUNT(*) as total_transactions,
+                SUM(CASE WHEN categories.type = "income" THEN amount ELSE 0 END) as total_income,
+                SUM(CASE WHEN categories.type = "expense" THEN amount ELSE 0 END) as total_expenses,
+                SUM(CASE
+                    WHEN MONTH(date) = ? AND YEAR(date) = ?
+                    THEN amount ELSE 0
+                END) as this_month_total
+            ', [now()->month, now()->year])
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->first();
 
@@ -244,6 +249,7 @@ class AccountController extends Controller
         }
 
         $account->delete();
+
         return redirect()->route('accounts.index')->with('success', 'Account deleted successfully!');
     }
 
@@ -342,7 +348,7 @@ class AccountController extends Controller
 
         if ($transactionFee > 0) {
             $feeCategory = Category::firstOrCreate(
-                ['user_id' => Auth::id(), 'name' => 'Transaction Fees'],
+                ['user_id' => Auth::id(), 'name' => 'Transaction Fees', 'parent_id' => null],
                 ['type' => 'expense', 'icon' => '💸', 'is_active' => true]
             );
 
@@ -402,7 +408,6 @@ class AccountController extends Controller
             ['min' => 50001, 'max' => 250000, 'cost' => 309],
         ];
 
-        // Both M-Pesa and Airtel share the same withdrawal tiers
         if (!in_array($accountType, ['mpesa', 'airtel_money'])) {
             return 0;
         }
@@ -493,11 +498,27 @@ class AccountController extends Controller
             abort(403, 'Unauthorized access to this account.');
         }
 
-        $categories = $this->getTopUpCategories($account->type);
-        return view('accounts.topup', compact('account', 'categories'));
+        [$categories, $showSaccoDividends] = $this->getTopUpCategories($account->type);
+
+        return view('accounts.topup', compact('account', 'categories', 'showSaccoDividends'));
     }
 
-    private function getTopUpCategories($accountType)
+    /**
+     * Returns categories eligible for top-up, filtered by account type.
+     *
+     * Special rule for "Sacco Dividends":
+     *   - Only shown between 10 April and 10 May (inclusive) of the current year.
+     *   - Hidden permanently for the rest of the year once the user has already
+     *     recorded a top-up using it (checked against the transactions table).
+     *     "Already used" is scoped per calendar year so it reappears next April.
+     *
+     * FIX: $showSaccoDividends and $excludedCategories are fully resolved BEFORE
+     * $categoryQuery is built, so the single whereNotIn clause always reflects
+     * the correct exclusion list. The previous code built the query first and
+     * tried to patch it afterward, causing 'Sacco Dividends' to leak through
+     * because it was absent from the original whereNotIn array.
+     */
+    private function getTopUpCategories(string $accountType): array
     {
         $excludedCategories = [
             'Loan Receipt', 'Loan Repayment', 'Excise Duty',
@@ -507,23 +528,67 @@ class AccountController extends Controller
 
         $excludedParents = ['Income', 'Loans'];
 
-        $query = Category::where('user_id', Auth::id())
+        // ── Sacco Dividends visibility logic ─────────────────────────────────
+        $today       = now();
+        $windowStart = $today->copy()->setDate($today->year, 4, 10); // 10 April
+        $windowEnd   = $today->copy()->setDate($today->year, 5, 10); // 10 May
+        $inWindow    = $today->between($windowStart, $windowEnd);
+
+        // Check if Sacco Dividends has been used THIS CALENDAR YEAR.
+        // We collect ALL category IDs named 'Sacco Dividends' for this user
+        // (there may be more than one if a seeder and the factory both created
+        // one) and check if ANY transaction references any of them.
+        // DB::table() bypasses ALL Eloquent model scopes so no scope bleeds
+        // into or corrupts the $categoryQuery builder defined below.
+        $saccoCategoryIds = Category::where('user_id', Auth::id())
+            ->where('name', 'Sacco Dividends')
+            ->pluck('id');
+
+        $saccoAlreadyUsed = false;
+
+        if ($saccoCategoryIds->isNotEmpty()) {
+            $saccoAlreadyUsed = DB::table('transactions')
+                ->where('user_id', Auth::id())
+                ->whereIn('category_id', $saccoCategoryIds)
+                ->whereYear('date', $today->year)
+                ->whereNull('deleted_at')
+                ->exists();
+        }
+
+        // Show ONLY if: (1) within the window AND (2) not yet used this year.
+        $showSaccoDividends = $inWindow && !$saccoAlreadyUsed;
+
+        // ── Mutate exclusion list BEFORE building the query ───────────────────
+        // This is the critical fix: the whereNotIn clause is constructed once,
+        // after we know whether Sacco Dividends should be excluded. The old code
+        // built $categoryQuery first and called ->whereNotIn() a second time,
+        // but the first whereNotIn (baked at construction) did not include
+        // 'Sacco Dividends', so the category leaked through even when
+        // $showSaccoDividends was false.
+        if (!$showSaccoDividends) {
+            $excludedCategories[] = 'Sacco Dividends';
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
+        $categoryQuery = Category::where('user_id', Auth::id())
             ->where('is_active', true)
             ->whereNotIn('name', $excludedCategories)
             ->whereNotIn('name', $excludedParents)
             ->whereNotNull('parent_id');
 
-        return match ($accountType) {
-            'bank'         => $query->where('type', 'income')->where('name', 'Salary')->orderBy('name')->get(),
-            'savings'      => $query->where('type', 'income')->orderBy('name')->get(),
-            'airtel_money' => $query->where('type', 'income')->where('name', '!=', 'Salary')->orderBy('name')->get(),
-            'mpesa'        => $query->where(function ($q) {
+        $categories = match ($accountType) {
+            'bank'         => $categoryQuery->where('type', 'income')->where('name', 'Salary')->orderBy('name')->get(),
+            'savings'      => $categoryQuery->where('type', 'income')->orderBy('name')->get(),
+            'airtel_money' => $categoryQuery->where('type', 'income')->where('name', '!=', 'Salary')->orderBy('name')->get(),
+            'mpesa'        => $categoryQuery->where(function ($q) {
                 $q->where(function ($s) {
                     $s->where('type', 'income')->where('name', '!=', 'Salary');
                 })->orWhere('type', 'liability');
             })->orderBy('name')->get(),
-            default        => $query->whereIn('type', ['income', 'liability'])->orderBy('name')->get(),
+            default        => $categoryQuery->whereIn('type', ['income', 'liability'])->orderBy('name')->get(),
         };
+
+        return [$categories, $showSaccoDividends];
     }
 
     public function topUp(Request $request, Account $account)
@@ -557,6 +622,36 @@ class AccountController extends Controller
         if (in_array($category->name, $systemCategories)) {
             return redirect()->back()->with('error', 'This category is reserved for system use only.');
         }
+
+        // ── Server-side guard for Sacco Dividends ────────────────────────────
+        if ($category->name === 'Sacco Dividends') {
+            $today       = now();
+            $windowStart = $today->copy()->setDate($today->year, 4, 10);
+            $windowEnd   = $today->copy()->setDate($today->year, 5, 10);
+            $inWindow    = $today->between($windowStart, $windowEnd);
+
+            if (!$inWindow) {
+                return redirect()->back()->with('error', 'Sacco Dividends can only be recorded between 10 April and 10 May.');
+            }
+
+            // Collect ALL 'Sacco Dividends' category IDs for this user so that
+            // a duplicate category (e.g. from a seeder) cannot bypass the guard.
+            $saccoCategoryIds = Category::where('user_id', Auth::id())
+                ->where('name', 'Sacco Dividends')
+                ->pluck('id');
+
+            $alreadyUsed = DB::table('transactions')
+                ->where('user_id', Auth::id())
+                ->whereIn('category_id', $saccoCategoryIds)
+                ->whereYear('date', $today->year)
+                ->whereNull('deleted_at')
+                ->exists();
+
+            if ($alreadyUsed) {
+                return redirect()->back()->with('error', 'Sacco Dividends have already been recorded for this year.');
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────────
 
         if ($account->type === 'bank' && $category->type === 'income' && $category->name !== 'Salary') {
             return redirect()->back()->with('error', 'Only Salary income is allowed for bank accounts.');
@@ -594,6 +689,7 @@ class AccountController extends Controller
         $this->clearAccountCache($account->id);
 
         $actionWord = $account->type === 'savings' ? 'deposited to' : 'topped up';
+
         return redirect()
             ->route('accounts.show', $account)
             ->with('success', "Account {$actionWord} successfully with KES " . number_format($request->amount, 0, '.', ','));

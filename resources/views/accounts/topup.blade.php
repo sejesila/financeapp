@@ -24,6 +24,20 @@
             </div>
         @endif
 
+        {{-- Sacco Dividends availability banner --}}
+        @if($showSaccoDividends)
+            <div class="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded mb-6 flex items-start gap-3">
+                <span class="text-2xl leading-none">🏦</span>
+                <div>
+                    <p class="font-semibold">Sacco Dividends available</p>
+                    <p class="text-sm mt-1">
+                        You can record your Sacco Dividends this month (10 Apr – 10 May).
+                        This option disappears once recorded or after 10 May.
+                    </p>
+                </div>
+            </div>
+        @endif
+
         <form method="POST" action="{{ route('accounts.topup.store', $account) }}" class="bg-white shadow rounded-lg p-6" id="topupForm" x-data="topupForm()">
             @csrf
 
@@ -35,7 +49,7 @@
                     <option value="">-- Select Source --</option>
 
                     @php
-                        $incomeCategories = $categories->filter(fn($cat) => $cat->type === 'income');
+                        $incomeCategories    = $categories->filter(fn($cat) => $cat->type === 'income');
                         $liabilityCategories = $categories->filter(fn($cat) => $cat->type === 'liability');
                     @endphp
 
@@ -47,7 +61,7 @@
                                     data-type="{{ $cat->type }}"
                                     {{ old('category_id') == $cat->id ? 'selected' : '' }}
                                 >
-                                    {{ $cat->name }}
+                                    {{ $cat->name === 'Sacco Dividends' ? '🏦 ' . $cat->name : $cat->name }}
                                 </option>
                             @endforeach
                         </optgroup>
@@ -147,7 +161,6 @@
                 description: '{{ old('description') }}',
 
                 init() {
-                    // Listen for form submit
                     this.$el.addEventListener('submit', (e) => this.handleSubmit(e));
                 },
 
@@ -159,10 +172,9 @@
                     if (categoryType === 'liability') {
                         e.preventDefault();
 
-                        const categoryName = selectedOption.text;
+                        const categoryName = selectedOption.text.replace('🏦 ', '').trim();
                         const loanType = this.detectLoanType(categoryName);
 
-                        // Build URL with query parameters
                         const url = new URL('{{ route("loans.create") }}', window.location.origin);
                         url.searchParams.append('account_id', '{{ $account->id }}');
                         if (this.amount) url.searchParams.append('amount', this.amount);
@@ -181,16 +193,10 @@
                     if (name.includes('kcb') || name.includes('kcb-mpesa') || name.includes('kcb mpesa')) {
                         return 'kcb_mpesa';
                     }
-
                     if (name.includes('mshwari') || name.includes('m-shwari')) {
                         return 'mshwari';
                     }
 
-                    if (name.includes('other') || name.includes('mother')) {
-                        return 'other';
-                    }
-
-                    // Default to other for unknown loan types
                     return 'other';
                 }
             }
