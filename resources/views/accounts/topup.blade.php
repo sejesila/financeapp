@@ -27,7 +27,6 @@
         {{-- Sacco Dividends availability banner --}}
         @if($showSaccoDividends)
             <div class="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded mb-6 flex items-start gap-3">
-                <span class="text-2xl leading-none">🏦</span>
                 <div>
                     <p class="font-semibold">Sacco Dividends available</p>
                     <p class="text-sm mt-1">

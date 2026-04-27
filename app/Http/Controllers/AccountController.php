@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Storage;
 
 class AccountController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $accounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
@@ -26,16 +26,27 @@ class AccountController extends Controller
             ->where('type', 'savings')
             ->get();
 
-        $totalBalance = $accounts->sum('current_balance');
-        $totalSavings = $savingsAccounts->sum('current_balance');
+
+        $totalBalance = number_format($accounts->sum('current_balance'), 2, '.', '');
+         $totalSavings = number_format($savingsAccounts->sum('current_balance'), 2, '.', '');
+
+        $transferSearch = $request->input('transfer_search');
 
         $recentTransfers = Transfer::with(['fromAccount', 'toAccount'])
             ->whereHas('fromAccount', function ($query) {
                 $query->where('user_id', Auth::id());
             })
+            ->when($transferSearch, function ($query) use ($transferSearch) {
+                $query->where(function ($q) use ($transferSearch) {
+                    $q->whereHas('fromAccount', fn($s) => $s->where('name', 'like', "%{$transferSearch}%"))
+                        ->orWhereHas('toAccount', fn($s) => $s->where('name', 'like', "%{$transferSearch}%"))
+                        ->orWhere('description', 'like', "%{$transferSearch}%")
+                        ->orWhereRaw('CAST(amount AS CHAR) LIKE ?', ["%{$transferSearch}%"]);
+                });
+            })
             ->latest()
-            ->limit(10)
-            ->get();
+            ->paginate(15, ['*'], 'transfer_page')
+            ->appends($request->query());
 
         $allAccounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
@@ -48,7 +59,8 @@ class AccountController extends Controller
             'totalBalance',
             'totalSavings',
             'recentTransfers',
-            'allAccounts'
+            'allAccounts',
+            'transferSearch'
         ));
     }
 
@@ -112,48 +124,41 @@ class AccountController extends Controller
         }
         $topDirection = $topDirection === 'asc' ? 'asc' : 'desc';
 
-        // ── Transactions query ────────────────────────────────────────
+// ── Transactions query ────────────────────────────────────────
         $transactionQuery = $account->transactions()
             ->with(['category.parent', 'feeTransaction'])
             ->whereHas('category', fn($q) => $q->where('type', 'expense'))
-            ->select([
-                'id', 'date', 'description', 'amount',
-                'category_id', 'account_id',
-                'is_transaction_fee', 'related_fee_transaction_id',
-            ]);
+            ->select('transactions.*');          // ← replaces the column list
 
-        if ($search && $activeTab === 'transactions') {
+        if ($search) {
             $transactionQuery->where(function ($q) use ($search) {
-                $q->where('description', 'like', '%' . $search . '%')
-                    ->orWhereRaw('CAST(amount AS CHAR) LIKE ?', ['%' . $search . '%']);
+                $q->where('transactions.description', 'like', '%' . $search . '%')
+                    ->orWhereRaw('CAST(transactions.amount AS CHAR) LIKE ?', ['%' . $search . '%']);
             });
         }
 
         $transactions = $transactionQuery
             ->orderBy($txSort, $txDirection)
-            ->when($txSort === 'date', fn($q) => $q->orderBy('id', $txDirection))
+            ->when($txSort === 'date', fn($q) => $q->orderBy('transactions.id', $txDirection))
             ->paginate(20, ['*'], 'tx_page')
             ->appends(request()->query());
 
-        // ── Top-ups query ─────────────────────────────────────────────
+// ── Top-ups query ─────────────────────────────────────────────
         $topUpQuery = $account->transactions()
             ->with(['category'])
             ->whereHas('category', fn($q) => $q->whereIn('type', ['income', 'liability']))
-            ->select([
-                'id', 'date', 'description', 'amount',
-                'category_id', 'account_id',
-            ]);
+            ->select('transactions.*');
 
-        if ($search && $activeTab === 'topups') {
+        if ($search) {
             $topUpQuery->where(function ($q) use ($search) {
-                $q->where('description', 'like', '%' . $search . '%')
-                    ->orWhereRaw('CAST(amount AS CHAR) LIKE ?', ['%' . $search . '%']);
+                $q->where('transactions.description', 'like', '%' . $search . '%')
+                    ->orWhereRaw('CAST(transactions.amount AS CHAR) LIKE ?', ['%' . $search . '%']);
             });
         }
 
         $topUps = $topUpQuery
             ->orderBy($topSort, $topDirection)
-            ->when($topSort === 'date', fn($q) => $q->orderBy('id', $topDirection))
+            ->when($topSort === 'date', fn($q) => $q->orderBy('transactions.id', $topDirection))
             ->paginate(20, ['*'], 'top_page')
             ->appends(request()->query());
 
@@ -175,6 +180,17 @@ class AccountController extends Controller
         $totalIncome       = $stats->total_income ?? 0;
         $totalExpenses     = $stats->total_expenses ?? 0;
         $thisMonthTotal    = $stats->this_month_total ?? 0;
+        \Log::info('TX COUNT', [
+            'total'  => $account->transactions()->count(),
+            'search' => $search,
+            'after_filter' => $account->transactions()
+                ->whereHas('category', fn($q) => $q->where('type', 'expense'))
+                ->count(),
+            'after_search' => $account->transactions()
+                ->whereHas('category', fn($q) => $q->where('type', 'expense'))
+                ->where('transactions.description', 'like', '%Lunch%')
+                ->count(),
+        ]);
 
         return view('accounts.show', compact(
             'account',
@@ -278,6 +294,49 @@ class AccountController extends Controller
         return view('accounts.transfer', compact('sourceAccounts', 'destinationAccounts'));
     }
 
+    /**
+     * Validate transfer rules between account types.
+     *
+     * Rules:
+     * 1. Cannot transfer to the same account
+     * 2. Cash cannot transfer directly to savings accounts (must go through mobile money first)
+     * 3. Mobile money (mpesa, airtel_money) can transfer to any account type
+     * 4. Bank can transfer to any account type
+     * 5. Savings can only transfer to cash/mpesa/airtel_money (not to bank or other savings)
+     *
+     * @param Account $fromAccount
+     * @param Account $toAccount
+     * @return array|null Returns null if valid, otherwise returns [fieldName, errorMessage]
+     */
+    private function validateTransferRules(Account $fromAccount, Account $toAccount): ?array
+    {
+        // Rule 1: Cannot transfer to same account (handled by 'different' validator)
+        if ($fromAccount->id === $toAccount->id) {
+            return ['from_account_id', 'Cannot transfer to the same account.'];
+        }
+
+        // Rule 2: Cash cannot transfer directly to savings
+        if ($fromAccount->type === 'cash' && $toAccount->type === 'savings') {
+            return [
+                'to_account_id',
+                'Direct transfers from cash to savings accounts are not allowed. Please transfer to M-Pesa or Airtel Money first.'
+            ];
+        }
+
+        // Rule 5: Savings can only transfer to cash/mobile money
+        if ($fromAccount->type === 'savings') {
+            $allowedTypes = ['cash', 'mpesa', 'airtel_money'];
+            if (!in_array($toAccount->type, $allowedTypes)) {
+                return [
+                    'to_account_id',
+                    'Savings accounts can only transfer to Cash, M-Pesa, or Airtel Money accounts.'
+                ];
+            }
+        }
+
+        return null; // Valid transfer
+    }
+
     public function transfer(Request $request)
     {
         if (auth()->user()->accounts()->count() < 2) {
@@ -297,10 +356,20 @@ class AccountController extends Controller
         $fromAccount = Account::withoutGlobalScopes()->findOrFail($request->from_account_id);
         $toAccount   = Account::withoutGlobalScopes()->findOrFail($request->to_account_id);
 
+        // ── Ownership check ───────────────────────────────────────────────────
         if ($fromAccount->user_id !== Auth::id() || $toAccount->user_id !== Auth::id()) {
             abort(403, 'Unauthorized access to one or both accounts.');
         }
 
+        // ── Transfer rule validation ──────────────────────────────────────────
+        $ruleViolation = $this->validateTransferRules($fromAccount, $toAccount);
+        if ($ruleViolation) {
+            return redirect()->back()
+                ->withInput()
+                ->withErrors([$ruleViolation[0] => $ruleViolation[1]]);
+        }
+
+        // ── Calculate fees ────────────────────────────────────────────────────
         $transactionFee        = 0;
         $feeType               = null;
         $isMobileMoneyTransfer = in_array($fromAccount->type, ['mpesa', 'airtel_money']);
@@ -327,6 +396,7 @@ class AccountController extends Controller
 
         $totalDeduction = $request->amount + $transactionFee;
 
+        // ── Balance check ─────────────────────────────────────────────────────
         if ($fromAccount->current_balance < $totalDeduction) {
             return redirect()->back()
                 ->withInput()
@@ -337,6 +407,7 @@ class AccountController extends Controller
                     . " + Fee: " . number_format($transactionFee, 2, '.', ',') . ")"]);
         }
 
+        // ── Create transfer ───────────────────────────────────────────────────
         Transfer::create([
             'from_account_id' => $fromAccount->id,
             'to_account_id'   => $toAccount->id,
@@ -346,6 +417,7 @@ class AccountController extends Controller
             'user_id'         => auth()->id(),
         ]);
 
+        // ── Create fee transaction if applicable ───────────────────────────────
         if ($transactionFee > 0) {
             $feeCategory = Category::firstOrCreate(
                 ['user_id' => Auth::id(), 'name' => 'Transaction Fees', 'parent_id' => null],
@@ -369,12 +441,14 @@ class AccountController extends Controller
             ]);
         }
 
+        // ── Update account balances ───────────────────────────────────────────
         $fromAccount->updateBalance();
         $toAccount->updateBalance();
 
         $this->clearAccountCache($fromAccount->id);
         $this->clearAccountCache($toAccount->id);
 
+        // ── Success message ───────────────────────────────────────────────────
         $successMessage = 'Transfer completed successfully!';
         if ($transactionFee > 0) {
             $feeTypeName = match ($feeType) {
@@ -559,16 +633,9 @@ class AccountController extends Controller
         $showSaccoDividends = $inWindow && !$saccoAlreadyUsed;
 
         // ── Mutate exclusion list BEFORE building the query ───────────────────
-        // This is the critical fix: the whereNotIn clause is constructed once,
-        // after we know whether Sacco Dividends should be excluded. The old code
-        // built $categoryQuery first and called ->whereNotIn() a second time,
-        // but the first whereNotIn (baked at construction) did not include
-        // 'Sacco Dividends', so the category leaked through even when
-        // $showSaccoDividends was false.
         if (!$showSaccoDividends) {
             $excludedCategories[] = 'Sacco Dividends';
         }
-        // ─────────────────────────────────────────────────────────────────────
 
         $categoryQuery = Category::where('user_id', Auth::id())
             ->where('is_active', true)
@@ -634,8 +701,6 @@ class AccountController extends Controller
                 return redirect()->back()->with('error', 'Sacco Dividends can only be recorded between 10 April and 10 May.');
             }
 
-            // Collect ALL 'Sacco Dividends' category IDs for this user so that
-            // a duplicate category (e.g. from a seeder) cannot bypass the guard.
             $saccoCategoryIds = Category::where('user_id', Auth::id())
                 ->where('name', 'Sacco Dividends')
                 ->pluck('id');
@@ -651,7 +716,6 @@ class AccountController extends Controller
                 return redirect()->back()->with('error', 'Sacco Dividends have already been recorded for this year.');
             }
         }
-        // ─────────────────────────────────────────────────────────────────────
 
         if ($account->type === 'bank' && $category->type === 'income' && $category->name !== 'Salary') {
             return redirect()->back()->with('error', 'Only Salary income is allowed for bank accounts.');

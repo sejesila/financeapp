@@ -297,26 +297,81 @@
             @endif
 
             <!-- Recent Transfers -->
-            @if($recentTransfers->count())
+            @if($recentTransfers->count() || $transferSearch)
                 <div class="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow-md">
-                    <h3 class="text-base sm:text-lg font-semibold mb-4">Recent Transfers</h3>
-                    <div class="space-y-3">
-                        @foreach($recentTransfers as $transfer)
-                            <div class="flex flex-col sm:flex-row sm:justify-between gap-2 p-3 bg-gray-50 dark:bg-gray-700 rounded">
-                                <div class="min-w-0">
-                                    <p class="font-semibold text-xs sm:text-sm break-words">
-                                        {{ $transfer->fromAccount->name }} → {{ $transfer->toAccount->name }}
-                                    </p>
-                                    <p class="text-xs text-gray-500">
-                                        {{ \Carbon\Carbon::parse($transfer->date)->format('M d, Y') }}
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                        <h3 class="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200">Recent Transfers</h3>
+
+                        <!-- Search Form -->
+                        <form method="GET" action="{{ route('accounts.index') }}" class="w-full sm:w-auto flex gap-2">
+                            <input type="text"
+                                   name="transfer_search"
+                                   placeholder="Search transfers..."
+                                   value="{{ $transferSearch }}"
+                                   class="flex-1 sm:flex-none px-3 py-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            <button type="submit"
+                                    class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded text-sm whitespace-nowrap transition-colors">
+                                Search
+                            </button>
+                            @if($transferSearch)
+                                <a href="{{ route('accounts.index') }}"
+                                   class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded text-sm whitespace-nowrap transition-colors">
+                                    Clear
+                                </a>
+                            @endif
+                        </form>
+                    </div>
+
+                    @if($recentTransfers->count())
+                        <div class="space-y-3 mb-6">
+                            @foreach($recentTransfers as $transfer)
+                                <div class="flex flex-col sm:flex-row sm:justify-between gap-2 p-3 bg-gray-50 dark:bg-gray-700 rounded hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+                                    <div class="min-w-0 flex-1">
+                                        <p class="font-semibold text-xs sm:text-sm break-words text-gray-800 dark:text-gray-200">
+                                            <span class="text-purple-600 dark:text-purple-400">{{ $transfer->fromAccount->name }}</span>
+                                            <span class="mx-2 text-gray-400">→</span>
+                                            <span class="text-teal-600 dark:text-teal-400">{{ $transfer->toAccount->name }}</span>
+                                        </p>
+                                        <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                            {{ \Carbon\Carbon::parse($transfer->date)->format('M d, Y') }}
+                                        </p>
+                                        @if($transfer->description)
+                                            <p class="text-xs text-gray-500 dark:text-gray-500 mt-1 italic">
+                                                {{ $transfer->description }}
+                                            </p>
+                                        @endif
+                                    </div>
+                                    <p class="font-semibold text-purple-600 dark:text-purple-400 text-sm whitespace-nowrap">
+                                        KES {{ number_format($transfer->amount, 0, '.', ',') }}
                                     </p>
                                 </div>
-                                <p class="font-semibold text-purple-600 text-sm whitespace-nowrap">
-                                    KES {{ number_format($transfer->amount, 0, '.', ',') }}
-                                </p>
+                            @endforeach
+                        </div>
+
+                        <!-- Pagination -->
+                        <div class="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4">
+                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                <div class="text-xs text-gray-600 dark:text-gray-400">
+                                    Showing <span class="font-semibold">{{ $recentTransfers->firstItem() }}</span> to
+                                    <span class="font-semibold">{{ $recentTransfers->lastItem() }}</span> of
+                                    <span class="font-semibold">{{ $recentTransfers->total() }}</span> transfers
+                                </div>
+                                <div class="flex justify-center sm:justify-end">
+                                    {{ $recentTransfers->links('pagination::tailwind') }}
+                                </div>
                             </div>
-                        @endforeach
-                    </div>
+                        </div>
+                    @else
+                        <div class="text-center py-8">
+                            <p class="text-gray-500 dark:text-gray-400 text-sm mb-3">
+                                No transfers found matching "<span class="font-semibold">{{ $transferSearch }}</span>"
+                            </p>
+                            <a href="{{ route('accounts.index') }}"
+                               class="text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 text-sm inline-block">
+                                ← Clear search
+                            </a>
+                        </div>
+                    @endif
                 </div>
             @endif
 
