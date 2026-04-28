@@ -344,7 +344,7 @@ class AccountController extends Controller
             return redirect()->back()->with('error', $error);
         }
 
-        // Loan receipt: redirect to loan creation flow
+        // Loan receipt: redirect to loan form with prefill
         if ($category->type === 'liability' && $category->parent?->name === 'Loans') {
             return redirect()->route('loans.create', [
                 'account_id' => $account->id,
