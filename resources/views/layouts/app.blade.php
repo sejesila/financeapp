@@ -6,7 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="icon" href="{{ asset('favicon.ico') }}" type="image/x-icon">
 
-    <title>{{ config('app.name', 'Budget App') }}</title>
+    <title>{{ config('app.name', 'Fin Tracker') }}</title>
 
     <!-- Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -63,11 +63,18 @@
     <nav class="bg-white dark:bg-gray-800 shadow mb-6 transition-colors duration-200">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
-                <!-- Logo -->
-                <a href="{{ url('/dashboard') }}" class="flex items-center space-x-2 text-gray-900 dark:text-white hover:opacity-80 transition">
-                    <svg class="w-8 h-8 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
+                <!-- Logo with Image -->
+                <a href="{{ url('/dashboard') }}" class="flex items-center space-x-3 text-gray-900 dark:text-white hover:opacity-90 transition group">
+                    <div class="relative flex items-center justify-center">
+                        <div class="absolute inset-0 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg opacity-0 group-hover:opacity-100 transition duration-300 blur-md"></div>
+                        <div class="relative flex items-center justify-center w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg shadow-lg group-hover:shadow-xl transition duration-300">
+                            <img src="{{ asset('images/logo.png') }}" alt="{{ config('app.name', 'Logo') }}" class="w-8 h-8 rounded-md object-cover">
+                        </div>
+                    </div>
+                    <div class="hidden sm:block">
+                        <p class="text-lg font-bold text-gray-900 dark:text-white">{{ config('app.name', 'Fin Tracker') }}</p>
+
+                    </div>
                 </a>
 
                 <!-- Mobile Menu Button -->
@@ -145,16 +152,11 @@
                         </button>
 
                         <!-- Dropdown Menu -->
-                        <!-- FIX: Consistent rounded corners and hover styles across all items -->
                         <div id="userMenu" class="hidden absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg z-50 overflow-hidden">
                             <a href="{{ route('client-funds.index') }}"
                                class="block px-4 py-3 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('client-funds*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
                                 Client Funds
                             </a>
-{{--                            <a href="{{ route('rolling-funds.index') }}"--}}
-{{--                               class="block px-4 py-3 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('rolling-funds*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">--}}
-{{--                                Odds &amp; Ends--}}
-{{--                            </a>--}}
                             <a href="{{ route('profile.edit') }}"
                                class="block px-4 py-3 text-base text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border-t dark:border-gray-700 transition">
                                 Profile
@@ -166,7 +168,6 @@
                                 </svg>
                                 Email Reports
                             </a>
-                            <!-- FIX: Added type="submit" explicitly so the mobile close-menu selector catches it -->
                             <form method="POST" action="{{ route('logout') }}" class="block border-t dark:border-gray-700">
                                 @csrf
                                 <button type="submit" class="w-full text-left px-4 py-3 text-base text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
@@ -233,7 +234,6 @@
                         </div>
 
                         <!-- Dark Mode Toggle (Mobile) -->
-                        <!-- FIX: type="button" prevents this from accidentally submitting any parent form -->
                         <button type="button" id="themeToggleMobile" class="w-full flex items-center justify-between px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 rounded transition">
                             <span>Theme</span>
                             <div class="flex items-center space-x-2">
@@ -256,10 +256,6 @@
                            class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('client-funds*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
                             Client Funds
                         </a>
-{{--                        <a href="{{ route('rolling-funds.index') }}"--}}
-{{--                           class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('rolling-funds*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">--}}
-{{--                            Odds &amp; Ends--}}
-{{--                        </a>--}}
 
                         <a href="{{ route('profile.edit') }}" class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition">
                             Profile
@@ -370,8 +366,7 @@
         }
     });
 
-    // FIX: Close mobile menu when a link or submit button is clicked
-    // Excludes the theme toggle (type="button") so it doesn't close the menu
+    // Close mobile menu when a link or submit button is clicked
     if (mobileMenu) {
         const menuLinks = mobileMenu.querySelectorAll('a, button[type="submit"]');
         menuLinks.forEach(link => {
@@ -381,12 +376,11 @@
         });
     }
 
-    // Session Timeout Management - 3 MINUTE TIMEOUT
-    // FIX: Wrapped in DOMContentLoaded to ensure logout form is available before any ping runs
+    // Session Timeout Management
     document.addEventListener('DOMContentLoaded', function () {
-        const sessionLifetime = 120 * 60 * 1000; // 120 minutes, matches SESSION_LIFETIME
-        const warningTime = 2* 60 * 1000; // warn 2 minutes before expiry
-        const pingInterval = 10* 60 * 1000; // Ping server every 10 minutes
+        const sessionLifetime = 120 * 60 * 1000; // 120 minutes
+        const warningTime = 2 * 60 * 1000; // warn 2 minutes before expiry
+        const pingInterval = 10 * 60 * 1000; // Ping server every 10 minutes
         let timeoutWarning;
         let sessionTimeout;
         let countdownInterval;
@@ -399,7 +393,7 @@
             clearTimeout(sessionTimeout);
             clearInterval(countdownInterval);
 
-            // Set warning to appear 30 seconds before session expires
+            // Set warning to appear before session expires
             timeoutWarning = setTimeout(showWarning, sessionLifetime - warningTime);
 
             // Set actual session timeout
@@ -413,7 +407,6 @@
             }
 
             let secondsLeft = 30;
-            // FIX: Initialise countdown display immediately before interval fires
             updateCountdown(secondsLeft);
 
             countdownInterval = setInterval(() => {
@@ -444,7 +437,6 @@
             }
         }
 
-        // FIX: logout() now exclusively uses the hidden POST form — no GET fallback
         function logout() {
             clearTimeout(timeoutWarning);
             clearTimeout(sessionTimeout);
@@ -455,7 +447,6 @@
             if (logoutForm) {
                 logoutForm.submit();
             }
-            // No window.location fallback: Laravel logout requires POST, not GET
         }
 
         function stayLoggedIn() {
@@ -521,14 +512,12 @@
             pingTimer = setInterval(() => {
                 pingServer(false);
             }, pingInterval);
-        }, pingInterval); // wait one full interval before starting
+        }, pingInterval);
 
         // Initialize timers
         resetTimer();
-       // pingServer(false);
 
-        // FIX: window.fetch override now correctly re-throws errors for non-419 failures
-        // so other fetch calls in the app are not silently broken
+        // Handle fetch errors
         const originalFetch = window.fetch;
         window.fetch = function(...args) {
             return originalFetch.apply(this, args).then(response => {

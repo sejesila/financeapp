@@ -1,6 +1,8 @@
 <?php
 
-use App\Http\Controllers\AccountController;
+namespace Tests\Unit\Controllers;
+
+use App\Services\TransferFeeCalculator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -9,10 +11,10 @@ uses(RefreshDatabase::class);
 
 function callPrivate(string $method, mixed ...$args): mixed
 {
-    $controller = app(AccountController::class);
-    $ref        = new ReflectionMethod(AccountController::class, $method);
+    $calculator = app(TransferFeeCalculator::class);
+    $ref        = new \ReflectionMethod(TransferFeeCalculator::class, $method);
     $ref->setAccessible(true);
-    return $ref->invoke($controller, ...$args);//
+    return $ref->invoke($calculator, ...$args);
 }
 
 // ─── Withdrawal Fees ──────────────────────────────────────────────────────────
@@ -29,12 +31,12 @@ dataset('withdrawal_fee_tiers', [
 ]);
 
 it('calculates correct withdrawal fee', function (float $amount, string $type, float $expected) {
-    expect(callPrivate('calculateWithdrawalFee', $amount, $type))->toBe($expected);
+    expect(callPrivate('withdrawalFee', $amount, $type))->toBe($expected);
 })->with('withdrawal_fee_tiers');
 
 it('returns 0 withdrawal fee for non-mobile account types', function () {
-    expect(callPrivate('calculateWithdrawalFee', 5000, 'bank'))->toBe(0.0)
-        ->and(callPrivate('calculateWithdrawalFee', 5000, 'cash'))->toBe(0.0);
+    expect(callPrivate('withdrawalFee', 5000, 'bank'))->toBe(0.0)
+        ->and(callPrivate('withdrawalFee', 5000, 'cash'))->toBe(0.0);
 });
 
 // ─── PayBill Fees ─────────────────────────────────────────────────────────────
@@ -48,25 +50,25 @@ dataset('mpesa_paybill_tiers', [
 ]);
 
 it('calculates correct M-Pesa paybill fee', function (float $amount, string $type, float $expected) {
-    expect(callPrivate('calculatePayBillFee', $amount, $type))->toBe($expected);
+    expect(callPrivate('payBillFee', $amount, $type))->toBe($expected);
 })->with('mpesa_paybill_tiers');
 
 it('charges zero paybill fee for Airtel Money', function () {
-    expect(callPrivate('calculatePayBillFee', 5000, 'airtel_money'))->toBe(0.0);
+    expect(callPrivate('payBillFee', 5000, 'airtel_money'))->toBe(0.0);
 });
 
 it('returns 0 paybill fee for unknown account type', function () {
-    expect(callPrivate('calculatePayBillFee', 5000, 'cash'))->toBe(0.0);
+    expect(callPrivate('payBillFee', 5000, 'cash'))->toBe(0.0);
 });
 
 // ─── ATM Fee ──────────────────────────────────────────────────────────────────
 
 it('calculates ATM fee as KES 33 + 15% excise duty = 37.95', function () {
-    expect(callPrivate('calculateAtmFee'))->toBe(37.95);
+    expect(callPrivate('atmFee'))->toBe(37.95);
 });
 
 // ─── Edge Cases ───────────────────────────────────────────────────────────────
 
 it('returns the last tier fee for amounts above all defined tiers on withdrawal', function () {
-    expect(callPrivate('calculateWithdrawalFee', 999999, 'mpesa'))->toBe(309.0);
+    expect(callPrivate('withdrawalFee', 999999, 'mpesa'))->toBe(309.0);
 });

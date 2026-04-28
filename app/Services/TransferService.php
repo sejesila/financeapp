@@ -154,10 +154,10 @@ readonly class TransferService
             'category_id'        => $feeCategory->id,
             'account_id'         => $from->id,
             'payment_method'     => match ($from->type) {
-                'mpesa'        => 'Mpesa',
-                'airtel_money' => 'Airtel Money',
-                'bank'         => 'Bank',
-                default        => 'Cash',
+                'mpesa'          => 'Mpesa',
+                'airtel_money'   => 'Airtel Money',
+                'bank'           => 'Bank',
+                default          => 'Cash',
             },
             'is_transaction_fee' => true,
         ]);
