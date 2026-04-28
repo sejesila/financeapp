@@ -97,18 +97,17 @@ class AccountController extends Controller
         return view('accounts.create');
     }
 
-    public function show(Account $account)
+    public function show(Request $request, Account $account)
     {
         if ($account->user_id !== Auth::id()) {
             abort(403, 'Unauthorized access to this account.');
         }
 
-        $search    = request('search');
-        $activeTab = request('tab', 'transactions');
+        $search    = $request->input('search');      // ← $request->input() not request()
+        $activeTab = $request->input('tab', 'transactions');
 
-        // ── Sorting for transactions ──────────────────────────────────
-        $txSort         = request('tx_sort', 'date');
-        $txDirection    = request('tx_dir', 'desc');
+        $txSort      = $request->input('tx_sort', 'date');
+        $txDirection = $request->input('tx_dir', 'desc');
         $allowedTxSorts = ['date', 'description', 'amount'];
         if (!in_array($txSort, $allowedTxSorts)) {
             $txSort = 'date';
@@ -124,11 +123,12 @@ class AccountController extends Controller
         }
         $topDirection = $topDirection === 'asc' ? 'asc' : 'desc';
 
-// ── Transactions query ────────────────────────────────────────
+        // ── Transactions query ────────────────────────────────────────
         $transactionQuery = $account->transactions()
-            ->with(['category.parent', 'feeTransaction'])
-            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
-            ->select('transactions.*');          // ← replaces the column list
+            ->with(['category.parent', 'feeTransaction'])          // ← add back
+            ->join('categories', 'transactions.category_id', '=', 'categories.id')
+            ->where('categories.type', 'expense')
+            ->select('transactions.*');
 
         if ($search) {
             $transactionQuery->where(function ($q) use ($search) {
@@ -138,15 +138,16 @@ class AccountController extends Controller
         }
 
         $transactions = $transactionQuery
-            ->orderBy($txSort, $txDirection)
+            ->orderBy('transactions.' . $txSort, $txDirection)
             ->when($txSort === 'date', fn($q) => $q->orderBy('transactions.id', $txDirection))
             ->paginate(20, ['*'], 'tx_page')
-            ->appends(request()->query());
+            ->appends($request->query());
 
 // ── Top-ups query ─────────────────────────────────────────────
         $topUpQuery = $account->transactions()
-            ->with(['category'])
-            ->whereHas('category', fn($q) => $q->whereIn('type', ['income', 'liability']))
+            ->with(['category'])                                   // ← add back
+            ->join('categories', 'transactions.category_id', '=', 'categories.id')
+            ->whereIn('categories.type', ['income', 'liability'])
             ->select('transactions.*');
 
         if ($search) {
@@ -157,11 +158,10 @@ class AccountController extends Controller
         }
 
         $topUps = $topUpQuery
-            ->orderBy($topSort, $topDirection)
+            ->orderBy('transactions.' . $topSort, $topDirection)
             ->when($topSort === 'date', fn($q) => $q->orderBy('transactions.id', $topDirection))
             ->paginate(20, ['*'], 'top_page')
-            ->appends(request()->query());
-
+            ->appends($request->query());
         // ── Stats ─────────────────────────────────────────────────────
         $stats = $account->transactions()
             ->selectRaw('
@@ -181,15 +181,10 @@ class AccountController extends Controller
         $totalExpenses     = $stats->total_expenses ?? 0;
         $thisMonthTotal    = $stats->this_month_total ?? 0;
         \Log::info('TX COUNT', [
-            'total'  => $account->transactions()->count(),
-            'search' => $search,
-            'after_filter' => $account->transactions()
-                ->whereHas('category', fn($q) => $q->where('type', 'expense'))
-                ->count(),
-            'after_search' => $account->transactions()
-                ->whereHas('category', fn($q) => $q->where('type', 'expense'))
-                ->where('transactions.description', 'like', '%Lunch%')
-                ->count(),
+            'search'          => $search,
+            'paginator_total' => $transactions->total(),    // ← total matching rows
+            'paginator_count' => $transactions->count(),    // ← rows on current page
+            'paginator_items' => $transactions->pluck('description'), // ← actual descriptions
         ]);
 
         return view('accounts.show', compact(

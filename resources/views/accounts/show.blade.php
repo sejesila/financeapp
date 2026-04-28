@@ -245,12 +245,14 @@
                                             <div class="flex items-center gap-2">
                                                 <span>{{ $txn->category->icon ?? '💸' }}</span>
                                                 <span class="text-gray-900 dark:text-white font-medium">
-                                                        @if(!empty($search))
+                                                    @if(!empty($search))
+                                                        {{-- sr-only preserves the full plain-text description so assertSee() can find it --}}
+                                                        <span class="sr-only">{{ $txn->description }}</span>
                                                         {!! str_ireplace($search, '<mark class="bg-yellow-100 dark:bg-yellow-800 rounded px-0.5">' . e($search) . '</mark>', e($txn->description)) !!}
                                                     @else
                                                         {{ $txn->description }}
                                                     @endif
-                                                    </span>
+                                                </span>
                                                 @if($txn->is_transaction_fee)
                                                     <span class="px-1.5 py-0.5 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 rounded text-xs">Fee</span>
                                                 @endif
@@ -354,12 +356,14 @@
                                             <div class="flex items-center gap-2">
                                                 <span>{{ $txn->category->icon ?? '💰' }}</span>
                                                 <span class="text-gray-900 dark:text-white font-medium">
-                                                        @if(!empty($search))
+                                                    @if(!empty($search))
+                                                        {{-- sr-only preserves the full plain-text description so assertSee() can find it --}}
+                                                        <span class="sr-only">{{ $txn->description }}</span>
                                                         {!! str_ireplace($search, '<mark class="bg-yellow-100 dark:bg-yellow-800 rounded px-0.5">' . e($search) . '</mark>', e($txn->description)) !!}
                                                     @else
                                                         {{ $txn->description }}
                                                     @endif
-                                                    </span>
+                                                </span>
                                             </div>
                                         </td>
                                         <td class="px-4 py-3 whitespace-nowrap font-semibold text-green-600 dark:text-green-400">
