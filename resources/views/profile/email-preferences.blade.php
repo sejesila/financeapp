@@ -74,27 +74,6 @@
                             <h4 class="text-md font-semibold text-gray-900 dark:text-white mb-4">Report Types</h4>
 
                             <div class="space-y-4">
-                                <!-- Weekly Reports -->
-                                <div class="flex items-start">
-                                    <div class="flex items-center h-5">
-                                        <input
-                                            id="weekly_reports"
-                                            name="weekly_reports"
-                                            type="checkbox"
-                                            {{ old('weekly_reports', $preference->weekly_reports) ? 'checked' : '' }}
-                                            class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-                                        >
-                                    </div>
-                                    <div class="ml-3">
-                                        <label for="weekly_reports" class="font-medium text-gray-900 dark:text-white">
-                                            Weekly Reports
-                                        </label>
-                                        <p class="text-sm text-gray-600 dark:text-gray-400">
-                                            Receive a summary of your weekly transactions, spending, and account balances
-                                        </p>
-                                    </div>
-                                </div>
-
                                 <!-- Monthly Reports -->
                                 <div class="flex items-start">
                                     <div class="flex items-center h-5">
@@ -115,6 +94,27 @@
                                         </p>
                                     </div>
                                 </div>
+
+                                <!-- Annual Reports -->
+                                <div class="flex items-start">
+                                    <div class="flex items-center h-5">
+                                        <input
+                                            id="annual_reports"
+                                            name="annual_reports"
+                                            type="checkbox"
+                                            {{ old('annual_reports', $preference->annual_reports) ? 'checked' : '' }}
+                                            class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                                        >
+                                    </div>
+                                    <div class="ml-3">
+                                        <label for="annual_reports" class="font-medium text-gray-900 dark:text-white">
+                                            Annual Reports
+                                        </label>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                                            Receive a full-year financial summary every January 1st, covering the previous year
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -123,31 +123,6 @@
                             <h4 class="text-md font-semibold text-gray-900 dark:text-white mb-4">Schedule</h4>
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <!-- Weekly Day -->
-                                <div>
-                                    <label for="weekly_day" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Weekly Report Day
-                                    </label>
-                                    <select
-                                        id="weekly_day"
-                                        name="weekly_day"
-                                        class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 @error('weekly_day') border-red-500 @enderror"
-                                    >
-                                        <option value="monday" {{ old('weekly_day', $preference->weekly_day) === 'monday' ? 'selected' : '' }}>Monday</option>
-                                        <option value="tuesday" {{ old('weekly_day', $preference->weekly_day) === 'tuesday' ? 'selected' : '' }}>Tuesday</option>
-                                        <option value="wednesday" {{ old('weekly_day', $preference->weekly_day) === 'wednesday' ? 'selected' : '' }}>Wednesday</option>
-                                        <option value="thursday" {{ old('weekly_day', $preference->weekly_day) === 'thursday' ? 'selected' : '' }}>Thursday</option>
-                                        <option value="friday" {{ old('weekly_day', $preference->weekly_day) === 'friday' ? 'selected' : '' }}>Friday</option>
-                                        <option value="saturday" {{ old('weekly_day', $preference->weekly_day) === 'saturday' ? 'selected' : '' }}>Saturday</option>
-                                        <option value="sunday" {{ old('weekly_day', $preference->weekly_day) === 'sunday' ? 'selected' : '' }}>Sunday</option>
-                                    </select>
-                                    @error('weekly_day')
-                                    <p class="text-xs text-red-500 mt-1">{{ $message }}</p>
-                                    @else
-                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Day to receive weekly reports</p>
-                                        @enderror
-                                </div>
-
                                 <!-- Monthly Day -->
                                 <div>
                                     <label for="monthly_day" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -172,7 +147,7 @@
                                 </div>
 
                                 <!-- Preferred Time -->
-                                <div class="md:col-span-2">
+                                <div>
                                     <label for="preferred_time" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                         Preferred Time
                                     </label>
@@ -181,12 +156,12 @@
                                         id="preferred_time"
                                         name="preferred_time"
                                         value="{{ old('preferred_time', $preference->preferred_time ? \Carbon\Carbon::parse($preference->preferred_time)->format('H:i') : '08:00') }}"
-                                        class="w-full md:w-64 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 @error('preferred_time') border-red-500 @enderror"
+                                        class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 @error('preferred_time') border-red-500 @enderror"
                                     >
                                     @error('preferred_time')
                                     <p class="text-xs text-red-500 mt-1">{{ $message }}</p>
                                     @else
-                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Time of day to receive reports (24-hour format)</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Applies to monthly reports (annual reports are always sent at 08:00 on Jan 1st)</p>
                                         @enderror
                                 </div>
                             </div>
@@ -242,15 +217,15 @@
                         </div>
 
                         <!-- Last Sent Info -->
-                        @if($preference->last_weekly_sent || $preference->last_monthly_sent)
+                        @if($preference->last_monthly_sent || $preference->last_annual_sent)
                             <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                                 <h5 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">Last Report Sent</h5>
                                 <div class="space-y-1 text-sm text-gray-600 dark:text-gray-400">
-                                    @if($preference->last_weekly_sent)
-                                        <p>📅 Weekly: {{ $preference->last_weekly_sent->format('M d, Y \a\t h:i A') }}</p>
-                                    @endif
                                     @if($preference->last_monthly_sent)
                                         <p>📅 Monthly: {{ $preference->last_monthly_sent->format('M d, Y \a\t h:i A') }}</p>
+                                    @endif
+                                    @if($preference->last_annual_sent)
+                                        <p>📅 Annual: {{ $preference->last_annual_sent->format('M d, Y \a\t h:i A') }}</p>
                                     @endif
                                 </div>
                             </div>
@@ -285,16 +260,6 @@
                         </p>
 
                         <div class="space-y-3">
-                            <form method="POST" action="{{ route('email-preferences.test-weekly') }}">
-                                @csrf
-                                <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg transition flex items-center justify-center">
-                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                                    </svg>
-                                    Send Test Weekly Report
-                                </button>
-                            </form>
-
                             <form method="POST" action="{{ route('email-preferences.test-monthly') }}">
                                 @csrf
                                 <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium px-4 py-2 rounded-lg transition flex items-center justify-center">
@@ -302,6 +267,16 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                                     </svg>
                                     Send Test Monthly Report
+                                </button>
+                            </form>
+
+                            <form method="POST" action="{{ route('email-preferences.test-annual') }}">
+                                @csrf
+                                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded-lg transition flex items-center justify-center">
+                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                    </svg>
+                                    Send Test Annual Report
                                 </button>
                             </form>
                         </div>
@@ -382,7 +357,8 @@
                             <ul class="list-disc list-inside space-y-1">
                                 <li>Reports are sent automatically based on your schedule</li>
                                 <li>All reports include transaction summaries, account balances, and insights</li>
-                                <li>Monthly reports also include budget performance analysis</li>
+                                <li>Monthly reports include budget performance analysis</li>
+                                <li>Annual reports are sent on January 1st and cover the full previous year</li>
                                 <li>PDF attachments are great for keeping offline records</li>
                                 <li>You can send test reports to preview the content anytime</li>
                             </ul>
@@ -390,6 +366,7 @@
                     </div>
                 </div>
             </div>
+
         </div>
     </div>
 </x-app-layout>
