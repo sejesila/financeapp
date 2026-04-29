@@ -6,6 +6,14 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="icon" href="{{ asset('favicon.ico') }}" type="image/x-icon">
 
+    {{-- PWA --}}
+    <link rel="manifest" href="{{ asset('manifest.json') }}">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="{{ config('app.name', 'Fin Tracker') }}">
+    <link rel="apple-touch-icon" href="{{ asset('icons/icon-192x192.png') }}">
+
     <title>{{ config('app.name', 'Fin Tracker') }}</title>
 
     <!-- Scripts -->
@@ -536,5 +544,14 @@
     });
 </script>
 
+<script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                .then(r => console.log('[PWA] SW registered:', r.scope))
+                .catch(e => console.error('[PWA] SW failed:', e));
+        });
+    }
+</script>
 </body>
 </html>
