@@ -395,6 +395,10 @@
         let pingTimer;
         let lastActivity = Date.now();
 
+        function getCsrfToken() {
+            return document.querySelector('meta[name="csrf-token"]')?.content || '';
+        }
+
         function resetTimer() {
             lastActivity = Date.now();
             clearTimeout(timeoutWarning);
@@ -414,7 +418,7 @@
                 modal.classList.remove('hidden');
             }
 
-            let secondsLeft = 30;
+            let secondsLeft = 120; // 2 minutes warning before logout
             updateCountdown(secondsLeft);
 
             countdownInterval = setInterval(() => {
@@ -463,34 +467,42 @@
         }
 
         function pingServer(userInitiated = false) {
-            @if(Route::has('session.ping'))
-            fetch('{{ route('session.ping') }}', {
+            const csrfToken = getCsrfToken();
+
+            if (!csrfToken) {
+                console.warn('CSRF token not found');
+                if (userInitiated) {
+                    resetTimer();
+                }
+                return;
+            }
+
+            fetch('/ping', { // Using your existing /ping route
                 method: 'POST',
                 headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    'X-CSRF-TOKEN': csrfToken,
                     'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
                 },
-                credentials: 'same-origin'
+                credentials: 'same-origin',
+                body: JSON.stringify({})
             })
                 .then(response => {
                     if (response.status === 401 || response.status === 419) {
+                        // Session expired, force logout
                         logout();
-                    } else if (userInitiated) {
-                        resetTimer();
+                    } else if (response.ok) {
+                        if (userInitiated) {
+                            resetTimer();
+                        }
                     }
+                    return response;
                 })
                 .catch(error => {
                     console.error('Session ping failed:', error);
-                    if (userInitiated) {
-                        resetTimer();
-                    }
+                    // Don't logout on network error, just try again next interval
                 });
-            @else
-            if (userInitiated) {
-                resetTimer();
-            }
-            @endif
         }
 
         // Track user activity
@@ -498,7 +510,7 @@
         events.forEach(event => {
             document.addEventListener(event, () => {
                 const now = Date.now();
-                if (now - lastActivity > 10000) {
+                if (now - lastActivity > 10000) { // Reset timer if 10+ seconds of inactivity
                     resetTimer();
                 }
             }, { passive: true });
@@ -516,22 +528,21 @@
         }
 
         // Periodic ping to keep session alive
-        setTimeout(() => {
-            pingTimer = setInterval(() => {
-                pingServer(false);
-            }, pingInterval);
+        pingTimer = setInterval(() => {
+            pingServer(false);
         }, pingInterval);
 
         // Initialize timers
         resetTimer();
 
-        // Handle fetch errors
+        // Handle 419 errors globally on fetch
         const originalFetch = window.fetch;
         window.fetch = function(...args) {
             return originalFetch.apply(this, args).then(response => {
                 if (response.status === 419) {
-                    if (confirm('Your session has expired. Reload the page to continue?')) {
-                        window.location.reload();
+                    console.warn('CSRF token expired, redirecting to login');
+                    if (confirm('Your session has expired. Please log in again.')) {
+                        window.location.href = '{{ route("login") }}';
                     } else {
                         logout();
                     }
