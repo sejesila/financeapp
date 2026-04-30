@@ -193,6 +193,39 @@ Route::middleware('auth')->group(function () {
         Route::post('test-monthly', [EmailPreferenceController::class, 'sendTestMonthly'])->name('test-monthly');
         Route::post('test-annual', [EmailPreferenceController::class, 'sendTestAnnual'])->name('test-annual');
         Route::post('send-custom', [EmailPreferenceController::class, 'sendCustom'])->name('send-custom');
+        // In routes/web.php, inside the email-preferences prefix group:
+
+        Route::get('preview-monthly', function () {
+            $user = Auth::user();
+            $reportService = app(\App\Services\ReportDataService::class);
+            $data = $reportService->generateMonthlyReport($user);
+            return view('emails.pdf.monthly-report', [
+                'user' => $user,
+                'data' => $data,
+            ]);
+        })->name('email-preferences.preview-monthly');
+
+        Route::get('preview-annual', function () {
+            $user = Auth::user();
+            $reportService = app(\App\Services\ReportDataService::class);
+            $data = $reportService->generateAnnualReport($user);
+            return view('emails.pdf.annual-report', [
+                'user' => $user,
+                'data' => $data,
+            ]);
+        })->name('email-preferences.preview-annual');
+
+        Route::get('preview-custom', function (\Illuminate\Http\Request $request) {
+            $user = Auth::user();
+            $reportService = app(\App\Services\ReportDataService::class);
+            $startDate = \Carbon\Carbon::parse($request->get('start', now()->startOfMonth()));
+            $endDate   = \Carbon\Carbon::parse($request->get('end', now()->endOfMonth()));
+            $data = $reportService->generateCustomReport($user, $startDate, $endDate);
+            return view('emails.pdf.monthly-report', [
+                'user' => $user,
+                'data' => $data,
+            ]);
+        })->name('email-preferences.preview-custom');
     });
 
     // ======================================================================

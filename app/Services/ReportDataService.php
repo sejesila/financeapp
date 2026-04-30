@@ -41,10 +41,11 @@ class ReportDataService
             $mExpenses = $monthTransactions->filter(fn($t) => $t->category->type === 'expense')->sum('amount');
 
             $monthlyBreakdown[] = [
-                'month' => $mStart->format('F Y'),       // e.g. "January 2024"
-                'income' => $mIncome,
-                'expenses' => $mExpenses,
-                'net_flow' => $mIncome - $mExpenses,
+                'month'             => $mStart->format('F Y'),
+                'income'            => $mIncome,
+                'expenses'          => $mExpenses,
+                'net_flow'          => $mIncome - $mExpenses,
+                'transaction_count' => $monthTransactions->count(),
             ];
         }
 
@@ -161,7 +162,11 @@ class ReportDataService
             'total_balance' => $totalBalance,
             'total_loans' => $totalLoanBalance,
             'net_worth' => $totalBalance - $totalLoanBalance,
-            'transactions' => $transactions->take(20), // Latest 20
+            'transactions' => match($type) {
+                'annual'  => $transactions->take(50),
+                'monthly' => $transactions->take(30),
+                default   => $transactions->take(25),
+            },
             'transaction_count' => $transactions->count(),
             'income' => $income,
             'expenses' => $expenses,
