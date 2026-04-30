@@ -13,14 +13,46 @@ use Illuminate\Support\Facades\Log;
 
 class ReportDataService
 {
-    public function generateWeeklyReport(User $user): array
+
+    public function generateAnnualReport(User $user): array
     {
-        $startDate = now()->startOfWeek();
-        $endDate = now()->endOfWeek();
-        Log::info('Generating report for user: ' . $user->email);
+        $year = now()->subYear()->year;
+        $startDate = Carbon::create($year, 1, 1)->startOfDay();
+        $endDate = Carbon::create($year, 12, 31)->endOfDay();
 
+        Log::info('Generating annual report for user: ' . $user->email . ' | year: ' . $year);
 
-        return $this->generateReport($user, $startDate, $endDate, 'weekly');
+        // Base report (accounts, transactions, top categories, loans, insights …)
+        $report = $this->generateReport($user, $startDate, $endDate, 'annual');
+
+        // ── Month-by-month breakdown ──────────────────────────────────────────────
+        $monthlyBreakdown = [];
+
+        for ($month = 1; $month <= 12; $month++) {
+            $mStart = Carbon::create($year, $month, 1)->startOfDay();
+            $mEnd = $mStart->copy()->endOfMonth()->endOfDay();
+
+            $monthTransactions = Transaction::where('user_id', $user->id)
+                ->whereBetween('date', [$mStart, $mEnd])
+                ->with('category')
+                ->get();
+
+            $mIncome = $monthTransactions->filter(fn($t) => $t->category->type === 'income')->sum('amount');
+            $mExpenses = $monthTransactions->filter(fn($t) => $t->category->type === 'expense')->sum('amount');
+
+            $monthlyBreakdown[] = [
+                'month' => $mStart->format('F Y'),       // e.g. "January 2024"
+                'income' => $mIncome,
+                'expenses' => $mExpenses,
+                'net_flow' => $mIncome - $mExpenses,
+            ];
+        }
+
+        $report['monthly_breakdown'] = $monthlyBreakdown;
+        $report['period_type'] = 'annual';
+        $report['year'] = $year;
+
+        return $report;
     }
 
     public function generateMonthlyReport(User $user): array

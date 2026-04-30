@@ -184,14 +184,14 @@ Route::middleware('auth')->group(function () {
     // Password Management
     Route::put('/password', [PasswordController::class, 'update'])->name('password.update');
 
-    // Email Report Preferences
+// Email Report Preferences
     Route::prefix('email-preferences')->name('email-preferences.')->group(function () {
         Route::get('/', [EmailPreferenceController::class, 'edit'])->name('edit');
         Route::put('/', [EmailPreferenceController::class, 'update'])->name('update');
 
         // Test email reports
-        Route::post('test-weekly', [EmailPreferenceController::class, 'sendTestWeekly'])->name('test-weekly');
         Route::post('test-monthly', [EmailPreferenceController::class, 'sendTestMonthly'])->name('test-monthly');
+        Route::post('test-annual', [EmailPreferenceController::class, 'sendTestAnnual'])->name('test-annual');
         Route::post('send-custom', [EmailPreferenceController::class, 'sendCustom'])->name('send-custom');
     });
 

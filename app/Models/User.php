@@ -75,13 +75,12 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         static::created(function ($user) {
             $user->emailPreference()->create([
-                'weekly_reports' => true,
                 'monthly_reports' => true,
-                'weekly_day' => 'monday',
-                'monthly_day' => 1,
-                'preferred_time' => '08:00:00',
-                'include_pdf' => true,
-                'include_charts' => true,
+                'annual_reports'  => true,
+                'monthly_day'     => 1,
+                'preferred_time'  => '08:00:00',
+                'include_pdf'     => true,
+                'include_charts'  => false,
             ]);
         });
     }
