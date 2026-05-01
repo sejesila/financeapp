@@ -30,7 +30,7 @@ class MpesaSmsController extends Controller
         // Handle GET
         if ($request->isMethod('get')) {
             return response()->json([
-                'message' => 'Webhook endpoint accepts POST requests only',
+                'message' => 'Webhook endpoint accepts POST requests only!',
                 'your_method' => 'GET',
                 'status' => 'ready'
             ]);
