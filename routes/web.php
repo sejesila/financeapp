@@ -290,3 +290,11 @@ Route::get('/session-expired', function () {
         ->route('login')
         ->with('message', 'Your session has expired due to inactivity. Please login again.');
 })->name('session.expired');
+/*
+|--------------------------------------------------------------------------
+| Mpesa SMS Webhook (from Android/Tasker — no session auth)
+|--------------------------------------------------------------------------
+*/
+Route::post('/webhook/mpesa-sms', [
+    \App\Http\Controllers\MpesaSmsController::class, 'handle'
+])->name('webhook.mpesa-sms');

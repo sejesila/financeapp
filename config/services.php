@@ -34,5 +34,8 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+    'mpesa_webhook' => [
+        'secret' => env('MPESA_WEBHOOK_SECRET'),
+    ],
 
 ];

@@ -18,6 +18,11 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
     })
+    ->withMiddleware(function (Middleware $middleware) {
+        $middleware->validateCsrfTokens(except: [
+            'webhook/mpesa-sms',
+        ]);
+    })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
     })->create();
