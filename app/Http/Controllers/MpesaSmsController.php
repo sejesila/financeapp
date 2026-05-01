@@ -30,19 +30,12 @@ class MpesaSmsController extends Controller
         // ── 2. Get the user ───────────────────────────────────────────────
         $user = User::find($request->input('user_id'));
         if (!$user) {
-            Log::warning('Webhook: user not found', ['user_id' => $request->input('user_id')]);
             return response()->json(['error' => 'User not found'], 404);
         }
-
-        Log::info('Webhook: user found', [
-            'user_id' => $user->id,
-            'user_email' => $user->email,
-        ]);
 
         // ── 3. Parse the SMS ──────────────────────────────────────────────
         $smsBody = $request->input('sms');
         if (!$smsBody) {
-            Log::warning('Webhook: no SMS body provided', ['user_id' => $user->id]);
             return response()->json(['error' => 'No SMS body provided'], 422);
         }
 
@@ -60,21 +53,15 @@ class MpesaSmsController extends Controller
         }
 
         // ── 4. Handle duplicates from bank transfer confirmations ─────────
-        // When a bank transfer is initiated (e.g., Bank to M-PESA), we get TWO SMS messages:
-        // 1. From I&M Bank (bank side) with reference like "4197QMGO4277" and M-PESA Ref "UE1882QZ2G"
-        // 2. From M-PESA (mpesa side) with reference "UE1882QZ2G" (the M-PESA ref from step 1)
-        //
-        // This means we need to skip the M-PESA confirmation to avoid duplicating the transaction.
         if (isset($parsed['is_duplicate']) && $parsed['is_duplicate'] === true) {
             Log::info('Webhook: skipping duplicate bank transfer confirmation', [
-                'user_id' => $user->id,
+                'user_id'   => $user->id,
                 'reference' => $parsed['reference'],
-                'amount' => $parsed['amount'],
-                'type' => $parsed['subtype'],
+                'amount'    => $parsed['amount'],
             ]);
             return response()->json([
-                'status' => 'ignored',
-                'reason' => 'Duplicate bank transfer confirmation',
+                'status'    => 'ignored',
+                'reason'    => 'Duplicate bank transfer confirmation',
                 'reference' => $parsed['reference'],
             ]);
         }
@@ -85,15 +72,12 @@ class MpesaSmsController extends Controller
             ->where('description', 'like', '%' . $parsed['reference'] . '%')
             ->exists();
 
-        // Also check Transfer table for subtypes stored as transfers
         if (!$alreadyExists && in_array($parsed['subtype'], ['atm_withdrawal', 'account_transfer'])) {
-            // Check by reference
             $alreadyExists = Transfer::withoutGlobalScopes()
                 ->where('user_id', $user->id)
                 ->where('description', 'like', '%' . $parsed['reference'] . '%')
                 ->exists();
 
-            // Also check by M-PESA ref if available (for bank transfers)
             if (!$alreadyExists && isset($parsed['mpesa_ref'])) {
                 $alreadyExists = Transfer::withoutGlobalScopes()
                     ->where('user_id', $user->id)
@@ -104,7 +88,7 @@ class MpesaSmsController extends Controller
 
         if ($alreadyExists) {
             Log::info('Webhook: duplicate transaction detected', [
-                'user_id' => $user->id,
+                'user_id'   => $user->id,
                 'reference' => $parsed['reference'],
             ]);
             return response()->json([
@@ -118,7 +102,7 @@ class MpesaSmsController extends Controller
             return $this->handleAtmWithdrawal($user, $parsed);
         }
 
-        // ── 6b. Route outgoing account transfer (e.g. Bank/Mpesa → Airtel) ─
+        // ── 6b. Route outgoing account transfer (Bank→Mpesa, Bank→Airtel, Mpesa→Airtel, Mpesa→Sanlam) ─
         if ($parsed['subtype'] === 'account_transfer' && $parsed['type'] === 'transfer' && isset($parsed['to_account_hint'])) {
             return $this->handleOutgoingAccountTransfer($user, $parsed);
         }
@@ -178,7 +162,7 @@ class MpesaSmsController extends Controller
             $transaction->update(['related_fee_transaction_id' => $feeTransaction->id]);
         }
 
-        // ── 11. Update account balance ───────────────────────────────────
+        // ── 11. Update account balance ────────────────────────────────────
         $account->updateBalance();
 
         Log::info('Webhook: transaction created', [
@@ -230,11 +214,7 @@ class MpesaSmsController extends Controller
             ->first();
 
         if (!$bankAccount || !$cashAccount) {
-            Log::warning('Webhook: ATM withdrawal — bank or cash account not found', [
-                'user_id' => $user->id,
-                'has_bank_account' => (bool) $bankAccount,
-                'has_cash_account' => (bool) $cashAccount,
-            ]);
+            Log::warning('Webhook: ATM withdrawal — bank or cash account not found', ['user_id' => $user->id]);
             return response()->json(['error' => 'Bank or cash account not found'], 404);
         }
 
@@ -269,15 +249,6 @@ class MpesaSmsController extends Controller
             $cashAccount->updateBalance();
         });
 
-        Log::info('Webhook: ATM withdrawal → bank→cash transfer', [
-            'user_id'   => $user->id,
-            'reference' => $parsed['reference'],
-            'amount'    => $parsed['amount'],
-            'fee'       => $atmFee,
-            'from'      => $bankAccount->name,
-            'to'        => $cashAccount->name,
-        ]);
-
         return response()->json([
             'status'  => 'created',
             'subtype' => 'atm_withdrawal',
@@ -289,39 +260,41 @@ class MpesaSmsController extends Controller
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Outgoing account transfer — e.g. Bank → Mpesa, Mpesa → Airtel Money, Mpesa → Sanlam MMF
+    // Outgoing account transfer
+    // Handles: Bank → Mpesa, Bank → Airtel, Mpesa → Airtel Money, Mpesa → Sanlam MMF
+    // Source account is determined by $parsed['bank']:
+    //   im_bank  → source is the bank account
+    //   mpesa    → source is the mpesa account
     // ─────────────────────────────────────────────────────────────────────────
 
     private function handleOutgoingAccountTransfer(User $user, array $parsed): JsonResponse
     {
-        // Determine source account based on bank type
-        $sourceAccount = null;
+        // ── Resolve source account based on which bank sent the SMS ──────
         if ($parsed['bank'] === 'im_bank') {
-            // Bank to Mpesa/Airtel
             $sourceAccount = Account::withoutGlobalScopes()
                 ->where('user_id', $user->id)
                 ->where('type', 'bank')
                 ->where('is_active', true)
                 ->first();
+
+            if (!$sourceAccount) {
+                Log::warning('Webhook: outgoing transfer — bank account not found', ['user_id' => $user->id]);
+                return response()->json(['error' => 'Bank account not found'], 404);
+            }
         } else {
-            // Mpesa to other accounts
             $sourceAccount = Account::withoutGlobalScopes()
                 ->where('user_id', $user->id)
                 ->where('type', 'mpesa')
                 ->where('is_active', true)
                 ->first();
+
+            if (!$sourceAccount) {
+                Log::warning('Webhook: outgoing transfer — mpesa account not found', ['user_id' => $user->id]);
+                return response()->json(['error' => 'Mpesa account not found'], 404);
+            }
         }
 
-        if (!$sourceAccount) {
-            $accountType = $parsed['bank'] === 'im_bank' ? 'bank' : 'mpesa';
-            Log::warning('Webhook: outgoing transfer — source account not found', [
-                'user_id' => $user->id,
-                'account_type' => $accountType,
-                'bank' => $parsed['bank'],
-            ]);
-            return response()->json(['error' => ucfirst($accountType) . ' account not found'], 404);
-        }
-
+        // ── Resolve destination account from hint ─────────────────────────
         $hint               = $parsed['to_account_hint'] ?? '';
         $destinationAccount = Account::withoutGlobalScopes()
             ->where('user_id', $user->id)
@@ -380,7 +353,7 @@ class MpesaSmsController extends Controller
             ], 201);
         }
 
-        // ── Happy path: create transfer ───────────────────────────────────
+        // ── Happy path: source decreases, destination increases ───────────
         DB::transaction(function () use ($user, $parsed, $sourceAccount, $destinationAccount) {
             Transfer::create([
                 'user_id'         => $user->id,
@@ -415,7 +388,6 @@ class MpesaSmsController extends Controller
             'user_id'   => $user->id,
             'reference' => $parsed['reference'],
             'amount'    => $parsed['amount'],
-            'hint'      => $parsed['to_account_hint'],
             'from'      => $sourceAccount->name,
             'to'        => $destinationAccount->name,
         ]);
@@ -443,9 +415,6 @@ class MpesaSmsController extends Controller
             ->first();
 
         if (!$mpesaAccount) {
-            Log::warning('Webhook: incoming transfer — mpesa account not found', [
-                'user_id' => $user->id,
-            ]);
             return response()->json(['error' => 'Mpesa account not found'], 404);
         }
 
@@ -487,7 +456,7 @@ class MpesaSmsController extends Controller
             ], 201);
         }
 
-        // ── Happy path: create transfer (source → mpesa) ──────────────────
+        // ── Happy path: source decreases, mpesa increases ─────────────────
         DB::transaction(function () use ($user, $parsed, $sourceAccount, $mpesaAccount) {
             Transfer::create([
                 'user_id'         => $user->id,
@@ -545,7 +514,6 @@ class MpesaSmsController extends Controller
     {
         $expectedType = $type === 'income' ? 'income' : 'expense';
 
-        // For "Side Income", specifically look for the child under "Income" parent
         if ($name === 'Side Income' && $expectedType === 'income') {
             $incomeParent = Category::where('user_id', $user->id)
                 ->where('name', 'Income')
@@ -566,7 +534,6 @@ class MpesaSmsController extends Controller
             }
         }
 
-        // First, try to find a child category (has parent_id)
         $childCategory = Category::where('user_id', $user->id)
             ->where('name', $name)
             ->where('type', $expectedType)
@@ -577,7 +544,6 @@ class MpesaSmsController extends Controller
             return $childCategory;
         }
 
-        // Second, try to find a root-level category
         $rootCategory = Category::where('user_id', $user->id)
             ->where('name', $name)
             ->where('type', $expectedType)
@@ -588,7 +554,6 @@ class MpesaSmsController extends Controller
             return $rootCategory;
         }
 
-        // Finally, create a new root-level category
         return Category::create([
             'user_id'   => $user->id,
             'name'      => $name,
