@@ -18,7 +18,7 @@ class MpesaSmsController extends Controller
 {
     public function handle(Request $request): JsonResponse
     {
-        // Log everything to see what's arriving (remove after debugging)
+        // Log everything to see what's arriving
         Log::channel('daily')->info('Webhook request received', [
             'method' => $request->method(),
             'headers' => $request->headers->all(),
@@ -27,7 +27,7 @@ class MpesaSmsController extends Controller
             'user_agent' => $request->userAgent(),
         ]);
 
-        // Handle GET requests
+        // Handle GET
         if ($request->isMethod('get')) {
             return response()->json([
                 'message' => 'Webhook endpoint accepts POST requests only!',
@@ -35,30 +35,18 @@ class MpesaSmsController extends Controller
                 'status' => 'ready'
             ]);
         }
-
         // ── 1. Authenticate ───────────────────────────────────────────────
-        // Check for secret in multiple places (header, body, or query param)
         $secret = $request->header('X-Webhook-Secret')
-            ?? $request->header('x-webhook-secret')  // lowercase version
-            ?? $request->input('secret')
-            ?? $request->input('webhook_secret')
-            ?? $request->query('secret');
+            ?? $request->input('secret');
 
         if ($secret !== config('services.mpesa_webhook.secret')) {
-            Log::warning('Webhook: invalid secret', [
-                'ip' => $request->ip(),
-                'received_secret' => $secret ? substr($secret, 0, 10) . '...' : null,
-                'from_header' => $request->header('X-Webhook-Secret') ? 'yes' : 'no',
-                'from_body' => $request->input('secret') ? 'yes' : 'no',
-                'from_query' => $request->query('secret') ? 'yes' : 'no',
-            ]);
+            Log::warning('Webhook: invalid secret', ['ip' => $request->ip()]);
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
         // ── 2. Get the user ───────────────────────────────────────────────
         $user = User::find($request->input('user_id'));
         if (!$user) {
-            Log::warning('Webhook: user not found', ['user_id' => $request->input('user_id')]);
             return response()->json(['error' => 'User not found'], 404);
         }
 
@@ -73,7 +61,7 @@ class MpesaSmsController extends Controller
         if (!$parsed) {
             Log::info('Webhook: SMS not recognised, skipping', [
                 'user_id' => $user->id,
-                'sms'     => substr($smsBody, 0, 200),
+                'sms'     => $smsBody,
             ]);
             return response()->json([
                 'status' => 'ignored',
@@ -622,6 +610,7 @@ class MpesaSmsController extends Controller
             || str_contains($r, 'eastmatt')) {
             return 'Groceries';
         }
+
 
         return 'Other Expenses';
     }

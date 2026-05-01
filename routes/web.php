@@ -296,7 +296,4 @@ Route::get('/session-expired', function () {
 */
 Route::match(['GET', 'POST'], '/webhook/mpesa-sms', [MpesaSmsController::class, 'handle'])
     ->name('webhook.mpesa-sms');
-Route::get('/webhook-ping', function () {
-    file_put_contents(__DIR__ . '/../storage/logs/ping.log', date('Y-m-d H:i:s') . " - Ping received\n", FILE_APPEND);
-    return 'pong';
-});
+
