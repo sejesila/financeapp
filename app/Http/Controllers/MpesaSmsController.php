@@ -18,6 +18,23 @@ class MpesaSmsController extends Controller
 {
     public function handle(Request $request): JsonResponse
     {
+        // Log everything to see what's arriving
+        Log::channel('daily')->info('Webhook request received', [
+            'method' => $request->method(),
+            'headers' => $request->headers->all(),
+            'input' => $request->all(),
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
+
+        // Handle GET
+        if ($request->isMethod('get')) {
+            return response()->json([
+                'message' => 'Webhook endpoint accepts POST requests only',
+                'your_method' => 'GET',
+                'status' => 'ready'
+            ]);
+        }
         // ── 1. Authenticate ───────────────────────────────────────────────
         $secret = $request->header('X-Webhook-Secret')
             ?? $request->input('secret');

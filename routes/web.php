@@ -6,19 +6,18 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
-use App\Http\Controllers\{
-    AccountController,
+use App\Http\Controllers\{AccountController,
     BudgetController,
     CategoryController,
     ClientFundController,
     DashboardController,
     EmailPreferenceController,
     LoanController,
+    MpesaSmsController,
     ProfileController,
     ReportsController,
     RollingFundController,
-    TransactionController
-};
+    TransactionController};
 use App\Http\Controllers\Auth\{AuthenticatedSessionController,
     EmailVerificationNotificationController,
     EmailVerificationPromptController,
@@ -295,6 +294,5 @@ Route::get('/session-expired', function () {
 | Mpesa SMS Webhook (from Android/Tasker — no session auth)
 |--------------------------------------------------------------------------
 */
-Route::post('/webhook/mpesa-sms', [
-    \App\Http\Controllers\MpesaSmsController::class, 'handle'
-])->name('webhook.mpesa-sms');
+Route::match(['GET', 'POST'], '/webhook/mpesa-sms', [MpesaSmsController::class, 'handle'])
+    ->name('webhook.mpesa-sms');
