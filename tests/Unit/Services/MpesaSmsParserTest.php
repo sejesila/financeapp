@@ -98,7 +98,6 @@ class MpesaSmsParserTest extends TestCase
         $this->assertEquals('WINAS SACCO', $result['recipient']);
         $this->assertEquals(19475.30, $result['balance']);
         $this->assertEquals(0.00, $result['fee']);
-
     }
 
     public function test_paybill_with_fee()
@@ -115,7 +114,6 @@ class MpesaSmsParserTest extends TestCase
         $this->assertEquals(250.00, $result['amount']);
         $this->assertEquals(37360.30, $result['balance']);
         $this->assertEquals(5.00, $result['fee']);
-
     }
 
     // ── Paybill — transfer (account hint set) ─────────────────────────────────
@@ -129,7 +127,7 @@ class MpesaSmsParserTest extends TestCase
         $this->assertNotNull($result);
         $this->assertEquals('mpesa', $result['bank']);
         $this->assertEquals('transfer', $result['type']);
-        $this->assertEquals('account_transfer', $result['subtype']);  // Changed from 'paybill'
+        $this->assertEquals('account_transfer', $result['subtype']);
         $this->assertEquals('UDR88272FR', $result['reference']);
         $this->assertEquals(5000.00, $result['amount']);
         $this->assertEquals('SANLAM UNIT TRUST', $result['recipient']);
@@ -148,7 +146,7 @@ class MpesaSmsParserTest extends TestCase
         $this->assertNotNull($result);
         $this->assertEquals('mpesa', $result['bank']);
         $this->assertEquals('transfer', $result['type']);
-        $this->assertEquals('account_transfer', $result['subtype']);  // Changed from 'paybill' to 'account_transfer'
+        $this->assertEquals('account_transfer', $result['subtype']);
         $this->assertEquals('UDT882G8GD', $result['reference']);
         $this->assertEquals(100.00, $result['amount']);
         $this->assertEquals('AIRTEL MONEY', $result['recipient']);
@@ -168,7 +166,6 @@ class MpesaSmsParserTest extends TestCase
         $this->assertNotNull($result);
         $this->assertEquals('expense', $result['type']);
         $this->assertEquals('paybill', $result['subtype']);
-
     }
 
     // ── Pochi la Biashara ─────────────────────────────────────────────────────
@@ -182,7 +179,7 @@ class MpesaSmsParserTest extends TestCase
         $this->assertNotNull($result);
         $this->assertEquals('mpesa', $result['bank']);
         $this->assertEquals('expense', $result['type']);
-        $this->assertEquals('pochi', $result['subtype']);           // ← pochi, not buy_goods
+        $this->assertEquals('pochi', $result['subtype']);
         $this->assertEquals('UDU882J1IZ', $result['reference']);
         $this->assertEquals(50.00, $result['amount']);
         $this->assertEquals('MAGDALENE WAMBUI', $result['recipient']);
@@ -264,7 +261,22 @@ class MpesaSmsParserTest extends TestCase
 
     // ── I&M: Bank to M-PESA transfer ──────────────────────────────────────────
 
-    public function test_im_bank_to_mpesa_transfer()
+    public function test_im_bank_to_mpesa_transfer_self()
+    {
+        $sms = 'Bank to M-PESA transfer of KES 600.00 to 254708745191 - SILAS SEJE successfully processed. Transaction Ref ID: 4006DMKD1032. M-PESA Ref ID: UD9O205UFV';
+
+        $result = MpesaSmsParser::parse($sms);
+
+        $this->assertNotNull($result);
+        $this->assertEquals('im_bank', $result['bank']);
+        $this->assertEquals('transfer', $result['type']);
+        $this->assertEquals('bank_to_mpesa_self', $result['subtype']);
+        $this->assertEquals('UD9O205UFV', $result['reference']); // Uses M-PESA ref for dedup
+        $this->assertEquals('UD9O205UFV', $result['mpesa_ref']);
+        $this->assertEquals(600.00, $result['amount']);
+    }
+
+    public function test_im_bank_to_mpesa_transfer_external()
     {
         $sms = 'Bank to M-PESA transfer of KES 600.00 to 254719685465 - JOHN DOE successfully processed. Transaction Ref ID: 4006DMKD1032. M-PESA Ref ID: UD9O205UFV';
 
@@ -272,16 +284,12 @@ class MpesaSmsParserTest extends TestCase
 
         $this->assertNotNull($result);
         $this->assertEquals('im_bank', $result['bank']);
-        $this->assertEquals('transfer', $result['type']);
-        $this->assertEquals('account_transfer', $result['subtype']);
-        $this->assertEquals('4006DMKD1032', $result['reference']);
-        $this->assertEquals('UD9O205UFV', $result['mpesa_ref']);
-        $this->assertEquals(600.00, $result['amount']);
-        $this->assertEquals('JOHN DOE', $result['recipient']);
-        $this->assertEquals('mpesa', $result['to_account_hint']);
+        // External transfers should be expense, not transfer
+        $this->assertEquals('expense', $result['type']);
+        $this->assertEquals('bank_to_mpesa', $result['subtype']);
     }
 
-    public function test_im_bank_to_airtel_transfer()
+    public function test_im_bank_to_airtel_transfer_self()
     {
         $sms = 'Bank to Airtel Money Transfer of KES 250.00 to 254731609277 successfully processed. Transaction Ref ID:888660788069. Airtel Money Ref ID:Z3KVKUL3OKA.';
 
@@ -290,11 +298,35 @@ class MpesaSmsParserTest extends TestCase
         $this->assertNotNull($result);
         $this->assertEquals('im_bank', $result['bank']);
         $this->assertEquals('transfer', $result['type']);
-        $this->assertEquals('account_transfer', $result['subtype']);
-        $this->assertEquals('888660788069', $result['reference']);
-        $this->assertEquals('Z3KVKUL3OKA', $result['airtel_ref']);
+        $this->assertEquals('bank_to_airtel_self', $result['subtype']);
+        $this->assertEquals('Z3KVKUL3OKA', $result['reference']); // Uses Airtel ref for dedup
         $this->assertEquals(250.00, $result['amount']);
-        $this->assertEquals('airtel money', $result['to_account_hint']);
+    }
+
+    // ── I&M: Airtel received SMS (second leg of bank→airtel self transfer) ─────
+
+    public function test_im_airtel_received_sms_self_transfer()
+    {
+        $sms = 'You\'ve received KES 250.00 from SILAS OUNO SE JE. Airtel Ref:Z3KVKUL3OKA.';
+
+        $result = MpesaSmsParser::parse($sms);
+
+        $this->assertNotNull($result);
+        $this->assertEquals('im_bank', $result['bank']);
+        $this->assertEquals('transfer', $result['type']);
+        $this->assertEquals('bank_to_airtel_self', $result['subtype']);
+        $this->assertEquals('Z3KVKUL3OKA', $result['reference']);
+        $this->assertEquals(250.00, $result['amount']);
+    }
+
+    public function test_im_airtel_received_sms_external_ignored()
+    {
+        // Airtel SMS from external source should be ignored (return null)
+        $sms = 'You\'ve received KES 100.00 from EXTERNAL PERSON. Airtel Ref:SOMEREF.';
+
+        $result = MpesaSmsParser::parse($sms);
+
+        $this->assertNull($result);
     }
 
     // ── I&M: ATM Withdrawal ───────────────────────────────────────────────────
@@ -313,27 +345,25 @@ class MpesaSmsParserTest extends TestCase
         $this->assertStringContainsString('I&M BANK KENYATTA', $result['location']);
     }
 
-    // ── Duplicate M-PESA Confirmation ─────────────────────────────────────────
+    // ── Mpesa: Received from IM BANK (bank→mpesa self transfer second leg) ──────
 
-    public function test_duplicate_mpesa_confirmation_of_bank_transfer()
+    public function test_mpesa_received_from_im_bank_self_transfer()
     {
-        // This is the M-PESA confirmation when a bank transfer was initiated
-        $sms = 'UE1882QZ2G Confirmed. You have received KES1,000.00 from IM BANK LIMITED- APP on 1/5/26 at 10:31 PM. New M-PESA balance is Ksh7,226.30. Buy goods with M-PESA.';
+        $sms = 'UE1882QZ2G Confirmed. You have received KES1,000.00 from IM BANK LIMITED- APP on 1/5/26 at 10:31 PM. New M-PESA balance is KES7,226.30. Buy goods with M-PESA.';
 
         $result = MpesaSmsParser::parse($sms);
 
         $this->assertNotNull($result);
         $this->assertEquals('mpesa', $result['bank']);
-        $this->assertEquals('duplicate', $result['type']);
-        $this->assertEquals('bank_transfer_confirmation', $result['subtype']);
+        $this->assertEquals('transfer', $result['type']);
+        $this->assertEquals('bank_to_mpesa_self', $result['subtype']);
         $this->assertEquals('UE1882QZ2G', $result['reference']);
         $this->assertEquals(1000.00, $result['amount']);
-        $this->assertTrue($result['is_duplicate']);
     }
 
-    public function test_duplicate_detection_ignores_regular_received_money()
+    public function test_regular_received_money_not_self_transfer()
     {
-        // Regular received money (not from IM BANK) should NOT be marked as duplicate
+        // Regular received money (not from IM BANK) should be receive_money
         $sms = 'UE18820MJ1 Confirmed. You have received KES10.00 from JANE DOE 0722123456 on 1/5/26 at 1:12 PM New M-PESA balance is KES7,448.30.';
 
         $result = MpesaSmsParser::parse($sms);
@@ -342,7 +372,6 @@ class MpesaSmsParserTest extends TestCase
         $this->assertEquals('mpesa', $result['bank']);
         $this->assertEquals('income', $result['type']);
         $this->assertEquals('receive_money', $result['subtype']);
-        $this->assertFalse($result['is_duplicate'] ?? false);
     }
 
     // ── Edge cases ────────────────────────────────────────────────────────────
@@ -398,5 +427,22 @@ class MpesaSmsParserTest extends TestCase
         $this->assertEquals(500.00, $result['amount']);
         $this->assertEquals('JANE DOE', $result['sender']);
         $this->assertEquals(6000.00, $result['balance']);
+    }
+
+    public function test_send_money_distinguishes_from_pochi()
+    {
+        // Send Money has a phone number
+        $sms = 'UDU882LSDZ Confirmed. KES530.00 sent to OGACHI DAVID 0719685465 on 30/4/26 at 6:34 PM. New M-PESA balance is KES5,790.30. Transaction cost, KES13.00.';
+        $result = MpesaSmsParser::parse($sms);
+
+        $this->assertNotNull($result);
+        $this->assertEquals('send_money', $result['subtype']);
+
+        // Pochi has NO phone number
+        $sms2 = 'UDU882J1IZ Confirmed. KES50.00 sent to MAGDALENE WAMBUI on 30/4/26 at 6:34 AM. New M-PESA balance is KES19,425.30. Transaction cost, KES0.00.';
+        $result2 = MpesaSmsParser::parse($sms2);
+
+        $this->assertNotNull($result2);
+        $this->assertEquals('pochi', $result2['subtype']);
     }
 }

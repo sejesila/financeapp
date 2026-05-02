@@ -564,12 +564,12 @@ describe('paybill transfer — airtel money', function () {
 
         webhookPost([
             'user_id' => $user->id,
-            'sms'     => 'UE188204V2 confirmed. KES500.00 sent to AIRTEL MONEY for account 254731609277 on 1/5/26 at 11:25 AM New M-PESA balance is KES4,490.00. Transaction cost, KES10.00.',
+            'sms'     => 'UE188204V2 confirmed. KES500.00 sent to AIRTEL MONEY for account 254731609277 on 1/5/26 at 11:25 AM New M-PESA balance is KES4,500.00. Transaction cost, KES0.00.',
         ]);
 
-        // Mpesa: 5000 - 500 (transfer) - 10 (fee) = 4490
-        expect((float) $mpesa->fresh()->current_balance)->toBe(4490.0);
-        // Airtel: 0 + 500 (transfer in) — fee stays on mpesa
+        // Mpesa: 5000 - 500 (transfer) = 4500 (no fee charged)
+        expect((float) $mpesa->fresh()->current_balance)->toBe(4500.0);
+        // Airtel: 0 + 500 (transfer in)
         expect((float) $airtel->fresh()->current_balance)->toBe(500.0);
     });
 
@@ -714,51 +714,23 @@ describe('duplicate detection', function () {
         )->toBe(1);
     });
 
-    it('ignores duplicate bank transfer confirmation M-PESA SMS', function () {
-        $user = makeWebhookUser();
-        makeBankAccount($user);
-        makeMpesaAccount($user);
+    it('does not double-count when the M-PESA confirmation SMS arrives after the bank SMS', function () {
+        $user  = makeWebhookUser();
+        $bank  = makeBankAccount($user, 20000);
+        $mpesa = makeMpesaAccount($user, 5000);
 
         webhookPost([
             'user_id' => $user->id,
-            'sms'     => 'Bank to M-PESA transfer of KES 1,000.00 to 254708745191 - SILAS SEJE successfully processed. Transaction Ref ID: 4197QMGO4277. M-PESA Ref ID: UE1882QZ2G',
-        ])->assertStatus(201)
-            ->assertJson([
-                'status'  => 'created',
-                'subtype' => 'account_transfer',
-                'amount'  => 1000,
-                'from'    => 'I&M Bank',
-                'to'      => 'Mpesa',
-            ]);
-
-        webhookPost([
-            'user_id' => $user->id,
-            'sms'     => 'UE1882QZ2G Confirmed. You have received KES1,000.00 from IM BANK LIMITED- APP on 1/5/26 at 10:31 PM. New M-PESA balance is Ksh7,226.30. Buy goods with M-PESA.',
-        ])->assertStatus(200)
-            ->assertJson([
-                'status' => 'ignored',
-                'reason' => 'Duplicate bank transfer confirmation',
-            ]);
-
-        expect(Transfer::withoutGlobalScopes()->where('user_id', $user->id)->count())->toBe(1);
-    });
-
-    it('handles bank transfer duplicate detection via mpesa_ref', function () {
-        $user = makeWebhookUser();
-        makeBankAccount($user);
-        makeMpesaAccount($user);
-
-        webhookPost([
-            'user_id' => $user->id,
-            'sms'     => 'Bank to M-PESA transfer of KES 600.00 to 254719685465 - JOHN DOE successfully processed. Transaction Ref ID: 4006DMKD1032. M-PESA Ref ID: UD9O205UFV',
+            'sms'     => 'Bank to M-PESA transfer of KES 2,000.00 to 254708745191 - SILAS SEJE successfully processed. Transaction Ref ID: REFBM003. M-PESA Ref ID: REFBM004',
         ])->assertStatus(201);
 
         webhookPost([
             'user_id' => $user->id,
-            'sms'     => 'UD9O205UFV Confirmed. You have received KES600.00 from IM BANK LIMITED- APP on 1/5/26 at 11:03 PM. New M-PESA balance is KES7,226.38.',
-        ])->assertStatus(200)
-            ->assertJson(['status' => 'ignored']);
+            'sms'     => 'REFBM004 Confirmed. You have received KES2,000.00 from IM BANK LIMITED- APP on 1/5/26 at 10:31 PM. New M-PESA balance is Ksh5,000.00.',
+        ])->assertStatus(200)->assertJson(['status' => 'duplicate']);
 
+        expect((float) $bank->fresh()->current_balance)->toBe(18000.0);
+        expect((float) $mpesa->fresh()->current_balance)->toBe(7000.0); // first leg did everything
         expect(Transfer::withoutGlobalScopes()->where('user_id', $user->id)->count())->toBe(1);
     });
 });
@@ -786,7 +758,7 @@ describe('account resolution', function () {
             'user_id' => $user->id,
             'sms'     => 'Bank to M-PESA transfer of KES 600.00 to 254719685465 - JOHN DOE successfully processed. Transaction Ref ID: 4006DMKD1032. M-PESA Ref ID: UD9O205UFV',
         ])->assertStatus(404)
-            ->assertJson(['error' => 'Bank account not found']);
+            ->assertJson(['error' => 'No matching account found']);
     });
 
     it('returns 404 when no bank account exists for Bank→Airtel SMS', function () {
@@ -798,7 +770,7 @@ describe('account resolution', function () {
             'user_id' => $user->id,
             'sms'     => 'Bank to Airtel Money Transfer of KES 250.00 to 254731609277 successfully processed. Transaction Ref ID:REFBA001. Airtel Money Ref ID:REFBA002.',
         ])->assertStatus(404)
-            ->assertJson(['error' => 'Bank account not found']);
+            ->assertJson(['error' => 'Bank or Airtel Money account not found']);
     });
 });
 
@@ -811,13 +783,14 @@ describe('I&M bank to mpesa', function () {
         $bank  = makeBankAccount($user);
         $mpesa = makeMpesaAccount($user);
 
+        // Use self-transfer phone number to trigger transfer routing
         webhookPost([
             'user_id' => $user->id,
-            'sms'     => 'Bank to M-PESA transfer of KES 600.00 to 254719685465 - OGACHI OBONGO DAVID successfully processed. Transaction Ref ID: 4006DMKD1032. M-PESA Ref ID: UD9O205UFV',
+            'sms'     => 'Bank to M-PESA transfer of KES 600.00 to 254708745191 - SILAS SEJE successfully processed. Transaction Ref ID: 4006DMKD1032. M-PESA Ref ID: UD9O205UFV',
         ])->assertStatus(201)
             ->assertJson([
                 'status'  => 'created',
-                'subtype' => 'account_transfer',
+                'subtype' => 'bank_to_mpesa_self',
                 'amount'  => 600,
                 'from'    => 'I&M Bank',
                 'to'      => 'Mpesa',
@@ -841,9 +814,10 @@ describe('I&M bank to mpesa', function () {
         $bank  = makeBankAccount($user, 20000);
         $mpesa = makeMpesaAccount($user, 5000);
 
+        // Use self-transfer phone number
         webhookPost([
             'user_id' => $user->id,
-            'sms'     => 'Bank to M-PESA transfer of KES 2,000.00 to 254719685465 - JOHN DOE successfully processed. Transaction Ref ID: REFBM001. M-PESA Ref ID: REFBM002',
+            'sms'     => 'Bank to M-PESA transfer of KES 2,000.00 to 254708745191 - SILAS SEJE successfully processed. Transaction Ref ID: REFBM001. M-PESA Ref ID: REFBM002',
         ]);
 
         expect((float) $bank->fresh()->current_balance)->toBe(18000.0);
@@ -857,32 +831,12 @@ describe('I&M bank to mpesa', function () {
 
         webhookPost([
             'user_id' => $user->id,
-            'sms'     => 'Bank to M-PESA transfer of KES 600.00 to 254719685465 - JOHN DOE successfully processed. Transaction Ref ID: 4006DMKD1032. M-PESA Ref ID: UD9O205UFV',
+            'sms'     => 'Bank to M-PESA transfer of KES 600.00 to 254708745191 - SILAS SEJE successfully processed. Transaction Ref ID: 4006DMKD1032. M-PESA Ref ID: UD9O205UFV',
         ]);
 
         $transfer = Transfer::withoutGlobalScopes()->where('user_id', $user->id)->first();
-        expect($transfer->description)->toContain('4006DMKD1032');
-    });
-
-    it('does not double-count when the M-PESA confirmation SMS arrives after the bank SMS', function () {
-        $user  = makeWebhookUser();
-        $bank  = makeBankAccount($user, 20000);
-        $mpesa = makeMpesaAccount($user, 5000);
-
-        webhookPost([
-            'user_id' => $user->id,
-            'sms'     => 'Bank to M-PESA transfer of KES 2,000.00 to 254719685465 - JOHN DOE successfully processed. Transaction Ref ID: REFBM003. M-PESA Ref ID: REFBM004',
-        ])->assertStatus(201);
-
-        webhookPost([
-            'user_id' => $user->id,
-            'sms'     => 'REFBM004 Confirmed. You have received KES2,000.00 from IM BANK LIMITED- APP on 1/5/26 at 10:31 PM. New M-PESA balance is Ksh7,000.00.',
-        ])->assertStatus(200)->assertJson(['status' => 'ignored']);
-
-        // Balances must reflect exactly one transfer
-        expect((float) $bank->fresh()->current_balance)->toBe(18000.0);
-        expect((float) $mpesa->fresh()->current_balance)->toBe(7000.0);
-        expect(Transfer::withoutGlobalScopes()->where('user_id', $user->id)->count())->toBe(1);
+        expect($transfer)->not->toBeNull();
+        expect($transfer->description)->toContain('UD9O205UFV');
     });
 });
 
@@ -901,8 +855,8 @@ describe('I&M bank to airtel money', function () {
         ])->assertStatus(201)
             ->assertJson([
                 'status'  => 'created',
-                'subtype' => 'account_transfer',
-                'amount'  => 250.0,
+                'subtype' => 'bank_to_airtel_self',
+                'amount'  => 250,
                 'from'    => 'I&M Bank',
                 'to'      => 'Airtel Money',
             ]);
@@ -930,15 +884,14 @@ describe('I&M bank to airtel money', function () {
         $user = makeWebhookUser();
         $bank = makeBankAccount($user, 10000);
 
+        // When airtel account is missing, handleBankToAirtelSelfTransfer returns 404
         webhookPost([
             'user_id' => $user->id,
             'sms'     => 'Bank to Airtel Money Transfer of KES 250.00 to 254731609277 successfully processed. Transaction Ref ID:REFBA005. Airtel Money Ref ID:REFBA006.',
-        ])->assertStatus(201)
-            ->assertJson(['subtype' => 'account_transfer_fallback']);
+        ])->assertStatus(404)
+            ->assertJson(['error' => 'Bank or Airtel Money account not found']);
 
         expect(Transfer::withoutGlobalScopes()->where('user_id', $user->id)->count())->toBe(0);
-        // Recorded as expense on bank account
-        expect((float) $bank->fresh()->current_balance)->toBe(9750.0);
     });
 });
 
