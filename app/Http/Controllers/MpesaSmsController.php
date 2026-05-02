@@ -24,6 +24,7 @@ class MpesaSmsController extends Controller
         // ── 1. Authenticate ───────────────────────────────────────────────
         $secret = $request->header('X-Webhook-Secret')
             ?? $request->input('secret');
+        \Illuminate\Log\log($secret);
 
         if ($secret !== config('services.mpesa_webhook.secret')) {
             Log::warning('Webhook: invalid secret', ['ip' => $request->ip()]);
