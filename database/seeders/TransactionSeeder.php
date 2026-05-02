@@ -14,7 +14,7 @@ class TransactionSeeder extends Seeder
     {
         $user  = User::where('email', 's@s.com')->first();
         $mpesa = Account::withoutGlobalScopes()->where('user_id', $user->id)->where('name', 'Mpesa')->first();
-        $bank  = Account::withoutGlobalScopes()->where('user_id', $user->id)->where('name', 'KCB Bank')->first();
+        $bank  = Account::withoutGlobalScopes()->where('user_id', $user->id)->where('name', 'I&M Bank')->first();
         $cash  = Account::withoutGlobalScopes()->where('user_id', $user->id)->where('name', 'Cash')->first();
 
         $cat = fn(string $name) => Category::where('user_id', $user->id)->where('name', $name)->first();
@@ -26,7 +26,7 @@ class TransactionSeeder extends Seeder
             // Salary → Bank (KES 90k-100k)
             $this->create($user, $bank, $cat('Salary'), [
                 'date'        => $month->copy()->startOfMonth()->addDay()->toDateString(),
-                'amount'      => rand(90000, 100000),
+                'amount'      => rand(9000, 10000),
                 'description' => 'Monthly Salary',
             ]);
 
@@ -34,7 +34,7 @@ class TransactionSeeder extends Seeder
             if (rand(0, 1)) {
                 $this->create($user, $mpesa, $cat('Freelance'), [
                     'date'        => $month->copy()->day(15)->toDateString(),
-                    'amount'      => rand(10000, 35000),
+                    'amount'      => rand(1000, 3500),
                     'description' => 'Freelance Payment - ' . $month->format('M Y'),
                 ]);
             }
@@ -43,7 +43,7 @@ class TransactionSeeder extends Seeder
             if (rand(0, 2) === 0) {
                 $this->create($user, $mpesa, $cat('Business Income'), [
                     'date'        => $month->copy()->day(rand(5, 25))->toDateString(),
-                    'amount'      => rand(5000, 20000),
+                    'amount'      => rand(500, 2000),
                     'description' => 'Business Revenue',
                 ]);
             }
@@ -51,7 +51,7 @@ class TransactionSeeder extends Seeder
             // Cash top-up from pocket money
             $this->create($user, $cash, $cat('Business Income'), [
                 'date'        => $month->copy()->day(1)->toDateString(),
-                'amount'      => rand(8000, 15000),
+                'amount'      => rand(800, 1500),
                 'description' => 'Monthly Cash Allowance',
             ]);
 
@@ -60,7 +60,7 @@ class TransactionSeeder extends Seeder
             // Rent → Bank (fixed, 2nd of month)
             $this->create($user, $bank, $cat('Rent'), [
                 'date'        => $month->copy()->startOfMonth()->addDays(1)->toDateString(),
-                'amount'      => 12000,
+                'amount'      => 1200,
                 'description' => 'Monthly Rent Payment',
             ]);
 

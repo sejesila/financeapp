@@ -14,13 +14,13 @@ class BudgetSeeder extends Seeder
         $user = User::where('email', 's@s.com')->first();
 
         $budgetCategories = [
-            'Rent'           => 25000,
-            'Groceries'      => 15000,
-            'Transport'      => 8000,
-            'Utilities'      => 5000,
-            'Entertainment'  => 4000,
-            'Airtime & Data' => 2000,
-            'Food & Dining'  => 6000,
+            'Rent'           => 250,
+            'Groceries'      => 150,
+            'Transport'      => 80,
+            'Utilities'      => 500,
+            'Entertainment'  => 40,
+            'Airtime & Data' => 20,
+            'Food & Dining'  => 60,
         ];
 
         // Seed budgets for the last 13 months (covers annual report + current month)

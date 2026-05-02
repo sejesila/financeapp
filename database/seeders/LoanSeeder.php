@@ -11,21 +11,21 @@ class LoanSeeder extends Seeder
 {
     public function run(): void
     {
-        $user    = User::where('email', 's@s.com    ')->first();
+        $user    = User::where('email', 's@s.com')->first();
         $account = Account::withoutGlobalScopes()
             ->where('user_id', $user->id)
-            ->where('name', 'KCB Bank')
+            ->where('name', 'I&M Bank')
             ->first();
 
         $loans = [
             [
                 'source'           => 'KCB Mpesa Loan',
-                'principal_amount' => 50000,
+                'principal_amount' => 5000,
                 'interest_rate'    => 8.64,
-                'interest_amount'  => 4320,
-                'total_amount'     => 54320,
-                'amount_paid'      => 20000,
-                'balance'          => 34320,
+                'interest_amount'  => 432,
+                'total_amount'     => 5432,
+                'amount_paid'      => 2000,
+                'balance'          => 3432,
                 'disbursed_date'   => now()->subMonths(3)->toDateString(),
                 'due_date'         => now()->addMonths(3)->toDateString(),
                 'status'           => 'active',
