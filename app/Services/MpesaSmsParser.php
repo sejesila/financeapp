@@ -273,7 +273,7 @@ class MpesaSmsParser
             }
         }
 
-        // 6. Received money (regular P2P)
+        // 5. Received money (regular P2P)
         if (preg_match(
             '/^(\w+)\s+Confirmed\.\s*You have received\s+KES\s*([\d,]+\.?\d*)\s+from\s+(.+?)\s+on\s+([\d\/]+)\s+at\s+([\d:]+\s*(?:AM|PM))\.?\s*New M-PESA balance is\s+KES\s*([\d,]+\.?\d*)/si',
             $sms, $m
@@ -292,7 +292,7 @@ class MpesaSmsParser
             ];
         }
 
-        // 7. Till / Lipa Na M-PESA Till
+        // 6. Till / Lipa Na M-PESA Till
         if (preg_match(
             '/^(\w+)\s+Confirmed\.\s*KES\s*([\d,]+\.?\d*)\s+paid to\s+(.+?)\s+on\s+([\d\/]+)\s+at\s+([\d:]+\s*(?:AM|PM))\.\s*New M-PESA balance is\s+KES\s*([\d,]+\.?\d*)\.\s*Transaction cost,\s*KES\s*([\d,]+\.?\d*)/si',
             $sms, $m
@@ -312,7 +312,7 @@ class MpesaSmsParser
             ];
         }
 
-        // 8. Mpesa Withdrawal (Agent)
+        // 7. Mpesa Withdrawal (Agent)
         if (preg_match(
             '/^(\w+)\s+Confirmed\.\s*KES\s*([\d,]+\.?\d*)\s+withdrawn from\s+.+?\s+on\s+([\d\/]+)\s+at\s+([\d:]+\s*(?:AM|PM))\.\s*New M-PESA balance is\s+KES\s*([\d,]+\.?\d*)\.\s*Transaction cost,\s*KES\s*([\d,]+\.?\d*)/si',
             $sms, $m
@@ -330,7 +330,7 @@ class MpesaSmsParser
             ];
         }
 
-        // 9. Airtime purchase
+        // 8. Airtime purchase
         if (preg_match(
             '/^(\w+)\s+Confirmed\.?\s*You bought\s+KES\s*([\d,]+\.?\d*)\s+of airtime\s+on\s+([\d\/]+)\s+at\s+([\d:]+\s*(?:AM|PM))\.\s*New M-PESA balance is\s+KES\s*([\d,]+\.?\d*)\.?\s*Transaction cost,\s*KES\s*([\d,]+\.?\d*)/si',
             $sms, $m
