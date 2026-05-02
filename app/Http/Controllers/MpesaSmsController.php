@@ -21,7 +21,6 @@ class MpesaSmsController extends Controller
         // Log everything to see what's arriving
         Log::info('triggered');
 
-
         // ── 1. Authenticate ───────────────────────────────────────────────
         $secret = $request->header('X-Webhook-Secret')
             ?? $request->input('secret');
@@ -64,7 +63,7 @@ class MpesaSmsController extends Controller
             ->exists();
 
         // Also check Transfer table for subtypes stored as transfers
-        if (!$alreadyExists && in_array($parsed['subtype'], ['atm_withdrawal', 'account_transfer'])) {
+        if (!$alreadyExists && in_array($parsed['subtype'], ['atm_withdrawal', 'account_transfer', 'bank_to_mpesa_self'])) {
             $alreadyExists = Transfer::withoutGlobalScopes()
                 ->where('user_id', $user->id)
                 ->where('description', 'like', '%' . $parsed['reference'] . '%')
@@ -83,12 +82,19 @@ class MpesaSmsController extends Controller
             return $this->handleAtmWithdrawal($user, $parsed);
         }
 
-        // ── 5b. Route outgoing account transfer (e.g. Mpesa → Airtel) ─────
+        // ── 5b. Route bank → own Mpesa self transfer ──────────────────────
+        //        Triggered by either the bank SMS or the Mpesa confirmation SMS.
+        //        Whichever arrives second will be caught by the duplicate check above.
+        if ($parsed['subtype'] === 'bank_to_mpesa_self') {
+            return $this->handleBankToMpesaSelfTransfer($user, $parsed);
+        }
+
+        // ── 5c. Route outgoing account transfer (e.g. Mpesa → Airtel) ─────
         if ($parsed['subtype'] === 'account_transfer' && $parsed['type'] === 'transfer' && isset($parsed['to_account_hint'])) {
             return $this->handleOutgoingAccountTransfer($user, $parsed);
         }
 
-        // ── 5c. Route incoming account transfer (e.g. Airtel → Mpesa) ─────
+        // ── 5d. Route incoming account transfer (e.g. Airtel → Mpesa) ─────
         if ($parsed['subtype'] === 'account_transfer' && $parsed['type'] === 'transfer' && isset($parsed['from_account_hint'])) {
             return $this->handleIncomingAccountTransfer($user, $parsed);
         }
@@ -175,6 +181,65 @@ class MpesaSmsController extends Controller
         }
 
         return response()->json($responseData, 201);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Bank → Own Mpesa (self transfer)
+    // Handles both legs: the I&M bank SMS and the Mpesa confirmation SMS.
+    // Both share the same M-PESA Ref ID so whichever arrives second is a duplicate.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private function handleBankToMpesaSelfTransfer(User $user, array $parsed): JsonResponse
+    {
+        $bankAccount = Account::withoutGlobalScopes()
+            ->where('user_id', $user->id)
+            ->where('type', 'bank')
+            ->where('is_active', true)
+            ->first();
+
+        $mpesaAccount = Account::withoutGlobalScopes()
+            ->where('user_id', $user->id)
+            ->where('type', 'mpesa')
+            ->where('is_active', true)
+            ->first();
+
+        if (!$bankAccount || !$mpesaAccount) {
+            Log::warning('Webhook: bank→mpesa self transfer — bank or mpesa account not found', [
+                'user_id' => $user->id,
+            ]);
+            return response()->json(['error' => 'Bank or Mpesa account not found'], 404);
+        }
+
+        DB::transaction(function () use ($user, $parsed, $bankAccount, $mpesaAccount) {
+            Transfer::create([
+                'user_id'         => $user->id,
+                'from_account_id' => $bankAccount->id,
+                'to_account_id'   => $mpesaAccount->id,
+                'amount'          => $parsed['amount'],
+                'date'            => $parsed['date'],
+                'description'     => $parsed['description'] . ' [' . $parsed['reference'] . ']',
+            ]);
+
+            $bankAccount->updateBalance();
+            $mpesaAccount->updateBalance();
+        });
+
+        Log::info('Webhook: bank → mpesa self transfer recorded', [
+            'user_id'   => $user->id,
+            'reference' => $parsed['reference'],
+            'amount'    => $parsed['amount'],
+            'from'      => $bankAccount->name,
+            'to'        => $mpesaAccount->name,
+            'source_sms'=> $parsed['bank'], // 'im_bank' or 'mpesa' — tells you which leg triggered it
+        ]);
+
+        return response()->json([
+            'status'  => 'created',
+            'subtype' => 'bank_to_mpesa_self',
+            'amount'  => $parsed['amount'],
+            'from'    => $bankAccount->name,
+            'to'      => $mpesaAccount->name,
+        ], 201);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -598,7 +663,6 @@ class MpesaSmsController extends Controller
             || str_contains($r, 'eastmatt')) {
             return 'Groceries';
         }
-
 
         return 'Other Expenses';
     }

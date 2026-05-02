@@ -7,6 +7,10 @@ use Carbon\Carbon;
 
 class MpesaSmsParser
 {
+    // Your personal identifiers — used to detect self-transfers
+    private const SELF_PHONE   = '254708745191';
+    private const SELF_NAME    = 'SILAS SEJE';
+
     public static function parse(string $sms): ?array
     {
         $sms = trim($sms);
@@ -21,25 +25,39 @@ class MpesaSmsParser
         // I&M BANK PATTERNS
         // ─────────────────────────────────────────────────────────────────
 
+        // Bank to M-PESA transfer
         if (preg_match(
-            '/Bank to M-PESA transfer of KES ([\d,]+\.?\d*)\s+to\s+[\d]+\s*-\s*(.+?)\s+successfully processed\.\s*Transaction Ref ID:\s*(\w+)\.\s*M-PESA Ref ID:\s*(\w+)/si',
+            '/Bank to M-PESA transfer of KES ([\d,]+\.?\d*)\s+to\s+([\d]+)\s*-\s*(.+?)\s+successfully processed\.\s*Transaction Ref ID:\s*(\w+)\.\s*M-PESA Ref ID:\s*(\w+)/si',
             $sms, $m
         )) {
+            $phoneNumber   = trim($m[2]);
+            $recipientName = trim($m[3]);
+
+            $isSelfTransfer = str_contains($phoneNumber, self::SELF_PHONE)
+                || stripos($recipientName, self::SELF_NAME) !== false;
+
             return [
-                'bank'        => 'im_bank',
-                'type'        => 'expense',
-                'subtype'     => 'bank_to_mpesa',
-                'reference'   => $m[3],
-                'mpesa_ref'   => $m[4],
-                'amount'      => self::parseAmount($m[1]),
-                'recipient'   => trim($m[2]),
-                'date'        => now(),
-                'balance'     => null,
-                'fee'         => 0,
-                'description' => 'Bank to Mpesa - ' . trim($m[2]),
+                'bank'             => 'im_bank',
+                'type'             => $isSelfTransfer ? 'transfer' : 'expense',
+                'subtype'          => $isSelfTransfer ? 'bank_to_mpesa_self' : 'bank_to_mpesa',
+                // Use M-PESA Ref ID as the reference so it matches the Mpesa SMS
+                'reference'        => $m[5],
+                'transaction_ref'  => $m[4],
+                'mpesa_ref'        => $m[5],
+                'amount'           => self::parseAmount($m[1]),
+                'recipient'        => $recipientName,
+                'recipient_phone'  => $phoneNumber,
+                'is_self_transfer' => $isSelfTransfer,
+                'date'             => now(),
+                'balance'          => null,
+                'fee'              => 0,
+                'description'      => $isSelfTransfer
+                    ? 'Bank to Mpesa (self transfer)'
+                    : 'Bank to Mpesa - ' . $recipientName,
             ];
         }
 
+        // ATM withdrawal
         if (preg_match(
             '/Dear\s+\w+,\s+you\s+withdrew\s+KES\s*([\d,]+\.?\d*)\s+on\s+([\d-]+)\s+([\d:]+)\s+at\s+(.+?)\s+using/si',
             $sms, $m
@@ -62,23 +80,46 @@ class MpesaSmsParser
         // MPESA PATTERNS — ORDER MATTERS (most specific first)
         // ─────────────────────────────────────────────────────────────────
 
-        // 1. Inter-account received (Airtel Money → Mpesa)
+        // 1a. Received from own bank (IM BANK) — inter-account self transfer
+        //     Must come BEFORE the generic receive_money pattern
+        if (preg_match(
+            '/^(\w+)\s+Confirmed\.\s*You have received\s+KES\s*([\d,]+\.?\d*)\s+from\s+(IM BANK[^on]*?)\s+on\s+([\d\/]+)\s+at\s+([\d:]+\s*(?:AM|PM))\.?\s*New M-PESA balance is\s+KES\s*([\d,]+\.?\d*)/si',
+            $sms, $m
+        )) {
+            return [
+                'bank'              => 'mpesa',
+                'type'              => 'transfer',
+                'subtype'           => 'bank_to_mpesa_self',
+                // The reference at the start of an Mpesa SMS IS the M-PESA Ref ID
+                // which matches mpesa_ref in the bank SMS — perfect for dedup
+                'reference'         => $m[1],
+                'amount'            => self::parseAmount($m[2]),
+                'sender'            => trim($m[3]),
+                'date'              => self::parseDate($m[4], $m[5]),
+                'balance'           => self::parseAmount($m[6]),
+                'fee'               => 0,
+                'description'       => 'Bank to Mpesa transfer',
+                'from_account_hint' => 'im bank',
+            ];
+        }
+
+        // 1b. Inter-account received (Airtel Money → Mpesa)
         if (preg_match(
             '/^(\w+)\s+Confirmed\.\s*You have received\s+KES\s*([\d,]+\.?\d*)\s+from\s+(AIRTEL MONEY|AIRTEL).+?on\s+([\d\/]+)\s+at\s+([\d:]+\s*(?:AM|PM))\s+New M-PESA balance is\s+KES\s*([\d,]+\.?\d*)/si',
             $sms, $m
         )) {
             return [
-                'bank'               => 'mpesa',
-                'type'               => 'transfer',
-                'subtype'            => 'account_transfer',
-                'reference'          => $m[1],
-                'amount'             => self::parseAmount($m[2]),
-                'sender'             => trim($m[3]),
-                'date'               => self::parseDate($m[4], $m[5]),
-                'balance'            => self::parseAmount($m[6]),
-                'fee'                => 0,
-                'description'        => 'Transfer received from ' . trim($m[3]),
-                'from_account_hint'  => 'airtel money',
+                'bank'              => 'mpesa',
+                'type'              => 'transfer',
+                'subtype'           => 'account_transfer',
+                'reference'         => $m[1],
+                'amount'            => self::parseAmount($m[2]),
+                'sender'            => trim($m[3]),
+                'date'              => self::parseDate($m[4], $m[5]),
+                'balance'           => self::parseAmount($m[6]),
+                'fee'               => 0,
+                'description'       => 'Transfer received from ' . trim($m[3]),
+                'from_account_hint' => 'airtel money',
             ];
         }
 
@@ -88,18 +129,18 @@ class MpesaSmsParser
             $sms, $m
         )) {
             return [
-                'bank'              => 'mpesa',
-                'type'              => 'transfer',
-                'subtype'           => 'account_transfer',
-                'reference'         => $m[1],
-                'amount'            => self::parseAmount($m[2]),
-                'recipient'         => trim($m[3]),
-                'paybill_account'   => $m[4],
-                'to_account_hint'   => 'airtel money',
-                'date'              => self::parseDate($m[5], $m[6]),
-                'balance'           => self::parseAmount($m[7]),
-                'fee'               => 0,
-                'description'       => 'Transfer to ' . trim($m[3]),
+                'bank'            => 'mpesa',
+                'type'            => 'transfer',
+                'subtype'         => 'account_transfer',
+                'reference'       => $m[1],
+                'amount'          => self::parseAmount($m[2]),
+                'recipient'       => trim($m[3]),
+                'paybill_account' => $m[4],
+                'to_account_hint' => 'airtel money',
+                'date'            => self::parseDate($m[5], $m[6]),
+                'balance'         => self::parseAmount($m[7]),
+                'fee'             => 0,
+                'description'     => 'Transfer to ' . trim($m[3]),
             ];
         }
 
@@ -108,48 +149,48 @@ class MpesaSmsParser
             '/^(\w+)\s+Confirmed\.\s*KES\s*([\d,]+\.?\d*)\s+sent to\s+(.+?)\s+for account\s+(\d+)\s+on\s+([\d\/]+)\s+at\s+([\d:]+\s*(?:AM|PM))\.?\s+New M-PESA balance is\s+KES\s*([\d,]+\.?\d*)\.\s*Transaction cost,\s*KES\s*([\d,]+\.?\d*)/si',
             $sms, $m
         )) {
-            $recipient   = trim($m[3]);
-            $accountNo   = $m[4];
+            $recipient = trim($m[3]);
+            $accountNo = $m[4];
 
             // Check if this is a known transfer (Sanlam, etc.)
             $isTransfer = self::isKnownTransferAccount($recipient, $accountNo);
 
             if ($isTransfer) {
                 return [
-                    'bank'              => 'mpesa',
-                    'type'              => 'transfer',
-                    'subtype'           => 'account_transfer',
-                    'reference'         => $m[1],
-                    'amount'            => self::parseAmount($m[2]),
-                    'recipient'         => $recipient,
-                    'paybill_account'   => $accountNo,
-                    'to_account_hint'   => $isTransfer,
-                    'date'              => self::parseDate($m[5], $m[6]),
-                    'balance'           => self::parseAmount($m[7]),
-                    'fee'               => self::parseAmount($m[8]),
-                    'description'       => 'Transfer to ' . $recipient,
+                    'bank'            => 'mpesa',
+                    'type'            => 'transfer',
+                    'subtype'         => 'account_transfer',
+                    'reference'       => $m[1],
+                    'amount'          => self::parseAmount($m[2]),
+                    'recipient'       => $recipient,
+                    'paybill_account' => $accountNo,
+                    'to_account_hint' => $isTransfer,
+                    'date'            => self::parseDate($m[5], $m[6]),
+                    'balance'         => self::parseAmount($m[7]),
+                    'fee'             => self::parseAmount($m[8]),
+                    'description'     => 'Transfer to ' . $recipient,
                 ];
             }
 
             // Regular expense paybill
             return [
-                'bank'             => 'mpesa',
-                'type'             => 'expense',
-                'subtype'          => 'paybill',
-                'reference'        => $m[1],
-                'amount'           => self::parseAmount($m[2]),
-                'recipient'        => $recipient,
-                'paybill_account'  => $accountNo,
-                'date'             => self::parseDate($m[5], $m[6]),
-                'balance'          => self::parseAmount($m[7]),
-                'fee'              => self::parseAmount($m[8]),
-                'description'      => 'Paybill - ' . $recipient,
+                'bank'            => 'mpesa',
+                'type'            => 'expense',
+                'subtype'         => 'paybill',
+                'reference'       => $m[1],
+                'amount'          => self::parseAmount($m[2]),
+                'recipient'       => $recipient,
+                'paybill_account' => $accountNo,
+                'date'            => self::parseDate($m[5], $m[6]),
+                'balance'         => self::parseAmount($m[7]),
+                'fee'             => self::parseAmount($m[8]),
+                'description'     => 'Paybill - ' . $recipient,
             ];
         }
 
         // 4. Send Money & Pochi la Biashara (combined pattern)
-// - If phone number present -> send_money
-// - If no phone number -> pochi
+        // - If phone number present -> send_money
+        // - If no phone number -> pochi
         if (preg_match(
             '/^(\w+)\s+Confirmed\.\s*KES\s*([\d,]+\.?\d*)\s+sent to\s+(.+?)\s+(?:on\s+([\d\/]+)\s+at\s+([\d:]+\s*(?:AM|PM))\.\s*New M-PESA balance is\s+KES\s*([\d,]+\.?\d*)\.\s*Transaction cost,\s*KES\s*([\d,]+\.?\d*))/si',
             $sms, $m
@@ -165,7 +206,7 @@ class MpesaSmsParser
                     'subtype'     => 'send_money',
                     'reference'   => $m[1],
                     'amount'      => self::parseAmount($m[2]),
-                    'recipient'   => trim($phoneMatch[1]), // Name without phone number
+                    'recipient'   => trim($phoneMatch[1]),
                     'date'        => self::parseDate($m[4], $m[5]),
                     'balance'     => self::parseAmount($m[6]),
                     'fee'         => self::parseAmount($m[7]),
