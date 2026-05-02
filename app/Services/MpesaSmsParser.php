@@ -50,6 +50,58 @@ class MpesaSmsParser
             ];
         }
 
+        // Bank to Airtel Money transfer (outgoing leg from bank).
+        // Uses Airtel Money Ref ID (m[4]) as reference so it matches the received SMS.
+        if (preg_match(
+            '/Bank to Airtel Money Transfer of KES ([\d,]+\.?\d*)\s+to\s+([\d]+)\s+successfully processed\.\s*Transaction Ref ID:\s*(\w+)\.\s*Airtel Money Ref ID:\s*(\w+)/si',
+            $sms, $m
+        )) {
+            $phoneNumber    = trim($m[2]);
+            $isSelfTransfer = str_contains($phoneNumber, '254731609277');
+
+            return [
+                'bank'        => 'im_bank',
+                'type'        => $isSelfTransfer ? 'transfer' : 'expense',
+                'subtype'     => $isSelfTransfer ? 'bank_to_airtel_self' : 'bank_to_airtel',
+                'reference'   => $m[4],  // Airtel Money Ref ID — matches the received SMS for dedup
+                'amount'      => self::parseAmount($m[1]),
+                'date'        => now(),
+                'balance'     => null,
+                'fee'         => 0,
+                'description' => 'Bank to Airtel Money transfer',
+            ];
+        }
+
+        // Airtel received SMS from own bank — second leg of bank→airtel self transfer.
+        // "You've received KES X from SILAS OUNO SE JE. Airtel Ref:XXXXX."
+        // No date in this SMS format so we use now().
+        if (preg_match(
+            '/You\'ve received\s+KES\s*([\d,]+\.?\d*)\s+from\s+(.+?)\.\s*Airtel Ref:\s*(\w+)/si',
+            $sms, $m
+        )) {
+            $sender         = trim($m[2]);
+            $isSelfTransfer = stripos($sender, 'SILAS OUNO SE JE') !== false
+                || stripos($sender, 'SILAS SEJE') !== false;
+
+            if (!$isSelfTransfer) {
+                return null; // Not our transaction — ignore
+            }
+
+            return [
+                'bank'        => 'im_bank',
+                'type'        => 'transfer',
+                'subtype'     => 'bank_to_airtel_self',
+                'reference'   => $m[3],  // Airtel Ref — matches outgoing SMS reference for dedup
+                'amount'      => self::parseAmount($m[1]),
+                'sender'      => $sender,
+                'date'        => now(),
+                'balance'     => null,
+                'fee'         => 0,
+                'description' => 'Bank to Airtel Money transfer',
+            ];
+        }
+
+        // ATM withdrawal
         if (preg_match(
             '/Dear\s+\w+,\s+you\s+withdrew\s+KES\s*([\d,]+\.?\d*)\s+on\s+([\d-]+)\s+([\d:]+)\s+at\s+(.+?)\s+using/si',
             $sms, $m

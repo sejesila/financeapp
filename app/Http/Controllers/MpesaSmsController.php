@@ -24,7 +24,6 @@ class MpesaSmsController extends Controller
         // ── 1. Authenticate ───────────────────────────────────────────────
         $secret = $request->header('X-Webhook-Secret')
             ?? $request->input('secret');
-        \Illuminate\Log\log($secret);
 
         if ($secret !== config('services.mpesa_webhook.secret')) {
             Log::warning('Webhook: invalid secret', ['ip' => $request->ip()]);
@@ -63,7 +62,7 @@ class MpesaSmsController extends Controller
             ->exists();
 
         // Also check Transfer table for subtypes stored as transfers
-        if (!$alreadyExists && in_array($parsed['subtype'], ['atm_withdrawal', 'account_transfer', 'bank_to_mpesa_self'])) {
+        if (!$alreadyExists && in_array($parsed['subtype'], ['atm_withdrawal', 'account_transfer', 'bank_to_mpesa_self', 'bank_to_airtel_self'])) {
             $alreadyExists = Transfer::withoutGlobalScopes()
                 ->where('user_id', $user->id)
                 ->where('description', 'like', '%' . $parsed['reference'] . '%')
@@ -83,18 +82,21 @@ class MpesaSmsController extends Controller
         }
 
         // ── 5b. Route bank → own Mpesa self transfer ──────────────────────
-        //        Triggered by either the bank SMS or the Mpesa confirmation SMS.
-        //        Whichever arrives second will be caught by the duplicate check above.
         if ($parsed['subtype'] === 'bank_to_mpesa_self') {
             return $this->handleBankToMpesaSelfTransfer($user, $parsed);
         }
 
-        // ── 5c. Route outgoing account transfer (e.g. Mpesa → Airtel) ─────
+        // ── 5c. Route bank → own Airtel Money self transfer ───────────────
+        if ($parsed['subtype'] === 'bank_to_airtel_self') {
+            return $this->handleBankToAirtelSelfTransfer($user, $parsed);
+        }
+
+        // ── 5d. Route outgoing account transfer (e.g. Mpesa → Airtel) ─────
         if ($parsed['subtype'] === 'account_transfer' && $parsed['type'] === 'transfer' && isset($parsed['to_account_hint'])) {
             return $this->handleOutgoingAccountTransfer($user, $parsed);
         }
 
-        // ── 5d. Route incoming account transfer (e.g. Airtel → Mpesa) ─────
+        // ── 5e. Route incoming account transfer (e.g. Airtel → Mpesa) ─────
         if ($parsed['subtype'] === 'account_transfer' && $parsed['type'] === 'transfer' && isset($parsed['from_account_hint'])) {
             return $this->handleIncomingAccountTransfer($user, $parsed);
         }
@@ -175,7 +177,6 @@ class MpesaSmsController extends Controller
             'category'  => $categoryName,
         ];
 
-        // Add fee to response if present
         if (isset($parsed['fee']) && $parsed['fee'] > 0) {
             $responseData['fee'] = $parsed['fee'];
         }
@@ -225,12 +226,12 @@ class MpesaSmsController extends Controller
         });
 
         Log::info('Webhook: bank → mpesa self transfer recorded', [
-            'user_id'   => $user->id,
-            'reference' => $parsed['reference'],
-            'amount'    => $parsed['amount'],
-            'from'      => $bankAccount->name,
-            'to'        => $mpesaAccount->name,
-            'source_sms'=> $parsed['bank'], // 'im_bank' or 'mpesa' — tells you which leg triggered it
+            'user_id'    => $user->id,
+            'reference'  => $parsed['reference'],
+            'amount'     => $parsed['amount'],
+            'from'       => $bankAccount->name,
+            'to'         => $mpesaAccount->name,
+            'source_sms' => $parsed['bank'],
         ]);
 
         return response()->json([
@@ -239,6 +240,64 @@ class MpesaSmsController extends Controller
             'amount'  => $parsed['amount'],
             'from'    => $bankAccount->name,
             'to'      => $mpesaAccount->name,
+        ], 201);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Bank → Own Airtel Money (self transfer)
+    // Two SMS legs both come from I&M bank, linked by the Airtel Money Ref ID.
+    // Whichever leg arrives second is caught by the duplicate check.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private function handleBankToAirtelSelfTransfer(User $user, array $parsed): JsonResponse
+    {
+        $bankAccount = Account::withoutGlobalScopes()
+            ->where('user_id', $user->id)
+            ->where('type', 'bank')
+            ->where('is_active', true)
+            ->first();
+
+        $airtelAccount = Account::withoutGlobalScopes()
+            ->where('user_id', $user->id)
+            ->where('type', 'airtel_money')
+            ->where('is_active', true)
+            ->first();
+
+        if (!$bankAccount || !$airtelAccount) {
+            Log::warning('Webhook: bank→airtel self transfer — bank or airtel account not found', [
+                'user_id' => $user->id,
+            ]);
+            return response()->json(['error' => 'Bank or Airtel Money account not found'], 404);
+        }
+
+        DB::transaction(function () use ($user, $parsed, $bankAccount, $airtelAccount) {
+            Transfer::create([
+                'user_id'         => $user->id,
+                'from_account_id' => $bankAccount->id,
+                'to_account_id'   => $airtelAccount->id,
+                'amount'          => $parsed['amount'],
+                'date'            => $parsed['date'],
+                'description'     => $parsed['description'] . ' [' . $parsed['reference'] . ']',
+            ]);
+
+            $bankAccount->updateBalance();
+            $airtelAccount->updateBalance();
+        });
+
+        Log::info('Webhook: bank → airtel self transfer recorded', [
+            'user_id'   => $user->id,
+            'reference' => $parsed['reference'],
+            'amount'    => $parsed['amount'],
+            'from'      => $bankAccount->name,
+            'to'        => $airtelAccount->name,
+        ]);
+
+        return response()->json([
+            'status'  => 'created',
+            'subtype' => 'bank_to_airtel_self',
+            'amount'  => $parsed['amount'],
+            'from'    => $bankAccount->name,
+            'to'      => $airtelAccount->name,
         ], 201);
     }
 
