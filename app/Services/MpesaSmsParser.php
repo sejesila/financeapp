@@ -294,10 +294,10 @@ class MpesaSmsParser
 
         // 6. Till / Lipa Na M-PESA Till
         if (preg_match(
-            '/^(\w+)\s+Confirmed\.\s*KES\s*([\d,]+\.?\d*)\s+paid to\s+(.+?)\s+on\s+([\d\/]+)\s+at\s+([\d:]+\s*(?:AM|PM))\.\s*New M-PESA balance is\s+KES\s*([\d,]+\.?\d*)\.\s*Transaction cost,\s*KES\s*([\d,]+\.?\d*)/si',
+            '/^(\w+)\s+Confirmed\.\s*KES\s*([\d,]+\.?\d*)\s+paid to\s+(.+?)\s+on\s+([\d\/]+)\s+at\s+([\d:]+\s*(?:AM|PM))\.+\s*New M-PESA balance is\s+KES\s*([\d,]+\.?\d*)\.\s*Transaction cost,\s*KES\s*([\d,]+\.?\d*)/si',
             $sms, $m
         )) {
-            $recipient = trim(preg_replace('/[\s\d.]+$/', '', $m[3]));
+            $recipient = trim(preg_replace('/\.+$/', '', trim($m[3]))); // strip trailing dots from recipient
             return [
                 'bank'        => 'mpesa',
                 'type'        => 'expense',

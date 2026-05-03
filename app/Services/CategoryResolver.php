@@ -8,10 +8,6 @@ use App\Models\User;
 
 class CategoryResolver
 {
-    // ─────────────────────────────────────────────────────────────────────
-    // Public API
-    // ─────────────────────────────────────────────────────────────────────
-
     /**
      * Derive the human-readable category name from a parsed SMS array.
      */
@@ -150,8 +146,8 @@ class CategoryResolver
         $r = strtolower($recipient);
 
         if (str_contains($r, 'naivas') || str_contains($r, 'quick mart')
-            || str_contains($r, 'vuno') || str_contains($r, 'cleanshelf')
-            || str_contains($r, 'eastmatt')) {
+            || str_contains($r, 'vuno') || str_contains($r, 'jeremiah mutuku')
+            || str_contains($r, 'waeconmatt')) {
             return 'Groceries';
         }
 
