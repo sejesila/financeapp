@@ -459,7 +459,7 @@ class MpesaSmsParserTest extends TestCase
         $this->assertEquals('account_transfer', $result['subtype']);
         $this->assertEquals('UD788BW2M5', $result['reference']);
         $this->assertEquals(4000.00, $result['amount']);
-        $this->assertEquals('mshwari', $result['to_account_hint']);
+        $this->assertEquals('m-shwari', $result['to_account_hint']);
         $this->assertArrayNotHasKey('from_account_hint', $result);
         $this->assertEquals(431.30, $result['balance']);
         $this->assertEquals(0, $result['fee']);
@@ -479,7 +479,7 @@ class MpesaSmsParserTest extends TestCase
         $this->assertEquals('account_transfer', $result['subtype']);
         $this->assertEquals('UD98808BZN', $result['reference']);
         $this->assertEquals(1000.00, $result['amount']);
-        $this->assertEquals('mshwari', $result['from_account_hint']);
+        $this->assertEquals('m-shwari', $result['from_account_hint']);
         $this->assertArrayNotHasKey('to_account_hint', $result);
         $this->assertEquals(1266.30, $result['balance']); // M-PESA balance (destination)
         $this->assertEquals(0, $result['fee']);

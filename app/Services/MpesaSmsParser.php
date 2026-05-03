@@ -201,7 +201,7 @@ class MpesaSmsParser
                 'date'            => self::parseDate($m[3], $m[4]),
                 'balance'         => self::parseAmount($m[5]),
                 'fee'             => 0,
-                'to_account_hint' => 'mshwari',
+                'to_account_hint' => 'm-shwari',
                 'description'     => 'Transfer to M-Shwari',
             ];
         }
@@ -220,7 +220,7 @@ class MpesaSmsParser
                 'date'              => self::parseDate($m[3], $m[4]),
                 'balance'           => self::parseAmount($m[6]), // M-PESA balance (destination)
                 'fee'               => 0,
-                'from_account_hint' => 'mshwari',
+                'from_account_hint' => 'm-shwari',
                 'description'       => 'Transfer from M-Shwari',
             ];
         }
