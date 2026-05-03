@@ -445,4 +445,119 @@ class MpesaSmsParserTest extends TestCase
         $this->assertNotNull($result2);
         $this->assertEquals('pochi', $result2['subtype']);
     }
+    // ── M-Shwari deposit (Mpesa → M-Shwari) ──────────────────────────────────────
+
+    public function test_mshwari_deposit_is_transfer()
+    {
+        $sms = 'UD788BW2M5 Confirmed.Ksh4,000.00 transferred to M-Shwari account on 7/4/26 at 5:14 PM. M-PESA balance is Ksh431.30 .New M-Shwari saving account balance is Ksh4,000.94. Transaction cost Ksh.0.00';
+
+        $result = MpesaSmsParser::parse($sms);
+
+        $this->assertNotNull($result);
+        $this->assertEquals('mpesa', $result['bank']);
+        $this->assertEquals('transfer', $result['type']);
+        $this->assertEquals('account_transfer', $result['subtype']);
+        $this->assertEquals('UD788BW2M5', $result['reference']);
+        $this->assertEquals(4000.00, $result['amount']);
+        $this->assertEquals('mshwari', $result['to_account_hint']);
+        $this->assertArrayNotHasKey('from_account_hint', $result);
+        $this->assertEquals(431.30, $result['balance']);
+        $this->assertEquals(0, $result['fee']);
+    }
+
+// ── M-Shwari withdrawal (M-Shwari → Mpesa) ───────────────────────────────────
+
+    public function test_mshwari_withdrawal_is_transfer()
+    {
+        $sms = 'UD98808BZN Confirmed.Ksh1,000.00 transferred from M-Shwari account on 9/4/26 at 7:04 PM. M-Shwari balance is Ksh3,000.94 .M-PESA balance is Ksh1,266.30 .Transaction cost Ksh.0.00';
+
+        $result = MpesaSmsParser::parse($sms);
+
+        $this->assertNotNull($result);
+        $this->assertEquals('mpesa', $result['bank']);
+        $this->assertEquals('transfer', $result['type']);
+        $this->assertEquals('account_transfer', $result['subtype']);
+        $this->assertEquals('UD98808BZN', $result['reference']);
+        $this->assertEquals(1000.00, $result['amount']);
+        $this->assertEquals('mshwari', $result['from_account_hint']);
+        $this->assertArrayNotHasKey('to_account_hint', $result);
+        $this->assertEquals(1266.30, $result['balance']); // M-PESA balance (destination)
+        $this->assertEquals(0, $result['fee']);
+    }
+
+// ── KES. normalization (Transaction cost Ksh.0.00) ───────────────────────────
+
+    public function test_kes_dot_amount_normalised_correctly()
+    {
+        // Both M-Shwari SMS formats use "Transaction cost Ksh.0.00" — no space, dot before digits
+        $sms = 'UD788BW2M5 Confirmed.Ksh4,000.00 transferred to M-Shwari account on 7/4/26 at 5:14 PM. M-PESA balance is Ksh431.30 .New M-Shwari saving account balance is Ksh4,000.94. Transaction cost Ksh.0.00';
+
+        $result = MpesaSmsParser::parse($sms);
+
+        $this->assertNotNull($result);
+        // Fee must be 0.00, not garbage from a failed parse
+        $this->assertEquals(0, $result['fee']);
+    }
+
+// ── Till: trailing number + dot stripped from recipient ───────────────────────
+
+    public function test_till_trailing_number_stripped_from_recipient()
+    {
+        // Merchant reference number + dot appears after the name (e.g. "JEREMIAH MUTUKU MWANTHI 7.")
+        $sms = 'UDT882GNBT Confirmed. KES850.00 paid to JEREMIAH MUTUKU MWANTHI 7. on 29/4/26 at 3:07 PM. New M-PESA balance is KES19,955.30. Transaction cost, KES0.00. Amount you can transact within the day is 492,755.00. Save frequent Tills for quick payment on M-PESA app https://bit.ly/mpesalnk';
+
+        $result = MpesaSmsParser::parse($sms);
+
+        $this->assertNotNull($result);
+        $this->assertEquals('till', $result['subtype']);
+        $this->assertEquals(850.00, $result['amount']);
+        // Trailing " 7." must be stripped — only the name remains
+        $this->assertEquals('JEREMIAH MUTUKU MWANTHI', $result['recipient']);
+        $this->assertEquals(19955.30, $result['balance']);
+        $this->assertEquals(0.00, $result['fee']);
+    }
+
+    public function test_till_double_dot_does_not_corrupt_fee()
+    {
+        // Original bug: double dot before "New M-PESA balance" caused fee to capture wrong group
+        $sms = 'UE3882WEM2 Confirmed. Ksh308.00 paid to Waeconmatt Limited -Tassia Branch.. on 3/5/26 at 11:44 AM.New M-PESA balance is Ksh5,723.30. Transaction cost, Ksh0.00. Amount you can transact within the day is 499,592.00. Save frequent Tills for quick payment on M-PESA app https://bit.ly/mpesalnk';
+
+        $result = MpesaSmsParser::parse($sms);
+
+        $this->assertNotNull($result);
+        $this->assertEquals('till', $result['subtype']);
+        $this->assertEquals(308.00, $result['amount']);
+        $this->assertEquals('Waeconmatt Limited -Tassia Branch', $result['recipient']);
+        $this->assertEquals(5723.30, $result['balance']);
+        $this->assertEquals(0.00, $result['fee']); // Was incorrectly KES 7 before the fix
+    }
+
+    public function test_till_naivas_resolves_to_groceries()
+    {
+        $sms = 'UDQ88254RC Confirmed. Ksh6,774.00 paid to NAIVAS DEVELOPMENT HOUSE. on 26/4/26 at 6:16 PM. New M-PESA balance is Ksh30,586.30. Transaction cost, Ksh0.00. Amount you can transact within the day is 490,896.00. Save frequent Tills for quick payment on M-PESA app https://bit.ly/mpesalnk';
+
+        $result = MpesaSmsParser::parse($sms);
+
+        $this->assertNotNull($result);
+        $this->assertEquals('till', $result['subtype']);
+        $this->assertEquals(6774.00, $result['amount']);
+        $this->assertEquals('NAIVAS DEVELOPMENT HOUSE', $result['recipient']);
+        $this->assertEquals(30586.30, $result['balance']);
+        $this->assertEquals(0.00, $result['fee']);
+    }
+
+    public function test_till_quick_mart_multi_word_name()
+    {
+        $sms = 'UDT882FVA5 Confirmed. Ksh1,595.00 paid to Quick Mart Tom Mboya. on 29/4/26 at 12:15 PM. New M-PESA balance is Ksh24,155.30. Transaction cost, Ksh0.00. Amount you can transact within the day is 496,895.00. Save frequent Tills for quick payment on M-PESA app https://bit.ly/mpesalnk';
+
+        $result = MpesaSmsParser::parse($sms);
+
+        $this->assertNotNull($result);
+        $this->assertEquals('till', $result['subtype']);
+        $this->assertEquals(1595.00, $result['amount']);
+        // Multi-word name with location suffix must be preserved intact
+        $this->assertEquals('Quick Mart Tom Mboya', $result['recipient']);
+        $this->assertEquals(24155.30, $result['balance']);
+        $this->assertEquals(0.00, $result['fee']);
+    }
 }

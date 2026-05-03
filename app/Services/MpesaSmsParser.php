@@ -167,7 +167,7 @@ class MpesaSmsParser
             ];
         }
 
-        // 2. Inter-account sent (Mpesa → Airtel Money via paybill)
+        // 2a. Inter-account sent (Mpesa → Airtel Money via paybill)
         if (preg_match(
             '/^(\w+)\s+Confirmed\.\s*KES\s*([\d,]+\.?\d*)\s+sent to\s+(AIRTEL MONEY|AIRTEL).+?for account\s+(\d+)\s+on\s+([\d\/]+)\s+at\s+([\d:]+\s*(?:AM|PM))\.?\s+New M-PESA balance is\s+KES\s*([\d,]+\.?\d*)/si',
             $sms, $m
@@ -185,6 +185,43 @@ class MpesaSmsParser
                 'balance'           => self::parseAmount($m[7]),
                 'fee'               => 0,
                 'description'       => 'Transfer to ' . trim($m[3]),
+            ];
+        }
+        // 2b. M-Shwari deposit — Mpesa → M-Shwari
+        if (preg_match(
+            '/^(\w+)\s+Confirmed\.\s*KES\s*([\d,]+\.?\d*)\s+transferred to M-Shwari account\s+on\s+([\d\/]+)\s+at\s+([\d:]+\s*(?:AM|PM))\.\s*M-PESA balance is\s+KES\s*([\d,]+\.?\d*)/si',
+            $sms, $m
+        )) {
+            return [
+                'bank'            => 'mpesa',
+                'type'            => 'transfer',
+                'subtype'         => 'account_transfer',
+                'reference'       => $m[1],
+                'amount'          => self::parseAmount($m[2]),
+                'date'            => self::parseDate($m[3], $m[4]),
+                'balance'         => self::parseAmount($m[5]),
+                'fee'             => 0,
+                'to_account_hint' => 'mshwari',
+                'description'     => 'Transfer to M-Shwari',
+            ];
+        }
+
+// 2c. M-Shwari withdrawal — M-Shwari → Mpesa
+        if (preg_match(
+            '/^(\w+)\s+Confirmed\.\s*KES\s*([\d,]+\.?\d*)\s+transferred from M-Shwari account\s+on\s+([\d\/]+)\s+at\s+([\d:]+\s*(?:AM|PM))\.\s*M-Shwari balance is\s+KES\s*([\d,]+\.?\d*).*?M-PESA balance is\s+KES\s*([\d,]+\.?\d*)/si',
+            $sms, $m
+        )) {
+            return [
+                'bank'              => 'mpesa',
+                'type'              => 'transfer',
+                'subtype'           => 'account_transfer',
+                'reference'         => $m[1],
+                'amount'            => self::parseAmount($m[2]),
+                'date'              => self::parseDate($m[3], $m[4]),
+                'balance'           => self::parseAmount($m[6]), // M-PESA balance (destination)
+                'fee'               => 0,
+                'from_account_hint' => 'mshwari',
+                'description'       => 'Transfer from M-Shwari',
             ];
         }
 
@@ -297,7 +334,7 @@ class MpesaSmsParser
             '/^(\w+)\s+Confirmed\.\s*KES\s*([\d,]+\.?\d*)\s+paid to\s+(.+?)\s+on\s+([\d\/]+)\s+at\s+([\d:]+\s*(?:AM|PM))\.+\s*New M-PESA balance is\s+KES\s*([\d,]+\.?\d*)\.\s*Transaction cost,\s*KES\s*([\d,]+\.?\d*)/si',
             $sms, $m
         )) {
-            $recipient = trim(preg_replace('/\.+$/', '', trim($m[3]))); // strip trailing dots from recipient
+            $recipient = trim(preg_replace('/[\s\d]*\.+$|[\s\d]+$/', '', trim($m[3]))); // strip trailing dots from recipient
             return [
                 'bank'        => 'mpesa',
                 'type'        => 'expense',
@@ -355,9 +392,8 @@ class MpesaSmsParser
     {
         $r = strtolower($recipient);
 
-        if (str_contains($r, 'sanlam')) {
-            return 'sanlam mmf';
-        }
+        if (str_contains($r, 'sanlam'))  return 'sanlam mmf';
+        if (str_contains($r, 'mshwari') || str_contains($r, 'm-shwari')) return 'mshwari';
 
         return null;
     }

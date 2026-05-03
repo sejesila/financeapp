@@ -22,7 +22,6 @@ class MpesaSmsController extends Controller
 
     public function handle(Request $request): JsonResponse
     {
-        Log::info('triggered');
 
         // ── 1. Authenticate ───────────────────────────────────────────────
         $secret = $request->header('X-Webhook-Secret')
@@ -48,10 +47,12 @@ class MpesaSmsController extends Controller
         $parsed = MpesaSmsParser::parse($smsBody);
 
         if (!$parsed) {
-            Log::info('Webhook: SMS not recognised, skipping', [
-                'user_id' => $user->id,
-                'sms'     => $smsBody,
-            ]);
+            if (config('app.debug')) {
+                Log::info('Webhook: SMS not recognised, skipping', [
+                    'user_id' => $user->id,
+                    'sms'     => $smsBody,
+                ]);
+            }
             return response()->json([
                 'status' => 'ignored',
                 'reason' => 'SMS not recognised as a tracked transaction',
