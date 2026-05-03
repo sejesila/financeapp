@@ -41,7 +41,10 @@ class AccountController extends Controller
             ->where('type', 'savings')
             ->get();
 
-        $totalBalance = number_format($accounts->sum('current_balance'), 2, '.', '');
+        $totalBalance = number_format(
+            $accounts->sum('current_balance') + $walletAccounts->sum('current_balance'),
+            2, '.', ''
+        );
         $totalSavings = number_format($savingsAccounts->sum('current_balance'), 2, '.', '');
 
         $transferSearch = $request->input('transfer_search');
@@ -316,6 +319,11 @@ class AccountController extends Controller
             abort(403);
         }
 
+        if (in_array($account->type, ['savings', 'wallet'])) {
+            return redirect()->route('accounts.index')
+                ->with('error', 'This account can only receive money via transfers.');
+        }
+
         [$categories, $showSaccoDividends] = $this->topUpService->getCategories($account->type);
 
         return view('accounts.topup', compact('account', 'categories', 'showSaccoDividends'));
@@ -327,6 +335,11 @@ class AccountController extends Controller
     {
         if ($account->user_id !== Auth::id()) {
             abort(403);
+        }
+
+        if (in_array($account->type, ['savings', 'wallet'])) {
+            return redirect()->route('accounts.index')
+                ->with('error', 'This account can only receive money via transfers.');
         }
 
         $request->validate([

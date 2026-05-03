@@ -56,8 +56,9 @@
                         <span class="balance-amount hidden">KES {{ number_format($totalBalance, 0, '.', ',') }}</span>
                         <span class="balance-placeholder">KES ••••••</span>
                     </p>
+                    @php $totalAccountCount = $accounts->count() + $walletAccounts->count(); @endphp
                     <p class="text-xs mt-1 opacity-90">
-                        Across {{ $accounts->count() }} {{ Str::plural('account', $accounts->count()) }}
+                        Across {{ $totalAccountCount }} {{ Str::plural('account', $totalAccountCount) }}
                     </p>
                 </div>
 
@@ -263,16 +264,12 @@
                                         </p>
                                     @endif
 
-                                    <div class="flex flex-col sm:flex-row gap-2">
-                                        <button onclick="openSavingsViewPinModal('{{ route('accounts.show', $account) }}')"
-                                                class="flex-1 bg-green-500 text-white text-center py-2 rounded hover:bg-green-600 text-xs sm:text-sm">
-                                            View
-                                        </button>
-                                        <a href="{{ route('accounts.topup', $account) }}"
-                                           class="flex-1 bg-emerald-500 text-white text-center py-2 rounded hover:bg-emerald-600 text-xs sm:text-sm">
-                                            Deposit
-                                        </a>
-                                    </div>
+                                        <div class="flex flex-col sm:flex-row gap-2">
+                                            <button onclick="openSavingsViewPinModal('{{ route('accounts.show', $account) }}')"
+                                                    class="flex-1 bg-green-500 text-white text-center py-2 rounded hover:bg-green-600 text-xs sm:text-sm">
+                                                View
+                                            </button>
+                                        </div>
 
                                 </div>
                             </div>
@@ -324,16 +321,12 @@
                                         </p>
                                     @endif
 
-                                    <div class="flex flex-col sm:flex-row gap-2">
-                                        <a href="{{ route('accounts.show', $account) }}"
-                                           class="flex-1 bg-blue-500 text-white text-center py-2 rounded hover:bg-blue-600 text-xs sm:text-sm">
-                                            View
-                                        </a>
-                                        <a href="{{ route('accounts.topup', $account) }}"
-                                           class="flex-1 bg-indigo-500 text-white text-center py-2 rounded hover:bg-indigo-600 text-xs sm:text-sm">
-                                            Top Up
-                                        </a>
-                                    </div>
+                                        <div class="flex flex-col sm:flex-row gap-2">
+                                            <a href="{{ route('accounts.show', $account) }}"
+                                               class="flex-1 bg-blue-500 text-white text-center py-2 rounded hover:bg-blue-600 text-xs sm:text-sm">
+                                                View
+                                            </a>
+                                        </div>
 
                                 </div>
                             </div>

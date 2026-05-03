@@ -1030,7 +1030,7 @@ it('uses a default description when none is provided for a top-up', function () 
     ]);
 });
 
-it('uses "Deposit to" default description for savings accounts', function () {
+it('prevents top-up to savings accounts (only allows transfers)', function () {
     $user    = User::factory()->create();
     $account = Account::factory()->create(['user_id' => $user->id, 'type' => 'savings', 'name' => 'Emergency Fund', 'current_balance' => 0, 'initial_balance' => 0]);
 
@@ -1042,12 +1042,11 @@ it('uses "Deposit to" default description for savings accounts', function () {
             'amount'      => 2000,
             'category_id' => $cat->id,
             'date'        => now()->toDateString(),
-        ]);
+        ])
+        ->assertRedirect(route('accounts.index'))
+        ->assertSessionHas('error');
 
-    $this->assertDatabaseHas('transactions', [
-        'account_id'  => $account->id,
-        'description' => 'Deposit to Emergency Fund',
-    ]);
+    $this->assertDatabaseCount('transactions', 0);
 });
 
 it('validates required fields on top-up store', function () {
