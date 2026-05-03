@@ -131,7 +131,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('loans', LoanController::class)->except(['edit', 'update']);
 
     Route::prefix('loans')->name('loans.')->group(function () {
-        // Loan payment routes
+        // Loan payment routes//
         Route::get('{loan}/payment', [LoanController::class, 'paymentForm'])->name('payment');
         Route::post('{loan}/payment', [LoanController::class, 'recordPayment'])->name('payment.store');
     });
