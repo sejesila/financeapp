@@ -15,14 +15,14 @@
                 </p>
 
                 <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                    @if (($accounts->count() + $savingsAccounts->count()) >= 2)
+                    @if (($accounts->count() + $savingsAccounts->count() + $walletAccounts->count()) >= 2)
                         <a href="{{ route('accounts.transfer') }}"
                            class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded text-sm text-center w-full sm:w-auto">
                             ↔ Transfer Money
                         </a>
                     @endif
 
-                    @if (($accounts->count() + $savingsAccounts->count()) < 7)
+                    @if (($accounts->count() + $savingsAccounts->count() + $walletAccounts->count()) < 7)
                         <a href="{{ route('accounts.create') }}"
                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm text-center w-full sm:w-auto">
                             + Add Account
@@ -117,7 +117,7 @@
             </div>
 
             <!-- Show/Hide Low Balance Accounts Toggle -->
-            @if($accounts->count() > 0 || $savingsAccounts->count() > 0)
+            @if($accounts->count() > 0 || $savingsAccounts->count() > 0 || $walletAccounts->count() > 0)
                 <div class="mb-4 flex justify-end">
                     <button onclick="toggleLowBalanceAccounts()"
                             class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 flex items-center gap-2">
@@ -198,13 +198,15 @@
                 </div>
             @endif
 
-            <!-- Savings Accounts Grid -->
-            @if($savingsAccounts->count() > 0)
+            <!-- Savings & Wallets Grid -->
+            @if($savingsAccounts->count() > 0 || $walletAccounts->count() > 0)
                 <div class="mb-6">
                     <h3 class="text-base sm:text-lg font-semibold mb-3 text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                        <span>💰</span> Savings Accounts
+                        <span>💰</span> Savings & Wallets
                     </h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
+
+                        {{-- Savings accounts (PIN protected, green gradient) --}}
                         @foreach($savingsAccounts as $account)
                             @php $isLowBalance = $account->current_balance < 1; @endphp
                             <div class="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg shadow-md border-2 border-green-200 dark:border-green-700 {{ $isLowBalance ? 'low-balance-account hidden opacity-60' : '' }}">
@@ -220,11 +222,7 @@
 
                                     <div class="flex items-center gap-3 mb-3">
                                         <div class="w-10 h-10 rounded-full flex items-center justify-center bg-green-100 dark:bg-green-800">
-                                            @if(str_contains(strtolower($account->name), 'mshwari'))
-                                                <img src="{{ asset('images/mpesa.png') }}" alt="M-Shwari" class="w-8 h-8 object-contain">
-                                            @elseif(str_contains(strtolower($account->name), 'kcb'))
-                                                <span class="text-green-700 dark:text-green-300 font-bold text-xs">KCB</span>
-                                            @elseif(str_contains(strtolower($account->name), 'sanlam'))
+                                            @if(str_contains(strtolower($account->name), 'sanlam'))
                                                 <span class="text-green-700 dark:text-green-300 font-bold text-xs">SAN</span>
                                             @else
                                                 <span class="text-green-700 dark:text-green-300 font-bold">💵</span>
@@ -279,12 +277,74 @@
                                 </div>
                             </div>
                         @endforeach
+
+                        {{-- Wallet accounts (no PIN, neutral styling) --}}
+                        @foreach($walletAccounts as $account)
+                            @php $isLowBalance = $account->current_balance < 1; @endphp
+                            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-blue-200 dark:border-blue-800 {{ $isLowBalance ? 'low-balance-account hidden opacity-60' : '' }}">
+                                <div class="p-4">
+
+                                    @if($isLowBalance)
+                                        <div class="mb-2">
+                                            <span class="inline-block bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">
+                                                ⚠️ Low Balance
+                                            </span>
+                                        </div>
+                                    @endif
+
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <div class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-50 dark:bg-blue-900/30">
+                                            @if(str_contains(strtolower($account->name), 'm-shwari') || str_contains(strtolower($account->name), 'mshwari'))
+                                                <img src="{{ asset('images/mpesa.png') }}" alt="M-Shwari" class="w-8 h-8 object-contain">
+                                            @elseif(str_contains(strtolower($account->name), 'kcb'))
+                                                <span class="text-blue-700 dark:text-blue-300 font-bold text-xs">KCB</span>
+                                            @else
+                                                <span class="text-blue-700 dark:text-blue-300 font-bold">{{ substr($account->name, 0, 1) }}</span>
+                                            @endif
+                                        </div>
+                                        <div class="min-w-0">
+                                            <h3 class="font-semibold text-sm text-gray-800 dark:text-gray-200 truncate">
+                                                {{ $account->name }}
+                                            </h3>
+                                            <p class="text-xs text-blue-600 dark:text-blue-400">Wallet</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3 balance-hidden">
+                                        <p class="text-xs text-gray-600 dark:text-gray-400">Available Balance</p>
+                                        <p class="text-xl font-bold {{ $account->current_balance >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600' }}">
+                                            <span class="balance-amount hidden">KES {{ number_format($account->current_balance, 0, '.', ',') }}</span>
+                                            <span class="balance-placeholder">KES ••••••</span>
+                                        </p>
+                                    </div>
+
+                                    @if($account->notes)
+                                        <p class="text-xs text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                                            {{ $account->notes }}
+                                        </p>
+                                    @endif
+
+                                    <div class="flex flex-col sm:flex-row gap-2">
+                                        <a href="{{ route('accounts.show', $account) }}"
+                                           class="flex-1 bg-blue-500 text-white text-center py-2 rounded hover:bg-blue-600 text-xs sm:text-sm">
+                                            View
+                                        </a>
+                                        <a href="{{ route('accounts.topup', $account) }}"
+                                           class="flex-1 bg-indigo-500 text-white text-center py-2 rounded hover:bg-indigo-600 text-xs sm:text-sm">
+                                            Top Up
+                                        </a>
+                                    </div>
+
+                                </div>
+                            </div>
+                        @endforeach
+
                     </div>
                 </div>
             @endif
 
             <!-- Empty State -->
-            @if($accounts->count() === 0 && $savingsAccounts->count() === 0)
+            @if($accounts->count() === 0 && $savingsAccounts->count() === 0 && $walletAccounts->count() === 0)
                 <div class="col-span-full text-center py-10 bg-gray-50 dark:bg-gray-700 rounded-lg">
                     <p class="text-gray-500 text-sm mb-4 px-4">
                         No accounts yet. Create your first account to get started!
@@ -302,7 +362,6 @@
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
                         <h3 class="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200">Recent Transfers</h3>
 
-                        <!-- Search Form -->
                         <form method="GET" action="{{ route('accounts.index') }}" class="w-full sm:w-auto flex gap-2">
                             <input type="text"
                                    name="transfer_search"
@@ -348,7 +407,6 @@
                             @endforeach
                         </div>
 
-                        <!-- Pagination -->
                         <div class="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4">
                             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                                 <div class="text-xs text-gray-600 dark:text-gray-400">
@@ -393,7 +451,7 @@
             return hash.toString();
         }
 
-        // ===================== PIN UNLOCK MODAL (balance reveal) =====================
+        // ===================== PIN UNLOCK MODAL =====================
         let acctPinEntry = '';
 
         function openAcctPinModal() {
@@ -574,7 +632,6 @@
         let savingsViewTarget = '';
 
         function openSavingsViewPinModal(url) {
-            // If already unlocked, navigate directly
             const unlockedUntil = localStorage.getItem(SAVINGS_UNLOCKED_KEY);
             if (unlockedUntil && Date.now() < parseInt(unlockedUntil)) {
                 window.location.href = url;
@@ -637,7 +694,7 @@
 
     <x-floating-action-button :quickAccount="$allAccounts->first()" />
 
-    {{-- PIN Unlock Modal (balance reveal on index) --}}
+    {{-- PIN Unlock Modal --}}
     <div id="acct-pin-unlock-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden">
         <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 w-80 mx-4">
             <div class="text-center mb-5">

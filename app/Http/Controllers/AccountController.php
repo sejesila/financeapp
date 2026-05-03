@@ -31,6 +31,11 @@ class AccountController extends Controller
             ->whereIn('type', ['cash', 'mpesa', 'airtel_money', 'bank'])
             ->get();
 
+        $walletAccounts = Account::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->where('type', 'wallet')
+            ->get();
+
         $savingsAccounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
             ->where('type', 'savings')
@@ -61,7 +66,8 @@ class AccountController extends Controller
             ->get();
 
         return view('accounts.index', compact(
-            'accounts', 'savingsAccounts', 'totalBalance', 'totalSavings',
+            'accounts', 'walletAccounts', 'savingsAccounts',
+            'totalBalance', 'totalSavings',
             'recentTransfers', 'allAccounts', 'transferSearch',
         ));
     }
