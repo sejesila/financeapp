@@ -10,17 +10,17 @@
 
         .watermark { position: fixed; top: 280px; left: 40px; transform: rotate(-45deg); font-size: 80px; color: rgba(139, 92, 246, 0.08); z-index: 0; font-weight: bold; pointer-events: none; }
 
-        .header { text-align: center; padding: 20px 0; margin-bottom: 20px; background: linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%); color: white; border-radius: 8px; }
+        .header { text-align: center; padding: 20px 0; margin-bottom: 20px; background: linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%); color: white; border-radius: 8px; page-break-after: avoid; }
         .header h1 { font-size: 24px; letter-spacing: 1px; font-weight: bold; }
         .header .period { font-size: 12px; margin-top: 5px; opacity: 0.95; }
         .header .user-info { font-size: 12px; margin-top: 8px; font-weight: 600; }
 
-        .net-worth-banner { background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%); color: white; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; }
+        .net-worth-banner { background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%); color: white; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; page-break-inside: avoid; page-break-after: avoid; }
         .net-worth-banner h3 { margin: 0 0 10px 0; font-size: 11px; opacity: 0.95; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; }
         .net-worth-banner .amount { font-size: 28px; font-weight: bold; margin-bottom: 8px; }
         .net-worth-banner .breakdown { font-size: 10px; opacity: 0.9; margin-top: 8px; }
 
-        .summary-grid { display: flex; gap: 10px; margin: 20px 0; }
+        .summary-grid { display: flex; gap: 10px; margin: 20px 0; page-break-inside: avoid; page-break-after: avoid; }
         .summary-cell { flex: 1; padding: 18px; background: #FFFFFF; border: 2px solid #E5E7EB; border-radius: 8px; text-align: center; }
         .summary-cell.income  { border-left: 5px solid #10B981; }
         .summary-cell.expense { border-left: 5px solid #EF4444; }
@@ -28,15 +28,15 @@
         .summary-cell h3 { margin: 0 0 10px 0; font-size: 10px; color: #6B7280; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
         .summary-cell .amount { font-size: 20px; font-weight: bold; line-height: 1.2; }
 
-        .stats-grid { display: flex; margin: 20px 0; background: #F9FAFB; padding: 12px; border-radius: 8px; }
+        .stats-grid { display: flex; margin: 20px 0; background: #F9FAFB; padding: 12px; border-radius: 8px; page-break-inside: avoid; page-break-after: avoid; }
         .stat-cell { flex: 1; text-align: center; padding: 10px 5px; }
         .stat-label { font-size: 8px; color: #6B7280; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
         .stat-value { font-size: 14px; font-weight: bold; color: #1F2937; margin-top: 4px; }
 
-        .section { margin: 20px 0; }
-        .section-title { font-size: 13px; font-weight: bold; color: #1F2937; margin-bottom: 12px; padding: 8px 12px; background: #F9FAFB; border-left: 4px solid #8B5CF6; border-radius: 4px; }
+        .section { margin: 20px 0; page-break-inside: avoid; }
+        .section-title { font-size: 13px; font-weight: bold; color: #1F2937; margin-bottom: 12px; padding: 8px 12px; background: #F9FAFB; border-left: 4px solid #8B5CF6; border-radius: 4px; page-break-after: avoid; }
 
-        .budget-item { background: #FAFAFA; padding: 12px; margin-bottom: 10px; border-left: 4px solid; border-radius: 4px; }
+        .budget-item { background: #FAFAFA; padding: 12px; margin-bottom: 10px; border-left: 4px solid; border-radius: 4px; page-break-inside: avoid; }
         .budget-item.good    { border-color: #10B981; }
         .budget-item.warning { border-color: #F59E0B; }
         .budget-item.danger  { border-color: #EF4444; }
@@ -50,25 +50,25 @@
         .budget-fill.danger  { background: #EF4444; }
         .budget-amounts { font-size: 9px; color: #6B7280; }
 
-        .budget-grid { display: flex; flex-wrap: wrap; gap: 10px; }
-        .budget-grid .budget-item { flex: 1 1 calc(50% - 5px); min-width: 0; margin-bottom: 0; }
+        .budget-grid { display: flex; flex-wrap: wrap; gap: 10px; page-break-inside: avoid; }
+        .budget-grid .budget-item { flex: 1 1 calc(50% - 5px); min-width: 0; margin-bottom: 0; page-break-inside: avoid; }
 
-        .insights-grid { display: flex; flex-wrap: wrap; gap: 10px; }
-        .insights-grid .insight-box { flex: 1 1 calc(50% - 5px); min-width: 0; margin: 0; }
+        .insights-grid { display: flex; flex-wrap: wrap; gap: 10px; page-break-inside: avoid; }
+        .insights-grid .insight-box { flex: 1 1 calc(50% - 5px); min-width: 0; margin: 0; page-break-inside: avoid; }
 
-        table { width: 100%; border-collapse: collapse; margin: 12px 0; background: white; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; background: white; page-break-inside: avoid; }
         table th { background: #F3F4F6; padding: 10px 8px; text-align: left; font-size: 9px; color: #4B5563; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; border-bottom: 2px solid #E5E7EB; }
         table td { padding: 9px 8px; border-bottom: 1px solid #F3F4F6; font-size: 10px; }
         table tr.total-row { background: #F9FAFB; font-weight: bold; border-top: 2px solid #8B5CF6; }
 
-        .alert { padding: 12px; border-radius: 6px; margin: 12px 0; border-left: 4px solid; }
+        .alert { padding: 12px; border-radius: 6px; margin: 12px 0; border-left: 4px solid; page-break-inside: avoid; }
         .alert.warning { background: #FEF3C7; border-color: #F59E0B; color: #92400E; }
         .alert.info    { background: #DBEAFE; border-color: #3B82F6; color: #1E40AF; }
         .alert.success { background: #D1FAE5; border-color: #10B981; color: #065F46; }
         .alert-title { font-weight: bold; font-size: 10px; margin-bottom: 4px; }
         .alert-text  { font-size: 9px; line-height: 1.4; }
 
-        .insight-box { background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%); padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #6366F1; }
+        .insight-box { background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%); padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #6366F1; page-break-inside: avoid; }
         .insight-box h4 { margin: 0 0 8px 0; font-size: 11px; color: #4338CA; font-weight: bold; }
         .insight-box p  { margin: 4px 0; font-size: 10px; color: #4B5563; line-height: 1.5; }
 
@@ -78,14 +78,14 @@
         .badge.warning { background: #FEF3C7; color: #92400E; }
         .badge.neutral { background: #F3F4F6; color: #4B5563; }
 
-        .trend-box { display: flex; margin: 0 0 16px 0; background: #F9FAFB; border-radius: 8px; padding: 12px; }
+        .trend-box { display: flex; margin: 0 0 16px 0; background: #F9FAFB; border-radius: 8px; padding: 12px; page-break-inside: avoid; }
         .trend-cell { flex: 1; text-align: center; padding: 8px; border-right: 1px solid #E5E7EB; }
         .trend-cell:last-child { border-right: none; }
         .trend-label   { font-size: 8px; color: #6B7280; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px; }
         .trend-value   { font-size: 16px; font-weight: bold; margin-top: 4px; }
         .trend-subtext { font-size: 9px; color: #6B7280; margin-top: 2px; }
 
-        .footer { margin-top: 30px; padding-top: 15px; border-top: 2px solid #E5E7EB; text-align: center; font-size: 9px; color: #6B7280; }
+        .footer { margin-top: 30px; padding-top: 15px; border-top: 2px solid #E5E7EB; text-align: center; font-size: 9px; color: #6B7280; page-break-before: avoid; }
         .footer .confidential { color: #DC2626; font-weight: bold; margin-bottom: 8px; }
     </style>
 </head>

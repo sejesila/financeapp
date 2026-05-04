@@ -8,22 +8,22 @@ use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 class Kernel extends ConsoleKernel
 {
     protected $commands = [
-        Commands\SendWeeklyReports::class,
         Commands\SendMonthlyReports::class,
+        Commands\SendAnnualReports::class,
         Commands\SendCustomReport::class,
     ];
 
     protected function schedule(Schedule $schedule): void
     {
         // Check for weekly reports every hour (commands handle day/time filtering)
-        $schedule->command('reports:send-weekly')
+        $schedule->command('reports:send-annual')
             ->hourly()
             ->withoutOverlapping()
             ->onSuccess(function () {
-                \Log::info('Weekly reports sent successfully');
+                \Log::info('Annual reports sent successfully');
             })
             ->onFailure(function () {
-                \Log::error('Weekly reports failed');
+                \Log::error('Annual reports failed');
             });
 
         // Check for monthly reports every hour
