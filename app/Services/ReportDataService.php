@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ClientFund;
 use App\Models\User;
 use App\Models\Transaction;
 use App\Models\Account;
@@ -269,6 +270,9 @@ class ReportDataService
         // ✅ Active loans (only current liabilities)
         $activeLoans      = Loan::where('user_id', $user->id)->where('status', 'active')->with('account')->get();
         $totalLoanBalance = $activeLoans->sum('balance');
+        $totalClientFunds = ClientFund::where('user_id', $user->id)
+                ->whereNotIn('status', ['completed', 'cancelled'])
+                ->sum('balance');
 
         // Budget Performance (monthly only)
         $budgetPerformance = [];
@@ -309,6 +313,7 @@ class ReportDataService
             'accounts'              => $accounts,
             'total_balance'         => $totalBalance,
             'total_loans'           => $totalLoanBalance,
+            'total_client_funds'    => $totalClientFunds,
             'net_worth'             => $totalBalance - $totalLoanBalance,
             'transactions'          => match ($type) {
                 'annual'  => $transactions->take(50),
