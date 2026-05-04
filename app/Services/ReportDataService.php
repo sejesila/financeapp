@@ -121,6 +121,7 @@ class ReportDataService
 
     private function generateReport(User $user, Carbon $startDate, Carbon $endDate, string $type): array
     {
+
         // Accounts
         $accounts     = Account::where('user_id', $user->id)->where('is_active', true)->get();
         $totalBalance = $accounts->sum('current_balance');
@@ -135,6 +136,15 @@ class ReportDataService
         $income   = $transactions->filter(fn($t) => $t->category->type === 'income')->sum('amount');
         $expenses = $transactions->filter(fn($t) => $t->category->type === 'expense')->sum('amount');
         $netFlow  = $income - $expenses;
+        Log::info('Report data', [
+            'user_id'           => $user->id,
+            'start'             => $startDate,
+            'end'               => $endDate,
+            'transaction_count' => $transactions->count(),
+            'income'            => $income,
+            'expenses'          => $expenses,
+            'accounts_count'    => $accounts->count(),
+        ]);
 
         // Top Spending Categories
         $topCategories = $transactions

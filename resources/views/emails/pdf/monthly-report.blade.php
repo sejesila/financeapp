@@ -91,36 +91,64 @@
 </head>
 <body>
 
+@php
+    $currency    = 'KES';
+    $income      = $data['income']              ?? 0;
+    $expenses    = $data['expenses']            ?? 0;
+    $netFlow     = $data['net_flow']            ?? 0;
+    $savingsRate = $data['savings_rate']        ?? 0;
+    $netWorth    = $data['net_worth']           ?? 0;
+    $totalLoans  = $data['total_loans']         ?? 0;
+    $totalBal    = $data['total_balance']       ?? 0;
+    $priorIncome = $data['prior_period_income'] ?? 0;
+    $incomeTrend = $data['income_trend']        ?? null;
+    $budgetsOver  = $data['budgets_over']       ?? 0;
+    $budgetsUnder = $data['budgets_under']      ?? 0;
+    $budgetsTotal = $data['budgets_total']      ?? 0;
+    $txCount     = $data['transaction_count']   ?? 0;
+    $startDate   = \Carbon\Carbon::parse($data['start_date']);
+    $endDate     = \Carbon\Carbon::parse($data['end_date']);
+    $days        = $startDate->diffInDays($endDate) + 1;
+    $dailyAvg    = $days > 0 ? $expenses / $days : 0;
+@endphp
+
 <div class="watermark">CONFIDENTIAL</div>
 
 <!-- Header -->
 <div class="header">
     <h1>MONTHLY FINANCIAL REPORT</h1>
-    <p class="period">May 2026</p>
-    <p class="period" style="opacity: 0.8; font-size: 10px;">May 1, 2026 — May 31, 2026</p>
-    <p class="user-info">Seje</p>
+    <p class="period">{{ $startDate->format('F Y') }}</p>
+    <p class="period" style="opacity: 0.8; font-size: 10px;">
+        {{ $startDate->format('M j, Y') }} &mdash; {{ $endDate->format('M j, Y') }}
+    </p>
+    <p class="user-info">{{ $user->name }}</p>
 </div>
 
 <!-- Net Worth Banner -->
 <div class="net-worth-banner">
     <h3>Your Net Worth</h3>
-    <div class="amount">KES 152,128</div>
-    <div class="breakdown">Assets: KES 160,560 &bull; Liabilities: KES 8,432</div>
+    <div class="amount">{{ $currency }} {{ number_format($netWorth) }}</div>
+    <div class="breakdown">
+        Assets: {{ $currency }} {{ number_format($totalBal) }}
+        &bull; Liabilities: {{ $currency }} {{ number_format($totalLoans) }}
+    </div>
 </div>
 
 <!-- Summary Cards -->
 <div class="summary-grid">
     <div class="summary-cell income">
         <h3>Total Income</h3>
-        <div class="amount" style="color: #10B981;">KES 11,978</div>
+        <div class="amount" style="color: #10B981;">{{ $currency }} {{ number_format($income) }}</div>
     </div>
     <div class="summary-cell expense">
         <h3>Total Expenses</h3>
-        <div class="amount" style="color: #EF4444;">KES 8,147</div>
+        <div class="amount" style="color: #EF4444;">{{ $currency }} {{ number_format($expenses) }}</div>
     </div>
     <div class="summary-cell savings">
         <h3>Net Savings</h3>
-        <div class="amount" style="color: #10B981;">+KES 3,831</div>
+        <div class="amount" style="color: {{ $netFlow >= 0 ? '#10B981' : '#EF4444' }};">
+            {{ $netFlow >= 0 ? '+' : '' }}{{ $currency }} {{ number_format($netFlow) }}
+        </div>
     </div>
 </div>
 
@@ -128,19 +156,21 @@
 <div class="stats-grid">
     <div class="stat-cell">
         <div class="stat-label">Transactions</div>
-        <div class="stat-value">24</div>
+        <div class="stat-value">{{ $txCount }}</div>
     </div>
     <div class="stat-cell">
         <div class="stat-label">Savings Rate</div>
-        <div class="stat-value" style="color: #10B981;">32.0%</div>
+        <div class="stat-value" style="color: {{ $savingsRate >= 20 ? '#10B981' : ($savingsRate >= 10 ? '#F59E0B' : '#EF4444') }};">
+            {{ number_format($savingsRate, 1) }}%
+        </div>
     </div>
     <div class="stat-cell">
         <div class="stat-label">Daily Avg Spending</div>
-        <div class="stat-value">KES 263</div>
+        <div class="stat-value">{{ $currency }} {{ number_format($dailyAvg) }}</div>
     </div>
     <div class="stat-cell">
         <div class="stat-label">Accounts</div>
-        <div class="stat-value">4</div>
+        <div class="stat-value">{{ $data['accounts']->count() }}</div>
     </div>
 </div>
 
@@ -148,258 +178,237 @@
 <div class="trend-box">
     <div class="trend-cell">
         <div class="trend-label">Income vs Last Month</div>
-        <div class="trend-value" style="color: #DC2626;">-23.3%</div>
-        <div class="trend-subtext">Prior month: KES 15,612</div>
+        @if($incomeTrend !== null)
+            <div class="trend-value" style="color: {{ $incomeTrend >= 0 ? '#059669' : '#DC2626' }};">
+                {{ $incomeTrend >= 0 ? '+' : '' }}{{ number_format($incomeTrend, 1) }}%
+            </div>
+            <div class="trend-subtext">Prior month: {{ $currency }} {{ number_format($priorIncome) }}</div>
+        @else
+            <div class="trend-value" style="color: #9CA3AF;">No prior data</div>
+        @endif
     </div>
     <div class="trend-cell">
         <div class="trend-label">Budget Adherence</div>
-        <div class="trend-value" style="color: #F59E0B;">5/7 on track</div>
-        <div class="trend-subtext">2 categories over budget</div>
+        <div class="trend-value" style="color: {{ $budgetsOver === 0 ? '#059669' : '#F59E0B' }};">
+            {{ $budgetsUnder }}/{{ $budgetsTotal }} on track
+        </div>
+        <div class="trend-subtext">{{ $budgetsOver }} {{ $budgetsOver === 1 ? 'category' : 'categories' }} over budget</div>
     </div>
 </div>
 
 <!-- Financial Health Alert -->
-<div class="alert success">
-    <div class="alert-title">&#10003; Excellent Financial Health!</div>
-    <div class="alert-text">You saved 32.0% of your income this month (KES 3,831). You're on track for strong financial growth!</div>
-</div>
+@if($savingsRate >= 20)
+    <div class="alert success">
+        <div class="alert-title">&#10003; Excellent Financial Health!</div>
+        <div class="alert-text">You saved {{ number_format($savingsRate, 1) }}% of your income this month ({{ $currency }} {{ number_format($netFlow) }}). You're on track for strong financial growth!</div>
+    </div>
+@elseif($savingsRate >= 10)
+    <div class="alert info">
+        <div class="alert-title">&#8505; Decent Savings This Month</div>
+        <div class="alert-text">You saved {{ number_format($savingsRate, 1) }}% of your income. Aim for 20%+ for stronger long-term results.</div>
+    </div>
+@else
+    <div class="alert warning">
+        <div class="alert-title">&#9888; Low Savings Rate</div>
+        <div class="alert-text">Your savings rate of {{ number_format($savingsRate, 1) }}% is below the recommended 20%. Review your spending to find areas to cut back.</div>
+    </div>
+@endif
 
 <!-- Budget Performance -->
-<div class="section">
-    <div class="section-title">Budget Performance Analysis</div>
-    <div class="budget-grid">
-        <div class="budget-item danger">
-            <div class="budget-header">
-                <div class="budget-name">Food &amp; Dining</div>
-                <div class="budget-percent" style="color: #DC2626;">177.1%</div>
-            </div>
-            <div class="budget-bar"><div class="budget-fill danger" style="width: 100%;"></div></div>
-            <div class="budget-amounts">Spent: KES 1,960 of KES 1,107 &bull; Remaining: KES 0</div>
+@if(!empty($data['budget_performance']))
+    <div class="section">
+        <div class="section-title">Budget Performance Analysis</div>
+        <div class="budget-grid">
+            @foreach($data['budget_performance'] as $budget)
+                @php
+                    $pct         = min($budget['percentage'], 100);
+                    $statusClass = $budget['percentage'] >= 100 ? 'danger' : ($budget['percentage'] >= 80 ? 'warning' : 'good');
+                    $pctColor    = $budget['percentage'] >= 100 ? '#DC2626' : ($budget['percentage'] >= 80 ? '#D97706' : '#059669');
+                @endphp
+                <div class="budget-item {{ $statusClass }}">
+                    <div class="budget-header">
+                        <div class="budget-name">{{ $budget['category'] }}</div>
+                        <div class="budget-percent" style="color: {{ $pctColor }};">{{ number_format($budget['percentage'], 1) }}%</div>
+                    </div>
+                    <div class="budget-bar">
+                        <div class="budget-fill {{ $statusClass }}" style="width: {{ $pct }}%;"></div>
+                    </div>
+                    <div class="budget-amounts">
+                        Spent: {{ $currency }} {{ number_format($budget['spent']) }}
+                        of {{ $currency }} {{ number_format($budget['budgeted']) }}
+                        &bull; Remaining: {{ $currency }} {{ number_format(max($budget['remaining'], 0)) }}
+                    </div>
+                </div>
+            @endforeach
         </div>
-        <div class="budget-item danger">
-            <div class="budget-header">
-                <div class="budget-name">Rent</div>
-                <div class="budget-percent" style="color: #DC2626;">103.3%</div>
-            </div>
-            <div class="budget-bar"><div class="budget-fill danger" style="width: 100%;"></div></div>
-            <div class="budget-amounts">Spent: KES 1,400 of KES 1,355 &bull; Remaining: KES 0</div>
-        </div>
-        <div class="budget-item warning">
-            <div class="budget-header">
-                <div class="budget-name">Entertainment</div>
-                <div class="budget-percent" style="color: #D97706;">75.5%</div>
-            </div>
-            <div class="budget-bar"><div class="budget-fill warning" style="width: 75.5%;"></div></div>
-            <div class="budget-amounts">Spent: KES 330 of KES 437 &bull; Remaining: KES 107</div>
-        </div>
-        <div class="budget-item warning">
-            <div class="budget-header">
-                <div class="budget-name">Transport</div>
-                <div class="budget-percent" style="color: #D97706;">74.3%</div>
-            </div>
-            <div class="budget-bar"><div class="budget-fill warning" style="width: 74.3%;"></div></div>
-            <div class="budget-amounts">Spent: KES 666 of KES 896 &bull; Remaining: KES 230</div>
-        </div>
-        <div class="budget-item good">
-            <div class="budget-header">
-                <div class="budget-name">Airtime &amp; Data</div>
-                <div class="budget-percent" style="color: #059669;">68.0%</div>
-            </div>
-            <div class="budget-bar"><div class="budget-fill good" style="width: 68%;"></div></div>
-            <div class="budget-amounts">Spent: KES 253 of KES 372 &bull; Remaining: KES 119</div>
-        </div>
-        <div class="budget-item good">
-            <div class="budget-header">
-                <div class="budget-name">Groceries</div>
-                <div class="budget-percent" style="color: #059669;">48.7%</div>
-            </div>
-            <div class="budget-bar"><div class="budget-fill good" style="width: 48.7%;"></div></div>
-            <div class="budget-amounts">Spent: KES 819 of KES 1,681 &bull; Remaining: KES 862</div>
-        </div>
-        <div class="budget-item good">
-            <div class="budget-header">
-                <div class="budget-name">Utilities</div>
-                <div class="budget-percent" style="color: #059669;">46.3%</div>
-            </div>
-            <div class="budget-bar"><div class="budget-fill good" style="width: 46.3%;"></div></div>
-            <div class="budget-amounts">Spent: KES 314 of KES 678 &bull; Remaining: KES 364</div>
+        <div class="insight-box">
+            <h4>Budget Management</h4>
+            @if($budgetsOver === 0)
+                <p>Excellent job this month! All your budgets are on track with no overspending.</p>
+            @else
+                <p>You exceeded {{ $budgetsOver }} budget {{ $budgetsOver === 1 ? 'category' : 'categories' }} this month. Focus on those areas next month to bring spending back in line.</p>
+            @endif
         </div>
     </div>
-    <div class="insight-box">
-        <h4>Budget Management</h4>
-        <p>You exceeded 2 budget categories this month. Focus on those areas next month to bring spending back in line.</p>
-    </div>
-</div>
+@endif
 
 <!-- Account Balances -->
-<div class="section">
-    <div class="section-title">Account Overview</div>
-    <table>
-        <thead>
-        <tr>
-            <th>Account Name</th>
-            <th style="text-align: center;">Status</th>
-            <th style="text-align: right;">Current Balance</th>
-            <th style="text-align: right;">% of Total</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr>
-            <td style="font-weight: 600;">Mpesa</td>
-            <td style="text-align: center;"><span class="badge danger">Negative</span></td>
-            <td style="text-align: right; font-weight: bold;">KES -38,641</td>
-            <td style="text-align: right; color: #6B7280;">-24.1%</td>
-        </tr>
-        <tr>
-            <td style="font-weight: 600;">I&amp;M Bank</td>
-            <td style="text-align: center;"><span class="badge success">Healthy</span></td>
-            <td style="text-align: right; font-weight: bold;">KES 285,563</td>
-            <td style="text-align: right; color: #6B7280;">177.9%</td>
-        </tr>
-        <tr>
-            <td style="font-weight: 600;">Cash</td>
-            <td style="text-align: center;"><span class="badge danger">Negative</span></td>
-            <td style="text-align: right; font-weight: bold;">KES -86,362</td>
-            <td style="text-align: right; color: #6B7280;">-53.8%</td>
-        </tr>
-        <tr>
-            <td style="font-weight: 600;">Airtel Money</td>
-            <td style="text-align: center;"><span class="badge neutral">Zero</span></td>
-            <td style="text-align: right; font-weight: bold;">KES 0</td>
-            <td style="text-align: right; color: #6B7280;">0.0%</td>
-        </tr>
-        <tr class="total-row">
-            <td colspan="2">Total Assets</td>
-            <td style="text-align: right; color: #10B981;">KES 160,560</td>
-            <td style="text-align: right; color: #6B7280;">100%</td>
-        </tr>
-        </tbody>
-    </table>
-</div>
+@if($data['accounts']->isNotEmpty())
+    <div class="section">
+        <div class="section-title">Account Overview</div>
+        <table>
+            <thead>
+            <tr>
+                <th>Account Name</th>
+                <th style="text-align: center;">Status</th>
+                <th style="text-align: right;">Current Balance</th>
+                <th style="text-align: right;">% of Total</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach($data['accounts'] as $account)
+                @php
+                    $pct         = $totalBal > 0 ? ($account->current_balance / $totalBal) * 100 : 0;
+                    $healthClass = $account->current_balance > 0 ? 'success' : ($account->current_balance < 0 ? 'danger' : 'neutral');
+                    $healthLabel = $account->current_balance > 0 ? 'Healthy' : ($account->current_balance < 0 ? 'Negative' : 'Zero');
+                @endphp
+                <tr>
+                    <td style="font-weight: 600;">{{ $account->name }}</td>
+                    <td style="text-align: center;"><span class="badge {{ $healthClass }}">{{ $healthLabel }}</span></td>
+                    <td style="text-align: right; font-weight: bold;">{{ $currency }} {{ number_format($account->current_balance) }}</td>
+                    <td style="text-align: right; color: #6B7280;">{{ number_format($pct, 1) }}%</td>
+                </tr>
+            @endforeach
+            <tr class="total-row">
+                <td colspan="2">Total Assets</td>
+                <td style="text-align: right; color: #10B981;">{{ $currency }} {{ number_format($totalBal) }}</td>
+                <td style="text-align: right; color: #6B7280;">100%</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+@endif
 
 <!-- Top Spending Categories -->
-<div class="section">
-    <div class="section-title">Spending Breakdown by Category</div>
-    <table>
-        <thead>
-        <tr>
-            <th style="width: 5%;">#</th>
-            <th style="width: 40%;">Category</th>
-            <th style="text-align: center; width: 15%;">Transactions</th>
-            <th style="text-align: right; width: 25%;">Total Amount</th>
-            <th style="text-align: right; width: 15%;">% of Expenses</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr>
-            <td style="color: #6B7280;">1</td>
-            <td style="font-weight: 600;">Food &amp; Dining</td>
-            <td style="text-align: center; color: #6B7280;">3</td>
-            <td style="text-align: right; font-weight: bold; color: #DC2626;">KES 1,960</td>
-            <td style="text-align: right; color: #6B7280;">24.1%</td>
-        </tr>
-        <tr>
-            <td style="color: #6B7280;">2</td>
-            <td style="font-weight: 600;">Rent</td>
-            <td style="text-align: center; color: #6B7280;">1</td>
-            <td style="text-align: right; font-weight: bold; color: #DC2626;">KES 1,400</td>
-            <td style="text-align: right; color: #6B7280;">17.2%</td>
-        </tr>
-        <tr>
-            <td style="color: #6B7280;">3</td>
-            <td style="font-weight: 600;">Savings</td>
-            <td style="text-align: center; color: #6B7280;">1</td>
-            <td style="text-align: right; font-weight: bold; color: #DC2626;">KES 1,053</td>
-            <td style="text-align: right; color: #6B7280;">12.9%</td>
-        </tr>
-        <tr>
-            <td style="color: #6B7280;">4</td>
-            <td style="font-weight: 600;">Groceries</td>
-            <td style="text-align: center; color: #6B7280;">2</td>
-            <td style="text-align: right; font-weight: bold; color: #DC2626;">KES 819</td>
-            <td style="text-align: right; color: #6B7280;">10.1%</td>
-        </tr>
-        <tr>
-            <td style="color: #6B7280;">5</td>
-            <td style="font-weight: 600;">Clothing</td>
-            <td style="text-align: center; color: #6B7280;">1</td>
-            <td style="text-align: right; font-weight: bold; color: #DC2626;">KES 812</td>
-            <td style="text-align: right; color: #6B7280;">10.0%</td>
-        </tr>
-        </tbody>
-    </table>
-    <div class="insight-box">
-        <h4>Spending Pattern Analysis</h4>
-        <p>Your dominant spending category was <strong>Food &amp; Dining</strong>, representing <strong>24.1%</strong> of total expenses — KES 1,960 across 3 transactions.</p>
+@if($data['top_categories']->isNotEmpty())
+    <div class="section">
+        <div class="section-title">Spending Breakdown by Category</div>
+        <table>
+            <thead>
+            <tr>
+                <th style="width: 5%;">#</th>
+                <th style="width: 40%;">Category</th>
+                <th style="text-align: center; width: 15%;">Transactions</th>
+                <th style="text-align: right; width: 25%;">Total Amount</th>
+                <th style="text-align: right; width: 15%;">% of Expenses</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach($data['top_categories'] as $i => $cat)
+                @php $catPct = $expenses > 0 ? ($cat['amount'] / $expenses) * 100 : 0; @endphp
+                <tr>
+                    <td style="color: #6B7280;">{{ $i + 1 }}</td>
+                    <td style="font-weight: 600;">{{ $cat['category'] }}</td>
+                    <td style="text-align: center; color: #6B7280;">{{ $cat['count'] }}</td>
+                    <td style="text-align: right; font-weight: bold; color: #DC2626;">{{ $currency }} {{ number_format($cat['amount']) }}</td>
+                    <td style="text-align: right; color: #6B7280;">{{ number_format($catPct, 1) }}%</td>
+                </tr>
+            @endforeach
+            </tbody>
+        </table>
+        @php $topCat = $data['top_categories']->first(); @endphp
+        @if($topCat)
+            <div class="insight-box">
+                <h4>Spending Pattern Analysis</h4>
+                @php $topPct = $expenses > 0 ? ($topCat['amount'] / $expenses) * 100 : 0; @endphp
+                <p>Your dominant spending category was <strong>{{ $topCat['category'] }}</strong>, representing <strong>{{ number_format($topPct, 1) }}%</strong> of total expenses &mdash; {{ $currency }} {{ number_format($topCat['amount']) }} across {{ $topCat['count'] }} transactions.</p>
+            </div>
+        @endif
     </div>
-</div>
+@endif
+
+<!-- Largest Transactions -->
+@if($data['largest_transactions']->isNotEmpty())
+    <div class="section">
+        <div class="section-title">Largest Individual Expenses</div>
+        <table>
+            <thead>
+            <tr>
+                <th style="width: 15%;">Date</th>
+                <th style="width: 40%;">Description</th>
+                <th style="width: 25%;">Category</th>
+                <th style="text-align: right; width: 20%;">Amount</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach($data['largest_transactions'] as $txn)
+                <tr>
+                    <td style="color: #6B7280;">{{ \Carbon\Carbon::parse($txn->date)->format('M j, Y') }}</td>
+                    <td style="font-weight: 500;">{{ $txn->description }}</td>
+                    <td style="color: #6B7280;">{{ $txn->category->name }}</td>
+                    <td style="text-align: right; font-weight: bold; color: #DC2626;">-{{ $currency }} {{ number_format($txn->amount) }}</td>
+                </tr>
+            @endforeach
+            </tbody>
+        </table>
+    </div>
+@endif
 
 <!-- Key Insights -->
-<div class="section">
-    <div class="section-title">Key Insights</div>
-    <div class="insights-grid">
-        <div class="insight-box">
-            <h4>&#128202; Average Daily Spending — KES 255</h4>
-            <p>You spent an average of KES 255 per day</p>
-        </div>
-        <div class="insight-box">
-            <h4>&#128201; Spending Decreased — -19.4%</h4>
-            <p>You spent KES 1,967 less than last month</p>
-        </div>
-        <div class="insight-box">
-            <h4>&#128184; Biggest Expense — KES 1,400</h4>
-            <p>Monthly Rent Payment (Rent)</p>
-        </div>
-        <div class="insight-box">
-            <h4>&#127919; Savings Rate — 32.0%</h4>
-            <p>Great! You're saving well</p>
+@if(!empty($data['insights']))
+    <div class="section">
+        <div class="section-title">Key Insights</div>
+        <div class="insights-grid">
+            @foreach($data['insights'] as $insight)
+                <div class="insight-box">
+                    <h4>{{ $insight['icon'] }} {{ $insight['title'] }} &mdash; {{ $insight['value'] }}</h4>
+                    <p>{{ $insight['description'] }}</p>
+                </div>
+            @endforeach
         </div>
     </div>
-</div>
+@endif
 
 <!-- Active Loans -->
-<div class="section">
-    <div class="section-title">Active Loans</div>
-    <table>
-        <thead>
-        <tr>
-            <th>Loan Source</th>
-            <th style="text-align: right;">Principal</th>
-            <th style="text-align: right;">Balance</th>
-            <th style="text-align: center;">Due Date</th>
-            <th style="text-align: center;">Status</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr>
-            <td style="font-weight: 600;">KCB Mpesa Loan</td>
-            <td style="text-align: right;">KES 5,000</td>
-            <td style="text-align: right; color: #DC2626; font-weight: bold;">KES 3,432</td>
-            <td style="text-align: center; color: #6B7280;">Aug 4, 2026</td>
-            <td style="text-align: center;"><span class="badge warning">Active</span></td>
-        </tr>
-        <tr>
-            <td style="font-weight: 600;">Fuliza</td>
-            <td style="text-align: right;">KES 5,000</td>
-            <td style="text-align: right; color: #DC2626; font-weight: bold;">KES 5,000</td>
-            <td style="text-align: center; color: #6B7280;">May 18, 2026</td>
-            <td style="text-align: center;"><span class="badge warning">Active</span></td>
-        </tr>
-        <tr class="total-row">
-            <td colspan="2">Total Loan Balance</td>
-            <td style="text-align: right; color: #DC2626;">KES 8,432</td>
-            <td colspan="2"></td>
-        </tr>
-        </tbody>
-    </table>
-</div>
+@if($data['active_loans']->isNotEmpty())
+    <div class="section">
+        <div class="section-title">Active Loans</div>
+        <table>
+            <thead>
+            <tr>
+                <th>Loan Source</th>
+                <th style="text-align: right;">Principal</th>
+                <th style="text-align: right;">Balance</th>
+                <th style="text-align: center;">Due Date</th>
+                <th style="text-align: center;">Status</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach($data['active_loans'] as $loan)
+                <tr>
+                    <td style="font-weight: 600;">{{ $loan->source }}</td>
+                    <td style="text-align: right;">{{ $currency }} {{ number_format($loan->principal_amount) }}</td>
+                    <td style="text-align: right; color: #DC2626; font-weight: bold;">{{ $currency }} {{ number_format($loan->balance) }}</td>
+                    <td style="text-align: center; color: #6B7280;">{{ \Carbon\Carbon::parse($loan->due_date)->format('M j, Y') }}</td>
+                    <td style="text-align: center;"><span class="badge warning">{{ ucfirst($loan->status) }}</span></td>
+                </tr>
+            @endforeach
+            <tr class="total-row">
+                <td colspan="2">Total Loan Balance</td>
+                <td style="text-align: right; color: #DC2626;">{{ $currency }} {{ number_format($totalLoans) }}</td>
+                <td colspan="2"></td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+@endif
 
 <!-- Footer -->
 <div class="footer">
     <p class="confidential">&#128274; CONFIDENTIAL FINANCIAL DOCUMENT</p>
-    <p>Generated on May 4, 2026</p>
-    <p>Report ID: MTH-2026-05-797341CA</p>
-    <p style="margin-top: 8px;">&#169; 2026 Financial Report System. All rights reserved.</p>
+    <p>Generated on {{ now()->format('F j, Y') }}</p>
+    <p>Report ID: MTH-{{ $startDate->format('Y-m') }}-{{ strtoupper(substr(md5($user->id . $data['start_date']), 0, 8)) }}</p>
+    <p style="margin-top: 8px;">&#169; {{ now()->year }} Financial Report System. All rights reserved.</p>
     <p style="margin-top: 5px; font-size: 8px; color: #9CA3AF;">This document contains highly confidential financial information. Store securely and do not share with unauthorized parties.</p>
 </div>
 
