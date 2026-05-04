@@ -1,5 +1,7 @@
 <?php
+
 namespace App\Console\Commands;
+
 use App\Mail\AnnualReportMail;
 use App\Models\User;
 use App\Services\ReportDataService;
@@ -8,21 +10,23 @@ use Illuminate\Support\Facades\Mail;
 
 class SendAnnualReports extends Command
 {
-    protected $signature = 'reports:send-annual {--force : Force send regardless of schedule}';
-    protected $description = 'Send annual financial reports to users';
+    protected $signature   = 'reports:send-annual {--force : Force send regardless of schedule}';
+    protected $description = 'Send annual financial reports to users (runs on Jan 1st)';
 
     public function handle(ReportDataService $reportService)
     {
         $this->info('Starting annual report generation...');
 
-        $currentDay   = now()->day;
-        $currentMonth = now()->month;
+        // Annual reports are always sent on January 1st.
+        // When not forced, enforce that constraint so this command is safe to
+        // schedule daily without accidentally sending on the wrong date.
+        if (!$this->option('force') && !(now()->month === 1 && now()->day === 1)) {
+            $this->info('Not January 1st — skipping. Use --force to override.');
+            return Command::SUCCESS;
+        }
 
-        // Get users who want annual reports
-        $users = User::whereHas('emailPreference', function ($query) use ($currentDay, $currentMonth) {
-            $query->where('annual_reports', true)
-                ->where('annual_day', $currentDay)
-                ->where('annual_month', $currentMonth);
+        $users = User::whereHas('emailPreference', function ($query) {
+            $query->where('annual_reports', true);
 
             if (!$this->option('force')) {
                 $query->where(function ($q) {
@@ -47,22 +51,21 @@ class SendAnnualReports extends Command
 
                 Mail::to($user->email)->send(new AnnualReportMail($user, $reportData));
 
-                $user->emailPreference->update([
-                    'last_annual_sent' => now()
-                ]);
+                $user->emailPreference->update(['last_annual_sent' => now()]);
 
-                $this->info("✓ Annual report sent to {$user->email}");
+                $this->info("  Report sent to {$user->email}");
                 $successCount++;
-
             } catch (\Exception $e) {
-                $this->error("✗ Failed to send report to {$user->email}: {$e->getMessage()}");
+                $this->error("  Failed for {$user->email}: {$e->getMessage()}");
                 $failCount++;
             }
         }
 
         $this->info("\n=== Summary ===");
         $this->info("Successfully sent: {$successCount}");
-        $this->error("Failed: {$failCount}");
+        if ($failCount > 0) {
+            $this->error("Failed: {$failCount}");
+        }
         $this->info("Total processed: " . ($successCount + $failCount));
 
         return Command::SUCCESS;

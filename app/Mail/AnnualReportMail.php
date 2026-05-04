@@ -1,25 +1,34 @@
 <?php
+
 namespace App\Mail;
+
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
-use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Queue\SerializesModels;
+use Spatie\LaravelPdf\Facades\Pdf;
+
 class AnnualReportMail extends Mailable
 {
     use Queueable, SerializesModels;
+
     public function __construct(
-        public User $user,
+        public User  $user,
         public array $reportData
     ) {}
+
     public function envelope(): Envelope
     {
+        $year = now()->subYear()->format('Y');
+
         return new Envelope(
-            subject: 'Your Annual Financial Report - ' . now()->subYear()->format('Y'),
+            subject: "Your Annual Financial Report — {$year}",
         );
     }
+
     public function content(): Content
     {
         return new Content(
@@ -27,47 +36,40 @@ class AnnualReportMail extends Mailable
             with: [
                 'user' => $this->user,
                 'data' => $this->reportData,
-            ]
+            ],
         );
     }
+
     public function attachments(): array
     {
-        $attachments = [];
-        if ($this->user->emailPreference->include_pdf) {
-            $password = $this->generatePDFPassword();
-            $filename = 'annual-report-' . now()->subYear()->format('Y') . '.pdf';
-            $pdfContent = $this->generatePasswordProtectedPDF($password);
-            $attachments[] = Attachment::fromData(fn () => $pdfContent, $filename)
-                ->withMime('application/pdf');
+        if (!$this->user->emailPreference?->include_pdf) {
+            return [];
         }
-        return $attachments;
+
+        $year     = now()->subYear()->format('Y');
+        $filename = "annual-report-{$year}.pdf";
+
+        return [
+            Attachment::fromData(fn () => $this->generatePdf(), $filename)
+                ->withMime('application/pdf'),
+        ];
     }
-    protected function generatePDFPassword(): string
+
+    protected function generatePdf(): string
     {
-        return substr(str_pad($this->user->id, 6, '0', STR_PAD_LEFT), -4);
-    }
-    protected function generatePasswordProtectedPDF(string $password): string
-    {
-        // Ensure temp directory exists
-        $tempDir = storage_path('app/temp');
-        if (!file_exists($tempDir)) {
-            mkdir($tempDir, 0775, true);
-        }
-        $html = view('emails.pdf.annual-report', [
+        $year     = now()->subYear()->format('Y');
+        $tempPath = tempnam(sys_get_temp_dir(), 'annual_report_') . '.pdf';
+
+        Pdf::view('emails.pdf.annual-report', [
             'user' => $this->user,
             'data' => $this->reportData,
-        ])->render();
-        $mpdf = new \Mpdf\Mpdf([
-            'mode' => 'utf-8',
-            'format' => 'A4',
-            'margin_left' => 15,
-            'margin_right' => 15,
-            'margin_top' => 15,
-            'margin_bottom' => 15,
-            'tempDir' => $tempDir,
-        ]);
-        $mpdf->SetProtection(['print', 'copy'], $password, null, 128);
-        $mpdf->WriteHTML($html);
-        return $mpdf->Output('', 'S');
+        ])
+            ->format('a4')
+            ->save($tempPath);
+
+        $contents = file_get_contents($tempPath);
+        unlink($tempPath);
+
+        return $contents;
     }
 }

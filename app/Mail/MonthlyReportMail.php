@@ -5,24 +5,25 @@ namespace App\Mail;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
-use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Queue\SerializesModels;
+use Spatie\LaravelPdf\Facades\Pdf;
 
 class MonthlyReportMail extends Mailable
 {
     use Queueable, SerializesModels;
 
     public function __construct(
-        public User $user,
+        public User  $user,
         public array $reportData
     ) {}
 
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Your Monthly Financial Report - ' . now()->format('F Y'),
+            subject: 'Your Monthly Financial Report — ' . now()->format('F Y'),
         );
     }
 
@@ -33,57 +34,39 @@ class MonthlyReportMail extends Mailable
             with: [
                 'user' => $this->user,
                 'data' => $this->reportData,
-            ]
+            ],
         );
     }
 
     public function attachments(): array
     {
-        $attachments = [];
-
-        if ($this->user->emailPreference->include_pdf) {
-            $password = $this->generatePDFPassword();
-            $filename = 'monthly-report-' . now()->format('Y-m') . '.pdf';
-            $pdfContent = $this->generatePasswordProtectedPDF($password);
-
-            $attachments[] = Attachment::fromData(fn () => $pdfContent, $filename)
-                ->withMime('application/pdf');
+        if (!$this->user->emailPreference?->include_pdf) {
+            return [];
         }
 
-        return $attachments;
+        $filename = 'monthly-report-' . now()->format('Y-m') . '.pdf';
+
+        return [
+            Attachment::fromData(fn () => $this->generatePdf(), $filename)
+                ->withMime('application/pdf'),
+        ];
     }
 
-    protected function generatePDFPassword(): string
+    protected function generatePdf(): string
     {
-        return substr(str_pad($this->user->id, 6, '0', STR_PAD_LEFT), -4);
-    }
+        $tempPath = tempnam(sys_get_temp_dir(), 'monthly_report_') . '.pdf';
 
-    protected function generatePasswordProtectedPDF(string $password): string
-    {
-        // Ensure temp directory exists
-        $tempDir = storage_path('app/temp');
-        if (!file_exists($tempDir)) {
-            mkdir($tempDir, 0775, true);
-        }
-
-        $html = view('emails.pdf.monthly-report', [
+        Pdf::view('emails.pdf.monthly-report', [
             'user' => $this->user,
             'data' => $this->reportData,
-        ])->render();
+        ])
+            ->format('a4')
+            ->save($tempPath);
 
-        $mpdf = new \Mpdf\Mpdf([
-            'mode' => 'utf-8',
-            'format' => 'A4',
-            'margin_left' => 15,
-            'margin_right' => 15,
-            'margin_top' => 15,
-            'margin_bottom' => 15,
-            'tempDir' => $tempDir,
-        ]);
+        $contents = file_get_contents($tempPath);
+        unlink($tempPath);
 
-        $mpdf->SetProtection(['print', 'copy'], $password, null, 128);
-        $mpdf->WriteHTML($html);
-
-        return $mpdf->Output('', 'S');
+        return $contents;
     }
+
 }

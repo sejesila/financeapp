@@ -405,7 +405,7 @@
 
 <!-- Footer -->
 <div class="footer">
-    <p class="confidential">&#128274; CONFIDENTIAL FINANCIAL DOCUMENT</p>
+    <p class="confidential">CONFIDENTIAL FINANCIAL DOCUMENT</p>
     <p>Generated on {{ now()->format('F j, Y') }}</p>
     <p>Report ID: MTH-{{ $startDate->format('Y-m') }}-{{ strtoupper(substr(md5($user->id . $data['start_date']), 0, 8)) }}</p>
     <p style="margin-top: 8px;">&#169; {{ now()->year }} Financial Report System. All rights reserved.</p>
