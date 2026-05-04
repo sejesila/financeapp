@@ -26,7 +26,12 @@ class AppServiceProvider extends ServiceProvider
         User::observe(UserObserver::class);
         Pdf::default()->withBrowsershot(function (Browsershot $browsershot) {
             $chromePath = glob('/usr/local/share/puppeteer/chrome/linux-*/chrome-linux64/chrome')[0]
-                ?? throw new \RuntimeException('Chrome not found');
+                ?? glob('/usr/bin/chromium-browser')[0]
+                ?? null;
+
+            if (!$chromePath) {
+                throw new \RuntimeException('Chrome not found');
+            }
 
             $browsershot
                 ->setChromePath($chromePath)
