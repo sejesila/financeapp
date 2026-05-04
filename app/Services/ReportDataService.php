@@ -314,7 +314,7 @@ class ReportDataService
             'total_balance'         => $totalBalance,
             'total_loans'           => $totalLoanBalance,
             'total_client_funds'    => $totalClientFunds,
-            'net_worth'             => $totalBalance - $totalLoanBalance,
+            'net_worth' => $totalBalance - $totalLoanBalance - $totalClientFunds,
             'transactions'          => match ($type) {
                 'annual'  => $transactions->take(50),
                 'monthly' => $transactions->take(30),

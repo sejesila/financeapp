@@ -22,6 +22,8 @@ class ReportDataServiceTest extends TestCase
     protected User $user;
     protected Account $account;
 
+    protected Carbon $reportStart;  // add to class properties
+
     public function setUp(): void
     {
         parent::setUp();
@@ -31,6 +33,9 @@ class ReportDataServiceTest extends TestCase
         $this->account = Account::factory()
             ->for($this->user)
             ->create(['current_balance' => 100000]);
+
+        // generateMonthlyReport() targets the PRIOR month
+        $this->reportStart = now()->subMonth()->startOfMonth();
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -185,7 +190,7 @@ class ReportDataServiceTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function it_generates_monthly_report_for_current_month()
     {
-        $startDate = now()->startOfMonth();
+        $startDate = $this->reportStart;
         $endDate = now()->endOfMonth();
 
         $this->createIncomeTransaction($this->user, $this->account, 50000, $startDate->copy()->addDays(5));
@@ -202,7 +207,7 @@ class ReportDataServiceTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function it_includes_budget_performance_in_monthly_report()
     {
-        $startDate = now()->startOfMonth();
+        $startDate = $this->reportStart;
         $endDate = now()->endOfMonth();
 
         $incomeCategory = $this->createCategory($this->user, 'Salary', 'income');
@@ -235,7 +240,7 @@ class ReportDataServiceTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function it_tracks_loan_payments_in_monthly_report()
     {
-        $startDate = now()->startOfMonth();
+        $startDate = $this->reportStart;
 
         $loanRepaymentCategory = $this->createCategory($this->user, 'Loan Repayment', 'expense');
 
@@ -284,7 +289,7 @@ class ReportDataServiceTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function it_excludes_client_fund_expenses()
     {
-        $startDate = now()->startOfMonth();
+        $startDate = $this->reportStart;
         $expenseCategory = $this->createCategory($this->user, 'Client Payment', 'expense');
 
         // Create client fund expense (should be excluded)
@@ -311,7 +316,7 @@ class ReportDataServiceTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function it_includes_client_commission_income()
     {
-        $startDate = now()->startOfMonth();
+        $startDate = $this->reportStart;
         $incomeCategory = $this->createCategory($this->user, 'Client Commission', 'income');
 
         // Create client commission income (should be included)
@@ -520,7 +525,7 @@ class ReportDataServiceTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function it_detects_spending_increase()
     {
-        $startDate = now()->startOfMonth();
+        $startDate = $this->reportStart;
         $prevStart = $startDate->copy()->subMonth()->startOfMonth();
 
         // Previous month: 5000 expense
@@ -540,7 +545,7 @@ class ReportDataServiceTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function it_detects_spending_decrease()
     {
-        $startDate = now()->startOfMonth();
+        $startDate = $this->reportStart;
         $prevStart = $startDate->copy()->subMonth()->startOfMonth();
 
         // Previous month: 10000 expense
@@ -560,7 +565,7 @@ class ReportDataServiceTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function it_identifies_biggest_expense()
     {
-        $startDate = now()->startOfMonth();
+        $startDate = $this->reportStart;
 
         $this->createExpenseTransaction($this->user, $this->account, 2000, $startDate->copy()->addDays(1));
         $this->createExpenseTransaction($this->user, $this->account, 5000, $startDate->copy()->addDays(5), null, 'Big Purchase');
@@ -577,7 +582,7 @@ class ReportDataServiceTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function it_calculates_savings_rate_insight()
     {
-        $startDate = now()->startOfMonth();
+        $startDate = $this->reportStart;
 
         $this->createIncomeTransaction($this->user, $this->account, 100000, $startDate->copy()->addDays(1));
         $this->createExpenseTransaction($this->user, $this->account, 50000, $startDate->copy()->addDays(5));
@@ -597,7 +602,7 @@ class ReportDataServiceTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function it_identifies_top_spending_categories()
     {
-        $startDate = now()->startOfMonth();
+        $startDate = $this->reportStart;
 
         $foodCategory = $this->createCategory($this->user, 'Food', 'expense');
         $transportCategory = $this->createCategory($this->user, 'Transport', 'expense');
@@ -618,7 +623,7 @@ class ReportDataServiceTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function it_limits_top_categories_to_5()
     {
-        $startDate = now()->startOfMonth();
+        $startDate = $this->reportStart;
 
         // Create 10 different expense categories
         for ($i = 1; $i <= 10; $i++) {
@@ -634,7 +639,7 @@ class ReportDataServiceTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function it_identifies_largest_transactions()
     {
-        $startDate = now()->startOfMonth();
+        $startDate = $this->reportStart;
 
         $this->createExpenseTransaction($this->user, $this->account, 1000, $startDate->copy()->addDays(1));
         $this->createExpenseTransaction($this->user, $this->account, 5000, $startDate->copy()->addDays(2));

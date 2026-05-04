@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Integration\Services;
+namespace Tests\Feature;
 
 use App\Models\Account;
 use App\Models\Category;
@@ -208,7 +208,7 @@ class ReportDataServiceIntegrationTest extends TestCase
 
         $category = $this->createCategory('Income', 'income');
 
-        $startDate = now()->startOfMonth();
+        $startDate = now()->subMonth()->startOfMonth();
 
         // Create income for user 1
         Transaction::factory()
@@ -305,7 +305,7 @@ class ReportDataServiceIntegrationTest extends TestCase
         $account = Account::factory()->for($this->user)->create();
         $category = $this->createCategory('Food', 'expense');
 
-        $startDate = now()->startOfMonth();
+        $startDate = now()->subMonth()->startOfMonth();
 
         // Create expenses on different days
         Transaction::factory()
@@ -357,7 +357,7 @@ class ReportDataServiceIntegrationTest extends TestCase
         $account = Account::factory()->for($this->user)->create();
         $category = $this->createCategory('Food', 'expense');
 
-        $startDate = now()->startOfMonth();
+        $startDate = now()->subMonth()->startOfMonth();
 
         // Create only expenses
         Transaction::factory()
