@@ -54,6 +54,13 @@
         .insight-box h4 { margin: 0 0 8px 0; font-size: 11px; color: #4338CA; font-weight: bold; }
         .insight-box p  { margin: 4px 0; font-size: 10px; color: #4B5563; line-height: 1.5; }
 
+        /* Two-column insights grid */
+        .insights-grid { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; }
+        .insight-card { width: calc(50% - 5px); background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%); padding: 12px 14px; border-radius: 8px; border-left: 4px solid #6366F1; page-break-inside: avoid; box-sizing: border-box; }
+        .insight-card h4 { margin: 0 0 4px 0; font-size: 10px; color: #4338CA; font-weight: bold; text-transform: uppercase; letter-spacing: 0.4px; }
+        .insight-card .insight-value { font-size: 14px; font-weight: bold; color: #1F2937; margin: 2px 0 4px 0; }
+        .insight-card p { margin: 0; font-size: 9px; color: #4B5563; line-height: 1.4; }
+
         .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
         .badge.success { background: #D1FAE5; color: #065F46; }
         .badge.danger  { background: #FEE2E2; color: #991B1B; }
@@ -66,8 +73,6 @@
         .trend-label   { font-size: 8px; color: #6B7280; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px; }
         .trend-value   { font-size: 16px; font-weight: bold; margin-top: 4px; }
         .trend-subtext { font-size: 9px; color: #6B7280; margin-top: 2px; }
-
-        .month-table-row-alt { background: #F9FAFB; }
 
         .footer { margin-top: 30px; padding-top: 15px; border-top: 2px solid #E5E7EB; text-align: center; font-size: 9px; color: #6B7280; page-break-before: avoid; }
         .footer .confidential { color: #DC2626; font-weight: bold; margin-bottom: 8px; }
@@ -103,34 +108,34 @@
 <div class="header">
     <h1>ANNUAL FINANCIAL REPORT</h1>
     <div class="year-badge">Financial Year {{ $year }}</div>
-    <p class="period" style="margin-top: 6px;">Jan 1, {{ $year }} — Dec 31, {{ $year }}</p>
+    <p class="period" style="margin-top: 6px;">Jan 1, {{ $year }} &mdash; Dec 31, {{ $year }}</p>
     <p class="user-info">{{ $user->name }}</p>
 </div>
 
 <!-- Net Worth Banner -->
 <div class="net-worth-banner">
-    <h3>💎 Year-End Net Worth</h3>
+    <h3>Year-End Net Worth</h3>
     <div class="amount">{{ $currency }} {{ number_format($netWorth) }}</div>
     <div class="breakdown">
         Assets: {{ $currency }} {{ number_format($totalBal) }}
-        • Liabilities: {{ $currency }} {{ number_format($totalLoans) }}
+        &bull; Liabilities: {{ $currency }} {{ number_format($totalLoans) }}
     </div>
 </div>
 
 <!-- Summary Cards -->
 <div class="summary-grid">
     <div class="summary-cell income">
-        <h3>💰 Total Income</h3>
+        <h3>Total Income</h3>
         <div class="amount" style="color: #10B981;">{{ $currency }} {{ number_format($income) }}</div>
         <div class="sub-label">Full Year {{ $year }}</div>
     </div>
     <div class="summary-cell expense">
-        <h3>💸 Total Expenses</h3>
+        <h3>Total Expenses</h3>
         <div class="amount" style="color: #EF4444;">{{ $currency }} {{ number_format($expenses) }}</div>
         <div class="sub-label">Full Year {{ $year }}</div>
     </div>
     <div class="summary-cell savings">
-        <h3>💰 Net Savings</h3>
+        <h3>Net Savings</h3>
         <div class="amount" style="color: {{ $netFlow >= 0 ? '#10B981' : '#EF4444' }};">
             {{ $netFlow >= 0 ? '+' : '' }}{{ $currency }} {{ number_format($netFlow) }}
         </div>
@@ -194,23 +199,23 @@
 <!-- Financial Health Alert -->
 @if($savingsRate >= 20)
     <div class="alert success">
-        <div class="alert-title">✓ Excellent Annual Financial Health!</div>
-        <div class="alert-text">You saved {{ number_format($savingsRate, 1) }}% of your total income in {{ $year }} ({{ $currency }} {{ number_format($netFlow) }}). Outstanding discipline — you're building serious long-term wealth!</div>
+        <div class="alert-title">Excellent Annual Financial Health</div>
+        <div class="alert-text">You saved {{ number_format($savingsRate, 1) }}% of your total income in {{ $year }} ({{ $currency }} {{ number_format($netFlow) }}). Outstanding discipline — you're building serious long-term wealth.</div>
     </div>
 @elseif($savingsRate >= 10)
     <div class="alert info">
-        <div class="alert-title">ℹ Good Progress on Savings</div>
+        <div class="alert-title">Good Progress on Savings</div>
         <div class="alert-text">You saved {{ number_format($savingsRate, 1) }}% of your income this year. Aim to push this above 20% for stronger long-term growth.</div>
     </div>
 @else
     <div class="alert warning">
-        <div class="alert-title">⚠ Low Savings Rate</div>
+        <div class="alert-title">Low Savings Rate</div>
         <div class="alert-text">Your savings rate of {{ number_format($savingsRate, 1) }}% is below the recommended 20%. Review your spending categories to find areas to reduce.</div>
     </div>
 @endif
 
 <div class="insight-box">
-    <h4>📈 Annual Performance Overview</h4>
+    <h4>Annual Performance Overview</h4>
     <p>Throughout {{ $year }}, you had positive cash flow in <strong>{{ $profitMonths }} of 12 months</strong>, with an average monthly savings of {{ $currency }} {{ number_format($avgMonthlySave) }}.
         @if($bestMonth) Your best month was <strong>{{ $bestMonth['month'] }}</strong> (net: {{ $currency }} {{ number_format($bestMonth['net_flow']) }}). @endif
         @if($worstMonth) Your toughest month was <strong>{{ $worstMonth['month'] }}</strong> (net: {{ $currency }} {{ number_format($worstMonth['net_flow']) }}). @endif
@@ -220,7 +225,7 @@
 <!-- Month-by-Month Breakdown -->
 @if(!empty($monthlyBreakdown))
     <div class="section">
-        <div class="section-title">📅 Month-by-Month Breakdown</div>
+        <div class="section-title">Month-by-Month Breakdown</div>
         <table>
             <thead>
             <tr>
@@ -266,7 +271,7 @@
 <!-- Account Balances -->
 @if($data['accounts']->isNotEmpty())
     <div class="section">
-        <div class="section-title">💰 Year-End Account Overview</div>
+        <div class="section-title">Year-End Account Overview</div>
         <table>
             <thead>
             <tr>
@@ -291,7 +296,7 @@
                 </tr>
             @endforeach
             <tr class="total-row">
-                <td colspan="2">💎 Total Year-End Assets</td>
+                <td colspan="2">Total Year-End Assets</td>
                 <td style="text-align: right; color: #10B981;">{{ $currency }} {{ number_format($totalBal) }}</td>
                 <td style="text-align: right; color: #6B7280;">100%</td>
             </tr>
@@ -303,7 +308,7 @@
 <!-- Top Spending Categories -->
 @if($data['top_categories']->isNotEmpty())
     <div class="section">
-        <div class="section-title">📊 Annual Spending Breakdown by Category</div>
+        <div class="section-title">Annual Spending Breakdown by Category</div>
         <table>
             <thead>
             <tr>
@@ -333,7 +338,7 @@
 <!-- Active Loans -->
 @if($data['active_loans']->isNotEmpty())
     <div class="section">
-        <div class="section-title">🏦 Active Loans</div>
+        <div class="section-title">Active Loans</div>
         <table>
             <thead>
             <tr>
@@ -364,23 +369,26 @@
     </div>
 @endif
 
-<!-- Insights -->
+<!-- Key Insights — two-column grid -->
 @if(!empty($data['insights']))
     <div class="section">
-        <div class="section-title">💡 Key Insights</div>
-        @foreach($data['insights'] as $insight)
-            <div class="insight-box" style="margin-bottom: 8px;">
-                <h4>{{ $insight['icon'] }} {{ $insight['title'] }} — {{ $insight['value'] }}</h4>
-                <p>{{ $insight['description'] }}</p>
-            </div>
-        @endforeach
+        <div class="section-title">Key Insights</div>
+        <div class="insights-grid">
+            @foreach($data['insights'] as $insight)
+                <div class="insight-card">
+                    <h4>{{ $insight['title'] }}</h4>
+                    <div class="insight-value">{{ $insight['value'] }}</div>
+                    <p>{{ $insight['description'] }}</p>
+                </div>
+            @endforeach
+        </div>
     </div>
 @endif
 
 <!-- Year in Review -->
 <div class="section">
     <div class="insight-box">
-        <h4>🌟 {{ $year }} Year in Review</h4>
+        <h4>{{ $year }} Year in Review</h4>
         <p>Over the course of {{ $year }}, you recorded <strong>{{ $txCount }} transactions</strong> across <strong>{{ $data['accounts']->count() }} accounts</strong>. Your total income was <strong>{{ $currency }} {{ number_format($income) }}</strong> against total expenses of <strong>{{ $currency }} {{ number_format($expenses) }}</strong>, yielding an annual savings rate of <strong>{{ number_format($savingsRate, 1) }}%</strong>. Your year-end net worth stands at <strong>{{ $currency }} {{ number_format($netWorth) }}</strong>.</p>
         <p style="margin-top: 6px;">Use this report to set intentional financial targets for {{ $year + 1 }}. Small, consistent improvements in your savings rate compound significantly over time.</p>
     </div>
@@ -388,7 +396,7 @@
 
 <!-- Footer -->
 <div class="footer">
-    <p class="confidential">🔒 CONFIDENTIAL FINANCIAL DOCUMENT</p>
+    <p class="confidential">CONFIDENTIAL FINANCIAL DOCUMENT</p>
     <p>Generated on {{ now()->format('F j, Y') }}</p>
     <p>Report ID: ANN-{{ $year }}-{{ strtoupper(substr(md5($user->id . $year), 0, 8)) }}</p>
     <p style="margin-top: 8px;">© {{ now()->year }} Financial Report System. All rights reserved.</p>
