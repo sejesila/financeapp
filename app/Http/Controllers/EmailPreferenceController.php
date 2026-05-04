@@ -3,15 +3,17 @@ namespace App\Http\Controllers;
 use App\Services\ReportDataService;
 use App\Mail\AnnualReportMail;
 use App\Mail\MonthlyReportMail;
+use Spatie\LaravelPdf\Facades\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
+use Carbon\Carbon;
+
 class EmailPreferenceController extends Controller
 {
     public function edit()
     {
         $user = Auth::user();
-
         $preference = $user->emailPreference()->firstOrCreate(
             ['user_id' => $user->id],
             [
@@ -23,32 +25,66 @@ class EmailPreferenceController extends Controller
                 'include_charts'  => false,
             ]
         );
-
         return view('profile.email-preferences', compact('preference'));
     }
+
     public function update(Request $request)
     {
         $validated = $request->validate([
-            'annual_reports' => 'nullable|in:on',
+            'annual_reports'  => 'nullable|in:on',
             'monthly_reports' => 'nullable|in:on',
-            'monthly_day' => 'required|integer|min:1|max:28',
-            'preferred_time' => 'required|date_format:H:i',
-            'include_pdf' => 'nullable|in:on',
-            'include_charts' => 'nullable|in:on',
+            'monthly_day'     => 'required|integer|min:1|max:28',
+            'preferred_time'  => 'required|date_format:H:i',
+            'include_pdf'     => 'nullable|in:on',
+            'include_charts'  => 'nullable|in:on',
         ]);
+
         $user = Auth::user();
-        // Use the validated data directly, with defaults for checkboxes
         $user->emailPreference->update([
-            'annual_reports' => $request->boolean('annual_reports'),
+            'annual_reports'  => $request->boolean('annual_reports'),
             'monthly_reports' => $request->boolean('monthly_reports'),
-            'monthly_day' => $validated['monthly_day'],
-            'preferred_time' => $validated['preferred_time'],
-            'include_pdf' => $request->boolean('include_pdf'),
-            'include_charts' => $request->boolean('include_charts'),
+            'monthly_day'     => $validated['monthly_day'],
+            'preferred_time'  => $validated['preferred_time'],
+            'include_pdf'     => $request->boolean('include_pdf'),
+            'include_charts'  => $request->boolean('include_charts'),
         ]);
+
         return redirect()->route('email-preferences.edit')
             ->with('success', 'Email preferences updated successfully!');
     }
+
+    public function previewMonthly(ReportDataService $reportService)
+    {
+        $user = Auth::user();
+        $data = $reportService->generateMonthlyReport($user);
+
+        return Pdf::view('emails.pdf.monthly-report', compact('user', 'data'))
+            ->format('a4')
+            ->inline('monthly-report-preview.pdf');
+    }
+
+    public function previewAnnual(ReportDataService $reportService)
+    {
+        $user = Auth::user();
+        $data = $reportService->generateAnnualReport($user);
+
+        return Pdf::view('emails.pdf.annual-report', compact('user', 'data'))
+            ->format('a4')
+            ->inline('annual-report-preview.pdf');
+    }
+
+    public function previewCustom(Request $request, ReportDataService $reportService)
+    {
+        $user      = Auth::user();
+        $startDate = Carbon::parse($request->get('start', now()->startOfMonth()));
+        $endDate   = Carbon::parse($request->get('end', now()->endOfMonth()));
+        $data      = $reportService->generateCustomReport($user, $startDate, $endDate);
+
+        return Pdf::view('emails.pdf.monthly-report', compact('user', 'data'))
+            ->format('a4')
+            ->inline('custom-report-preview.pdf');
+    }
+
     public function sendTestAnnual(ReportDataService $reportService)
     {
         $user = Auth::user();
@@ -62,6 +98,7 @@ class EmailPreferenceController extends Controller
                 ->with('error', 'Failed to send test report: ' . $e->getMessage());
         }
     }
+
     public function sendTestMonthly(ReportDataService $reportService)
     {
         $user = Auth::user();
@@ -75,16 +112,18 @@ class EmailPreferenceController extends Controller
                 ->with('error', 'Failed to send test report: ' . $e->getMessage());
         }
     }
+
     public function sendCustom(Request $request, ReportDataService $reportService)
     {
         $validated = $request->validate([
             'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
+            'end_date'   => 'required|date|after_or_equal:start_date',
         ]);
+
         $user = Auth::user();
         try {
-            $startDate = \Carbon\Carbon::parse($validated['start_date']);
-            $endDate = \Carbon\Carbon::parse($validated['end_date']);
+            $startDate  = Carbon::parse($validated['start_date']);
+            $endDate    = Carbon::parse($validated['end_date']);
             $reportData = $reportService->generateCustomReport($user, $startDate, $endDate);
             Mail::to($user->email)->send(new MonthlyReportMail($user, $reportData));
             return redirect()->route('email-preferences.edit')

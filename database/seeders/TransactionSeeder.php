@@ -1,5 +1,4 @@
 <?php
-
 namespace Database\Seeders;
 
 use App\Models\Account;
@@ -19,18 +18,19 @@ class TransactionSeeder extends Seeder
 
         $cat = fn(string $name) => Category::where('user_id', $user->id)->where('name', $name)->first();
 
-        for ($monthsAgo = 12; $monthsAgo >= 0; $monthsAgo--) {
+        for ($monthsAgo = 36; $monthsAgo >= 0; $monthsAgo--) {
             $month = now()->subMonths($monthsAgo);
 
             // ── INCOME ────────────────────────────────────────────────────────
-            // Salary → Bank (KES 90k-100k)
+            // Salary → Bank (KES 90k-100k), grows slightly over 3 years
+            $salaryBase = 9000 + (int)(((36 - $monthsAgo) / 36) * 1500); // grows from ~9k to ~10.5k
             $this->create($user, $bank, $cat('Salary'), [
                 'date'        => $month->copy()->startOfMonth()->addDay()->toDateString(),
-                'amount'      => rand(9000, 10000),
+                'amount'      => rand($salaryBase, $salaryBase + 1000),
                 'description' => 'Monthly Salary',
             ]);
 
-            // Freelance → Mpesa (occasional)
+            // Freelance → Mpesa (occasional, more frequent in recent months)
             if (rand(0, 1)) {
                 $this->create($user, $mpesa, $cat('Freelance'), [
                     'date'        => $month->copy()->day(15)->toDateString(),
@@ -48,19 +48,20 @@ class TransactionSeeder extends Seeder
                 ]);
             }
 
-            // Cash top-up from pocket money
+            // Cash top-up
             $this->create($user, $cash, $cat('Business Income'), [
                 'date'        => $month->copy()->day(1)->toDateString(),
                 'amount'      => rand(800, 1500),
                 'description' => 'Monthly Cash Allowance',
             ]);
 
-            // ── EXPENSES — route to accounts that have income ─────────────────
+            // ── EXPENSES ──────────────────────────────────────────────────────
 
-            // Rent → Bank (fixed, 2nd of month)
+            // Rent → Bank (fixed, increases once a year)
+            $rent = $monthsAgo > 24 ? 1000 : ($monthsAgo > 12 ? 1200 : 1400);
             $this->create($user, $bank, $cat('Rent'), [
                 'date'        => $month->copy()->startOfMonth()->addDays(1)->toDateString(),
-                'amount'      => 1200,
+                'amount'      => $rent,
                 'description' => 'Monthly Rent Payment',
             ]);
 
@@ -107,7 +108,7 @@ class TransactionSeeder extends Seeder
             foreach (range(1, rand(3, 6)) as $i) {
                 $this->create($user, $cash, $cat('Food & Dining'), [
                     'date'        => $month->copy()->day(rand(1, 28))->toDateString(),
-                    'amount'      => rand(400, 1200),  // reduced max
+                    'amount'      => rand(400, 1200),
                     'description' => collect(['Lunch', 'Dinner Out', 'Coffee', 'Restaurant'])->random(),
                 ]);
             }
