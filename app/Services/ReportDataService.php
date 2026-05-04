@@ -30,7 +30,7 @@ class ReportDataService
             $mEnd   = $mStart->copy()->endOfMonth()->endOfDay();
 
             $monthTransactions = Transaction::where('user_id', $user->id)
-                ->whereBetween('date', [$mStart, $mEnd])
+                ->whereBetween(DB::raw('COALESCE(period_date, date)'), [$mStart, $mEnd])
                 ->with('category')
                 ->get();
 
@@ -49,9 +49,9 @@ class ReportDataService
             ];
         }
 
-        $collection  = collect($monthlyBreakdown);
-        $bestMonth   = $collection->sortByDesc('net_flow')->first();
-        $worstMonth  = $collection->sortBy('net_flow')->first();
+        $collection   = collect($monthlyBreakdown);
+        $bestMonth    = $collection->sortByDesc('net_flow')->first();
+        $worstMonth   = $collection->sortBy('net_flow')->first();
         $profitMonths = $collection->where('net_flow', '>=', 0)->count();
 
         // Loans paid down during the year
@@ -59,24 +59,24 @@ class ReportDataService
 
         // Prior year income for trend
         $priorYearIncome = Transaction::where('user_id', $user->id)
-            ->whereBetween('date', [
+            ->whereBetween(DB::raw('COALESCE(period_date, date)'), [
                 Carbon::create($year - 1, 1, 1)->startOfDay(),
                 Carbon::create($year - 1, 12, 31)->endOfDay(),
             ])
             ->whereHas('category', fn($q) => $q->where('type', 'income'))
             ->sum('amount');
 
-        $report['monthly_breakdown']   = $monthlyBreakdown;
-        $report['best_month']          = $bestMonth;
-        $report['worst_month']         = $worstMonth;
-        $report['profitable_months']   = $profitMonths;
+        $report['monthly_breakdown']    = $monthlyBreakdown;
+        $report['best_month']           = $bestMonth;
+        $report['worst_month']          = $worstMonth;
+        $report['profitable_months']    = $profitMonths;
         $report['loans_paid_in_period'] = $loansPaidInYear;
-        $report['prior_period_income'] = $priorYearIncome;
-        $report['income_trend']        = $priorYearIncome > 0
+        $report['prior_period_income']  = $priorYearIncome;
+        $report['income_trend']         = $priorYearIncome > 0
             ? (($report['income'] - $priorYearIncome) / $priorYearIncome) * 100
             : null;
-        $report['period_type']         = 'annual';
-        $report['year']                = $year;
+        $report['period_type']          = 'annual';
+        $report['year']                 = $year;
 
         return $report;
     }
@@ -96,7 +96,7 @@ class ReportDataService
         $prevEnd   = $prevStart->copy()->endOfMonth();
 
         $priorMonthIncome = Transaction::where('user_id', $user->id)
-            ->whereBetween('date', [$prevStart, $prevEnd])
+            ->whereBetween(DB::raw('COALESCE(period_date, date)'), [$prevStart, $prevEnd])
             ->whereHas('category', fn($q) => $q->where('type', 'income'))
             ->sum('amount');
 
@@ -105,8 +105,8 @@ class ReportDataService
             ? (($report['income'] - $priorMonthIncome) / $priorMonthIncome) * 100
             : null;
 
-        // Budget adherence: how many categories were under budget
-        $budgetPerf = collect($report['budget_performance']);
+        // Budget adherence
+        $budgetPerf               = collect($report['budget_performance']);
         $report['budgets_under']  = $budgetPerf->where('percentage', '<=', 100)->count();
         $report['budgets_over']   = $budgetPerf->where('percentage', '>', 100)->count();
         $report['budgets_total']  = $budgetPerf->count();
@@ -121,30 +121,29 @@ class ReportDataService
 
     private function generateReport(User $user, Carbon $startDate, Carbon $endDate, string $type): array
     {
-
         // Accounts
         $accounts     = Account::where('user_id', $user->id)->where('is_active', true)->get();
         $totalBalance = $accounts->sum('current_balance');
 
-        // Transactions
+        // Transactions — use COALESCE(period_date, date) to match BudgetController logic
         $transactions = Transaction::where('user_id', $user->id)
-            ->whereBetween('date', [$startDate, $endDate])
+            ->whereBetween(DB::raw('COALESCE(period_date, date)'), [$startDate, $endDate])
             ->with(['category', 'account'])
             ->orderBy('date', 'desc')
             ->get();
 
+        Log::info('ReportDataService::generateReport', [
+            'user_id'           => $user->id,
+            'type'              => $type,
+            'start'             => $startDate->toDateTimeString(),
+            'end'               => $endDate->toDateTimeString(),
+            'transaction_count' => $transactions->count(),
+            'accounts_count'    => $accounts->count(),
+        ]);
+
         $income   = $transactions->filter(fn($t) => $t->category->type === 'income')->sum('amount');
         $expenses = $transactions->filter(fn($t) => $t->category->type === 'expense')->sum('amount');
         $netFlow  = $income - $expenses;
-        Log::info('Report data', [
-            'user_id'           => $user->id,
-            'start'             => $startDate,
-            'end'               => $endDate,
-            'transaction_count' => $transactions->count(),
-            'income'            => $income,
-            'expenses'          => $expenses,
-            'accounts_count'    => $accounts->count(),
-        ]);
 
         // Top Spending Categories
         $topCategories = $transactions
@@ -168,10 +167,10 @@ class ReportDataService
 
         // Daily Spending (for charts)
         $dailySpending = Transaction::where('user_id', $user->id)
-            ->whereBetween('date', [$startDate, $endDate])
+            ->whereBetween(DB::raw('COALESCE(period_date, date)'), [$startDate, $endDate])
             ->whereHas('category', fn($q) => $q->where('type', 'expense'))
-            ->select(DB::raw('DATE(date) as date'), DB::raw('SUM(amount) as total'))
-            ->groupBy(DB::raw('DATE(date)'))
+            ->select(DB::raw('DATE(COALESCE(period_date, date)) as date'), DB::raw('SUM(amount) as total'))
+            ->groupBy(DB::raw('DATE(COALESCE(period_date, date))'))
             ->orderBy('date')
             ->get()
             ->map(fn($item) => [
@@ -215,51 +214,46 @@ class ReportDataService
         $insights = $this->generateInsights($user, $transactions, $startDate, $endDate, $type);
 
         return [
-            'period_type'         => $type,
-            'start_date'          => $startDate->format('M d, Y'),
-            'end_date'            => $endDate->format('M d, Y'),
-            'user'                => $user,
-            'accounts'            => $accounts,
-            'total_balance'       => $totalBalance,
-            'total_loans'         => $totalLoanBalance,
-            'net_worth'           => $totalBalance - $totalLoanBalance,
-            'transactions'        => match ($type) {
+            'period_type'          => $type,
+            'start_date'           => $startDate->format('M d, Y'),
+            'end_date'             => $endDate->format('M d, Y'),
+            'user'                 => $user,
+            'accounts'             => $accounts,
+            'total_balance'        => $totalBalance,
+            'total_loans'          => $totalLoanBalance,
+            'net_worth'            => $totalBalance - $totalLoanBalance,
+            'transactions'         => match ($type) {
                 'annual'  => $transactions->take(50),
                 'monthly' => $transactions->take(30),
                 default   => $transactions->take(25),
             },
-            'transaction_count'   => $transactions->count(),
-            'income'              => $income,
-            'expenses'            => $expenses,
-            'net_flow'            => $netFlow,
-            'savings_rate'        => $income > 0 ? ($netFlow / $income) * 100 : 0,
-            'top_categories'      => $topCategories,
+            'transaction_count'    => $transactions->count(),
+            'income'               => $income,
+            'expenses'             => $expenses,
+            'net_flow'             => $netFlow,
+            'savings_rate'         => $income > 0 ? ($netFlow / $income) * 100 : 0,
+            'top_categories'       => $topCategories,
             'largest_transactions' => $largestTransactions,
-            'daily_spending'      => $dailySpending,
-            'active_loans'        => $activeLoans,
-            'budget_performance'  => $budgetPerformance,
-            'insights'            => $insights,
+            'daily_spending'       => $dailySpending,
+            'active_loans'         => $activeLoans,
+            'budget_performance'   => $budgetPerformance,
+            'insights'             => $insights,
         ];
     }
 
-    /**
-     * Get total loan payments (principal repayments) recorded within a period.
-     * Assumes loan repayments are transactions with a category named/typed as 'loan_repayment'
-     * or you track them directly — adjust the filter to match your schema.
-     */
     private function getLoanPaymentsInPeriod(User $user, Carbon $startDate, Carbon $endDate): array
     {
         $payments = Transaction::where('user_id', $user->id)
-            ->whereBetween('date', [$startDate, $endDate])
-            ->whereHas('category', fn($q) => $q->where('type', 'loan_repayment'))
+            ->whereBetween(DB::raw('COALESCE(period_date, date)'), [$startDate, $endDate])
+            ->whereHas('category', fn($q) => $q->where('name', 'Loan Repayment'))
             ->with(['category', 'account'])
             ->get();
 
         return [
-            'count'  => $payments->count(),
-            'total'  => $payments->sum('amount'),
-            'items'  => $payments->map(fn($t) => [
-                'date'        => $t->date->format('M d, Y'),
+            'count' => $payments->count(),
+            'total' => $payments->sum('amount'),
+            'items' => $payments->map(fn($t) => [
+                'date'        => Carbon::parse($t->date)->format('M d, Y'),
                 'description' => $t->description,
                 'amount'      => $t->amount,
             ])->values()->toArray(),
@@ -279,7 +273,7 @@ class ReportDataService
             'icon'        => '📊',
             'title'       => 'Average Daily Spending',
             'value'       => 'KES ' . number_format($avgDaily, 0),
-            'description' => "You spent an average of KES " . number_format($avgDaily, 0) . " per day",
+            'description' => 'You spent an average of KES ' . number_format($avgDaily, 0) . ' per day',
         ];
 
         // Compare with previous period
@@ -297,8 +291,8 @@ class ReportDataService
             default   => 'period',
         };
 
-        $prevExpenses  = Transaction::where('user_id', $user->id)
-            ->whereBetween('date', [$prevStart, $prevEnd])
+        $prevExpenses = Transaction::where('user_id', $user->id)
+            ->whereBetween(DB::raw('COALESCE(period_date, date)'), [$prevStart, $prevEnd])
             ->whereHas('category', fn($q) => $q->where('type', 'expense'))
             ->sum('amount');
 
@@ -310,7 +304,7 @@ class ReportDataService
                 'icon'        => '📈',
                 'title'       => 'Spending Increased',
                 'value'       => '+' . number_format($changePercent, 1) . '%',
-                'description' => "You spent KES " . number_format($change, 0) . " more than last " . $periodLabel,
+                'description' => 'You spent KES ' . number_format($change, 0) . ' more than last ' . $periodLabel,
                 'trend'       => 'up',
             ];
         } elseif ($change < 0) {
@@ -318,7 +312,7 @@ class ReportDataService
                 'icon'        => '📉',
                 'title'       => 'Spending Decreased',
                 'value'       => number_format($changePercent, 1) . '%',
-                'description' => "You spent KES " . number_format(abs($change), 0) . " less than last " . $periodLabel,
+                'description' => 'You spent KES ' . number_format(abs($change), 0) . ' less than last ' . $periodLabel,
                 'trend'       => 'down',
             ];
         }
