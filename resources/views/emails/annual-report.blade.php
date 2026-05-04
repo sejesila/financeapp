@@ -30,15 +30,7 @@
             letter-spacing: 1px;
             text-transform: uppercase;
         }
-        .password-notice {
-            background: #FEF3C7;
-            padding: 13px 15px;
-            border-radius: 6px;
-            margin: 20px 0;
-            border-left: 4px solid #F59E0B;
-            font-size: 13px;
-        }
-        .password-notice p { margin: 4px 0; }
+
         .footer {
             margin-top: 30px;
             padding-top: 20px;
@@ -65,12 +57,6 @@
         and account performance from <strong>{{ $data['start_date'] }} – {{ $data['end_date'] }}</strong>.
     </p>
 
-    <div class="password-notice">
-        <p><strong>🔒 The attached PDF is password protected.</strong></p>
-        <p>Your password: <strong>{{ substr(str_pad($user->id, 6, '0', STR_PAD_LEFT), -4) }}</strong>
-            <span style="font-size:11px; color:#78716C;"> (last 4 digits of your user ID)</span></p>
-        <p style="font-size:11px; color:#78716C; margin-top:6px;">Use Adobe Acrobat Reader 6.0+ to open the attachment.</p>
-    </div>
 
     <p style="font-size:13px; color:#4B5563;">
         If you have any questions about your report, feel free to reach out to us at
