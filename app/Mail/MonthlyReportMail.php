@@ -23,7 +23,7 @@ class MonthlyReportMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Your Monthly Financial Report — ' . now()->format('F Y'),
+            subject: 'Your Monthly Financial Report — ' . now()->subMonth()->format('F Y'),
         );
     }
 

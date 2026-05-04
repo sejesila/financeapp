@@ -95,8 +95,8 @@ class ReportDataService
      */
     public function generateMonthlyReport(User $user): array
     {
-        $startDate = now()->startOfMonth();
-        $endDate   = now()->endOfMonth();
+        $startDate = now()->subMonth()->startOfMonth();
+        $endDate   = now()->subMonth()->endOfMonth();
 
         $report = $this->generateReport($user, $startDate, $endDate, 'monthly');
 
