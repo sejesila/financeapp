@@ -24,15 +24,16 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         User::observe(UserObserver::class);
-        Pdf::default()->withBrowsershot(function (Browsershot $browsershot) {
-            $chromePath = glob('/usr/local/share/puppeteer/chrome/linux-*/chrome-linux64/chrome')[0]
-                ?? glob('/usr/bin/chromium-browser')[0]
-                ?? null;
+        $chromePath = glob('/root/.cache/puppeteer/chrome/linux-*/chrome-linux64/chrome')[0]
+            ?? glob('/home/farmpedia-finance/.cache/puppeteer/chrome/linux-*/chrome-linux64/chrome')[0]
+            ?? glob('/usr/local/share/puppeteer/chrome/linux-*/chrome-linux64/chrome')[0]
+            ?? null;
 
-            if (!$chromePath) {
-                throw new \RuntimeException('Chrome not found');
-            }
+        if (!$chromePath) {
+            throw new \RuntimeException('Chrome not found');
+        }
 
+        Pdf::default()->withBrowsershot(function (Browsershot $browsershot) use ($chromePath) {
             $browsershot
                 ->setChromePath($chromePath)
                 ->noSandbox()
