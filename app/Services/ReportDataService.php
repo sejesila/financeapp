@@ -29,10 +29,8 @@ class ReportDataService
             $mStart = Carbon::create($year, $month, 1)->startOfDay();
             $mEnd   = $mStart->copy()->endOfMonth()->endOfDay();
 
-            $monthTransactions = Transaction::where('user_id', $user->id)
-                ->whereBetween(DB::raw('COALESCE(period_date, date)'), [$mStart, $mEnd])
-                ->with('category')
-                ->get();
+            // ✅ FIXED: Use same filtering as main report generation
+            $monthTransactions = $this->getFilteredTransactions($user, $mStart, $mEnd);
 
             $mIncome   = $monthTransactions->filter(fn($t) => $t->category->type === 'income')->sum('amount');
             $mExpenses = $monthTransactions->filter(fn($t) => $t->category->type === 'expense')->sum('amount');
@@ -58,12 +56,10 @@ class ReportDataService
         $loansPaidInYear = $this->getLoanPaymentsInPeriod($user, $startDate, $endDate);
 
         // Prior year income for trend
-        $priorYearIncome = Transaction::where('user_id', $user->id)
-            ->whereBetween(DB::raw('COALESCE(period_date, date)'), [
-                Carbon::create($year - 1, 1, 1)->startOfDay(),
-                Carbon::create($year - 1, 12, 31)->endOfDay(),
-            ])
-            ->whereHas('category', fn($q) => $q->where('type', 'income'))
+        $priorYearStart  = Carbon::create($year - 1, 1, 1)->startOfDay();
+        $priorYearEnd    = Carbon::create($year - 1, 12, 31)->endOfDay();
+        $priorYearIncome = $this->getFilteredTransactions($user, $priorYearStart, $priorYearEnd)
+            ->filter(fn($t) => $t->category->type === 'income')
             ->sum('amount');
 
         $report['monthly_breakdown']    = $monthlyBreakdown;
@@ -95,9 +91,8 @@ class ReportDataService
         $prevStart = $startDate->copy()->subMonth()->startOfMonth();
         $prevEnd   = $prevStart->copy()->endOfMonth();
 
-        $priorMonthIncome = Transaction::where('user_id', $user->id)
-            ->whereBetween(DB::raw('COALESCE(period_date, date)'), [$prevStart, $prevEnd])
-            ->whereHas('category', fn($q) => $q->where('type', 'income'))
+        $priorMonthIncome = $this->getFilteredTransactions($user, $prevStart, $prevEnd)
+            ->filter(fn($t) => $t->category->type === 'income')
             ->sum('amount');
 
         $report['prior_period_income'] = $priorMonthIncome;
@@ -119,28 +114,57 @@ class ReportDataService
         return $this->generateReport($user, $startDate, $endDate, 'custom');
     }
 
+    /**
+     * ✅ NEW: Extract shared filtering logic to ensure consistency
+     * Matches BudgetController's transaction filtering exactly
+     */
+    private function getFilteredTransactions(User $user, Carbon $startDate, Carbon $endDate)
+    {
+        return Transaction::query()
+            ->where('user_id', $user->id)
+            ->whereBetween(DB::raw('COALESCE(period_date, date)'), [$startDate, $endDate])
+            ->where(function($q) {
+                // Include regular transactions (not related to client funds)
+                $q->where(function($q2) {
+                    $q2->where('payment_method', '!=', 'Client Fund')
+                        ->where('payment_method', '!=', 'Client Commission')
+                        ->orWhereNull('payment_method');
+                })
+                    // OR include client fund profit income (payment_method = 'Client Commission' AND type = 'income')
+                    ->orWhereExists(function($query) {
+                        $query->select(DB::raw(1))
+                            ->from('categories')
+                            ->whereColumn('categories.id', 'transactions.category_id')
+                            ->where('categories.type', 'income')
+                            ->where('transactions.payment_method', 'Client Commission');
+                    });
+            })
+            ->whereHas('category', function ($q) {
+                $q->whereIn('type', ['income', 'expense'])
+                    ->whereNotIn('name', [
+                        'Loan Disbursement',
+                        'Loan Receipt',
+                        'Balance Adjustment',
+                        'Client Funds'  // ✅ Exclude liability category
+                    ]);
+            })
+            ->with(['category', 'account'])
+            ->get();
+    }
+
     private function generateReport(User $user, Carbon $startDate, Carbon $endDate, string $type): array
     {
         // Accounts
         $accounts     = Account::where('user_id', $user->id)->where('is_active', true)->get();
         $totalBalance = $accounts->sum('current_balance');
 
-        // Transactions — use COALESCE(period_date, date) to match BudgetController logic
-        $transactions = Transaction::where('user_id', $user->id)
-            ->whereBetween(DB::raw('COALESCE(period_date, date)'), [$startDate, $endDate])
-            ->with(['category', 'account'])
-            ->orderBy('date', 'desc')
-            ->get();
+        // ✅ FIXED: Use consistent filtering
+        $transactions = $this->getFilteredTransactions($user, $startDate, $endDate)
+            ->sortBy(fn($t) => $t->date)
+            ->reverse()
+            ->values();
 
-        Log::info('ReportDataService::generateReport', [
-            'user_id'           => $user->id,
-            'type'              => $type,
-            'start'             => $startDate->toDateTimeString(),
-            'end'               => $endDate->toDateTimeString(),
-            'transaction_count' => $transactions->count(),
-            'accounts_count'    => $accounts->count(),
-        ]);
-
+        // Calculate income and expenses
         $income   = $transactions->filter(fn($t) => $t->category->type === 'income')->sum('amount');
         $expenses = $transactions->filter(fn($t) => $t->category->type === 'expense')->sum('amount');
         $netFlow  = $income - $expenses;
@@ -169,6 +193,28 @@ class ReportDataService
         $dailySpending = Transaction::where('user_id', $user->id)
             ->whereBetween(DB::raw('COALESCE(period_date, date)'), [$startDate, $endDate])
             ->whereHas('category', fn($q) => $q->where('type', 'expense'))
+            ->where(function($q) {
+                $q->where(function($q2) {
+                    $q2->where('payment_method', '!=', 'Client Fund')
+                        ->where('payment_method', '!=', 'Client Commission')
+                        ->orWhereNull('payment_method');
+                })
+                    ->orWhereExists(function($query) {
+                        $query->select(DB::raw(1))
+                            ->from('categories')
+                            ->whereColumn('categories.id', 'transactions.category_id')
+                            ->where('categories.type', 'income')
+                            ->where('transactions.payment_method', 'Client Commission');
+                    });
+            })
+            ->whereHas('category', function ($q) {
+                $q->whereNotIn('name', [
+                    'Loan Disbursement',
+                    'Loan Receipt',
+                    'Balance Adjustment',
+                    'Client Funds'
+                ]);
+            })
             ->select(DB::raw('DATE(COALESCE(period_date, date)) as date'), DB::raw('SUM(amount) as total'))
             ->groupBy(DB::raw('DATE(COALESCE(period_date, date))'))
             ->orderBy('date')
@@ -243,6 +289,7 @@ class ReportDataService
 
     private function getLoanPaymentsInPeriod(User $user, Carbon $startDate, Carbon $endDate): array
     {
+        // ✅ Loan payments are specifically categorized, so use direct query
         $payments = Transaction::where('user_id', $user->id)
             ->whereBetween(DB::raw('COALESCE(period_date, date)'), [$startDate, $endDate])
             ->whereHas('category', fn($q) => $q->where('name', 'Loan Repayment'))
@@ -291,10 +338,9 @@ class ReportDataService
             default   => 'period',
         };
 
-        $prevExpenses = Transaction::where('user_id', $user->id)
-            ->whereBetween(DB::raw('COALESCE(period_date, date)'), [$prevStart, $prevEnd])
-            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
-            ->sum('amount');
+        // ✅ FIXED: Use filtered transactions for comparison
+        $prevTransactions = $this->getFilteredTransactions($user, $prevStart, $prevEnd);
+        $prevExpenses = $prevTransactions->filter(fn($t) => $t->category->type === 'expense')->sum('amount');
 
         $change        = $totalExpenses - $prevExpenses;
         $changePercent = $prevExpenses > 0 ? (($change / $prevExpenses) * 100) : 0;
