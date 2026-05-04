@@ -92,6 +92,35 @@
 <body>
 
 @php
+    /*
+    |--------------------------------------------------------------------------
+    | Data comes from ReportDataService::generateMonthlyReport()
+    |
+    | $data['start_date']            — pre-formatted string e.g. "May 01, 2025"
+    | $data['end_date']              — pre-formatted string e.g. "May 31, 2025"
+    | $data['income']                — float
+    | $data['expenses']              — float
+    | $data['net_flow']              — float  (income - expenses)
+    | $data['savings_rate']          — float  percentage
+    | $data['net_worth']             — float  (total_balance - total_loans - total_client_funds)
+    | $data['total_loans']           — float  (active loans balance)
+    | $data['total_balance']         — float  (sum of active account balances)
+    | $data['prior_period_income']   — float  (prior month income)
+    | $data['income_trend']          — float|null  percentage change vs prior month
+    | $data['budgets_over']          — int
+    | $data['budgets_under']         — int
+    | $data['budgets_total']         — int
+    | $data['transaction_count']     — int
+    | $data['accounts']              — Collection<Account>  (active accounts)
+    | $data['budget_performance']    — array[]  {category, budgeted, spent, remaining, percentage}
+    | $data['top_categories']        — Collection  {category, amount, count}
+    | $data['largest_transactions']  — Collection<Transaction>  (top 5 expenses by amount)
+    | $data['insights']              — array[]  {icon, title, value, description}
+    | $data['active_loans']          — Collection<Loan>
+    | $data['loans_paid_in_period']  — array  {count, total, items[]}   (repayment transactions)
+    | $data['loans_repaid_in_period']— array  {count, total, principal_total, items[]}  (fully cleared loans)
+    |--------------------------------------------------------------------------
+    */
     $currency    = 'KES';
     $income      = $data['income']              ?? 0;
     $expenses    = $data['expenses']            ?? 0;
@@ -105,11 +134,16 @@
     $budgetsOver  = $data['budgets_over']       ?? 0;
     $budgetsUnder = $data['budgets_under']      ?? 0;
     $budgetsTotal = $data['budgets_total']      ?? 0;
-    $txCount     = $data['transaction_count']   ?? 0;
-    $startDate   = \Carbon\Carbon::parse($data['start_date']);
-    $endDate     = \Carbon\Carbon::parse($data['end_date']);
-    $days        = $startDate->diffInDays($endDate) + 1;
-    $dailyAvg    = $days > 0 ? $expenses / $days : 0;
+    $txCount      = $data['transaction_count']  ?? 0;
+
+    /*
+     * start_date / end_date are stored as pre-formatted strings by the service
+     * (e.g. "May 01, 2025"). Parse them back to Carbon for display formatting.
+     */
+    $startDate = \Carbon\Carbon::parse($data['start_date']);
+    $endDate   = \Carbon\Carbon::parse($data['end_date']);
+    $days      = $startDate->diffInDays($endDate) + 1;
+    $dailyAvg  = $days > 0 ? $expenses / $days : 0;
 @endphp
 
 <div class="watermark">CONFIDENTIAL</div>
@@ -129,7 +163,7 @@
     <h3>Your Net Worth</h3>
     <div class="amount">{{ $currency }} {{ number_format($netWorth) }}</div>
     <div class="breakdown">
-        Assets: {{ $currency }} {{ number_format($totalBal) }}
+        Assets: {{ $currency }} {{ number_format($netWorth) }}
         &bull; Liabilities: {{ $currency }} {{ number_format($totalLoans) }}
     </div>
 </div>
@@ -170,6 +204,7 @@
     </div>
     <div class="stat-cell">
         <div class="stat-label">Accounts</div>
+        {{-- $data['accounts'] is an Eloquent Collection from Account::where(...)->get() --}}
         <div class="stat-value">{{ $data['accounts']->count() }}</div>
     </div>
 </div>
@@ -215,6 +250,7 @@
 @endif
 
 <!-- Budget Performance -->
+{{-- $data['budget_performance'] is a plain PHP array populated only for 'monthly' type --}}
 @if(!empty($data['budget_performance']))
     <div class="section">
         <div class="section-title">Budget Performance Analysis</div>
@@ -253,6 +289,7 @@
 @endif
 
 <!-- Account Balances -->
+{{-- $data['accounts'] is a Collection<Account> with current_balance and name properties --}}
 @if($data['accounts']->isNotEmpty())
     <div class="section">
         <div class="section-title">Account Overview</div>
@@ -290,6 +327,7 @@
 @endif
 
 <!-- Top Spending Categories -->
+{{-- $data['top_categories'] is a Collection of arrays: {category, amount, count} --}}
 @if($data['top_categories']->isNotEmpty())
     <div class="section">
         <div class="section-title">Spending Breakdown by Category</div>
@@ -328,6 +366,11 @@
 @endif
 
 <!-- Largest Transactions -->
+{{--
+    $data['largest_transactions'] is a Collection<Transaction>
+    Each Transaction has: date, description, amount, category->name
+    These are top-5 expense transactions sorted by amount desc.
+--}}
 @if($data['largest_transactions']->isNotEmpty())
     <div class="section">
         <div class="section-title">Largest Individual Expenses</div>
@@ -343,7 +386,8 @@
             <tbody>
             @foreach($data['largest_transactions'] as $txn)
                 <tr>
-                    <td style="color: #6B7280;">{{ \Carbon\Carbon::parse($txn->date)->format('M j, Y') }}</td>
+                    {{-- Use COALESCE(period_date, date) logic — period_date may be null, fall back to date --}}
+                    <td style="color: #6B7280;">{{ \Carbon\Carbon::parse($txn->period_date ?? $txn->date)->format('M j, Y') }}</td>
                     <td style="font-weight: 500;">{{ $txn->description }}</td>
                     <td style="color: #6B7280;">{{ $txn->category->name }}</td>
                     <td style="text-align: right; font-weight: bold; color: #DC2626;">-{{ $currency }} {{ number_format($txn->amount) }}</td>
@@ -354,7 +398,39 @@
     </div>
 @endif
 
+<!-- Loan Repayments This Month -->
+{{--
+    $data['loans_paid_in_period']   — repayment transactions {count, total, items[]}
+    $data['loans_repaid_in_period'] — fully cleared loans    {count, total, principal_total, items[]}
+--}}
+@php
+    $loansPaid   = $data['loans_paid_in_period']   ?? ['count' => 0, 'total' => 0, 'items' => []];
+    $loansCleared = $data['loans_repaid_in_period'] ?? ['count' => 0, 'total' => 0, 'items' => []];
+@endphp
+@if($loansPaid['count'] > 0 || $loansCleared['count'] > 0)
+    <div class="section">
+        <div class="section-title">Loan Activity This Month</div>
+        @if($loansPaid['count'] > 0)
+            <div class="insight-box">
+                <h4>&#128176; Repayments Made</h4>
+                <p>You made <strong>{{ $loansPaid['count'] }} loan repayment{{ $loansPaid['count'] > 1 ? 's' : '' }}</strong> totalling <strong>{{ $currency }} {{ number_format($loansPaid['total']) }}</strong> this month.</p>
+            </div>
+        @endif
+        @if($loansCleared['count'] > 0)
+            <div class="insight-box" style="border-left-color: #10B981; background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);">
+                <h4 style="color: #065F46;">&#10003; Loans Fully Cleared</h4>
+                <p>Congratulations! You fully repaid <strong>{{ $loansCleared['count'] }} loan{{ $loansCleared['count'] > 1 ? 's' : '' }}</strong> this month with a combined principal of <strong>{{ $currency }} {{ number_format($loansCleared['principal_total']) }}</strong>.</p>
+            </div>
+        @endif
+    </div>
+@endif
+
 <!-- Key Insights -->
+{{--
+    $data['insights'] is a plain array of arrays, each with:
+    {icon (emoji string), title, value, description}
+    Generated by ReportDataService::generateInsights()
+--}}
 @if(!empty($data['insights']))
     <div class="section">
         <div class="section-title">Key Insights</div>
@@ -370,6 +446,11 @@
 @endif
 
 <!-- Active Loans -->
+{{--
+    $data['active_loans'] is a Collection<Loan>
+    Each Loan has: source, principal_amount, balance, due_date, status
+    The service loads only status='active' loans.
+--}}
 @if($data['active_loans']->isNotEmpty())
     <div class="section">
         <div class="section-title">Active Loans</div>
@@ -407,6 +488,7 @@
 <div class="footer">
     <p class="confidential">CONFIDENTIAL FINANCIAL DOCUMENT</p>
     <p>Generated on {{ now()->format('F j, Y') }}</p>
+    {{-- Report ID uses the raw start date string stored by the service --}}
     <p>Report ID: MTH-{{ $startDate->format('Y-m') }}-{{ strtoupper(substr(md5($user->id . $data['start_date']), 0, 8)) }}</p>
     <p style="margin-top: 8px;">&#169; {{ now()->year }} Financial Report System. All rights reserved.</p>
     <p style="margin-top: 5px; font-size: 8px; color: #9CA3AF;">This document contains highly confidential financial information. Store securely and do not share with unauthorized parties.</p>

@@ -83,23 +83,61 @@
 <div class="watermark">CONFIDENTIAL</div>
 
 @php
+    /*
+    |--------------------------------------------------------------------------
+    | Data comes from ReportDataService::generateAnnualReport()
+    |
+    | $data['year']                    — int  (prior full year)
+    | $data['start_date']              — pre-formatted string e.g. "Jan 01, 2024"
+    | $data['end_date']                — pre-formatted string e.g. "Dec 31, 2024"
+    | $data['income']                  — float
+    | $data['expenses']                — float
+    | $data['net_flow']                — float
+    | $data['savings_rate']            — float  percentage
+    | $data['net_worth']               — float  (total_balance - total_loans - total_client_funds)
+    | $data['total_loans']             — float  (active loans balance)
+    | $data['total_balance']           — float  (sum of active account balances)
+    | $data['transaction_count']       — int
+    | $data['profitable_months']       — int    (months with net_flow > 0)
+    | $data['prior_period_income']     — float  (prior year income)
+    | $data['income_trend']            — float|null  percentage change vs prior year
+    | $data['monthly_breakdown']       — array[] {month, month_short, income, expenses, net_flow, savings_rate, transaction_count}
+    | $data['best_month']              — array|null  {month, net_flow, ...}  (highest net_flow month)
+    | $data['worst_month']             — array|null  {month, net_flow, ...}  (lowest net_flow month)
+    | $data['loans_paid_in_period']    — array  {count, total, items[]}   (repayment transactions during year)
+    | $data['loans_repaid_in_period']  — array  {count, total, principal_total, items[]}  (fully cleared loans)
+    | $data['accounts']                — Collection<Account>
+    | $data['top_categories']          — Collection  {category, amount, count}
+    | $data['largest_transactions']    — Collection<Transaction>
+    | $data['active_loans']            — Collection<Loan>
+    | $data['insights']                — array[]  {icon, title, value, description}
+    |--------------------------------------------------------------------------
+    */
     $currency        = 'KES';
-    $year            = $data['year']           ?? now()->subYear()->year;
-    $income          = $data['income']         ?? 0;
-    $expenses        = $data['expenses']       ?? 0;
-    $netFlow         = $data['net_flow']       ?? 0;
-    $savingsRate     = $data['savings_rate']   ?? 0;
-    $netWorth        = $data['net_worth']      ?? 0;
-    $totalLoans      = $data['total_loans']    ?? 0;
-    $totalBal        = $data['total_balance']  ?? 0;
-    $txCount         = $data['transaction_count'] ?? 0;
+    $year            = $data['year']            ?? now()->subYear()->year;
+    $income          = $data['income']          ?? 0;
+    $expenses        = $data['expenses']        ?? 0;
+    $netFlow         = $data['net_flow']        ?? 0;
+    $savingsRate     = $data['savings_rate']    ?? 0;
+    $netWorth        = $data['net_worth']       ?? 0;
+    $totalLoans      = $data['total_loans']     ?? 0;
+    $totalBal        = $data['total_balance']   ?? 0;
+    $txCount         = $data['transaction_count']  ?? 0;
     $profitMonths    = $data['profitable_months']  ?? 0;
     $priorIncome     = $data['prior_period_income'] ?? 0;
-    $incomeTrend     = $data['income_trend']   ?? null;
+    $incomeTrend     = $data['income_trend']    ?? null;
     $monthlyBreakdown = $data['monthly_breakdown'] ?? [];
-    $bestMonth       = $data['best_month']     ?? null;
-    $worstMonth      = $data['worst_month']    ?? null;
-    $loansPaid       = $data['loans_paid_in_period'] ?? ['count' => 0, 'total' => 0];
+    $bestMonth       = $data['best_month']      ?? null;
+    $worstMonth      = $data['worst_month']     ?? null;
+
+    /*
+     * loans_paid_in_period  — transactions where category = 'Loan Repayment'
+     * loans_repaid_in_period — Loan records with status='paid' and repaid_date in period
+     * These are two distinct datasets; the trend-box uses loans_paid_in_period.
+     */
+    $loansPaid    = $data['loans_paid_in_period']   ?? ['count' => 0, 'total' => 0, 'items' => []];
+    $loansCleared = $data['loans_repaid_in_period']  ?? ['count' => 0, 'total' => 0, 'principal_total' => 0, 'items' => []];
+
     $avgMonthlySpend = $expenses > 0 ? $expenses / 12 : 0;
     $avgMonthlySave  = $netFlow / 12;
 @endphp
@@ -117,7 +155,7 @@
     <h3>Year-End Net Worth</h3>
     <div class="amount">{{ $currency }} {{ number_format($netWorth) }}</div>
     <div class="breakdown">
-        Assets: {{ $currency }} {{ number_format($totalBal) }}
+        Assets: {{ $currency }} {{ number_format($netWorth) }}
         &bull; Liabilities: {{ $currency }} {{ number_format($totalLoans) }}
     </div>
 </div>
@@ -147,6 +185,7 @@
 <div class="stats-grid">
     <div class="stat-cell">
         <div class="stat-label">Transactions</div>
+        {{-- transaction_count is the full untruncated count (service truncates ->transactions to 50 but counts all) --}}
         <div class="stat-value">{{ $txCount }}</div>
     </div>
     <div class="stat-cell">
@@ -186,6 +225,7 @@
         <div class="trend-subtext">months with positive cash flow</div>
     </div>
     <div class="trend-cell">
+        {{-- loans_paid_in_period = repayment transactions (count & total from getLoanPaymentsInPeriod) --}}
         <div class="trend-label">Loan Repayments</div>
         @if($loansPaid['count'] > 0)
             <div class="trend-value" style="color: #059669;">{{ $currency }} {{ number_format($loansPaid['total']) }}</div>
@@ -214,15 +254,30 @@
     </div>
 @endif
 
+<!-- Annual Performance Overview -->
 <div class="insight-box">
     <h4>Annual Performance Overview</h4>
     <p>Throughout {{ $year }}, you had positive cash flow in <strong>{{ $profitMonths }} of 12 months</strong>, with an average monthly savings of {{ $currency }} {{ number_format($avgMonthlySave) }}.
+        {{-- best_month and worst_month are the first() items from sortByDesc/sortBy on net_flow --}}
         @if($bestMonth) Your best month was <strong>{{ $bestMonth['month'] }}</strong> (net: {{ $currency }} {{ number_format($bestMonth['net_flow']) }}). @endif
         @if($worstMonth) Your toughest month was <strong>{{ $worstMonth['month'] }}</strong> (net: {{ $currency }} {{ number_format($worstMonth['net_flow']) }}). @endif
     </p>
 </div>
 
+<!-- Loans Fully Cleared During Year -->
+{{-- loans_repaid_in_period = Loan records where status='paid' AND repaid_date falls within the year --}}
+@if($loansCleared['count'] > 0)
+    <div class="insight-box" style="border-left-color: #10B981; background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);">
+        <h4 style="color: #065F46;">&#10003; Loans Fully Cleared in {{ $year }}</h4>
+        <p>You completely paid off <strong>{{ $loansCleared['count'] }} loan{{ $loansCleared['count'] > 1 ? 's' : '' }}</strong> during {{ $year }},
+            with a combined principal of <strong>{{ $currency }} {{ number_format($loansCleared['principal_total']) }}</strong>
+            (total repaid including interest: <strong>{{ $currency }} {{ number_format($loansCleared['total']) }}</strong>).
+        </p>
+    </div>
+@endif
+
 <!-- Month-by-Month Breakdown -->
+{{-- monthly_breakdown is a plain array built in generateAnnualReport() via a loop over 12 months --}}
 @if(!empty($monthlyBreakdown))
     <div class="section">
         <div class="section-title">Month-by-Month Breakdown</div>
@@ -241,6 +296,7 @@
             @foreach($monthlyBreakdown as $i => $month)
                 @php $rowNet = $month['net_flow']; @endphp
                 <tr @if($i % 2 === 0) style="background: #F9FAFB;" @endif>
+                    {{-- month_short is pre-formatted as 'M' (e.g. "Jan", "Feb") --}}
                     <td style="font-weight: 600;">{{ $month['month_short'] }}</td>
                     <td style="text-align: right; color: #059669;">{{ number_format($month['income']) }}</td>
                     <td style="text-align: right; color: #DC2626;">{{ number_format($month['expenses']) }}</td>
@@ -269,6 +325,7 @@
 @endif
 
 <!-- Account Balances -->
+{{-- $data['accounts'] is a Collection<Account> — active accounts only (is_active = true) --}}
 @if($data['accounts']->isNotEmpty())
     <div class="section">
         <div class="section-title">Year-End Account Overview</div>
@@ -306,6 +363,7 @@
 @endif
 
 <!-- Top Spending Categories -->
+{{-- $data['top_categories'] is a Collection of arrays: {category, amount, count} — top 5 by amount --}}
 @if($data['top_categories']->isNotEmpty())
     <div class="section">
         <div class="section-title">Annual Spending Breakdown by Category</div>
@@ -335,7 +393,39 @@
     </div>
 @endif
 
+<!-- Largest Transactions -->
+{{--
+    $data['largest_transactions'] is a Collection<Transaction> (top 5 expenses, sorted by amount desc)
+    Uses COALESCE(period_date, date) in the query, so prefer period_date when set.
+--}}
+@if($data['largest_transactions']->isNotEmpty())
+    <div class="section">
+        <div class="section-title">Largest Individual Expenses</div>
+        <table>
+            <thead>
+            <tr>
+                <th style="width: 15%;">Date</th>
+                <th style="width: 40%;">Description</th>
+                <th style="width: 25%;">Category</th>
+                <th style="text-align: right; width: 20%;">Amount</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach($data['largest_transactions'] as $txn)
+                <tr>
+                    <td style="color: #6B7280;">{{ \Carbon\Carbon::parse($txn->period_date ?? $txn->date)->format('M j, Y') }}</td>
+                    <td style="font-weight: 500;">{{ $txn->description }}</td>
+                    <td style="color: #6B7280;">{{ $txn->category->name }}</td>
+                    <td style="text-align: right; font-weight: bold; color: #DC2626;">-{{ $currency }} {{ number_format($txn->amount) }}</td>
+                </tr>
+            @endforeach
+            </tbody>
+        </table>
+    </div>
+@endif
+
 <!-- Active Loans -->
+{{-- $data['active_loans'] = Loan::where('status','active') — only currently outstanding loans --}}
 @if($data['active_loans']->isNotEmpty())
     <div class="section">
         <div class="section-title">Active Loans</div>
@@ -370,13 +460,19 @@
 @endif
 
 <!-- Key Insights — two-column grid -->
+{{--
+    $data['insights'] is a plain array from generateInsights():
+    {icon (emoji), title, value, description}
+    The annual blade uses insight-card style (title + value on separate lines) for better layout.
+--}}
 @if(!empty($data['insights']))
     <div class="section">
         <div class="section-title">Key Insights</div>
         <div class="insights-grid">
             @foreach($data['insights'] as $insight)
                 <div class="insight-card">
-                    <h4>{{ $insight['title'] }}</h4>
+                    {{-- icon is an emoji string present in all insight arrays from the service --}}
+                    <h4>{{ $insight['icon'] }} {{ $insight['title'] }}</h4>
                     <div class="insight-value">{{ $insight['value'] }}</div>
                     <p>{{ $insight['description'] }}</p>
                 </div>
@@ -398,6 +494,7 @@
 <div class="footer">
     <p class="confidential">CONFIDENTIAL FINANCIAL DOCUMENT</p>
     <p>Generated on {{ now()->format('F j, Y') }}</p>
+    {{-- Report ID hashes user->id and the year integer, matching the service's data keys --}}
     <p>Report ID: ANN-{{ $year }}-{{ strtoupper(substr(md5($user->id . $year), 0, 8)) }}</p>
     <p style="margin-top: 8px;">© {{ now()->year }} Financial Report System. All rights reserved.</p>
     <p style="margin-top: 5px; font-size: 8px; color: #9CA3AF;">This document contains highly confidential financial information. Store securely and do not share with unauthorized parties.</p>
