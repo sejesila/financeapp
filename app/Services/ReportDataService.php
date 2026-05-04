@@ -13,6 +13,12 @@ use Illuminate\Support\Facades\Log;
 
 class ReportDataService
 {
+    /**
+     * Generate annual report for the prior full year
+     *
+     * @param User $user
+     * @return array
+     */
     public function generateAnnualReport(User $user): array
     {
         $year      = now()->subYear()->year;
@@ -29,7 +35,7 @@ class ReportDataService
             $mStart = Carbon::create($year, $month, 1)->startOfDay();
             $mEnd   = $mStart->copy()->endOfMonth()->endOfDay();
 
-            // ✅ FIXED: Use same filtering as main report generation
+            // ✅ Use same filtering as main report generation
             $monthTransactions = $this->getFilteredTransactions($user, $mStart, $mEnd);
 
             $mIncome   = $monthTransactions->filter(fn($t) => $t->category->type === 'income')->sum('amount');
@@ -50,10 +56,13 @@ class ReportDataService
         $collection   = collect($monthlyBreakdown);
         $bestMonth    = $collection->sortByDesc('net_flow')->first();
         $worstMonth   = $collection->sortBy('net_flow')->first();
-        $profitMonths = $collection->where('net_flow', '>=', 0)->count();
+        $profitMonths = $collection->where('net_flow', '>', 0)->count();
 
         // Loans paid down during the year
         $loansPaidInYear = $this->getLoanPaymentsInPeriod($user, $startDate, $endDate);
+
+        // ✅ NEW: Loans that were completely paid off during the year
+        $loansRepaidDuringYear = $this->getLoansRepaidInPeriod($user, $startDate, $endDate);
 
         // Prior year income for trend
         $priorYearStart  = Carbon::create($year - 1, 1, 1)->startOfDay();
@@ -62,21 +71,28 @@ class ReportDataService
             ->filter(fn($t) => $t->category->type === 'income')
             ->sum('amount');
 
-        $report['monthly_breakdown']    = $monthlyBreakdown;
-        $report['best_month']           = $bestMonth;
-        $report['worst_month']          = $worstMonth;
-        $report['profitable_months']    = $profitMonths;
-        $report['loans_paid_in_period'] = $loansPaidInYear;
-        $report['prior_period_income']  = $priorYearIncome;
-        $report['income_trend']         = $priorYearIncome > 0
+        $report['monthly_breakdown']      = $monthlyBreakdown;
+        $report['best_month']             = $bestMonth;
+        $report['worst_month']            = $worstMonth;
+        $report['profitable_months']      = $profitMonths;
+        $report['loans_paid_in_period']   = $loansPaidInYear;
+        $report['loans_repaid_in_period'] = $loansRepaidDuringYear;
+        $report['prior_period_income']    = $priorYearIncome;
+        $report['income_trend']           = $priorYearIncome > 0
             ? (($report['income'] - $priorYearIncome) / $priorYearIncome) * 100
             : null;
-        $report['period_type']          = 'annual';
-        $report['year']                 = $year;
+        $report['period_type']            = 'annual';
+        $report['year']                   = $year;
 
         return $report;
     }
 
+    /**
+     * Generate monthly report for the current month
+     *
+     * @param User $user
+     * @return array
+     */
     public function generateMonthlyReport(User $user): array
     {
         $startDate = now()->startOfMonth();
@@ -86,6 +102,9 @@ class ReportDataService
 
         // Loans paid this month
         $report['loans_paid_in_period'] = $this->getLoanPaymentsInPeriod($user, $startDate, $endDate);
+
+        // ✅ Loans repaid this month
+        $report['loans_repaid_in_period'] = $this->getLoansRepaidInPeriod($user, $startDate, $endDate);
 
         // Prior month income for trend
         $prevStart = $startDate->copy()->subMonth()->startOfMonth();
@@ -109,34 +128,45 @@ class ReportDataService
         return $report;
     }
 
+    /**
+     * Generate custom period report
+     *
+     * @param User $user
+     * @param Carbon $startDate
+     * @param Carbon $endDate
+     * @return array
+     */
     public function generateCustomReport(User $user, Carbon $startDate, Carbon $endDate): array
     {
         return $this->generateReport($user, $startDate, $endDate, 'custom');
     }
 
     /**
-     * ✅ NEW: Extract shared filtering logic to ensure consistency
-     * Matches BudgetController's transaction filtering exactly
+     * Get filtered transactions matching BudgetController logic
+     * Excludes client fund pass-throughs and loan-related entries
+     *
+     * @param User $user
+     * @param Carbon $startDate
+     * @param Carbon $endDate
+     * @return \Illuminate\Support\Collection
      */
     private function getFilteredTransactions(User $user, Carbon $startDate, Carbon $endDate)
     {
         return Transaction::query()
             ->where('user_id', $user->id)
-            ->whereBetween(DB::raw('COALESCE(period_date, date)'), [$startDate, $endDate])
+            ->whereBetween(DB::raw('COALESCE(period_date, date)'), [
+                $startDate->toDateString(),
+                $endDate->toDateString(),
+            ])
             ->where(function($q) {
-                // Include regular transactions (not related to client funds)
-                $q->where(function($q2) {
-                    $q2->where('payment_method', '!=', 'Client Fund')
-                        ->where('payment_method', '!=', 'Client Commission')
-                        ->orWhereNull('payment_method');
-                })
-                    // OR include client fund profit income (payment_method = 'Client Commission' AND type = 'income')
-                    ->orWhereExists(function($query) {
-                        $query->select(DB::raw(1))
-                            ->from('categories')
-                            ->whereColumn('categories.id', 'transactions.category_id')
-                            ->where('categories.type', 'income')
-                            ->where('transactions.payment_method', 'Client Commission');
+                $q->whereNull('payment_method')
+                    ->orWhere(function($q2) {
+                        $q2->where('payment_method', '!=', 'Client Fund')
+                            ->where('payment_method', '!=', 'Client Commission');
+                    })
+                    ->orWhere(function($q2) {
+                        $q2->where('payment_method', 'Client Commission')
+                            ->whereHas('category', fn($c) => $c->where('type', 'income'));
                     });
             })
             ->whereHas('category', function ($q) {
@@ -145,20 +175,29 @@ class ReportDataService
                         'Loan Disbursement',
                         'Loan Receipt',
                         'Balance Adjustment',
-                        'Client Funds'  // ✅ Exclude liability category
+                        'Client Funds',
                     ]);
             })
             ->with(['category', 'account'])
             ->get();
     }
 
+    /**
+     * Core report generation logic
+     *
+     * @param User $user
+     * @param Carbon $startDate
+     * @param Carbon $endDate
+     * @param string $type 'annual', 'monthly', or 'custom'
+     * @return array
+     */
     private function generateReport(User $user, Carbon $startDate, Carbon $endDate, string $type): array
     {
-        // Accounts
+        // Accounts and total balance (point-in-time snapshot)
         $accounts     = Account::where('user_id', $user->id)->where('is_active', true)->get();
         $totalBalance = $accounts->sum('current_balance');
 
-        // ✅ FIXED: Use consistent filtering
+        // ✅ Use consistent filtering
         $transactions = $this->getFilteredTransactions($user, $startDate, $endDate)
             ->sortBy(fn($t) => $t->date)
             ->reverse()
@@ -191,7 +230,10 @@ class ReportDataService
 
         // Daily Spending (for charts)
         $dailySpending = Transaction::where('user_id', $user->id)
-            ->whereBetween(DB::raw('COALESCE(period_date, date)'), [$startDate, $endDate])
+            ->whereBetween(DB::raw('COALESCE(period_date, date)'), [
+                $startDate->toDateString(),
+                $endDate->toDateString(),
+            ])
             ->whereHas('category', fn($q) => $q->where('type', 'expense'))
             ->where(function($q) {
                 $q->where(function($q2) {
@@ -224,7 +266,7 @@ class ReportDataService
                 'amount' => $item->total,
             ]);
 
-        // Active Loans
+        // ✅ Active loans (only current liabilities)
         $activeLoans      = Loan::where('user_id', $user->id)->where('status', 'active')->with('account')->get();
         $totalLoanBalance = $activeLoans->sum('balance');
 
@@ -260,36 +302,43 @@ class ReportDataService
         $insights = $this->generateInsights($user, $transactions, $startDate, $endDate, $type);
 
         return [
-            'period_type'          => $type,
-            'start_date'           => $startDate->format('M d, Y'),
-            'end_date'             => $endDate->format('M d, Y'),
-            'user'                 => $user,
-            'accounts'             => $accounts,
-            'total_balance'        => $totalBalance,
-            'total_loans'          => $totalLoanBalance,
-            'net_worth'            => $totalBalance - $totalLoanBalance,
-            'transactions'         => match ($type) {
+            'period_type'           => $type,
+            'start_date'            => $startDate->format('M d, Y'),
+            'end_date'              => $endDate->format('M d, Y'),
+            'user'                  => $user,
+            'accounts'              => $accounts,
+            'total_balance'         => $totalBalance,
+            'total_loans'           => $totalLoanBalance,
+            'net_worth'             => $totalBalance - $totalLoanBalance,
+            'transactions'          => match ($type) {
                 'annual'  => $transactions->take(50),
                 'monthly' => $transactions->take(30),
                 default   => $transactions->take(25),
             },
-            'transaction_count'    => $transactions->count(),
-            'income'               => $income,
-            'expenses'             => $expenses,
-            'net_flow'             => $netFlow,
-            'savings_rate'         => $income > 0 ? ($netFlow / $income) * 100 : 0,
-            'top_categories'       => $topCategories,
-            'largest_transactions' => $largestTransactions,
-            'daily_spending'       => $dailySpending,
-            'active_loans'         => $activeLoans,
-            'budget_performance'   => $budgetPerformance,
-            'insights'             => $insights,
+            'transaction_count'     => $transactions->count(),
+            'income'                => $income,
+            'expenses'              => $expenses,
+            'net_flow'              => $netFlow,
+            'savings_rate'          => $income > 0 ? ($netFlow / $income) * 100 : 0,
+            'top_categories'        => $topCategories,
+            'largest_transactions'  => $largestTransactions,
+            'daily_spending'        => $dailySpending,
+            'active_loans'          => $activeLoans,
+            'budget_performance'    => $budgetPerformance,
+            'insights'              => $insights,
         ];
     }
 
+    /**
+     * Get loan payment transactions in a period
+     *
+     * @param User $user
+     * @param Carbon $startDate
+     * @param Carbon $endDate
+     * @return array
+     */
     private function getLoanPaymentsInPeriod(User $user, Carbon $startDate, Carbon $endDate): array
     {
-        // ✅ Loan payments are specifically categorized, so use direct query
         $payments = Transaction::where('user_id', $user->id)
             ->whereBetween(DB::raw('COALESCE(period_date, date)'), [$startDate, $endDate])
             ->whereHas('category', fn($q) => $q->where('name', 'Loan Repayment'))
@@ -307,6 +356,44 @@ class ReportDataService
         ];
     }
 
+    /**
+     * ✅ NEW: Get loans that were completely repaid during the period
+     *
+     * @param User $user
+     * @param Carbon $startDate
+     * @param Carbon $endDate
+     * @return array
+     */
+    private function getLoansRepaidInPeriod(User $user, Carbon $startDate, Carbon $endDate): array
+    {
+        $repaidLoans = Loan::where('user_id', $user->id)
+            ->where('status', 'paid')
+            ->whereBetween('repaid_date', [$startDate, $endDate])
+            ->get();
+
+        return [
+            'count' => $repaidLoans->count(),
+            'total' => $repaidLoans->sum('total_amount'),
+            'principal_total' => $repaidLoans->sum('principal_amount'),
+            'items' => $repaidLoans->map(fn($loan) => [
+                'source'       => $loan->source,
+                'principal'    => $loan->principal_amount,
+                'total'        => $loan->total_amount,
+                'repaid_date'  => Carbon::parse($loan->repaid_date)->format('M d, Y'),
+            ])->values()->toArray(),
+        ];
+    }
+
+    /**
+     * Generate actionable insights from transaction data
+     *
+     * @param User $user
+     * @param \Illuminate\Support\Collection $transactions
+     * @param Carbon $startDate
+     * @param Carbon $endDate
+     * @param string $type
+     * @return array
+     */
     private function generateInsights(User $user, $transactions, Carbon $startDate, Carbon $endDate, string $type): array
     {
         $insights = [];
@@ -316,6 +403,7 @@ class ReportDataService
         $income        = $transactions->filter(fn($t) => $t->category->type === 'income')->sum('amount');
         $avgDaily      = $days > 0 ? $totalExpenses / $days : 0;
 
+        // Insight 1: Average Daily Spending
         $insights[] = [
             'icon'        => '📊',
             'title'       => 'Average Daily Spending',
@@ -323,7 +411,7 @@ class ReportDataService
             'description' => 'You spent an average of KES ' . number_format($avgDaily, 0) . ' per day',
         ];
 
-        // Compare with previous period
+        // Insight 2: Spending Trend (vs previous period)
         if ($type === 'annual') {
             $prevStart = $startDate->copy()->subYear();
             $prevEnd   = $endDate->copy()->subYear();
@@ -338,7 +426,6 @@ class ReportDataService
             default   => 'period',
         };
 
-        // ✅ FIXED: Use filtered transactions for comparison
         $prevTransactions = $this->getFilteredTransactions($user, $prevStart, $prevEnd);
         $prevExpenses = $prevTransactions->filter(fn($t) => $t->category->type === 'expense')->sum('amount');
 
@@ -363,7 +450,7 @@ class ReportDataService
             ];
         }
 
-        // Biggest single expense
+        // Insight 3: Biggest single expense
         $biggestExpense = $transactions
             ->filter(fn($t) => $t->category->type === 'expense')
             ->sortByDesc('amount')
@@ -373,12 +460,12 @@ class ReportDataService
             $insights[] = [
                 'icon'        => '💸',
                 'title'       => 'Biggest Expense',
-                'value'       => 'KES ' . number_format($biggestExpense->amount, 0),
+                'value' => 'KES ' . $biggestExpense->amount,
                 'description' => $biggestExpense->description . ' (' . $biggestExpense->category->name . ')',
             ];
         }
 
-        // Savings rate
+        // Insight 4: Savings rate
         if ($income > 0) {
             $savingsRate = (($income - $totalExpenses) / $income) * 100;
             $insights[]  = [

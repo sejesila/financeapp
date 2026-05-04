@@ -21,7 +21,7 @@ class TransactionFactory extends Factory
             'account_id'                 => Account::factory(),
             'category_id'                => Category::factory(),
             'date'                       => now()->toDateString(),
-            'period_date'                => now()->toDateString(),
+            'period_date'                => null,
             'description'                => $this->faker->sentence(3),
             'amount'                     => $this->faker->randomFloat(2, 10, 5000),
             'payment_method'             => 'Cash',
