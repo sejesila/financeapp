@@ -206,7 +206,7 @@ class MpesaSmsParser
             ];
         }
 
-// 2c. M-Shwari withdrawal — M-Shwari → Mpesa
+        // 2c. M-Shwari withdrawal — M-Shwari → Mpesa
         if (preg_match(
             '/^(\w+)\s+Confirmed\.\s*KES\s*([\d,]+\.?\d*)\s+transferred from M-Shwari account\s+on\s+([\d\/]+)\s+at\s+([\d:]+\s*(?:AM|PM))\.\s*M-Shwari balance is\s+KES\s*([\d,]+\.?\d*).*?M-PESA balance is\s+KES\s*([\d,]+\.?\d*)/si',
             $sms, $m
@@ -225,15 +225,16 @@ class MpesaSmsParser
             ];
         }
 
-        // 3. Paybill transfers (Sanlam MMF, etc.) - must come BEFORE expense paybills
+        // 3. Paybill transfers (Sanlam MMF, Etica, etc.) - must come BEFORE expense paybills
+        // FIXED: Changed to accept both KES and Ksh, and account codes with letters (e.g., 357892M)
         if (preg_match(
-            '/^(\w+)\s+Confirmed\.\s*KES\s*([\d,]+\.?\d*)\s+sent to\s+(.+?)\s+for account\s+(\d+)\s+on\s+([\d\/]+)\s+at\s+([\d:]+\s*(?:AM|PM))\.?\s+New M-PESA balance is\s+KES\s*([\d,]+\.?\d*)\.\s*Transaction cost,\s*KES\s*([\d,]+\.?\d*)/si',
+            '/^(\w+)\s+Confirmed\.\s*(?:KES|Ksh)\s*([\d,]+\.?\d*)\s+sent to\s+(.+?)\s+for account\s+(\S+)\s+on\s+([\d\/]+)\s+at\s+([\d:]+\s*(?:AM|PM))\s+New M-PESA balance is\s+(?:KES|Ksh)\s*([\d,]+\.?\d*)\.\s*Transaction cost,\s*(?:KES|Ksh)\s*([\d,]+\.?\d*)/si',
             $sms, $m
         )) {
             $recipient   = trim($m[3]);
             $accountNo   = $m[4];
 
-            // Check if this is a known transfer (Sanlam, etc.)
+            // Check if this is a known transfer (Sanlam, Etica, etc.)
             $isTransfer = self::isKnownTransferAccount($recipient, $accountNo);
 
             if ($isTransfer) {
@@ -392,7 +393,7 @@ class MpesaSmsParser
     {
         $r = strtolower($recipient);
 
-        if (str_contains($r, 'sanlam'))  return 'sanlam mmf';
+        if (str_contains($r, 'sanlam'))  return 'sanlam';
         if (str_contains($r, 'mshwari') || str_contains($r, 'm-shwari')) return 'mshwari';
         if (str_contains($r, 'etica'))   return 'etica';
 
