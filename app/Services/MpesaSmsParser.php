@@ -394,6 +394,7 @@ class MpesaSmsParser
 
         if (str_contains($r, 'sanlam'))  return 'sanlam mmf';
         if (str_contains($r, 'mshwari') || str_contains($r, 'm-shwari')) return 'mshwari';
+        if (str_contains($r, 'etica'))   return 'etica';
 
         return null;
     }

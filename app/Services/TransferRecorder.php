@@ -212,6 +212,11 @@ class TransferRecorder
     // not found in the user's account list.
     // ─────────────────────────────────────────────────────────────────────
 
+    /**
+     * Outgoing account transfer — e.g. Mpesa → Airtel Money, Mpesa → Sanlam, Mpesa → Etica
+     * Falls back to an expense transaction when the destination account is
+     * not found in the user's account list.
+     */
     public function outgoing(User $user, array $parsed): JsonResponse
     {
         $mpesaAccount = Account::withoutGlobalScopes()
@@ -224,21 +229,23 @@ class TransferRecorder
             return response()->json(['error' => 'Mpesa account not found'], 404);
         }
 
-        $hint               = $parsed['to_account_hint'] ?? '';
+        $hint = $parsed['to_account_hint'] ?? '';
+
+        // Fuzzy match destination account by hint (case-insensitive LIKE search)
         $destinationAccount = Account::withoutGlobalScopes()
             ->where('user_id', $user->id)
             ->where('is_active', true)
             ->whereRaw('LOWER(name) LIKE ?', ['%' . strtolower($hint) . '%'])
             ->first();
 
-        // ── Fallback: destination not found — record as expense ───────────
+        // ── Fallback: destination not found — record as expense ───────────────
         if (!$destinationAccount) {
             Log::info('Webhook: outgoing transfer — destination not found, recording as expense', [
                 'user_id' => $user->id,
                 'hint'    => $hint,
             ]);
 
-            $category    = $this->categories->findOrCreate($user, 'Other Expenses', 'expense');
+            $category = $this->categories->findOrCreate($user, 'Other Expenses', 'expense');
             $transaction = Transaction::withoutGlobalScopes()->create([
                 'user_id'        => $user->id,
                 'account_id'     => $mpesaAccount->id,
@@ -252,7 +259,7 @@ class TransferRecorder
             ]);
 
             if (!empty($parsed['fee']) && $parsed['fee'] > 0) {
-                $feeCategory    = $this->categories->findOrCreate($user, 'Transaction Fees', 'expense');
+                $feeCategory = $this->categories->findOrCreate($user, 'Transaction Fees', 'expense');
                 $feeTransaction = Transaction::withoutGlobalScopes()->create([
                     'user_id'                    => $user->id,
                     'account_id'                 => $mpesaAccount->id,
@@ -281,7 +288,7 @@ class TransferRecorder
             ], 201);
         }
 
-        // ── Happy path: create transfer ───────────────────────────────────
+        // ── Happy path: create transfer ───────────────────────────────────────
         DB::transaction(function () use ($user, $parsed, $mpesaAccount, $destinationAccount) {
             Transfer::create([
                 'user_id'         => $user->id,
