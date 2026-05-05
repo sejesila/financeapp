@@ -205,7 +205,7 @@
                     <h3 class="text-base sm:text-lg font-semibold mb-3 text-gray-800 dark:text-gray-200 flex items-center gap-2">
                         <span>💰</span> Savings & Wallets
                     </h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
 
                         {{-- Savings accounts (PIN protected, green gradient) --}}
                         @foreach($savingsAccounts as $account)
