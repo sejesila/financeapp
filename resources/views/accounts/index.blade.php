@@ -134,7 +134,7 @@
                     <h3 class="text-base sm:text-lg font-semibold mb-3 text-gray-800 dark:text-gray-200">
                         Main Accounts
                     </h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
                         @foreach($accounts as $account)
                             @php $isLowBalance = $account->current_balance < 1; @endphp
                             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md {{ $isLowBalance ? 'low-balance-account hidden opacity-60' : '' }}">
