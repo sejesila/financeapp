@@ -37,7 +37,7 @@ class CategoryResolver
             'send_money'    => 'Other Expenses',
             'withdrawal'    => 'Other Expenses',
             'airtime'       => 'Airtime & Data',
-            default         => 'Other Expenses',
+            default         => 'Groceries',
         };
     }
 
@@ -138,7 +138,7 @@ class CategoryResolver
             return 'School Fees';
         }
 
-        return 'Other Expenses';
+        return 'Groceries';
     }
 
     private function resolveTill(string $recipient): string
@@ -151,6 +151,6 @@ class CategoryResolver
             return 'Groceries';
         }
 
-        return 'Other Expenses';
+        return 'Groceries';
     }
 }
