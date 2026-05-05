@@ -22,7 +22,7 @@
                         </a>
                     @endif
 
-                    @if (($accounts->count() + $savingsAccounts->count() + $walletAccounts->count()) < 7)
+                    @if (($accounts->count() + $savingsAccounts->count() + $walletAccounts->count()) < 8)
                         <a href="{{ route('accounts.create') }}"
                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm text-center w-full sm:w-auto">
                             + Add Account
