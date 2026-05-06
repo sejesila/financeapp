@@ -193,14 +193,16 @@ class ReportDataService
      * @return array
      */
 
+
     /**
      * Modified generateReport() method for ReportDataService
+     * Version 2: Fixed to include wallet and savings accounts with activity
      *
      * Changes:
-     * 1. Fetches transactions first (moved from later in the method)
-     * 2. Filters accounts to only those with activity during the period
-     * 3. Passes filtered accounts ($accountsWithActivity) to the return array
-     * 4. Maintains all other functionality unchanged
+     * 1. Fetches transactions first
+     * 2. Retrieves ALL active accounts INCLUDING wallet and savings types
+     * 3. Filters accounts to only those with activity during the period
+     * 4. Includes accounts by account_id match, not just transaction filtering
      */
 
     private function generateReport(User $user, Carbon $startDate, Carbon $endDate, string $type): array
@@ -211,17 +213,32 @@ class ReportDataService
             ->reverse()
             ->values();
 
-        // ✅ NEW: Get accounts that had activity during the period
-        $allAccounts = Account::where('user_id', $user->id)->where('is_active', true)->get();
+        // ✅ FIXED: Get ALL active accounts (including wallet and savings)
+        $allAccounts = Account::where('user_id', $user->id)
+            ->where('is_active', true)
+            ->get();
 
-        $accountsWithActivity = $allAccounts->filter(function($account) use ($transactions) {
-            return $transactions->contains(fn($t) => $t->account_id === $account->id);
+        // Get ALL transactions in period (not just filtered ones) for activity detection
+        $allPeriodTransactions = Transaction::where('user_id', $user->id)
+            ->whereBetween(DB::raw('COALESCE(period_date, date)'), [
+                $startDate->toDateString(),
+                $endDate->toDateString(),
+            ])
+            ->whereNull('deleted_at')
+            ->select('account_id')
+            ->distinct()
+            ->pluck('account_id')
+            ->toArray();
+
+        // ✅ FIXED: Filter accounts by ANY activity in the period (not just filtered transactions)
+        $accountsWithActivity = $allAccounts->filter(function($account) use ($allPeriodTransactions) {
+            return in_array($account->id, $allPeriodTransactions);
         })->values();
 
         // For balance calculations, use all accounts; for reporting, use only those with activity
         $totalBalance = $allAccounts->sum('current_balance');
 
-        // Calculate income and expenses
+        // Calculate income and expenses (from filtered transactions)
         $income   = $transactions->filter(fn($t) => $t->category->type === 'income')->sum('amount');
         $expenses = $transactions->filter(fn($t) => $t->category->type === 'expense')->sum('amount');
         $netFlow  = $income - $expenses;
@@ -327,7 +344,7 @@ class ReportDataService
             'start_date'            => $startDate->format('M d, Y'),
             'end_date'              => $endDate->format('M d, Y'),
             'user'                  => $user,
-            'accounts'              => $accountsWithActivity,  // ✅ CHANGED: Only accounts with activity
+            'accounts'              => $accountsWithActivity,  // ✅ All accounts with activity including wallets/savings
             'total_balance'         => $totalBalance,
             'total_loans'           => $totalLoanBalance,
             'total_client_funds'    => $totalClientFunds,
