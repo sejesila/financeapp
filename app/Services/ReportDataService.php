@@ -310,6 +310,9 @@ class ReportDataService
 
             foreach ($allCategoryIds as $catId) {
                 $spent    = $actualByCat[$catId]['spent']   ?? 0;
+                if ($spent === 0) {
+                    continue;
+                }
                 $catName  = $actualByCat[$catId]['name']
                     ?? $baselines[$catId]['name']
                     ?? 'Unknown';
