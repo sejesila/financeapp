@@ -192,17 +192,34 @@ class ReportDataService
      * @param string $type 'annual', 'monthly', or 'custom'
      * @return array
      */
+
+    /**
+     * Modified generateReport() method for ReportDataService
+     *
+     * Changes:
+     * 1. Fetches transactions first (moved from later in the method)
+     * 2. Filters accounts to only those with activity during the period
+     * 3. Passes filtered accounts ($accountsWithActivity) to the return array
+     * 4. Maintains all other functionality unchanged
+     */
+
     private function generateReport(User $user, Carbon $startDate, Carbon $endDate, string $type): array
     {
-        // Accounts and total balance (point-in-time snapshot)
-        $accounts     = Account::where('user_id', $user->id)->where('is_active', true)->get();
-        $totalBalance = $accounts->sum('current_balance');
-
-        // ✅ Use consistent filtering
+        // ✅ Use consistent filtering - moved to top
         $transactions = $this->getFilteredTransactions($user, $startDate, $endDate)
             ->sortBy(fn($t) => $t->date)
             ->reverse()
             ->values();
+
+        // ✅ NEW: Get accounts that had activity during the period
+        $allAccounts = Account::where('user_id', $user->id)->where('is_active', true)->get();
+
+        $accountsWithActivity = $allAccounts->filter(function($account) use ($transactions) {
+            return $transactions->contains(fn($t) => $t->account_id === $account->id);
+        })->values();
+
+        // For balance calculations, use all accounts; for reporting, use only those with activity
+        $totalBalance = $allAccounts->sum('current_balance');
 
         // Calculate income and expenses
         $income   = $transactions->filter(fn($t) => $t->category->type === 'income')->sum('amount');
@@ -271,8 +288,8 @@ class ReportDataService
         $activeLoans      = Loan::where('user_id', $user->id)->where('status', 'active')->with('account')->get();
         $totalLoanBalance = $activeLoans->sum('balance');
         $totalClientFunds = ClientFund::where('user_id', $user->id)
-                ->whereNotIn('status', ['completed', 'cancelled'])
-                ->sum('balance');
+            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->sum('balance');
 
         // Budget Performance (monthly only)
         $budgetPerformance = [];
@@ -310,11 +327,11 @@ class ReportDataService
             'start_date'            => $startDate->format('M d, Y'),
             'end_date'              => $endDate->format('M d, Y'),
             'user'                  => $user,
-            'accounts'              => $accounts,
+            'accounts'              => $accountsWithActivity,  // ✅ CHANGED: Only accounts with activity
             'total_balance'         => $totalBalance,
             'total_loans'           => $totalLoanBalance,
             'total_client_funds'    => $totalClientFunds,
-            'net_worth' => $totalBalance - $totalLoanBalance - $totalClientFunds,
+            'net_worth'             => $totalBalance - $totalLoanBalance - $totalClientFunds,
             'transactions'          => match ($type) {
                 'annual'  => $transactions->take(50),
                 'monthly' => $transactions->take(30),

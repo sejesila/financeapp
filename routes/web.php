@@ -277,6 +277,6 @@ Route::get('/session-expired', function () {
 | Mpesa SMS Webhook (from Android/Tasker — no session auth)
 |--------------------------------------------------------------------------
 */
-Route::match(['GET', 'POST'], '/webhook/mpesa-sms', [MpesaSmsController::class, 'handle'])
+Route::match('POST', '/webhook/mpesa-sms', [MpesaSmsController::class, 'handle'])
     ->name('webhook.mpesa-sms');
 
