@@ -13,22 +13,11 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        $userId = Auth::id();
+        $userId       = Auth::id();
         $currentMonth = now()->month;
-        $currentYear = now()->year;
+        $currentYear  = now()->year;
 
-        // ============ FINANCIAL DASHBOARD DATA ============
-
-        // AFTER
-        $totalAssets = Account::where('is_active', true)
-            ->where('user_id', $userId)
-            ->whereIn('type', ['cash', 'mpesa', 'airtel_money', 'bank'])
-            ->sum('current_balance');
-
-        $totalSavings = Account::where('is_active', true)
-            ->where('user_id', $userId)
-            ->where('type', 'savings')
-            ->sum('current_balance');
+        // ============ ACCOUNTS ============
 
         $accounts = Account::where('is_active', true)
             ->where('user_id', $userId)
@@ -40,12 +29,27 @@ class DashboardController extends Controller
             ->where('type', 'savings')
             ->get();
 
+        $walletAccounts = Account::where('is_active', true)
+            ->where('user_id', $userId)
+            ->where('type', 'wallet')
+            ->get();
+
+        // ============ FINANCIAL OVERVIEW ============
+
+        // Total Cash = main accounts + wallets (matches accounts index)
+        $totalAssets = $accounts->sum('current_balance')
+            + $walletAccounts->sum('current_balance');
+
+        $totalSavings = $savingsAccounts->sum('current_balance');
+
         $totalLiabilities = Loan::where('status', 'active')
             ->where('user_id', $userId)
             ->sum('balance');
 
-        $netWorth = $totalAssets - $totalLiabilities;
-        $debtToAssetRatio = $totalAssets > 0 ? ($totalLiabilities / $totalAssets) * 100 : 0;
+        $netWorth        = $totalAssets - $totalLiabilities;
+        $debtToAssetRatio = $totalAssets > 0
+            ? ($totalLiabilities / $totalAssets) * 100
+            : 0;
 
         $activeLoans = Loan::where('status', 'active')
             ->where('user_id', $userId)
@@ -53,7 +57,7 @@ class DashboardController extends Controller
             ->orderBy('due_date', 'asc')
             ->get();
 
-        // ============ QUICK DASHBOARD DATA ============
+        // ============ QUICK STATS ============
 
         $totalToday = Transaction::where('user_id', $userId)
             ->whereDate('date', today())
@@ -74,14 +78,15 @@ class DashboardController extends Controller
         $monthlyIncome = Transaction::where('user_id', $userId)
             ->whereMonth('date', $currentMonth)
             ->whereYear('date', $currentYear)
-            ->whereHas('category', fn($q) => $q->where('type', 'income')
+            ->whereHas('category', fn($q) => $q
+                ->where('type', 'income')
                 ->whereNotIn('name', ['Loan Disbursement', 'Balance Adjustment'])
             )
             ->sum('amount');
 
         $remainingThisMonth = $monthlyIncome - $totalThisMonth;
 
-        // ============ MONTHLY & YEARLY DATA ============
+        // ============ MONTHLY & YEARLY OVERVIEW ============
 
         $monthlyExpenses = Transaction::where('user_id', $userId)
             ->whereYear('date', $currentYear)
@@ -93,7 +98,8 @@ class DashboardController extends Controller
 
         $yearlyIncome = Transaction::where('user_id', $userId)
             ->whereYear('date', $currentYear)
-            ->whereHas('category', fn($q) => $q->where('type', 'income')
+            ->whereHas('category', fn($q) => $q
+                ->where('type', 'income')
                 ->whereNotIn('name', ['Loan Disbursement', 'Balance Adjustment'])
             )
             ->sum('amount');
@@ -115,13 +121,12 @@ class DashboardController extends Controller
             ->get()
             ->groupBy('category_id')
             ->map(function ($group) {
-                $first = $group->first(); // take the first transaction for the category
-                $first->total = $group->sum('amount'); // sum total
+                $first        = $group->first();
+                $first->total = $group->sum('amount');
                 return $first;
             })
             ->sortByDesc('total')
             ->take(5);
-
 
         $dailySpending = Transaction::where('user_id', $userId)
             ->select(DB::raw('DATE(date) as date'), DB::raw('SUM(amount) as total'))
@@ -140,7 +145,7 @@ class DashboardController extends Controller
             ->whereHas('category', fn($q) => $q->where('type', 'expense'))
             ->sum('amount');
 
-        $monthlyComparison = $totalThisMonth - $lastMonthTotal;
+        $monthlyComparison        = $totalThisMonth - $lastMonthTotal;
         $monthlyComparisonPercent = $lastMonthTotal > 0
             ? round(($monthlyComparison / $lastMonthTotal) * 100, 1)
             : 0;
@@ -163,11 +168,14 @@ class DashboardController extends Controller
             ->get();
 
         return view('dashboard.index', compact(
+            'accounts',
+            'savingsAccounts',
+            'walletAccounts',
             'totalAssets',
+            'totalSavings',
             'totalLiabilities',
             'netWorth',
             'debtToAssetRatio',
-            'accounts',
             'activeLoans',
             'totalToday',
             'totalThisWeek',
@@ -186,8 +194,6 @@ class DashboardController extends Controller
             'monthlyComparisonPercent',
             'recentTransactions',
             'budgets',
-            'totalSavings',
-            'savingsAccounts',
         ));
     }
 }
