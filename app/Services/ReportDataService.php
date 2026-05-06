@@ -490,11 +490,11 @@ class ReportDataService
             $savingsRate = (($income - $totalExpenses) / $income) * 100;
             $insights[]  = [
                 'icon'        => $savingsRate > 20 ? '🎯' : '⚠️',
-                'title'       => 'Savings Rate',
                 'value'       => number_format($savingsRate, 1) . '%',
+                'title'       => 'Surplus Rate',
                 'description' => $savingsRate > 20
-                    ? "Great! You're saving well"
-                    : 'Consider reducing expenses to save more',
+                    ? "Great! You're generating a strong surplus"
+                    : 'Consider reducing expenses to improve your surplus rate',
             ];
         }
 
