@@ -96,7 +96,14 @@ Route::middleware('auth')->group(function () {
         // Top-up account
         Route::get('{account}/topup', [AccountController::class, 'topUpForm'])->name('topup');
         Route::post('{account}/topup', [AccountController::class, 'topUp'])->name('topup.store');
+
+        Route::get('{account}/topups/{transaction}/reverse', [AccountController::class, 'reverseTopUpForm'])
+            ->name('topup.reverse.form');
+
+        Route::delete('{account}/topups/{transaction}/reverse', [AccountController::class, 'reverseTopUp'])
+            ->name('topup.reverse');
     });
+
 
     // Standard CRUD operations for accounts
     Route::resource('accounts', AccountController::class);

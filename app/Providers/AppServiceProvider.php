@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Models\Transaction;
 use App\Models\User;
+use App\Observers\TransactionObserver;
 use App\Observers\UserObserver;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Browsershot\Browsershot;
@@ -24,6 +26,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         User::observe(UserObserver::class);
+        Transaction::observe(TransactionObserver::class);
         $chromePath = glob('/home/farmpedia-finance/.cache/puppeteer/chrome/linux-*/chrome-linux64/chrome')[0]
             ?? glob('/usr/local/share/puppeteer/chrome/linux-*/chrome-linux64/chrome')[0]
             ?? null;

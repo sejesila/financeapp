@@ -20,6 +20,12 @@
                 </div>
             @endif
 
+            @if(session('error'))
+                <div class="bg-red-100 text-red-700 p-4 rounded-lg mb-6">
+                    {{ session('error') }}
+                </div>
+            @endif
+
             @if($errors->any())
                 <div class="bg-red-100 text-red-700 p-4 rounded-lg mb-6">
                     <ul class="list-disc list-inside">
@@ -233,6 +239,7 @@
                                         </th>
                                     @endforeach
                                     <th class="px-4 py-3 text-left font-medium hidden sm:table-cell">Category</th>
+                                    <th class="px-4 py-3"></th>
                                 </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
@@ -246,7 +253,6 @@
                                                 <span>{{ $txn->category->icon ?? '💸' }}</span>
                                                 <span class="text-gray-900 dark:text-white font-medium">
                                                     @if(!empty($search))
-                                                        {{-- sr-only preserves the full plain-text description so assertSee() can find it --}}
                                                         <span class="sr-only">{{ $txn->description }}</span>
                                                         {!! str_ireplace($search, '<mark class="bg-yellow-100 dark:bg-yellow-800 rounded px-0.5">' . e($search) . '</mark>', e($txn->description)) !!}
                                                     @else
@@ -269,10 +275,11 @@
                                             @endif
                                         </td>
                                         <td class="px-4 py-3 hidden sm:table-cell">
-                                                <span class="inline-flex rounded-full px-2 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
-                                                    {{ $txn->category->name }}
-                                                </span>
+                                            <span class="inline-flex rounded-full px-2 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
+                                                {{ $txn->category->name }}
+                                            </span>
                                         </td>
+                                        <td class="px-4 py-3"></td>
                                     </tr>
                                 @endforeach
                                 </tbody>
@@ -295,7 +302,7 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
                                 </svg>
                                 <p class="text-gray-500 font-medium mb-1">No transactions yet</p>
-                                <a href="{{ route('transactions.create') }}"
+                                <a href="{{ route('transactions.create', ['account_id' => $account->id]) }}"
                                    class="inline-block mt-2 bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700 transition text-sm">
                                     Add Transaction
                                 </a>
@@ -344,6 +351,7 @@
                                         </th>
                                     @endforeach
                                     <th class="px-4 py-3 text-left font-medium hidden sm:table-cell">Category</th>
+                                    <th class="px-4 py-3"></th>
                                 </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
@@ -357,7 +365,6 @@
                                                 <span>{{ $txn->category->icon ?? '💰' }}</span>
                                                 <span class="text-gray-900 dark:text-white font-medium">
                                                     @if(!empty($search))
-                                                        {{-- sr-only preserves the full plain-text description so assertSee() can find it --}}
                                                         <span class="sr-only">{{ $txn->description }}</span>
                                                         {!! str_ireplace($search, '<mark class="bg-yellow-100 dark:bg-yellow-800 rounded px-0.5">' . e($search) . '</mark>', e($txn->description)) !!}
                                                     @else
@@ -374,9 +381,20 @@
                                             @endif
                                         </td>
                                         <td class="px-4 py-3 hidden sm:table-cell">
-                                                <span class="inline-flex rounded-full px-2 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-                                                    {{ $txn->category->name }}
-                                                </span>
+                                            <span class="inline-flex rounded-full px-2 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                                                {{ $txn->category->name }}
+                                            </span>
+                                        </td>
+                                        <td class="px-4 py-3 text-right whitespace-nowrap">
+                                            <a href="{{ route('accounts.topup.reverse.form', ['account' => $account, 'transaction' => $txn]) }}"
+                                               title="Reverse this top-up"
+                                               class="inline-flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                          d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+                                                </svg>
+                                                Reverse
+                                            </a>
                                         </td>
                                     </tr>
                                 @endforeach

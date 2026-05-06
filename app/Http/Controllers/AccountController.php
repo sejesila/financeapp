@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Account;
 use App\Models\Category;
+use App\Models\Transaction;
 use App\Models\Transfer;
 use App\Services\TopUpService;
 use App\Services\TransferFeeCalculator;
@@ -159,6 +160,7 @@ class AccountController extends Controller
             ->appends($request->query());
 
         $stats = $account->transactions()
+            ->whereNull('transactions.deleted_at')
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->selectRaw('
                 COUNT(*) as total_transactions,
@@ -402,5 +404,48 @@ class AccountController extends Controller
     private function clearAccountCache(int $accountId): void
     {
         Cache::forget("account.{$accountId}.stats");
+    }
+    // ── reverse top-up form ───────────────────────────────────────────────────
+
+    public function reverseTopUpForm(Account $account, Transaction $transaction)
+    {
+        if ($account->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        // Only income/liability transactions can be reversed
+        if (!in_array($transaction->category->type, ['income', 'liability'])) {
+            return redirect()->route('accounts.show', $account)
+                ->with('error', 'Only top-up transactions can be reversed.');
+        }
+
+        return view('accounts.reverse-topup', compact('account', 'transaction'));
+    }
+
+// ── reverse top-up post ───────────────────────────────────────────────────
+
+    public function reverseTopUp(Request $request, Account $account, Transaction $transaction)
+    {
+        if ($account->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        if (!in_array($transaction->category->type, ['income', 'liability'])) {
+            return redirect()->route('accounts.show', $account)
+                ->with('error', 'Only top-up transactions can be reversed.');
+        }
+
+        $request->validate([
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        // Soft-delete the original transaction
+        $transaction->delete();
+
+        $account->updateBalance();
+        $this->clearAccountCache($account->id);
+
+        return redirect()->route('accounts.show', ['account' => $account, 'tab' => 'topups'])
+            ->with('success', 'Top-up of KES ' . number_format($transaction->amount, 0, '.', ',') . ' has been reversed.');
     }
 }
