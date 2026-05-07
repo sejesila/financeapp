@@ -36,7 +36,7 @@ class CategoryResolver
             'receive_money' => 'Side Income',
             'send_money'    => 'Other Expenses',
             'withdrawal'    => 'Other Expenses',
-            'airtime'       => 'Airtime & Data',
+            'airtime'       => 'Internet and Communication',
             default         => 'Groceries',
         };
     }
