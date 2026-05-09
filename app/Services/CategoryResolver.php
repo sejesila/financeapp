@@ -36,8 +36,8 @@ class CategoryResolver
             'receive_money' => 'Side Income',
             'send_money'    => 'Other Expenses',
             'withdrawal'    => 'Other Expenses',
-            'airtime'       => 'Internet and Communication',
-            default         => 'Groceries',
+            'airtime'       => 'Airtime & Data',
+            default         => 'Other Expenses',
         };
     }
 
@@ -131,14 +131,14 @@ class CategoryResolver
 
         if (str_contains($r, 'safaricom') || str_contains($r, 'zuku')
             || str_contains($r, 'faiba') || str_contains($r, 'airtel')) {
-            return 'Internet and Communication';
+            return 'Airtime & Data';
         }
 
         if (str_contains($r, 'co-operative') && $accountNo === '1040616#0889') {
             return 'School Fees';
         }
 
-        return 'Groceries';
+        return 'Other Expenses';
     }
 
     private function resolveTill(string $recipient): string
@@ -151,6 +151,6 @@ class CategoryResolver
             return 'Groceries';
         }
 
-        return 'Groceries';
+        return 'Other Expenses';
     }
 }

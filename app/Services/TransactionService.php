@@ -21,19 +21,27 @@
         public function createTransaction(array $data): Transaction
         {
             return DB::transaction(function () use ($data) {
-                $category = Category::findOrFail($data['category_id']);
-                if ($category->user_id !== Auth::id()) {
-                    throw new Exception('Unauthorized access to this category.');
-                }
-
                 $isSplit = !empty($data['splits']);
 
                 $primaryAccountId = $isSplit
                     ? $data['splits'][0]['account_id']
                     : $data['account_id'];
 
-                $primaryAccount = Account::find($primaryAccountId);
-                $isMobileMoney  = in_array($primaryAccount?->type, ['mpesa', 'airtel_money']);
+                // Lock the primary account once, reuse it throughout
+                $primaryAccount = Account::lockForUpdate()->findOrFail($primaryAccountId);
+                $isMobileMoney  = in_array($primaryAccount->type, ['mpesa', 'airtel_money']);
+
+                \Log::info('Balance check', [
+                    'account_id'      => $primaryAccount->id,
+                    'account_name'    => $primaryAccount->name,
+                    'current_balance' => $primaryAccount->current_balance,
+                    'required'        => $data['amount'],
+                ]);
+
+                $category = Category::findOrFail($data['category_id']);
+                if ($category->user_id !== Auth::id()) {
+                    throw new Exception('Unauthorized access to this category.');
+                }
 
                 $transaction = Transaction::create([
                     'user_id'           => Auth::id(),
@@ -48,7 +56,7 @@
                 ]);
 
                 if ($isSplit) {
-                    $splits = $data['splits'];
+                    $splits = $data['splits'];  // ← this line was missing entirely
 
                     $splitTotal = array_sum(array_column($splits, 'amount'));
                     if (round($splitTotal, 2) !== round((float) $data['amount'], 2)) {
@@ -60,7 +68,7 @@
                     $affectedAccountIds = [];
 
                     foreach ($splits as $splitData) {
-                        $account = Account::findOrFail($splitData['account_id']);
+                        $account = Account::lockForUpdate()->findOrFail($splitData['account_id']);
                         if ($account->user_id !== Auth::id()) {
                             throw new Exception('Unauthorized account access.');
                         }
@@ -70,7 +78,7 @@
                         $fee             = $this->calculateTransactionCost($splitData['amount'], $account->type, $mobileMoneyType ?? 'send_money', $category);
                         $paymentMethod   = $this->getPaymentMethod($account);
 
-                        if ($category->type === 'expense' && $account->current_balance < ($splitData['amount'] + $fee)) {
+                        if ($category->type === 'expense' && (float) $account->current_balance < ($splitData['amount'] + $fee)) {
                             throw new Exception(
                                 "Insufficient balance in {$account->name}. " .
                                 "Available: KSh " . number_format($account->current_balance, 2) . ", " .
@@ -90,7 +98,7 @@
                             $feeTransaction = Transaction::withoutGlobalScope('ownedByUser')->create([
                                 'user_id'                => Auth::id(),
                                 'date'                   => $transaction->date,
-                                'description'            => "{$this->getPaymentMethod($account)} fee ({$this->getTransactionTypeLabel($mobileMoneyType)}): {$transaction->description}",
+                                'description'            => "{$paymentMethod} fee ({$this->getTransactionTypeLabel($mobileMoneyType)}): {$transaction->description}",
                                 'amount'                 => $fee,
                                 'category_id'            => $this->getFeesCategory(Auth::id())->id,
                                 'account_id'             => $account->id,
@@ -114,33 +122,35 @@
                     }
 
                 } else {
-                    $account = Account::findOrFail($data['account_id']);
-                    if ($account->user_id !== Auth::id()) {
+                    // Reuse the already-locked $primaryAccount — no second fetch
+                    if ($primaryAccount->user_id !== Auth::id()) {
                         throw new Exception('Unauthorized access to this account.');
                     }
 
-                    $transactionType = $isMobileMoney ? ($data['mobile_money_type'] ?? 'send_money') : 'send_money';
-                    $fee             = $this->calculateTransactionCost($data['amount'], $account->type, $transactionType, $category);
+                    $transactionType = $isMobileMoney
+                        ? ($data['mobile_money_type'] ?? 'send_money')
+                        : 'send_money';
+                    $fee = $this->calculateTransactionCost(
+                        $data['amount'], $primaryAccount->type, $transactionType, $category
+                    );
 
-                    if ($category->type === 'expense' && $account->current_balance < ($data['amount'] + $fee)) {
+                    if ($category->type === 'expense'
+                        && (float) $primaryAccount->current_balance < ($data['amount'] + $fee)) {
                         throw new Exception(
-                            "Insufficient balance in {$account->name}. " .
-                            "Available: KSh " . number_format($account->current_balance, 2) . ", " .
+                            "Insufficient balance in {$primaryAccount->name}. " .
+                            "Available: KSh " . number_format($primaryAccount->current_balance, 2) . ", " .
                             "Required: KSh " . number_format($data['amount'] + $fee, 2)
                         );
                     }
 
                     if ($fee > 0) {
                         $feeTransaction = $this->createFeeTransaction(
-                            $transaction,
-                            $fee,
-                            $transactionType,
-                            $this->getPaymentMethod($account)
+                            $transaction, $fee, $transactionType, $this->getPaymentMethod($primaryAccount)
                         );
                         $transaction->update(['related_fee_transaction_id' => $feeTransaction->id]);
                     }
 
-                    $this->recalculateAccountBalance($account);
+                    $this->recalculateAccountBalance($primaryAccount);
                 }
 
                 $this->updateBudgetFromTransaction($transaction);

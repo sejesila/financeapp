@@ -228,7 +228,7 @@ class MpesaSmsParser
         // 3. Paybill transfers (Sanlam MMF, Etica, etc.) - must come BEFORE expense paybills
         // FIXED: Changed to accept both KES and Ksh, and account codes with letters (e.g., 357892M)
         if (preg_match(
-            '/^(\w+)\s+Confirmed\.\s*(?:KES|Ksh)\s*([\d,]+\.?\d*)\s+sent to\s+(.+?)\s+for account\s+(\S+)\s+on\s+([\d\/]+)\s+at\s+([\d:]+\s*(?:AM|PM))\s+New M-PESA balance is\s+(?:KES|Ksh)\s*([\d,]+\.?\d*)\.\s*Transaction cost,\s*(?:KES|Ksh)\s*([\d,]+\.?\d*)/si',
+            '/^(\w+)\s+Confirmed\.\s*(?:KES|Ksh)\s*([\d,]+\.?\d*)\s+sent to\s+(.+?)\s+for account\s+(\S+)\s+on\s+([\d\/]+)\s+at\s+([\d:]+\s*(?:AM|PM))\.?\s+New M-PESA balance is\s+(?:KES|Ksh)\s*([\d,]+\.?\d*)\.\s*Transaction cost,\s*(?:KES|Ksh)\s*([\d,]+\.?\d*)/si',
             $sms, $m
         )) {
             $recipient   = trim($m[3]);

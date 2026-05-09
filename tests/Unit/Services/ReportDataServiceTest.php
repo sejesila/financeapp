@@ -208,22 +208,14 @@ class ReportDataServiceTest extends TestCase
     public function it_includes_budget_performance_in_monthly_report()
     {
         $startDate = $this->reportStart;
-        $endDate = now()->endOfMonth();
 
-        $incomeCategory = $this->createCategory($this->user, 'Salary', 'income');
         $expenseCategory = $this->createCategory($this->user, 'Food', 'expense');
 
-        // Create budget
-        Budget::factory()
-            ->for($this->user)
-            ->for($expenseCategory)
-            ->create([
-                'year'   => $startDate->year,
-                'month'  => $startDate->month,
-                'amount' => 20000,
-            ]);
+        // Seed prior month so the rolling average has data
+        $prevStart = $startDate->copy()->subMonth()->startOfMonth();
+        $this->createExpenseTransaction($this->user, $this->account, 20000, $prevStart->copy()->addDays(5), $expenseCategory);
 
-        // Create transaction
+        // Current period spend
         $this->createExpenseTransaction($this->user, $this->account, 15000, $startDate->copy()->addDays(5), $expenseCategory);
 
         $report = $this->service->generateMonthlyReport($this->user);
@@ -231,10 +223,10 @@ class ReportDataServiceTest extends TestCase
         $this->assertNotEmpty($report['budget_performance']);
         $budget = $report['budget_performance'][0];
         $this->assertEquals('Food', $budget['category']);
-        $this->assertEquals(20000, $budget['budgeted']);
+        $this->assertEquals(20000, $budget['budgeted']);  // rolling average of prior month
         $this->assertEquals(15000, $budget['spent']);
         $this->assertEquals(5000, $budget['remaining']);
-        $this->assertEquals(75, $budget['percentage']); // 15000/20000 * 100
+        $this->assertEquals(75, $budget['percentage']);   // 15000/20000 * 100
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
@@ -589,7 +581,7 @@ class ReportDataServiceTest extends TestCase
 
         $report = $this->service->generateMonthlyReport($this->user);
 
-        $savingsRateInsight = collect($report['insights'])->firstWhere('title', 'Savings Rate');
+        $savingsRateInsight = collect($report['insights'])->firstWhere('title', 'Surplus Rate');
 
         $this->assertNotNull($savingsRateInsight);
         $this->assertStringContainsString('50', $savingsRateInsight['value']); // 50% savings rate

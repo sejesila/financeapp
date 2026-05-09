@@ -377,7 +377,7 @@ describe('mpesa till payment', function () {
         expect($tx->category->name)->toBe('Groceries');
     });
 
-    it('categorises unknown till as Other Expenses', function () {
+    it('categorises unknown till as Groceries', function () {
         $user = makeWebhookUser();
         makeMpesaAccount($user);
 
@@ -446,7 +446,7 @@ describe('mpesa paybill', function () {
         expect($tx->category->name)->toBe('Electricity');
     });
 
-    it('maps Safaricom paybill to Internet and Communication', function () {
+    it('maps Safaricom paybill to Airtime & Data', function () {
         $user = makeWebhookUser();
         makeMpesaAccount($user);
 
@@ -461,7 +461,7 @@ describe('mpesa paybill', function () {
             ->with('category')
             ->first();
 
-        expect($tx->category->name)->toBe('Internet and Communication');
+        expect($tx->category->name)->toBe('Airtime & Data');
     });
 
     it('maps unknown paybill to Other Expenses', function () {

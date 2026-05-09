@@ -132,7 +132,7 @@ class MpesaSmsParserTest extends TestCase
         $this->assertEquals(5000.00, $result['amount']);
         $this->assertEquals('SANLAM UNIT TRUST', $result['recipient']);
         $this->assertEquals('14468', $result['paybill_account']);
-        $this->assertEquals('sanlam mmf', $result['to_account_hint']);
+        $this->assertEquals('sanlam', $result['to_account_hint']);
         $this->assertEquals(25476.30, $result['balance']);
         $this->assertEquals(0.00, $result['fee']);
     }

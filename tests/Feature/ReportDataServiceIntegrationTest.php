@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\ReportDataService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class ReportDataServiceIntegrationTest extends TestCase
@@ -28,30 +29,29 @@ class ReportDataServiceIntegrationTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+
     public function it_handles_complex_financial_scenario()
     {
-        /**
-         * Scenario: User with:
-         * - Multiple income sources
-         * - Various expense categories
-         * - Active and paid loans
-         * - Client fund transactions
-         */
-
-        $account = Account::factory()->for($this->user)->create(['current_balance' => 250000]);
-        $savingsAccount = Account::factory()->for($this->user)->create(['current_balance' => 150000]);
+        $account = Account::factory()->for($this->user)->create([
+            'current_balance' => 250000,
+            'initial_balance' => 250000,
+        ]);
+        $savingsAccount = Account::factory()->for($this->user)->create([
+            'current_balance' => 150000,
+            'initial_balance' => 150000,
+        ]);
 
         $priorYear = now()->subYear()->year;
         $startDate = Carbon::create($priorYear, 1, 1);
 
         // Income sources
-        $salaryCategory = $this->createCategory('Salary', 'income');
-        $freelanceCategory = $this->createCategory('Freelance', 'income');
+        $salaryCategory           = $this->createCategory('Salary', 'income');
+        $freelanceCategory        = $this->createCategory('Freelance', 'income');
         $clientCommissionCategory = $this->createCategory('Client Commission', 'income');
 
         // Expense categories
-        $foodCategory = $this->createCategory('Food', 'expense');
-        $transportCategory = $this->createCategory('Transport', 'expense');
+        $foodCategory          = $this->createCategory('Food', 'expense');
+        $transportCategory     = $this->createCategory('Transport', 'expense');
         $loanRepaymentCategory = $this->createCategory('Loan Repayment', 'expense');
 
         // Create monthly salary (12 months x 100000)
@@ -69,22 +69,16 @@ class ReportDataServiceIntegrationTest extends TestCase
 
         // Create freelance income (sporadic)
         Transaction::factory()
-            ->for($this->user)
-            ->for($account)
-            ->for($freelanceCategory)
+            ->for($this->user)->for($account)->for($freelanceCategory)
             ->create(['type' => 'income', 'amount' => 50000, 'date' => $startDate->copy()->addMonth(2)]);
 
         Transaction::factory()
-            ->for($this->user)
-            ->for($account)
-            ->for($freelanceCategory)
+            ->for($this->user)->for($account)->for($freelanceCategory)
             ->create(['type' => 'income', 'amount' => 75000, 'date' => $startDate->copy()->addMonth(6)]);
 
-        // Create client commission income (with payment method)
+        // Create client commission income
         Transaction::factory()
-            ->for($this->user)
-            ->for($account)
-            ->for($clientCommissionCategory)
+            ->for($this->user)->for($account)->for($clientCommissionCategory)
             ->create([
                 'type'           => 'income',
                 'amount'         => 30000,
@@ -92,11 +86,9 @@ class ReportDataServiceIntegrationTest extends TestCase
                 'date'           => $startDate->copy()->addMonth(4),
             ]);
 
-        // Create client fund expense (should be excluded)
+        // Create client fund expense (should be excluded from report)
         Transaction::factory()
-            ->for($this->user)
-            ->for($account)
-            ->for($foodCategory)
+            ->for($this->user)->for($account)->for($foodCategory)
             ->create([
                 'type'           => 'expense',
                 'amount'         => 20000,
@@ -104,98 +96,71 @@ class ReportDataServiceIntegrationTest extends TestCase
                 'date'           => $startDate->copy()->addMonth(3),
             ]);
 
-        // Create regular expenses (should be included)
+        // Create regular expenses
         for ($i = 0; $i < 12; $i++) {
             Transaction::factory()
-                ->for($this->user)
-                ->for($account)
-                ->for($foodCategory)
-                ->create([
-                    'type'   => 'expense',
-                    'amount' => 15000,
-                    'date'   => $startDate->copy()->addMonth($i),
-                ]);
+                ->for($this->user)->for($account)->for($foodCategory)
+                ->create(['type' => 'expense', 'amount' => 15000, 'date' => $startDate->copy()->addMonth($i)]);
 
             Transaction::factory()
-                ->for($this->user)
-                ->for($account)
-                ->for($transportCategory)
-                ->create([
-                    'type'   => 'expense',
-                    'amount' => 5000,
-                    'date'   => $startDate->copy()->addMonth($i),
-                ]);
+                ->for($this->user)->for($account)->for($transportCategory)
+                ->create(['type' => 'expense', 'amount' => 5000, 'date' => $startDate->copy()->addMonth($i)]);
         }
 
         // Create loan payments
         for ($i = 0; $i < 6; $i++) {
             Transaction::factory()
-                ->for($this->user)
-                ->for($account)
-                ->for($loanRepaymentCategory)
-                ->create([
-                    'type'   => 'expense',
-                    'amount' => 10000,
-                    'date'   => $startDate->copy()->addMonth($i),
-                ]);
+                ->for($this->user)->for($account)->for($loanRepaymentCategory)
+                ->create(['type' => 'expense', 'amount' => 10000, 'date' => $startDate->copy()->addMonth($i)]);
         }
 
         // Create active loan
-        $activeLoan = Loan::factory()
-            ->for($this->user)
-            ->for($account)
-            ->create([
-                'status'  => 'active',
-                'balance' => 50000,
-            ]);
+        Loan::factory()->for($this->user)->for($account)->create([
+            'status'  => 'active',
+            'balance' => 50000,
+        ]);
 
         // Create paid loan (repaid during the year)
-        $paidLoan = Loan::factory()
-            ->for($this->user)
-            ->for($account)
-            ->create([
-                'status'           => 'paid',
-                'principal_amount' => 100000,
-                'total_amount'     => 110000,
-                'repaid_date'      => $startDate->copy()->addMonth(8),
-            ]);
+        Loan::factory()->for($this->user)->for($account)->create([
+            'status'           => 'paid',
+            'principal_amount' => 100000,
+            'total_amount'     => 110000,
+            'repaid_date'      => $startDate->copy()->addMonth(8),
+        ]);
 
-        // Generate report
+        // Reset balances to known values — updateBalance() fires during factory
+        // creation and overwrites the seeded current_balance. We pin them back
+        // so net_worth is deterministic regardless of balance-hook behaviour.
+        DB::statement('UPDATE accounts SET current_balance = 250000 WHERE id = ?', [$account->id]);
+        DB::statement('UPDATE accounts SET current_balance = 150000 WHERE id = ?', [$savingsAccount->id]);
+
         $report = $this->service->generateAnnualReport($this->user);
 
-        // Assertions
         // Income: 12x100000 (salary) + 50000 + 75000 (freelance) + 30000 (commission) = 1,355,000
         $this->assertEquals(1355000, $report['income']);
 
-        // Expenses: Should exclude the 20000 client fund transaction
-        // Food: 12x15000 = 180000
-        // Transport: 12x5000 = 60000
-        // Loan Repayment: 6x10000 = 60000
-        // Total: 300000 (not including the 20000 client fund)
+        // Expenses: client fund (20000) excluded
+        // Food: 12x15000 = 180000 | Transport: 12x5000 = 60000 | Loan Repayment: 6x10000 = 60000
         $this->assertEquals(300000, $report['expenses']);
 
-        // Net flow
         $this->assertEquals(1055000, $report['net_flow']);
 
-        // Savings rate
         $expectedSavingsRate = (1055000 / 1355000) * 100;
         $this->assertEqualsWithDelta($expectedSavingsRate, $report['savings_rate'], 0.1);
 
-        // Active loans
-        $this->assertEquals(50000, $report['total_loans']);
-
-        // Net worth (accounts: 250000 + 150000 = 400000, loans: 50000)
+        // Net worth: accounts (250000 + 150000) - active loans (50000) - client funds (0)
+        $this->assertEquals(50000,  $report['total_loans']);
         $this->assertEquals(350000, $report['net_worth']);
 
-        // Loans repaid
-        $this->assertEquals(1, $report['loans_repaid_in_period']['count']);
+        // Loans repaid during the year
+        $this->assertEquals(1,      $report['loans_repaid_in_period']['count']);
         $this->assertEquals(110000, $report['loans_repaid_in_period']['total']);
 
-        // Loan payments
-        $this->assertEquals(6, $report['loans_paid_in_period']['count']);
+        // Loan repayment transactions
+        $this->assertEquals(6,     $report['loans_paid_in_period']['count']);
         $this->assertEquals(60000, $report['loans_paid_in_period']['total']);
 
-        // Profitable months (all 12 months should be profitable with this scenario)
+        // All 12 months profitable (100k salary far exceeds monthly expenses)
         $this->assertEquals(12, $report['profitable_months']);
     }
 
