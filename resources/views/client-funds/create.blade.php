@@ -23,11 +23,17 @@
                 </div>
             @endif
 
+            @if(session('info'))
+                <div class="bg-blue-100 text-blue-700 p-3 sm:p-4 rounded mb-6 text-sm">
+                    {{ session('info') }}
+                </div>
+            @endif
+
             @if($accounts->isEmpty())
                 <div class="bg-yellow-100 text-yellow-800 p-4 rounded mb-6">
                     <p class="font-semibold">⚠️ No Eligible Accounts Found</p>
                     <p class="text-sm mt-2">
-                        Client funds can only be received in M-Pesa or Bank accounts.
+                        Client funds can only be received in M-Pesa, Bank, or Savings accounts.
                         Please create one of these account types first.
                     </p>
                     <a href="{{ route('accounts.create') }}" class="text-blue-600 hover:text-blue-800 text-sm font-semibold mt-3 inline-block">
@@ -68,12 +74,11 @@
 
                     <!-- Fund Type -->
                     <div class="mb-4">
-                        <label for="type" class="block text-sm sm:text-base text-gray-700 dark:text-gray-300 font-semibold mb-2">
+                        <label class="block text-sm sm:text-base text-gray-700 dark:text-gray-300 font-semibold mb-2">
                             Fund Type <span class="text-red-500">*</span>
                         </label>
                         <div class="space-y-3">
-                            <label class="flex items-start p-3 border dark:border-gray-600 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 {{ $accounts->isEmpty() ? 'opacity-50 cursor-not-allowed' : '' }}"
-                                   onclick="if (!{{ $accounts->isEmpty() ? 'true' : 'false' }}) document.getElementById('commission').checked = true">
+                            <label class="flex items-start p-3 border dark:border-gray-600 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 {{ $accounts->isEmpty() ? 'opacity-50 cursor-not-allowed' : '' }}">
                                 <input
                                     type="radio"
                                     name="type"
@@ -92,8 +97,7 @@
                                 </div>
                             </label>
 
-                            <label class="flex items-start p-3 border dark:border-gray-600 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 {{ $accounts->isEmpty() ? 'opacity-50 cursor-not-allowed' : '' }}"
-                                   onclick="if (!{{ $accounts->isEmpty() ? 'true' : 'false' }}) document.getElementById('no_profit').checked = true">
+                            <label class="flex items-start p-3 border dark:border-gray-600 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 {{ $accounts->isEmpty() ? 'opacity-50 cursor-not-allowed' : '' }}">
                                 <input
                                     type="radio"
                                     name="type"
@@ -101,7 +105,6 @@
                                     value="no_profit"
                                     {{ old('type') === 'no_profit' ? 'checked' : '' }}
                                     class="mt-1"
-                                    required
                                     {{ $accounts->isEmpty() ? 'disabled' : '' }}
                                 >
                                 <div class="ml-3">
@@ -124,7 +127,7 @@
                             step="0.01"
                             name="amount_received"
                             id="amount_received"
-                            value="{{ old('amount_received') }}"
+                            value="{{ old('amount_received', request('amount')) }}"
                             placeholder="100000"
                             class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded px-3 sm:px-4 py-2 text-sm focus:outline-none focus:border-indigo-500"
                             required
@@ -147,15 +150,20 @@
                         >
                             <option value="">{{ $accounts->isEmpty() ? 'No eligible accounts available' : 'Select Account' }}</option>
                             @foreach($accounts as $account)
-                                <option value="{{ $account->id }}" {{ old('account_id') == $account->id ? 'selected' : '' }}>
-                                    @if($account->type == 'mpesa') 📱 @endif
-                                    @if($account->type == 'bank') 🏦 @endif
+                                <option
+                                    value="{{ $account->id }}"
+                                    {{ (old('account_id', request('account_id')) == $account->id) ? 'selected' : '' }}
+                                >
+                                    @if($account->type === 'mpesa') 📱
+                                    @elseif($account->type === 'bank') 🏦
+                                    @elseif($account->type === 'savings') 💰
+                                    @endif
                                     {{ $account->name }} (KES {{ number_format($account->current_balance, 0, '.', ',') }})
                                 </option>
                             @endforeach
                         </select>
                         <p class="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                            💡 Client funds can only be received in M-Pesa or Bank accounts
+                            💡 Client funds can only be received in M-Pesa, Bank, or Savings accounts
                         </p>
                     </div>
 
@@ -186,7 +194,7 @@
                             type="date"
                             name="received_date"
                             id="received_date"
-                            value="{{ old('received_date', date('Y-m-d')) }}"
+                            value="{{ old('received_date', request('date', date('Y-m-d'))) }}"
                             class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded px-3 sm:px-4 py-2 text-sm focus:outline-none focus:border-indigo-500"
                             required
                             {{ $accounts->isEmpty() ? 'disabled' : '' }}

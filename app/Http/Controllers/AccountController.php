@@ -321,17 +321,21 @@ class AccountController extends Controller
             abort(403);
         }
 
-        if (in_array($account->type, ['savings', 'wallet'])) {
+        $isEtica = $account->type === 'savings' && strtolower($account->name) === 'etica';
+        if ($account->type === 'wallet' || ($account->type === 'savings' && !$isEtica)) {
             return redirect()->route('accounts.index')
                 ->with('error', 'This account can only receive money via transfers.');
         }
 
         [$categories, $showSaccoDividends] = $this->topUpService->getCategories($account->type);
+        $isSavings = $account->type === 'savings';
 
-        return view('accounts.topup', compact('account', 'categories', 'showSaccoDividends'));
+        return view('accounts.topup', compact('account', 'categories', 'showSaccoDividends', 'isSavings'));
     }
 
     // ── top-up store ──────────────────────────────────────────────────────────
+
+    // Updated topUp method in AccountController
 
     public function topUp(Request $request, Account $account)
     {
@@ -339,9 +343,32 @@ class AccountController extends Controller
             abort(403);
         }
 
-        if (in_array($account->type, ['savings', 'wallet'])) {
+        $isEtica = $account->type === 'savings' && strtolower($account->name) === 'etica';
+        if ($account->type === 'wallet' || ($account->type === 'savings' && !$isEtica)) {
             return redirect()->route('accounts.index')
                 ->with('error', 'This account can only receive money via transfers.');
+        }
+
+        $isClientFund = $request->boolean('is_client_fund');
+
+        if ($isClientFund) {
+            // Non-savings accounts cannot record client funds
+            if ($account->type !== 'savings') {
+                return redirect()->route('accounts.index')
+                    ->with('error', 'Client fund recording is only allowed for savings accounts.');
+            }
+
+            // Validate amount and date even for client fund redirects
+            $request->validate([
+                'amount' => 'required|numeric|min:0.01',
+                'date'   => 'required|date',
+            ]);
+
+            return redirect()->route('client-funds.create', [
+                'account_id' => $account->id,
+                'amount'     => $request->amount,
+                'date'       => $request->date,
+            ])->with('info', 'Complete the client fund details below.');
         }
 
         $request->validate([

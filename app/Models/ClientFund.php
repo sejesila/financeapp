@@ -56,8 +56,10 @@ class ClientFund extends Model
         if ($this->balance <= 0) {
             $this->status = 'completed';
             $this->completed_date = now();
-        } elseif ($this->amount_spent > 0) {
+        } elseif ($this->amount_spent > 0 || $this->profit_amount > 0) {
             $this->status = 'partial';
+        } else {
+            $this->status = 'pending';
         }
 
         $this->save();

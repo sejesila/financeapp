@@ -42,9 +42,13 @@
 
             <div class="mb-4">
                 <label for="category_id" class="block text-gray-700 font-semibold mb-2">
-                    Source Category <span class="text-red-500">*</span>
+                    Source Category
+                    <span class="text-red-500">*</span>
+                    <span id="category-optional-note" class="text-xs text-gray-500 font-normal italic" style="display: none;">
+                        (optional for client funds)
+                    </span>
                 </label>
-                <select name="category_id" id="category_id" class="w-full border border-gray-300 rounded px-4 py-2" required>
+                <select name="category_id" id="category_id" class="w-full border border-gray-300 rounded px-4 py-2" @change="updateCategoryRequired()">
                     <option value="">-- Select Source --</option>
 
                     @php
@@ -141,11 +145,33 @@
                 @enderror
             </div>
 
+            @if($isSavings)
+                <div class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <label class="flex items-start gap-3 cursor-pointer">
+                        <input type="checkbox"
+                               name="is_client_fund"
+                               id="is_client_fund"
+                               value="1"
+                               x-model="isClientFund"
+                               @change="updateCategoryRequired()"
+                               class="mt-0.5 rounded border-gray-300 text-indigo-600">
+                        <div>
+                            <span class="font-semibold text-amber-800 text-sm">Record as Client Fund</span>
+                            <p class="text-xs text-amber-700 mt-0.5">
+                                Check this if the deposit belongs to a client and needs to be tracked separately.
+                            </p>
+                        </div>
+                    </label>
+                </div>
+            @endif
+
             <div class="flex gap-4">
-                <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">
+                <button type="submit" id="submit-btn"
+                        class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">
                     Top-Up Account
                 </button>
-                <a href="{{ route('accounts.show', $account) }}" class="bg-gray-300 text-gray-700 px-6 py-2 rounded hover:bg-gray-400">
+                <a href="{{ route('accounts.show', $account) }}"
+                   class="bg-gray-300 text-gray-700 px-6 py-2 rounded hover:bg-gray-400">
                     Cancel
                 </a>
             </div>
@@ -158,16 +184,56 @@
                 amount: '{{ old('amount') }}',
                 date: '{{ old('date', date('Y-m-d')) }}',
                 description: '{{ old('description') }}',
+                isClientFund: @if($isSavings) {{ old('is_client_fund') ? 'true' : 'false' }} @else false @endif,
 
                 init() {
+                    this.updateCategoryRequired();
                     this.$el.addEventListener('submit', (e) => this.handleSubmit(e));
                 },
 
-                handleSubmit(e) {
+                updateCategoryRequired() {
                     const categorySelect = document.getElementById('category_id');
+                    const optionalNote = document.getElementById('category-optional-note');
+
+                    if (this.isClientFund) {
+                        // Remove required attribute - user can proceed without selecting category
+                        categorySelect.removeAttribute('required');
+                        optionalNote.style.display = 'inline';
+                        document.getElementById('submit-btn').textContent = 'Continue to Client Fund →';
+                    } else {
+                        // Restore required attribute - must select category
+                        categorySelect.setAttribute('required', 'required');
+                        optionalNote.style.display = 'none';
+                        document.getElementById('submit-btn').textContent = 'Top-Up Account';
+                    }
+                },
+
+                handleSubmit(e) {
+                    // If recording as client fund, redirect without needing category
+                    if (this.isClientFund) {
+                        e.preventDefault();
+                        const url = new URL('{{ route("client-funds.create") }}', window.location.origin);
+                        url.searchParams.append('account_id', '{{ $account->id }}');
+                        if (this.amount) url.searchParams.append('amount', this.amount);
+                        if (this.date) url.searchParams.append('date', this.date);
+                        if (this.description) url.searchParams.append('purpose', this.description);
+                        window.location.href = url.toString();
+                        return;
+                    }
+
+                    // Otherwise, validate category is selected
+                    const categorySelect = document.getElementById('category_id');
+                    if (!categorySelect.value) {
+                        e.preventDefault();
+                        categorySelect.focus();
+                        categorySelect.style.borderColor = '#ef4444';
+                        return;
+                    }
+
                     const selectedOption = categorySelect.options[categorySelect.selectedIndex];
                     const categoryType = selectedOption.getAttribute('data-type');
 
+                    // If it's a loan, redirect to loan form
                     if (categoryType === 'liability') {
                         e.preventDefault();
 

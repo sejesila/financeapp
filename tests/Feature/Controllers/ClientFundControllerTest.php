@@ -57,7 +57,6 @@ function makeExpenseCategory(User $user): Category
 
 /**
  * Insert a ClientFundTransaction row directly — no factory needed.
- * The model uses $fillable so ::create() works fine.
  */
 function makeCFT(ClientFund $fund, string $type, float $amount, ?int $transactionId = null): ClientFundTransaction
 {
@@ -91,9 +90,9 @@ describe('store', function () {
         expect(ClientFund::where('user_id', $user->id)->count())->toBe(1);
 
         $fund = ClientFund::first();
-        expect($fund->balance)->toEqual('3000.00')
+        expect((float) $fund->balance)->toBe(3000.0)
             ->and($fund->status)->toBe('pending')
-            ->and($fund->amount_spent)->toEqual('0.00');
+            ->and((float) $fund->amount_spent)->toBe(0.0);
 
         expect(
             Transaction::where('account_id', $account->id)->where('amount', 3000)->exists()
@@ -104,9 +103,73 @@ describe('store', function () {
         )->toBeTrue();
     });
 
+    it('accepts an mpesa account', function () {
+        $user    = makeUser();
+        $account = makeAccount($user, 'mpesa');
+
+        $this->actingAs($user)->post(route('client-funds.store'), [
+            'client_name'     => 'Alice',
+            'type'            => 'commission',
+            'amount_received' => 1000,
+            'account_id'      => $account->id,
+            'purpose'         => 'Supplies',
+            'received_date'   => '2024-06-01',
+        ])->assertRedirect();
+
+        expect(ClientFund::count())->toBe(1);
+    });
+
+    it('accepts a bank account', function () {
+        $user    = makeUser();
+        $account = makeAccount($user, 'bank');
+
+        $this->actingAs($user)->post(route('client-funds.store'), [
+            'client_name'     => 'Corp',
+            'type'            => 'no_profit',
+            'amount_received' => 2000,
+            'account_id'      => $account->id,
+            'purpose'         => 'Office',
+            'received_date'   => '2024-06-01',
+        ])->assertRedirect();
+
+        expect(ClientFund::count())->toBe(1);
+    });
+
+    it('accepts a savings account', function () {
+        $user    = makeUser();
+        $account = makeAccount($user, 'savings');
+
+        $this->actingAs($user)->post(route('client-funds.store'), [
+            'client_name'     => 'Corp',
+            'type'            => 'no_profit',
+            'amount_received' => 2000,
+            'account_id'      => $account->id,
+            'purpose'         => 'Office',
+            'received_date'   => '2024-06-01',
+        ])->assertRedirect();
+
+        expect(ClientFund::count())->toBe(1);
+    });
+
     it('rejects a cash account for client funds', function () {
         $user    = makeUser();
         $account = makeAccount($user, 'cash');
+
+        $this->actingAs($user)->post(route('client-funds.store'), [
+            'client_name'     => 'Bob',
+            'type'            => 'commission',
+            'amount_received' => 1000,
+            'account_id'      => $account->id,
+            'purpose'         => 'Supplies',
+            'received_date'   => '2024-06-01',
+        ])->assertSessionHasErrors('account_id');
+
+        expect(ClientFund::count())->toBe(0);
+    });
+
+    it('rejects a wallet account for client funds', function () {
+        $user    = makeUser();
+        $account = makeAccount($user, 'wallet');
 
         $this->actingAs($user)->post(route('client-funds.store'), [
             'client_name'     => 'Bob',
@@ -159,10 +222,50 @@ describe('store', function () {
 
         expect(Category::where('user_id', $user->id)->where('name', 'Client Funds')->exists())->toBeTrue();
     });
+
+    it('reuses an existing Client Funds category instead of creating a duplicate', function () {
+        $user    = makeUser();
+        $account = makeAccount($user, 'mpesa');
+
+        Category::factory()->create([
+            'user_id' => $user->id,
+            'name'    => 'Client Funds',
+            'type'    => 'liability',
+        ]);
+
+        $this->actingAs($user)->post(route('client-funds.store'), [
+            'client_name'     => 'Alice',
+            'type'            => 'commission',
+            'amount_received' => 1000,
+            'account_id'      => $account->id,
+            'purpose'         => 'Test',
+            'received_date'   => '2024-06-01',
+        ]);
+
+        expect(
+            Category::where('user_id', $user->id)->where('name', 'Client Funds')->count()
+        )->toBe(1);
+    });
+
+    it('redirects to the newly created client fund on success', function () {
+        $user    = makeUser();
+        $account = makeAccount($user, 'mpesa');
+
+        $response = $this->actingAs($user)->post(route('client-funds.store'), [
+            'client_name'     => 'Alice',
+            'type'            => 'commission',
+            'amount_received' => 1000,
+            'account_id'      => $account->id,
+            'purpose'         => 'Test',
+            'received_date'   => '2024-06-01',
+        ]);
+
+        $fund = ClientFund::first();
+        $response->assertRedirect(route('client-funds.show', $fund));
+    });
 });
 
 // ── recordExpense ─────────────────────────────────────────────────────────────
-// Route: POST /client-funds/{clientFund}/expense  (adjust if your route differs)
 
 describe('recordExpense', function () {
 
@@ -215,6 +318,27 @@ describe('recordExpense', function () {
         )->toBeTrue();
     });
 
+    it('appends the client name to the expense description', function () {
+        $user     = makeUser();
+        $account  = makeAccount($user, 'mpesa', 10000);
+        $fund     = makeClientFund($user, $account, ['client_name' => 'Alice']);
+        $category = makeExpenseCategory($user);
+
+        $this->actingAs($user)
+            ->post("/client-funds/{$fund->id}/expense", [
+                'amount'      => 200,
+                'description' => 'Bought gear',
+                'date'        => '2024-06-05',
+                'category_id' => $category->id,
+            ]);
+
+        expect(
+            Transaction::where('account_id', $account->id)
+                ->where('description', 'like', '%Alice%')
+                ->exists()
+        )->toBeTrue();
+    });
+
     it('rejects an expense exceeding the fund balance', function () {
         $user     = makeUser();
         $account  = makeAccount($user, 'mpesa');
@@ -247,6 +371,16 @@ describe('recordExpense', function () {
         expect($fund->fresh()->status)->toBe('completed');
     });
 
+    it('requires all fields for recording an expense', function () {
+        $user    = makeUser();
+        $account = makeAccount($user, 'mpesa');
+        $fund    = makeClientFund($user, $account);
+
+        $this->actingAs($user)
+            ->post("/client-funds/{$fund->id}/expense", [])
+            ->assertSessionHasErrors(['amount', 'description', 'date', 'category_id']);
+    });
+
     it('prevents a different user from recording an expense', function () {
         $user     = makeUser();
         $other    = makeUser();
@@ -265,7 +399,6 @@ describe('recordExpense', function () {
 });
 
 // ── recordProfit ──────────────────────────────────────────────────────────────
-// Route: POST /client-funds/{clientFund}/profit
 
 describe('recordProfit', function () {
 
@@ -300,7 +433,7 @@ describe('recordProfit', function () {
                 'date'   => '2024-06-10',
             ])->assertSessionHas('error');
 
-        expect($fund->fresh()->profit_amount)->toEqual('0.00');
+        expect((float) $fund->fresh()->profit_amount)->toBe(0.0);
     });
 
     it('creates an income transaction and a liability-reduction transaction', function () {
@@ -342,6 +475,46 @@ describe('recordProfit', function () {
         )->toBeTrue();
     });
 
+    it('uses a default description when none is provided', function () {
+        $user    = makeUser();
+        $account = makeAccount($user, 'mpesa', 10000);
+        $fund    = makeClientFund($user, $account, [
+            'type'            => 'commission',
+            'client_name'     => 'Alice',
+            'purpose'         => 'Laptop',
+            'amount_received' => 5000,
+            'balance'         => 5000,
+        ]);
+
+        Category::factory()->create(['user_id' => $user->id, 'name' => 'Client Funds', 'type' => 'liability']);
+        Category::factory()->create(['user_id' => $user->id, 'name' => 'Income', 'type' => 'income', 'parent_id' => null]);
+
+        $this->actingAs($user)
+            ->post("/client-funds/{$fund->id}/profit", [
+                'amount' => 200,
+                'date'   => '2024-06-10',
+                // No description
+            ]);
+
+        expect(
+            Transaction::where('account_id', $account->id)
+                ->where('description', 'like', '%Alice%')
+                ->exists()
+        )->toBeTrue();
+    });
+
+    it('requires amount and date', function () {
+        $user    = makeUser();
+        $account = makeAccount($user, 'mpesa');
+        $fund    = makeClientFund($user, $account, ['type' => 'commission']);
+
+        Category::factory()->create(['user_id' => $user->id, 'name' => 'Client Funds', 'type' => 'liability']);
+
+        $this->actingAs($user)
+            ->post("/client-funds/{$fund->id}/profit", [])
+            ->assertSessionHasErrors(['amount', 'date']);
+    });
+
     it('prevents another user from recording profit', function () {
         $user    = makeUser();
         $other   = makeUser();
@@ -357,7 +530,6 @@ describe('recordProfit', function () {
 });
 
 // ── complete ──────────────────────────────────────────────────────────────────
-// Route: POST /client-funds/{clientFund}/complete
 
 describe('complete', function () {
 
@@ -423,6 +595,19 @@ describe('destroy', function () {
         expect(ClientFund::find($fund->id))->toBeNull();
     });
 
+    it('also deletes associated ClientFundTransaction records on destroy', function () {
+        $user    = makeUser();
+        $account = makeAccount($user, 'mpesa', 10000);
+        $fund    = makeClientFund($user, $account);
+
+        $cft = makeCFT($fund, 'receipt', 5000);
+
+        $this->actingAs($user)
+            ->delete(route('client-funds.destroy', $fund));
+
+        expect(ClientFundTransaction::find($cft->id))->toBeNull();
+    });
+
     it('blocks deletion when expenses exist', function () {
         $user    = makeUser();
         $account = makeAccount($user, 'mpesa');
@@ -464,7 +649,6 @@ describe('destroy', function () {
 });
 
 // ── deleteExpense ─────────────────────────────────────────────────────────────
-// Route: DELETE /client-funds/{clientFund}/expense/{transaction}
 
 describe('deleteExpense', function () {
 
@@ -489,6 +673,26 @@ describe('deleteExpense', function () {
             ->and((float) $fund->balance)->toBe(5000.0);
 
         expect(ClientFundTransaction::find($txn->id))->toBeNull();
+    });
+
+    it('restores the fund status to pending when expense is reversed and balance is full', function () {
+        $user    = makeUser();
+        $account = makeAccount($user, 'mpesa', 10000);
+        $fund    = makeClientFund($user, $account, [
+            'amount_received' => 5000,
+            'amount_spent'    => 1000,
+            'balance'         => 4000,
+            'status'          => 'partial',
+        ]);
+
+        $txn = makeCFT($fund, 'expense', 1000);
+
+        $this->actingAs($user)
+            ->delete("/client-funds/{$fund->id}/expense/{$txn->id}");
+
+        // After full reversal, updateBalance should recalculate status
+        // With amount_spent=0 and balance=amount_received, status becomes pending
+        expect($fund->fresh()->status)->toBe('pending');
     });
 
     it('rejects deletion if the transaction type is not expense', function () {
@@ -518,7 +722,6 @@ describe('deleteExpense', function () {
 });
 
 // ── deleteProfit ──────────────────────────────────────────────────────────────
-// Route: DELETE /client-funds/{clientFund}/profit/{transaction}
 
 describe('deleteProfit', function () {
 
@@ -550,6 +753,26 @@ describe('deleteProfit', function () {
 
         expect(ClientFundTransaction::find($profitCFT->id))->toBeNull();
         expect(Transaction::find($linkedTxn->id))->toBeNull();
+    });
+
+    it('gracefully handles a missing linked transaction', function () {
+        $user    = makeUser();
+        $account = makeAccount($user, 'mpesa', 10000);
+        $fund    = makeClientFund($user, $account, [
+            'type'          => 'commission',
+            'profit_amount' => 200,
+            'balance'       => 4800,
+        ]);
+
+        // Simulate a CFT whose linked transaction was already deleted
+        // (ON DELETE SET NULL means transaction_id becomes null in production)
+        $profitCFT = makeCFT($fund, 'profit', 200, null); // ← null, not 99999
+
+        $this->actingAs($user)
+            ->delete("/client-funds/{$fund->id}/profit/{$profitCFT->id}")
+            ->assertRedirect()->assertSessionHas('success');
+
+        expect(ClientFundTransaction::find($profitCFT->id))->toBeNull();
     });
 
     it('rejects deletion if the transaction type is not profit', function () {
@@ -596,7 +819,17 @@ describe('update', function () {
         $fund->refresh();
         expect($fund->client_name)->toBe('New Name')
             ->and($fund->purpose)->toBe('New purpose')
+            ->and($fund->notes)->toBe('Some notes')
             ->and((float) $fund->amount_received)->toBe(5000.0);
+    });
+
+    it('requires client_name and purpose', function () {
+        $user    = makeUser();
+        $account = makeAccount($user, 'mpesa');
+        $fund    = makeClientFund($user, $account);
+
+        $this->actingAs($user)->put(route('client-funds.update', $fund), [])
+            ->assertSessionHasErrors(['client_name', 'purpose']);
     });
 
     it('prevents another user from updating the fund', function () {
@@ -649,6 +882,23 @@ describe('ClientFund::updateBalance', function () {
         expect($fund->fresh()->status)->toBe('completed')
             ->and((float) $fund->fresh()->balance)->toBe(0.0)
             ->and($fund->fresh()->completed_date)->not->toBeNull();
+    });
+
+    it('sets status to pending when nothing has been spent or profited', function () {
+        $user    = makeUser();
+        $account = makeAccount($user);
+        $fund    = makeClientFund($user, $account, [
+            'amount_received' => 1000,
+            'amount_spent'    => 0,
+            'profit_amount'   => 0,
+            'balance'         => 999, // stale value
+            'status'          => 'partial',
+        ]);
+
+        $fund->updateBalance();
+
+        expect($fund->fresh()->status)->toBe('pending')
+            ->and((float) $fund->fresh()->balance)->toBe(1000.0);
     });
 
     it('computes balance as received minus spent minus profit', function () {

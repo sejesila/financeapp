@@ -88,13 +88,13 @@ class ClientFundController extends Controller
         // Verify the account belongs to the user and is the correct type
         $account = Account::where('id', $request->account_id)
             ->where('user_id', Auth::id())
-            ->whereIn('type', ['mpesa', 'bank'])
+            ->whereIn('type', ['mpesa', 'bank', 'savings'])
             ->first();
 
         if (!$account) {
             return back()
                 ->withInput()
-                ->withErrors(['account_id' => 'Client funds can only be received in M-Pesa or Bank accounts.']);
+                ->withErrors(['account_id' => 'Client funds can only be received in M-Pesa, Bank, or Savings accounts.']);
         }
 
         DB::beginTransaction();
@@ -166,10 +166,9 @@ class ClientFundController extends Controller
 
     public function create()
     {
-        // Only M-Pesa and Bank accounts can receive client funds
         $accounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
-            ->whereIn('type', ['mpesa', 'bank'])
+            ->whereIn('type', ['mpesa', 'bank', 'savings'])
             ->get();
 
         return view('client-funds.create', compact('accounts'));
@@ -450,8 +449,8 @@ class ClientFundController extends Controller
         try {
             // Add the amount back to account balance
             $account = $clientFund->account;
-            $account->current_balance += $transaction->amount;
-            $account->save();
+            $clientFund->account->updateBalance();
+           // $account->save();
 
             // Update client fund
             $clientFund->amount_spent -= $transaction->amount;
