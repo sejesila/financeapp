@@ -55,13 +55,18 @@ class TransactionRecorder
         if (!empty($parsed['fee']) && $parsed['fee'] > 0) {
             $feeCategory = $this->categories->findOrCreate($user, 'Transaction Fees', 'expense');
 
+            $feeLabel = $parsed['reference']
+                . (!empty($parsed['to_account_hint'])
+                    ? ' (' . ucfirst($parsed['to_account_hint']) . ')'
+                    : '');
+
             $feeTransaction = Transaction::withoutGlobalScopes()->create([
                 'user_id'                    => $user->id,
                 'account_id'                 => $account->id,
                 'category_id'                => $feeCategory->id,
                 'amount'                     => $parsed['fee'],
                 'date'                       => $parsed['date'],
-                'description'                => 'Transaction fee for ' . $parsed['reference'],
+                'description'                => 'Transaction fee for ' . $feeLabel,
                 'payment_method'             => $paymentMethod,
                 'is_transaction_fee'         => true,
                 'related_fee_transaction_id' => $transaction->id,
