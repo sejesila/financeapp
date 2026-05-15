@@ -112,30 +112,38 @@ class AccountController extends Controller
 
     // ── show ──────────────────────────────────────────────────────────────────
 
+
     public function show(Request $request, Account $account)
     {
         if ($account->user_id !== Auth::id()) {
             abort(403);
         }
 
-        $search    = $request->input('search');
+        $search = $request->input('search');
         $activeTab = $request->input('tab', 'transactions');
 
         $allowedSorts = ['date', 'description', 'amount'];
 
-        $txSort      = in_array($request->input('tx_sort'), $allowedSorts) ? $request->input('tx_sort') : 'date';
+        // ── Transactions tab sort ─────────────────────────────────────────────
+        $txSort = in_array($request->input('tx_sort'), $allowedSorts) ? $request->input('tx_sort') : 'date';
         $txDirection = $request->input('tx_dir', 'desc') === 'asc' ? 'asc' : 'desc';
 
-        $topSort      = in_array($request->input('top_sort'), $allowedSorts) ? $request->input('top_sort') : 'date';
+        // ── Top Ups tab sort ──────────────────────────────────────────────────
+        $topSort = in_array($request->input('top_sort'), $allowedSorts) ? $request->input('top_sort') : 'date';
         $topDirection = $request->input('top_dir', 'desc') === 'asc' ? 'asc' : 'desc';
 
+        // ── Transfers tab sort ────────────────────────────────────────────────
+        $transferSort = in_array($request->input('tr_sort'), $allowedSorts) ? $request->input('tr_sort') : 'date';
+        $transferDirection = $request->input('tr_dir', 'desc') === 'asc' ? 'asc' : 'desc';
+
+        // ── Transactions query ────────────────────────────────────────────────
         $transactions = $account->transactions()
             ->with(['category.parent', 'feeTransaction'])
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('categories.type', 'expense')
             ->whereNull('transactions.deleted_at')
             ->select('transactions.*')
-            ->when($search, fn($q) => $q->where(function ($q) use ($search) {
+            ->when($search && $activeTab === 'transactions', fn($q) => $q->where(function ($q) use ($search) {
                 $q->where('transactions.description', 'like', "%{$search}%")
                     ->orWhereRaw('CAST(transactions.amount AS CHAR) LIKE ?', ["%{$search}%"]);
             }))
@@ -144,13 +152,14 @@ class AccountController extends Controller
             ->paginate(20, ['*'], 'tx_page')
             ->appends($request->query());
 
+        // ── Top Ups query ─────────────────────────────────────────────────────
         $topUps = $account->transactions()
             ->with(['category'])
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->whereIn('categories.type', ['income', 'liability'])
             ->whereNull('transactions.deleted_at')
             ->select('transactions.*')
-            ->when($search, fn($q) => $q->where(function ($q) use ($search) {
+            ->when($search && $activeTab === 'topups', fn($q) => $q->where(function ($q) use ($search) {
                 $q->where('transactions.description', 'like', "%{$search}%")
                     ->orWhereRaw('CAST(transactions.amount AS CHAR) LIKE ?', ["%{$search}%"]);
             }))
@@ -159,31 +168,50 @@ class AccountController extends Controller
             ->paginate(20, ['*'], 'top_page')
             ->appends($request->query());
 
+        // ── Transfers query ───────────────────────────────────────────────────
+        $transfers = Transfer::with(['fromAccount', 'toAccount'])
+            ->where(function ($q) use ($account) {
+                $q->where('from_account_id', $account->id)
+                    ->orWhere('to_account_id', $account->id);
+            })
+            ->when($search && $activeTab === 'transfers', fn($q) => $q->where(function ($q) use ($search) {
+                $q->where('description', 'like', "%{$search}%")
+                    ->orWhereRaw('CAST(amount AS CHAR) LIKE ?', ["%{$search}%"]);
+            }))
+            ->orderBy($transferSort, $transferDirection)
+            ->when($transferSort === 'date', fn($q) => $q->orderBy('id', $transferDirection))
+            ->paginate(20, ['*'], 'tr_page')
+            ->appends($request->query());
+
+        // ── Account stats ─────────────────────────────────────────────────────
         $stats = $account->transactions()
             ->whereNull('transactions.deleted_at')
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->selectRaw('
-                COUNT(*) as total_transactions,
-                SUM(CASE WHEN categories.type = "income"  THEN amount ELSE 0 END) as total_income,
-                SUM(CASE WHEN categories.type = "expense" THEN amount ELSE 0 END) as total_expenses,
-                SUM(CASE WHEN MONTH(date) = ? AND YEAR(date) = ? THEN amount ELSE 0 END) as this_month_total
-            ', [now()->month, now()->year])
+            COUNT(*) as total_transactions,
+            SUM(CASE WHEN categories.type = "income"  THEN amount ELSE 0 END) as total_income,
+            SUM(CASE WHEN categories.type = "expense" THEN amount ELSE 0 END) as total_expenses,
+            SUM(CASE WHEN MONTH(date) = ? AND YEAR(date) = ? THEN amount ELSE 0 END) as this_month_total
+        ', [now()->month, now()->year])
             ->first();
 
         return view('accounts.show', [
-            'account'           => $account,
-            'transactions'      => $transactions,
-            'topUps'            => $topUps,
+            'account' => $account,
+            'transactions' => $transactions,
+            'topUps' => $topUps,
+            'transfers' => $transfers,
             'totalTransactions' => $stats->total_transactions ?? 0,
-            'totalIncome'       => $stats->total_income       ?? 0,
-            'totalExpenses'     => $stats->total_expenses     ?? 0,
-            'thisMonthTotal'    => $stats->this_month_total   ?? 0,
-            'search'            => $search,
-            'activeTab'         => $activeTab,
-            'txSort'            => $txSort,
-            'txDirection'       => $txDirection,
-            'topSort'           => $topSort,
-            'topDirection'      => $topDirection,
+            'totalIncome' => $stats->total_income ?? 0,
+            'totalExpenses' => $stats->total_expenses ?? 0,
+            'thisMonthTotal' => $stats->this_month_total ?? 0,
+            'search' => $search,
+            'activeTab' => $activeTab,
+            'txSort' => $txSort,
+            'txDirection' => $txDirection,
+            'topSort' => $topSort,
+            'topDirection' => $topDirection,
+            'transferSort' => $transferSort,
+            'transferDirection' => $transferDirection,
         ]);
     }
 

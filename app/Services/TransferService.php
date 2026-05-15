@@ -73,7 +73,7 @@ readonly class TransferService
             ]);
 
             if ($fee->isCharged()) {
-                $this->recordFeeTransaction($from, $date, $fee, $description);
+                $this->recordFeeTransaction($from, $to, $date, $fee, $description);
             }
 
             $from->updateBalance();
@@ -140,6 +140,7 @@ readonly class TransferService
 
     private function recordFeeTransaction(
         Account     $from,
+        Account     $to,
         string      $date,
         TransferFee $fee,
         ?string     $userDescription,
@@ -152,9 +153,9 @@ readonly class TransferService
         Transaction::create([
             'user_id'            => Auth::id(),
             'date'               => $date,
-            'description'        => $userDescription
-                ? "{$fee->description}: {$userDescription}"
-                : $fee->description,
+            'description' => $userDescription
+                ? "{$from->name} to {$to->name} fee: {$userDescription}"
+                : "{$from->name} to {$to->name} fee",
             'amount'             => $fee->amount,
             'category_id'        => $feeCategory->id,
             'account_id'         => $from->id,

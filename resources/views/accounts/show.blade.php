@@ -13,7 +13,7 @@
     <div class="py-6 sm:py-12">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
 
-            {{-- Success Messages --}}
+            {{-- Flash Messages --}}
             @if(session('success'))
                 <div class="bg-green-100 text-green-700 p-4 rounded-lg mb-6">
                     {{ session('success') }}
@@ -139,7 +139,9 @@
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
 
                 {{-- Tab Bar --}}
-                <div class="flex border-b border-gray-200 dark:border-gray-700 mb-5 gap-1">
+                <div class="flex flex-wrap border-b border-gray-200 dark:border-gray-700 mb-5 gap-1">
+
+                    {{-- Transactions --}}
                     <a href="{{ request()->fullUrlWithQuery(['tab' => 'transactions', 'tx_page' => 1]) }}"
                        class="px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors
                               {{ $activeTab === 'transactions'
@@ -151,6 +153,8 @@
                             {{ number_format($transactions->total()) }}
                         </span>
                     </a>
+
+                    {{-- Top Ups --}}
                     <a href="{{ request()->fullUrlWithQuery(['tab' => 'topups', 'top_page' => 1]) }}"
                        class="px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors
                               {{ $activeTab === 'topups'
@@ -163,13 +167,27 @@
                         </span>
                     </a>
 
-                    {{-- View All (transactions tab only) --}}
+                    {{-- Transfers --}}
+                    <a href="{{ request()->fullUrlWithQuery(['tab' => 'transfers', 'tr_page' => 1]) }}"
+                       class="px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors
+                              {{ $activeTab === 'transfers'
+                                  ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200' }}">
+                        Transfers
+                        <span class="ml-1.5 px-1.5 py-0.5 text-xs rounded-full
+                                     {{ $activeTab === 'transfers' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400' }}">
+                            {{ number_format($transfers->total()) }}
+                        </span>
+                    </a>
+
+                    {{-- View All link (transactions tab only) --}}
                     @if($activeTab === 'transactions')
                         <a href="{{ route('transactions.index', ['account_id' => $account->id]) }}"
                            class="ml-auto text-sm text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 font-medium self-center whitespace-nowrap">
                             View All →
                         </a>
                     @endif
+
                 </div>
 
                 {{-- Search Bar --}}
@@ -189,7 +207,7 @@
                                       dark:border-gray-600 dark:bg-gray-700 dark:text-white
                                       focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                         @if(!empty($search))
-                            <a href="{{ route('accounts.show', array_merge(['account' => $account->id], ['tab' => $activeTab])) }}"
+                            <a href="{{ route('accounts.show', ['account' => $account->slug, 'tab' => $activeTab]) }}"
                                class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -198,10 +216,16 @@
                         @endif
                     </div>
                     @if(!empty($search))
+                        @php
+                            $resultCount = match($activeTab) {
+                                'topups'     => $topUps->total(),
+                                'transfers'  => $transfers->total(),
+                                default      => $transactions->total(),
+                            };
+                        @endphp
                         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
                             Results for "<span class="font-medium text-gray-700 dark:text-gray-300">{{ $search }}</span>"
-                            — {{ number_format($activeTab === 'transactions' ? $transactions->total() : $topUps->total()) }}
-                            {{ Str::plural('result', $activeTab === 'transactions' ? $transactions->total() : $topUps->total()) }}
+                            — {{ number_format($resultCount) }} {{ Str::plural('result', $resultCount) }}
                         </p>
                     @endif
                 </form>
@@ -226,10 +250,10 @@
                                             $isActive = $txSort === $col;
                                             $newDir   = ($isActive && $txDirection === 'asc') ? 'desc' : 'asc';
                                             $url      = request()->fullUrlWithQuery([
-                                                'tab'      => 'transactions',
-                                                'tx_sort'  => $col,
-                                                'tx_dir'   => $newDir,
-                                                'tx_page'  => 1,
+                                                'tab'     => 'transactions',
+                                                'tx_sort' => $col,
+                                                'tx_dir'  => $newDir,
+                                                'tx_page' => 1,
                                             ]);
                                         @endphp
                                         <th class="px-4 py-3 text-left font-medium">
@@ -237,12 +261,12 @@
                                                class="inline-flex items-center gap-1 hover:text-indigo-600 transition-colors group">
                                                 {{ $label }}
                                                 <span class="text-xs">
-                                                        @if($isActive)
+                                                    @if($isActive)
                                                         <span class="text-indigo-600 font-bold">{{ $txDirection === 'asc' ? '↑' : '↓' }}</span>
                                                     @else
                                                         <span class="text-gray-400 group-hover:text-indigo-400">↕</span>
                                                     @endif
-                                                    </span>
+                                                </span>
                                             </a>
                                         </th>
                                     @endforeach
@@ -252,7 +276,8 @@
                                 </thead>
                                 <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
                                 @foreach($transactions as $txn)
-                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors {{ $txn->is_transaction_fee ? 'bg-yellow-50 dark:bg-yellow-900/10' : '' }}">
+                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors
+                                               {{ $txn->is_transaction_fee ? 'bg-yellow-50 dark:bg-yellow-900/10' : '' }}">
                                         <td class="px-4 py-3 whitespace-nowrap text-gray-600 dark:text-gray-400 text-xs">
                                             {{ $txn->date->format('M d, Y') }}
                                         </td>
@@ -272,7 +297,9 @@
                                                 @endif
                                             </div>
                                             @if($txn->feeTransaction)
-                                                <p class="text-xs text-gray-400 mt-0.5 ml-6">+{{ number_format($txn->feeTransaction->amount, 0) }} fee</p>
+                                                <p class="text-xs text-gray-400 mt-0.5 ml-6">
+                                                    +{{ number_format($txn->feeTransaction->amount, 0) }} fee
+                                                </p>
                                             @endif
                                         </td>
                                         <td class="px-4 py-3 whitespace-nowrap font-semibold text-red-600 dark:text-red-400">
@@ -319,7 +346,7 @@
                     @endif
 
                     {{-- ═══════════ TOP UPS TAB ═══════════ --}}
-                @else
+                @elseif($activeTab === 'topups')
                     @php
                         $topColumns = [
                             'date'        => 'Date',
@@ -349,12 +376,12 @@
                                                class="inline-flex items-center gap-1 hover:text-green-600 transition-colors group">
                                                 {{ $label }}
                                                 <span class="text-xs">
-                                                        @if($isActive)
+                                                    @if($isActive)
                                                         <span class="text-green-600 font-bold">{{ $topDirection === 'asc' ? '↑' : '↓' }}</span>
                                                     @else
                                                         <span class="text-gray-400 group-hover:text-green-400">↕</span>
                                                     @endif
-                                                    </span>
+                                                </span>
                                             </a>
                                         </th>
                                     @endforeach
@@ -435,7 +462,119 @@
                             @endif
                         </div>
                     @endif
-                @endif
+
+                    {{-- ═══════════ TRANSFERS TAB ═══════════ --}}
+                @else
+                    @php
+                        $trColumns = [
+                            'date'        => 'Date',
+                            'description' => 'Description',
+                            'amount'      => 'Amount',
+                        ];
+                    @endphp
+
+                    @if($transfers->count() > 0)
+                        <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                                <tr>
+                                    @foreach($trColumns as $col => $label)
+                                        @php
+                                            $isActive = $transferSort === $col;
+                                            $newDir   = ($isActive && $transferDirection === 'asc') ? 'desc' : 'asc';
+                                            $url      = request()->fullUrlWithQuery([
+                                                'tab'     => 'transfers',
+                                                'tr_sort' => $col,
+                                                'tr_dir'  => $newDir,
+                                                'tr_page' => 1,
+                                            ]);
+                                        @endphp
+                                        <th class="px-4 py-3 text-left font-medium">
+                                            <a href="{{ $url }}"
+                                               class="inline-flex items-center gap-1 hover:text-blue-600 transition-colors group">
+                                                {{ $label }}
+                                                <span class="text-xs">
+                                                    @if($isActive)
+                                                        <span class="text-blue-600 font-bold">{{ $transferDirection === 'asc' ? '↑' : '↓' }}</span>
+                                                    @else
+                                                        <span class="text-gray-400 group-hover:text-blue-400">↕</span>
+                                                    @endif
+                                                </span>
+                                            </a>
+                                        </th>
+                                    @endforeach
+                                    <th class="px-4 py-3 text-left font-medium">Direction</th>
+                                    <th class="px-4 py-3 text-left font-medium hidden sm:table-cell">Counterpart</th>
+                                </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                                @foreach($transfers as $transfer)
+                                    @php
+                                        $isOut       = $transfer->from_account_id === $account->id;
+                                        $counterpart = $isOut ? $transfer->toAccount : $transfer->fromAccount;
+                                    @endphp
+                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                        <td class="px-4 py-3 whitespace-nowrap text-gray-600 dark:text-gray-400 text-xs">
+                                            {{ $transfer->date->format('M d, Y') }}
+                                        </td>
+                                        <td class="px-4 py-3 text-gray-900 dark:text-white">
+                                            @if(!empty($search))
+                                                {!! str_ireplace($search, '<mark class="bg-yellow-100 dark:bg-yellow-800 rounded px-0.5">' . e($search) . '</mark>', e($transfer->description ?: '—')) !!}
+                                            @else
+                                                {{ $transfer->description ?: '—' }}
+                                            @endif
+                                        </td>
+                                        <td class="px-4 py-3 whitespace-nowrap font-semibold tabular-nums
+                                                   {{ $isOut ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400' }}">
+                                            @if(!empty($search))
+                                                {!! str_ireplace($search, '<mark class="bg-yellow-100 dark:bg-yellow-800 rounded px-0.5">' . e($search) . '</mark>', e(($isOut ? '−' : '+') . number_format($transfer->amount, 0))) !!}
+                                            @else
+                                                {{ $isOut ? '−' : '+' }}{{ number_format($transfer->amount, 0) }}
+                                            @endif
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium
+                                                         {{ $isOut
+                                                             ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                                             : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' }}">
+                                                {{ $isOut ? '↑ Out' : '↓ In' }}
+                                            </span>
+                                        </td>
+                                        <td class="px-4 py-3 hidden sm:table-cell text-gray-600 dark:text-gray-400 text-sm">
+                                            {{ $counterpart->name ?? '—' }}
+                                        </td>
+                                    </tr>
+                                @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-4">{{ $transfers->links() }}</div>
+
+                    @else
+                        <div class="text-center py-12">
+                            @if(!empty($search))
+                                <svg class="w-12 h-12 mx-auto text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
+                                </svg>
+                                <p class="text-gray-500 font-medium mb-1">No transfers found</p>
+                                <p class="text-gray-400 text-sm">No match for "{{ $search }}"</p>
+                                <a href="{{ route('accounts.show', ['account' => $account, 'tab' => 'transfers']) }}"
+                                   class="inline-block mt-3 text-sm text-blue-600 hover:underline">Clear search</a>
+                            @else
+                                <svg class="w-12 h-12 mx-auto text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                                </svg>
+                                <p class="text-gray-500 font-medium mb-1">No transfers yet</p>
+                                <a href="{{ route('transfers.create') }}"
+                                   class="inline-block mt-2 bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 transition text-sm">
+                                    Make a Transfer
+                                </a>
+                            @endif
+                        </div>
+                    @endif
+
+                @endif {{-- end tab switch --}}
 
             </div>{{-- end card --}}
 
