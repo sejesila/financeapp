@@ -112,19 +112,41 @@
 
             {{-- Transaction Statistics --}}
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-                @php
-                    $stats = [
-                        ['label' => 'Total Transactions', 'value' => number_format($totalTransactions),            'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', 'color' => 'blue'],
-                        ['label' => 'Total Income',        'value' => 'KES ' . number_format($totalIncome, 0),    'icon' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'green'],
-                        ['label' => 'Total Expenses',      'value' => 'KES ' . number_format($totalExpenses, 0),  'icon' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'red'],
-                        ['label' => 'This Month',          'value' => 'KES ' . number_format($thisMonthTotal, 0), 'icon' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', 'color' => 'purple'],
-                    ];
-                @endphp
+                @if($account->type === 'savings')
+                    @php
+                        $stats = [
+                            ['label' => 'Total Transactions', 'value' => number_format($totalTransactions), 'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', 'color' => 'blue'],
+                            ['label' => 'Total Interest', 'value' => 'KES ' . number_format($savingsStats->total_interest ?? 0, 0), 'icon' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'emerald'],
+                            ['label' => 'Total Expenses', 'value' => 'KES ' . number_format($savingsStats->total_expenses ?? 0, 0), 'icon' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'red'],
+                            ['label' => 'This Month', 'value' => 'KES ' . number_format($thisMonthTotal, 0), 'icon' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', 'color' => 'purple'],
+                        ];
+                    @endphp
+                @else
+                    @php
+                        $stats = [
+                            ['label' => 'Total Transactions', 'value' => number_format($totalTransactions), 'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', 'color' => 'blue'],
+                            ['label' => 'Total Income', 'value' => 'KES ' . number_format($totalIncome, 0), 'icon' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'green'],
+                            ['label' => 'Total Expenses', 'value' => 'KES ' . number_format($totalExpenses, 0), 'icon' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'red'],
+                            ['label' => 'This Month', 'value' => 'KES ' . number_format($thisMonthTotal, 0), 'icon' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', 'color' => 'purple'],
+                        ];
+                    @endphp
+                @endif
+
                 @foreach($stats as $stat)
+                    @php
+                        $colorMap = [
+                            'blue'     => 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300',
+                            'emerald'  => 'bg-emerald-100 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-300',
+                            'green'    => 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300',
+                            'red'      => 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300',
+                            'purple'   => 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300',
+                        ];
+                        $classes = $colorMap[$stat['color']] ?? $colorMap['blue'];
+                    @endphp
                     <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
                         <div class="flex items-center justify-between mb-2">
-                            <div class="p-2 bg-{{ $stat['color'] }}-100 dark:bg-{{ $stat['color'] }}-900 rounded-lg">
-                                <svg class="w-4 h-4 text-{{ $stat['color'] }}-600 dark:text-{{ $stat['color'] }}-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div class="{{ $classes }} p-2 rounded-lg">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $stat['icon'] }}"/>
                                 </svg>
                             </div>
@@ -134,6 +156,143 @@
                     </div>
                 @endforeach
             </div>
+
+            {{-- Savings Analytics (savings accounts only) --}}
+            @if($account->type === 'savings')
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-6">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
+                        <h3 class="text-base font-semibold text-gray-900 dark:text-white">📊 Interest & Expenses Breakdown</h3>
+
+                        {{-- Period & Year Selector using Alpine.js --}}
+                        <div class="flex flex-wrap items-center gap-3 ml-auto">
+                            {{-- Period Dropdown --}}
+                            <div class="relative" x-data="{ open: false }">
+                                <button
+                                    @click="open = !open"
+                                    @click.outside="open = false"
+                                    class="flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition cursor-pointer"
+                                >
+                                    <span class="font-medium capitalize">{{ $selectedPeriod }}</span>
+                                    <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </button>
+
+                                <div
+                                    x-show="open"
+                                    x-transition
+                                    class="absolute left-0 mt-2 w-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50"
+                                    style="display: none;"
+                                >
+                                    @foreach(['weekly' => 'Weekly', 'monthly' => 'Monthly', 'yearly' => 'Yearly'] as $value => $label)
+                                        <a
+                                            href="{{ request()->fullUrlWithQuery(['period' => $value, 'year' => $selectedYear, 'tab' => $activeTab]) }}"
+                                            class="block px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition {{ $selectedPeriod === $value ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-gray-700 dark:text-gray-300' }}"
+                                        >
+                                            {{ $label }}
+                                        </a>
+                                    @endforeach
+                                </div>
+                            </div>
+
+                            {{-- Year Dropdown (hidden for yearly view) --}}
+                            @if($selectedPeriod !== 'yearly')
+                                <div class="relative" x-data="{ open: false }">
+                                    <button
+                                        @click="open = !open"
+                                        @click.outside="open = false"
+                                        class="flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition cursor-pointer"
+                                    >
+                                        <span class="font-medium">{{ $selectedYear }}</span>
+                                        <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                        </svg>
+                                    </button>
+
+                                    <div
+                                        x-show="open"
+                                        x-transition
+                                        class="absolute left-0 mt-2 w-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto"
+                                        style="display: none;"
+                                    >
+                                        @foreach($availableYears as $yr)
+                                            <a
+                                                href="{{ request()->fullUrlWithQuery(['period' => $selectedPeriod, 'year' => $yr, 'tab' => $activeTab]) }}"
+                                                class="block px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition {{ $selectedYear == $yr ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-gray-700 dark:text-gray-300' }}"
+                                            >
+                                                {{ $yr }}
+                                            </a>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+
+                    @if($interestByPeriod->isEmpty() && $expensesByPeriod->isEmpty())
+                        <p class="text-sm text-gray-500 dark:text-gray-400 text-center py-6">No data for this period.</p>
+                    @else
+                        {{-- Merge all period labels --}}
+                        @php
+                            $allLabels = $interestByPeriod->pluck('period_label')
+                                ->merge($expensesByPeriod->pluck('period_label'))
+                                ->unique()->values();
+
+                            $interestMap  = $interestByPeriod->keyBy('period_label');
+                            $expensesMap  = $expensesByPeriod->keyBy('period_label');
+                        @endphp
+
+                        <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-medium">
+                                        {{ $selectedPeriod === 'weekly' ? 'Week' : ($selectedPeriod === 'yearly' ? 'Year' : 'Month') }}
+                                    </th>
+                                    <th class="px-4 py-3 text-right font-medium text-emerald-700 dark:text-emerald-400">Interest (KES)</th>
+                                    <th class="px-4 py-3 text-right font-medium text-red-700 dark:text-red-400">Expenses (KES)</th>
+                                    <th class="px-4 py-3 text-right font-medium text-indigo-700 dark:text-indigo-400">Net (KES)</th>
+                                </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                                @php $grandInterest = 0; $grandExpenses = 0; @endphp
+                                @foreach($allLabels as $label)
+                                    @php
+                                        $interest = $interestMap[$label]->total ?? 0;
+                                        $expenses = $expensesMap[$label]->total ?? 0;
+                                        $net      = $interest - $expenses;
+                                        $grandInterest += $interest;
+                                        $grandExpenses += $expenses;
+                                    @endphp
+                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                        <td class="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">{{ $label }}</td>
+                                        <td class="px-4 py-3 text-right text-emerald-600 dark:text-emerald-400 font-medium">
+                                            {{ $interest > 0 ? number_format($interest, 0) : '—' }}
+                                        </td>
+                                        <td class="px-4 py-3 text-right text-red-600 dark:text-red-400 font-medium">
+                                            {{ $expenses > 0 ? number_format($expenses, 0) : '—' }}
+                                        </td>
+                                        <td class="px-4 py-3 text-right font-semibold {{ $net >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-red-600 dark:text-red-400' }}">
+                                            {{ ($net >= 0 ? '+' : '') . number_format($net, 0) }}
+                                        </td>
+                                    </tr>
+                                @endforeach
+                                </tbody>
+                                <tfoot class="bg-gray-50 dark:bg-gray-700 font-semibold text-gray-800 dark:text-gray-200">
+                                <tr>
+                                    <td class="px-4 py-3">Total</td>
+                                    <td class="px-4 py-3 text-right text-emerald-700 dark:text-emerald-400">{{ number_format($grandInterest, 0) }}</td>
+                                    <td class="px-4 py-3 text-right text-red-700 dark:text-red-400">{{ number_format($grandExpenses, 0) }}</td>
+                                    <td class="px-4 py-3 text-right {{ ($grandInterest - $grandExpenses) >= 0 ? 'text-indigo-700 dark:text-indigo-400' : 'text-red-700 dark:text-red-400' }}">
+                                        {{ (($grandInterest - $grandExpenses) >= 0 ? '+' : '') . number_format($grandInterest - $grandExpenses, 0) }}
+                                    </td>
+                                </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    @endif
+                </div>
+            @endif
 
             {{-- Tabs + Search --}}
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">

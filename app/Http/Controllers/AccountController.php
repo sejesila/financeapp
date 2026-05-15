@@ -119,21 +119,18 @@ class AccountController extends Controller
             abort(403);
         }
 
-        $search = $request->input('search');
+        $search    = $request->input('search');
         $activeTab = $request->input('tab', 'transactions');
 
         $allowedSorts = ['date', 'description', 'amount'];
 
-        // ── Transactions tab sort ─────────────────────────────────────────────
-        $txSort = in_array($request->input('tx_sort'), $allowedSorts) ? $request->input('tx_sort') : 'date';
+        $txSort      = in_array($request->input('tx_sort'), $allowedSorts) ? $request->input('tx_sort') : 'date';
         $txDirection = $request->input('tx_dir', 'desc') === 'asc' ? 'asc' : 'desc';
 
-        // ── Top Ups tab sort ──────────────────────────────────────────────────
-        $topSort = in_array($request->input('top_sort'), $allowedSorts) ? $request->input('top_sort') : 'date';
+        $topSort      = in_array($request->input('top_sort'), $allowedSorts) ? $request->input('top_sort') : 'date';
         $topDirection = $request->input('top_dir', 'desc') === 'asc' ? 'asc' : 'desc';
 
-        // ── Transfers tab sort ────────────────────────────────────────────────
-        $transferSort = in_array($request->input('tr_sort'), $allowedSorts) ? $request->input('tr_sort') : 'date';
+        $transferSort      = in_array($request->input('tr_sort'), $allowedSorts) ? $request->input('tr_sort') : 'date';
         $transferDirection = $request->input('tr_dir', 'desc') === 'asc' ? 'asc' : 'desc';
 
         // ── Transactions query ────────────────────────────────────────────────
@@ -183,7 +180,7 @@ class AccountController extends Controller
             ->paginate(20, ['*'], 'tr_page')
             ->appends($request->query());
 
-        // ── Account stats ─────────────────────────────────────────────────────
+        // ── Base stats (all accounts) ─────────────────────────────────────────
         $stats = $account->transactions()
             ->whereNull('transactions.deleted_at')
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
@@ -195,23 +192,123 @@ class AccountController extends Controller
         ', [now()->month, now()->year])
             ->first();
 
+        // ── Savings-specific stats ────────────────────────────────────────────
+        $savingsStats        = null;
+        $interestByPeriod    = collect();
+        $expensesByPeriod    = collect();
+        $availableYears      = collect();
+
+        if ($account->type === 'savings') {
+            $selectedYear  = (int) $request->input('year', now()->year);
+            $selectedPeriod = $request->input('period', 'monthly'); // weekly | monthly | yearly
+
+            // Total interest earned
+            $savingsStats = $account->transactions()
+                ->whereNull('transactions.deleted_at')
+                ->join('categories', 'transactions.category_id', '=', 'categories.id')
+                ->selectRaw('
+                SUM(CASE WHEN categories.name = "Interest" THEN transactions.amount ELSE 0 END) as total_interest,
+                SUM(CASE WHEN categories.type = "expense"  THEN transactions.amount ELSE 0 END) as total_expenses
+            ')
+                ->first();
+
+            // Available years (for year selector)
+            $availableYears = $account->transactions()
+                ->whereNull('transactions.deleted_at')
+                ->selectRaw('YEAR(date) as year')
+                ->groupBy('year')
+                ->orderByDesc('year')
+                ->pluck('year');
+
+            // Period breakdown base query
+            $periodBase = $account->transactions()
+                ->whereNull('transactions.deleted_at')
+                ->join('categories', 'transactions.category_id', '=', 'categories.id');
+
+            if ($selectedPeriod === 'yearly') {
+                // All years, group by year
+                $interestByPeriod = (clone $periodBase)
+                    ->where('categories.name', 'Interest')
+                    ->selectRaw('YEAR(transactions.date) as period_label, SUM(transactions.amount) as total')
+                    ->groupByRaw('YEAR(transactions.date)')
+                    ->orderByRaw('YEAR(transactions.date)')
+                    ->get();
+
+                $expensesByPeriod = (clone $periodBase)
+                    ->where('categories.type', 'expense')
+                    ->selectRaw('YEAR(transactions.date) as period_label, SUM(transactions.amount) as total')
+                    ->groupByRaw('YEAR(transactions.date)')
+                    ->orderByRaw('YEAR(transactions.date)')
+                    ->get();
+
+            } elseif ($selectedPeriod === 'weekly') {
+                // Weeks within selected year
+                $interestByPeriod = (clone $periodBase)
+                    ->where('categories.name', 'Interest')
+                    ->whereYear('transactions.date', $selectedYear)
+                    ->selectRaw('WEEK(transactions.date, 1) as period_label, SUM(transactions.amount) as total')
+                    ->groupByRaw('WEEK(transactions.date, 1)')
+                    ->orderByRaw('WEEK(transactions.date, 1)')
+                    ->get()
+                    ->map(fn($r) => tap($r, fn($r) => $r->period_label = 'Week ' . $r->period_label));
+
+                $expensesByPeriod = (clone $periodBase)
+                    ->where('categories.type', 'expense')
+                    ->whereYear('transactions.date', $selectedYear)
+                    ->selectRaw('WEEK(transactions.date, 1) as period_label, SUM(transactions.amount) as total')
+                    ->groupByRaw('WEEK(transactions.date, 1)')
+                    ->orderByRaw('WEEK(transactions.date, 1)')
+                    ->get()
+                    ->map(fn($r) => tap($r, fn($r) => $r->period_label = 'Week ' . $r->period_label));
+
+            } else {
+                // Monthly (default) within selected year
+                $monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+                $interestByPeriod = (clone $periodBase)
+                    ->where('categories.name', 'Interest')
+                    ->whereYear('transactions.date', $selectedYear)
+                    ->selectRaw('MONTH(transactions.date) as month_num, SUM(transactions.amount) as total')
+                    ->groupByRaw('MONTH(transactions.date)')
+                    ->orderByRaw('MONTH(transactions.date)')
+                    ->get()
+                    ->map(fn($r) => tap($r, fn($r) => $r->period_label = $monthNames[$r->month_num - 1]));
+
+                $expensesByPeriod = (clone $periodBase)
+                    ->where('categories.type', 'expense')
+                    ->whereYear('transactions.date', $selectedYear)
+                    ->selectRaw('MONTH(transactions.date) as month_num, SUM(transactions.amount) as total')
+                    ->groupByRaw('MONTH(transactions.date)')
+                    ->orderByRaw('MONTH(transactions.date)')
+                    ->get()
+                    ->map(fn($r) => tap($r, fn($r) => $r->period_label = $monthNames[$r->month_num - 1]));
+            }
+        }
+
         return view('accounts.show', [
-            'account' => $account,
-            'transactions' => $transactions,
-            'topUps' => $topUps,
-            'transfers' => $transfers,
+            'account'           => $account,
+            'transactions'      => $transactions,
+            'topUps'            => $topUps,
+            'transfers'         => $transfers,
             'totalTransactions' => $stats->total_transactions ?? 0,
-            'totalIncome' => $stats->total_income ?? 0,
-            'totalExpenses' => $stats->total_expenses ?? 0,
-            'thisMonthTotal' => $stats->this_month_total ?? 0,
-            'search' => $search,
-            'activeTab' => $activeTab,
-            'txSort' => $txSort,
-            'txDirection' => $txDirection,
-            'topSort' => $topSort,
-            'topDirection' => $topDirection,
-            'transferSort' => $transferSort,
+            'totalIncome'       => $stats->total_income       ?? 0,
+            'totalExpenses'     => $stats->total_expenses     ?? 0,
+            'thisMonthTotal'    => $stats->this_month_total   ?? 0,
+            'search'            => $search,
+            'activeTab'         => $activeTab,
+            'txSort'            => $txSort,
+            'txDirection'       => $txDirection,
+            'topSort'           => $topSort,
+            'topDirection'      => $topDirection,
+            'transferSort'      => $transferSort,
             'transferDirection' => $transferDirection,
+            // savings-only
+            'savingsStats'      => $savingsStats,
+            'interestByPeriod'  => $interestByPeriod,
+            'expensesByPeriod'  => $expensesByPeriod,
+            'availableYears'    => $availableYears,
+            'selectedYear'      => $selectedYear  ?? now()->year,
+            'selectedPeriod'    => $selectedPeriod ?? 'monthly',
         ]);
     }
 
