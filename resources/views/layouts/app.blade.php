@@ -34,7 +34,6 @@
         window.dataLayer = window.dataLayer || [];
         function gtag(){dataLayer.push(arguments);}
         gtag('js', new Date());
-
         gtag('config', 'G-ZQPW22HEMP');
     </script>
 </head>
@@ -71,7 +70,7 @@
     <nav class="bg-white dark:bg-gray-800 shadow mb-6 transition-colors duration-200">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
-                <!-- Logo with Image -->
+                <!-- Logo -->
                 <a href="{{ url('/dashboard') }}" class="flex items-center space-x-3 text-gray-900 dark:text-white hover:opacity-90 transition group">
                     <div class="relative flex items-center justify-center">
                         <div class="absolute inset-0 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg opacity-0 group-hover:opacity-100 transition duration-300 blur-md"></div>
@@ -81,7 +80,6 @@
                     </div>
                     <div class="hidden sm:block">
                         <p class="text-lg font-bold text-gray-900 dark:text-white">{{ config('app.name', 'Fin Tracker') }}</p>
-
                     </div>
                 </a>
 
@@ -100,21 +98,12 @@
                             Dashboard
                         </a>
                     </li>
-
                     <li>
                         <a href="{{ url('/accounts') }}"
                            class="text-base text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('accounts*') ? 'text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
                             Accounts
                         </a>
                     </li>
-
-                    <li>
-                        <a href="{{ url('/loans') }}"
-                           class="text-base text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('loans*') ? 'text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
-                            Loans
-                        </a>
-                    </li>
-
                     <li>
                         <a href="{{ url('/transactions') }}"
                            class="text-base text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('transactions*') ? 'text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
@@ -122,28 +111,12 @@
                         </a>
                     </li>
 
-                    <li>
-                        <a href="{{ url('/budgets') }}"
-                           class="text-base text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('budgets*') ? 'text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
-                            Budgets
-                        </a>
-                    </li>
-
-                    <li>
-                        <a href="{{ url('/reports') }}"
-                           class="text-base text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('reports*') ? 'text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
-                            Reports
-                        </a>
-                    </li>
-
                     <!-- Dark Mode Toggle (Desktop) -->
                     <li>
                         <button id="themeToggle" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition" title="Toggle dark mode">
-                            <!-- Sun icon (shows in dark mode) -->
                             <svg id="sunIcon" class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
                             </svg>
-                            <!-- Moon icon (shows in light mode) -->
                             <svg id="moonIcon" class="w-5 h-5 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
                             </svg>
@@ -159,10 +132,21 @@
                             </svg>
                         </button>
 
-                        <!-- Dropdown Menu -->
                         <div id="userMenu" class="hidden absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg z-50 overflow-hidden">
+                            <a href="{{ url('/loans') }}"
+                               class="block px-4 py-3 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('loans*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                                Loans
+                            </a>
+                            <a href="{{ url('/budgets') }}"
+                               class="block px-4 py-3 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('budgets*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                                Budgets
+                            </a>
+                            <a href="{{ url('/reports') }}"
+                               class="block px-4 py-3 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('reports*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                                Reports
+                            </a>
                             <a href="{{ route('client-funds.index') }}"
-                               class="block px-4 py-3 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('client-funds*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                               class="block px-4 py-3 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 transition border-t dark:border-gray-700 {{ request()->is('client-funds*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
                                 Client Funds
                             </a>
                             <a href="{{ route('profile.edit') }}"
@@ -196,21 +180,12 @@
                             Dashboard
                         </a>
                     </li>
-
                     <li>
                         <a href="{{ url('/accounts') }}"
                            class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('accounts*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
                             Accounts
                         </a>
                     </li>
-
-                    <li>
-                        <a href="{{ url('/loans') }}"
-                           class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('loans*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
-                            Loans
-                        </a>
-                    </li>
-
                     <li>
                         <a href="{{ url('/transactions') }}"
                            class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('transactions*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
@@ -218,64 +193,60 @@
                         </a>
                     </li>
 
-                    <li>
-                        <a href="{{ url('/budgets') }}"
-                           class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('budgets*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
-                            Budgets
-                        </a>
-                    </li>
-
-                    <li>
-                        <a href="{{ url('/reports') }}"
-                           class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('reports*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
-                            Reports
-                        </a>
-                    </li>
-
-                    <!-- Mobile User Menu -->
+                    <!-- Mobile User Section -->
                     <li class="border-t dark:border-gray-700 pt-2 mt-2">
                         <div class="px-4 py-2 text-base text-gray-900 dark:text-white font-semibold">
                             {{ Auth::user()->name }}
                         </div>
-                        <div class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">
+                        <div class="px-4 py-1 text-sm text-gray-500 dark:text-gray-400 mb-1">
                             {{ Auth::user()->email }}
                         </div>
+
+                        <a href="{{ url('/loans') }}"
+                           class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('loans*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                            Loans
+                        </a>
+                        <a href="{{ url('/budgets') }}"
+                           class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('budgets*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                            Budgets
+                        </a>
+                        <a href="{{ url('/reports') }}"
+                           class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('reports*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                            Reports
+                        </a>
+                        <a href="{{ route('client-funds.index') }}"
+                           class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('client-funds*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                            Client Funds
+                        </a>
 
                         <!-- Dark Mode Toggle (Mobile) -->
                         <button type="button" id="themeToggleMobile" class="w-full flex items-center justify-between px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 rounded transition">
                             <span>Theme</span>
                             <div class="flex items-center space-x-2">
-                                <span id="themeLabel" class="text-sm text-gray-500 dark:text-gray-400">
+                                <span class="text-sm text-gray-500 dark:text-gray-400">
                                     <span class="dark:hidden">Light</span>
                                     <span class="hidden dark:inline">Dark</span>
                                 </span>
                                 <div class="p-1.5 rounded bg-gray-100 dark:bg-gray-700">
-                                    <svg id="sunIconMobile" class="w-4 h-4 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg class="w-4 h-4 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
                                     </svg>
-                                    <svg id="moonIconMobile" class="w-4 h-4 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg class="w-4 h-4 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
                                     </svg>
                                 </div>
                             </div>
                         </button>
 
-                        <a href="{{ route('client-funds.index') }}"
-                           class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('client-funds*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
-                            Client Funds
-                        </a>
-
                         <a href="{{ route('profile.edit') }}" class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition">
                             Profile
                         </a>
-
                         <a href="{{ route('email-preferences.edit') }}" class="flex items-center gap-2 px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                             </svg>
                             Email Reports
                         </a>
-
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
                             <button type="submit" class="w-full text-left px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition">
@@ -288,7 +259,7 @@
         </div>
     </nav>
 
-    <!-- Page Header (optional, from slot) -->
+    <!-- Page Header -->
     @isset($header)
         <header class="bg-white dark:bg-gray-800 shadow transition-colors duration-200">
             <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
@@ -304,7 +275,6 @@
 </div>
 
 <script>
-    // Dark Mode Toggle Function
     function toggleTheme() {
         const html = document.documentElement;
         if (html.classList.contains('dark')) {
@@ -316,27 +286,17 @@
         }
     }
 
-    // Desktop theme toggle
     const themeToggle = document.getElementById('themeToggle');
-    if (themeToggle) {
-        themeToggle.addEventListener('click', toggleTheme);
-    }
+    if (themeToggle) themeToggle.addEventListener('click', toggleTheme);
 
-    // Mobile theme toggle
     const themeToggleMobile = document.getElementById('themeToggleMobile');
-    if (themeToggleMobile) {
-        themeToggleMobile.addEventListener('click', toggleTheme);
-    }
+    if (themeToggleMobile) themeToggleMobile.addEventListener('click', toggleTheme);
 
-    // Mobile menu elements
     const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-    const mobileMenu = document.getElementById('mobileMenu');
+    const mobileMenu    = document.getElementById('mobileMenu');
+    const userMenuBtn   = document.getElementById('userMenuBtn');
+    const userMenu      = document.getElementById('userMenu');
 
-    // Desktop user menu elements
-    const userMenuBtn = document.getElementById('userMenuBtn');
-    const userMenu = document.getElementById('userMenu');
-
-    // Mobile menu toggle
     if (mobileMenuBtn && mobileMenu) {
         mobileMenuBtn.addEventListener('click', function(e) {
             e.preventDefault();
@@ -345,7 +305,6 @@
         });
     }
 
-    // Desktop user menu toggle
     if (userMenuBtn && userMenu) {
         userMenuBtn.addEventListener('click', function(e) {
             e.preventDefault();
@@ -354,19 +313,12 @@
         });
     }
 
-    // Close menus when clicking outside
     document.addEventListener('click', function(event) {
-        // Close mobile menu if clicking outside
         if (mobileMenu && mobileMenuBtn) {
-            const clickedInsideMenu = mobileMenu.contains(event.target);
-            const clickedButton = mobileMenuBtn.contains(event.target);
-
-            if (!clickedButton && !clickedInsideMenu && !mobileMenu.classList.contains('hidden')) {
+            if (!mobileMenuBtn.contains(event.target) && !mobileMenu.contains(event.target) && !mobileMenu.classList.contains('hidden')) {
                 mobileMenu.classList.add('hidden');
             }
         }
-
-        // Close desktop user menu if clicking outside
         if (userMenu && userMenuBtn) {
             if (!userMenuBtn.contains(event.target) && !userMenu.contains(event.target)) {
                 userMenu.classList.add('hidden');
@@ -374,25 +326,18 @@
         }
     });
 
-    // Close mobile menu when a link or submit button is clicked
     if (mobileMenu) {
-        const menuLinks = mobileMenu.querySelectorAll('a, button[type="submit"]');
-        menuLinks.forEach(link => {
-            link.addEventListener('click', function() {
-                mobileMenu.classList.add('hidden');
-            });
+        mobileMenu.querySelectorAll('a, button[type="submit"]').forEach(link => {
+            link.addEventListener('click', () => mobileMenu.classList.add('hidden'));
         });
     }
 
     // Session Timeout Management
     document.addEventListener('DOMContentLoaded', function () {
-        const sessionLifetime = 120 * 60 * 1000; // 120 minutes
-        const warningTime = 2 * 60 * 1000; // warn 2 minutes before expiry
-        const pingInterval = 10 * 60 * 1000; // Ping server every 10 minutes
-        let timeoutWarning;
-        let sessionTimeout;
-        let countdownInterval;
-        let pingTimer;
+        const sessionLifetime = 120 * 60 * 1000;
+        const warningTime     = 2 * 60 * 1000;
+        const pingInterval    = 10 * 60 * 1000;
+        let timeoutWarning, sessionTimeout, countdownInterval, pingTimer;
         let lastActivity = Date.now();
 
         function getCsrfToken() {
@@ -404,49 +349,33 @@
             clearTimeout(timeoutWarning);
             clearTimeout(sessionTimeout);
             clearInterval(countdownInterval);
-
-            // Set warning to appear before session expires
             timeoutWarning = setTimeout(showWarning, sessionLifetime - warningTime);
-
-            // Set actual session timeout
             sessionTimeout = setTimeout(logout, sessionLifetime);
         }
 
         function showWarning() {
-            const modal = document.getElementById('timeoutWarning');
-            if (modal) {
-                modal.classList.remove('hidden');
-            }
-
-            let secondsLeft = 120; // 2 minutes warning before logout
+            document.getElementById('timeoutWarning')?.classList.remove('hidden');
+            let secondsLeft = 120;
             updateCountdown(secondsLeft);
-
             countdownInterval = setInterval(() => {
                 secondsLeft--;
                 updateCountdown(secondsLeft);
-
-                if (secondsLeft <= 0) {
-                    clearInterval(countdownInterval);
-                    logout();
-                }
+                if (secondsLeft <= 0) { clearInterval(countdownInterval); logout(); }
             }, 1000);
         }
 
         function updateCountdown(seconds) {
-            const countdownElement = document.getElementById('countdown');
-            if (countdownElement) {
-                const minutes = Math.floor(seconds / 60);
-                const secs = seconds % 60;
-                countdownElement.textContent = `${minutes}:${secs.toString().padStart(2, '0')}`;
+            const el = document.getElementById('countdown');
+            if (el) {
+                const m = Math.floor(seconds / 60);
+                const s = seconds % 60;
+                el.textContent = `${m}:${s.toString().padStart(2, '0')}`;
             }
         }
 
         function hideWarning() {
             clearInterval(countdownInterval);
-            const modal = document.getElementById('timeoutWarning');
-            if (modal) {
-                modal.classList.add('hidden');
-            }
+            document.getElementById('timeoutWarning')?.classList.add('hidden');
         }
 
         function logout() {
@@ -454,30 +383,13 @@
             clearTimeout(sessionTimeout);
             clearInterval(countdownInterval);
             clearInterval(pingTimer);
-
-            const logoutForm = document.getElementById('logoutForm');
-            if (logoutForm) {
-                logoutForm.submit();
-            }
-        }
-
-        function stayLoggedIn() {
-            hideWarning();
-            pingServer(true);
+            document.getElementById('logoutForm')?.submit();
         }
 
         function pingServer(userInitiated = false) {
             const csrfToken = getCsrfToken();
-
-            if (!csrfToken) {
-                console.warn('CSRF token not found');
-                if (userInitiated) {
-                    resetTimer();
-                }
-                return;
-            }
-
-            fetch('/ping', { // Using your existing /ping route
+            if (!csrfToken) { if (userInitiated) resetTimer(); return; }
+            fetch('/ping', {
                 method: 'POST',
                 headers: {
                     'X-CSRF-TOKEN': csrfToken,
@@ -487,60 +399,28 @@
                 },
                 credentials: 'same-origin',
                 body: JSON.stringify({})
-            })
-                .then(response => {
-                    if (response.status === 401 || response.status === 419) {
-                        // Session expired, force logout
-                        logout();
-                    } else if (response.ok) {
-                        if (userInitiated) {
-                            resetTimer();
-                        }
-                    }
-                    return response;
-                })
-                .catch(error => {
-                    console.error('Session ping failed:', error);
-                    // Don't logout on network error, just try again next interval
-                });
+            }).then(response => {
+                if (response.status === 401 || response.status === 419) logout();
+                else if (response.ok && userInitiated) resetTimer();
+            }).catch(err => console.error('Session ping failed:', err));
         }
 
-        // Track user activity
-        const events = ['mousedown', 'keypress', 'scroll', 'touchstart', 'click'];
-        events.forEach(event => {
+        document.getElementById('stayLoggedIn')?.addEventListener('click', () => { hideWarning(); pingServer(true); });
+        document.getElementById('logoutNow')?.addEventListener('click', logout);
+
+        ['mousedown', 'keypress', 'scroll', 'touchstart', 'click'].forEach(event => {
             document.addEventListener(event, () => {
-                const now = Date.now();
-                if (now - lastActivity > 10000) { // Reset timer if 10+ seconds of inactivity
-                    resetTimer();
-                }
+                if (Date.now() - lastActivity > 10000) resetTimer();
             }, { passive: true });
         });
 
-        // Button event listeners
-        const stayLoggedInBtn = document.getElementById('stayLoggedIn');
-        if (stayLoggedInBtn) {
-            stayLoggedInBtn.addEventListener('click', stayLoggedIn);
-        }
-
-        const logoutNowBtn = document.getElementById('logoutNow');
-        if (logoutNowBtn) {
-            logoutNowBtn.addEventListener('click', logout);
-        }
-
-        // Periodic ping to keep session alive
-        pingTimer = setInterval(() => {
-            pingServer(false);
-        }, pingInterval);
-
-        // Initialize timers
+        pingTimer = setInterval(() => pingServer(false), pingInterval);
         resetTimer();
 
-        // Handle 419 errors globally on fetch
         const originalFetch = window.fetch;
         window.fetch = function(...args) {
             return originalFetch.apply(this, args).then(response => {
                 if (response.status === 419) {
-                    console.warn('CSRF token expired, redirecting to login');
                     if (confirm('Your session has expired. Please log in again.')) {
                         window.location.href = '{{ route("login") }}';
                     } else {
@@ -548,9 +428,7 @@
                     }
                 }
                 return response;
-            }).catch(error => {
-                return Promise.reject(error);
-            });
+            }).catch(error => Promise.reject(error));
         };
     });
 </script>
