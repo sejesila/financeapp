@@ -33,12 +33,13 @@ readonly class TransferService
     /**
      * Execute a transfer.
      *
-     * @param  Account $from
-     * @param  Account $to
-     * @param  float   $amount
-     * @param  string  $date
-     * @param  string|null $description
-     * @return TransferFee   The fee that was charged (amount may be 0).
+     * @param  Account      $from
+     * @param  Account      $to
+     * @param  float        $amount
+     * @param  string       $date
+     * @param  string|null  $description
+     * @param  float|null   $manualFee      User-supplied fee override (null = use calculator)
+     * @return TransferFee  The fee that was charged (amount may be 0).
      *
      * @throws ValidationException
      */
@@ -48,10 +49,16 @@ readonly class TransferService
         float   $amount,
         string  $date,
         ?string $description = null,
+        ?float  $manualFee = null,
     ): TransferFee {
         $this->enforceTransferRules($from, $to, $amount);
 
         $fee = $this->feeCalculator->calculate($from, $to, $amount);
+
+        // Override calculated fee with user-supplied value if provided
+        if ($manualFee !== null) {
+            $fee = $fee->withAmount($manualFee);
+        }
 
         $this->enforceBalanceCheck($from, $amount, $fee);
 
@@ -82,10 +89,8 @@ readonly class TransferService
      * Enforce account-type transfer rules.
      *
      * Rules:
-     *   1. Cash → Savings : blocked (go through mobile money first)
-     *   2. Savings → Bank or Savings : blocked
-     *
-     * Throws ValidationException with the appropriate field/message pair.
+     *   1. Cash → Savings  : blocked (go through mobile money first)
+     *   2. Savings → *     : only Cash, M-Pesa, Airtel Money, or Bank allowed
      */
     private function enforceTransferRules(Account $from, Account $to, float $amount): void
     {
@@ -96,12 +101,12 @@ readonly class TransferService
             ]);
         }
 
-        // Rule: Savings can only transfer to Cash / mobile money
+        // Rule: Savings can only transfer to Cash, mobile money, or Bank
         if ($from->type === 'savings') {
-            $allowed = ['cash', 'mpesa', 'airtel_money'];
+            $allowed = ['cash', 'mpesa', 'airtel_money', 'bank'];
             if (!in_array($to->type, $allowed)) {
                 throw ValidationException::withMessages([
-                    'to_account_id' => 'Savings accounts can only transfer to Cash, M-Pesa, or Airtel Money accounts.',
+                    'to_account_id' => 'Savings accounts can only transfer to Cash, M-Pesa, Airtel Money, or Bank accounts.',
                 ]);
             }
         }
@@ -134,10 +139,10 @@ readonly class TransferService
     // ── Fee transaction ───────────────────────────────────────────────────────
 
     private function recordFeeTransaction(
-        Account    $from,
-        string     $date,
+        Account     $from,
+        string      $date,
         TransferFee $fee,
-        ?string    $userDescription,
+        ?string     $userDescription,
     ): void {
         $feeCategory = Category::firstOrCreate(
             ['user_id' => Auth::id(), 'name' => 'Transaction Fees', 'parent_id' => null],
@@ -154,10 +159,10 @@ readonly class TransferService
             'category_id'        => $feeCategory->id,
             'account_id'         => $from->id,
             'payment_method'     => match ($from->type) {
-                'mpesa'          => 'Mpesa',
-                'airtel_money'   => 'Airtel Money',
-                'bank'           => 'Bank',
-                default          => 'Cash',
+                'mpesa'        => 'Mpesa',
+                'airtel_money' => 'Airtel Money',
+                'bank'         => 'Bank',
+                default        => 'Cash',
             },
             'is_transaction_fee' => true,
         ]);

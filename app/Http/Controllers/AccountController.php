@@ -285,6 +285,7 @@ class AccountController extends Controller
             'amount'          => 'required|numeric|min:0.01',
             'date'            => 'required|date',
             'description'     => 'nullable|string',
+            'transaction_fee' => 'nullable|numeric|min:0',
         ]);
 
         $from = Account::withoutGlobalScopes()->findOrFail($request->from_account_id);
@@ -301,6 +302,7 @@ class AccountController extends Controller
                 (float) $request->amount,
                 $request->date,
                 $request->description,
+                $request->filled('transaction_fee') ? (float) $request->transaction_fee : null,
             );
         } catch (ValidationException $e) {
             return redirect()->back()->withInput()->withErrors($e->errors());
@@ -335,8 +337,6 @@ class AccountController extends Controller
 
     // ── top-up store ──────────────────────────────────────────────────────────
 
-    // Updated topUp method in AccountController
-
     public function topUp(Request $request, Account $account)
     {
         if ($account->user_id !== Auth::id()) {
@@ -352,13 +352,11 @@ class AccountController extends Controller
         $isClientFund = $request->boolean('is_client_fund');
 
         if ($isClientFund) {
-            // Non-savings accounts cannot record client funds
             if ($account->type !== 'savings') {
                 return redirect()->route('accounts.index')
                     ->with('error', 'Client fund recording is only allowed for savings accounts.');
             }
 
-            // Validate amount and date even for client fund redirects
             $request->validate([
                 'amount' => 'required|numeric|min:0.01',
                 'date'   => 'required|date',
@@ -392,7 +390,6 @@ class AccountController extends Controller
             return redirect()->back()->with('error', $error);
         }
 
-        // Loan receipt: redirect to loan form with prefill
         if ($category->type === 'liability' && $category->parent?->name === 'Loans') {
             return redirect()->route('loans.create', [
                 'account_id' => $account->id,
@@ -432,15 +429,18 @@ class AccountController extends Controller
     {
         Cache::forget("account.{$accountId}.stats");
     }
+
     // ── reverse top-up form ───────────────────────────────────────────────────
 
     public function reverseTopUpForm(Account $account, Transaction $transaction)
     {
-        if ($account->user_id !== Auth::id()) {
-            abort(403);
+        if ($account->user_id !== Auth::id()) abort(403);
+
+        if ($transaction->created_at->diffInMinutes(now()) > 30) {
+            return redirect()->route('accounts.show', ['account' => $account, 'tab' => 'topups'])
+                ->with('error', 'Top-ups can only be reversed within 30 minutes of being recorded.');
         }
 
-        // Only income/liability transactions can be reversed
         if (!in_array($transaction->category->type, ['income', 'liability'])) {
             return redirect()->route('accounts.show', $account)
                 ->with('error', 'Only top-up transactions can be reversed.');
@@ -449,12 +449,15 @@ class AccountController extends Controller
         return view('accounts.reverse-topup', compact('account', 'transaction'));
     }
 
-// ── reverse top-up post ───────────────────────────────────────────────────
+    // ── reverse top-up post ───────────────────────────────────────────────────
 
     public function reverseTopUp(Request $request, Account $account, Transaction $transaction)
     {
-        if ($account->user_id !== Auth::id()) {
-            abort(403);
+        if ($account->user_id !== Auth::id()) abort(403);
+
+        if ($transaction->created_at->diffInMinutes(now()) > 30) {
+            return redirect()->route('accounts.show', ['account' => $account, 'tab' => 'topups'])
+                ->with('error', 'Top-ups can only be reversed within 30 minutes of being recorded.');
         }
 
         if (!in_array($transaction->category->type, ['income', 'liability'])) {
@@ -466,7 +469,6 @@ class AccountController extends Controller
             'reason' => 'nullable|string|max:500',
         ]);
 
-        // Soft-delete the original transaction
         $transaction->delete();
 
         $account->updateBalance();
@@ -474,5 +476,95 @@ class AccountController extends Controller
 
         return redirect()->route('accounts.show', ['account' => $account, 'tab' => 'topups'])
             ->with('success', 'Top-up of KES ' . number_format($transaction->amount, 0, '.', ',') . ' has been reversed.');
+    }
+
+    /**
+     * Show interest recording form for savings accounts
+     *
+     * @param Account $account
+     * @return \Illuminate\View\View
+     * @throws \Illuminate\Auth\Access\AuthorizationException
+     */
+    public function recordInterestForm(Account $account)
+    {
+        if ($account->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        if ($account->type !== 'savings') {
+            return redirect()->route('accounts.show', $account)
+                ->with('error', 'Interest can only be recorded for savings accounts.');
+        }
+
+        return view('accounts.record-interest', compact('account'));
+    }
+
+    /**
+     * Store an interest transaction for a savings account
+     *
+     * @param Request $request
+     * @param Account $account
+     * @return \Illuminate\Http\RedirectResponse
+     * @throws \Illuminate\Auth\Access\AuthorizationException
+     */
+    public function recordInterest(Request $request, Account $account)
+    {
+        if ($account->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        if ($account->type !== 'savings') {
+            return redirect()->route('accounts.show', $account)
+                ->with('error', 'Interest can only be recorded for savings accounts.');
+        }
+
+        $request->validate([
+            'amount' => 'required|numeric|min:0.01',
+            'date' => 'required|date',
+            'rate' => 'nullable|numeric|min:0|max:100',
+            'description' => 'nullable|string|max:255',
+        ]);
+
+        // Get or create "Interest" category under Income
+        $interestCategory = Category::firstOrCreate(
+            [
+                'user_id' => Auth::id(),
+                'name' => 'Interest',
+                'parent_id' => null,
+            ],
+            [
+                'type' => 'income',
+                'icon' => '📈',
+                'is_active' => true,
+            ]
+        );
+
+        // Build description
+        if ($request->filled('description')) {
+            $description = $request->description;
+        } elseif ($request->filled('rate')) {
+            $description = "Interest earned ({$request->rate}% APY)";
+        } else {
+            $description = "Interest earned";
+        }
+
+        // Create transaction
+        $account->transactions()->create([
+            'user_id' => Auth::id(),
+            'amount' => (float)$request->amount,
+            'date' => $request->date,
+            'description' => $description,
+            'category_id' => $interestCategory->id,
+            'payment_method' => 'Interest',
+        ]);
+
+        // Update account balance
+        $account->updateBalance();
+
+        // Clear cache if using it
+        Cache::forget("account.{$account->id}.stats");
+
+        return redirect()->route('accounts.show', $account)
+            ->with('success', 'Interest of KES ' . number_format($request->amount, 0, '.', ',') . ' recorded successfully!');
     }
 }

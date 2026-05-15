@@ -102,6 +102,12 @@ Route::middleware('auth')->group(function () {
 
         Route::delete('{account}/topups/{transaction}/reverse', [AccountController::class, 'reverseTopUp'])
             ->name('topup.reverse');
+        // Interest recording (savings accounts only)
+        Route::get('{account}/record-interest', [AccountController::class, 'recordInterestForm'])
+            ->name('interest.form');
+        Route::post('{account}/record-interest', [AccountController::class, 'recordInterest'])
+            ->name('interest.store');
+
     });
 
 

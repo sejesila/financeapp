@@ -89,10 +89,18 @@
                             </p>
                         @endif
                     </div>
-                    <a href="{{ route('accounts.topup', $account) }}"
-                       class="bg-green-600 text-white px-6 py-2.5 rounded-lg hover:bg-green-700 transition text-center font-medium shadow-md">
-                        + Top Up Account
-                    </a>
+                    <div class="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                        <a href="{{ route('accounts.topup', $account) }}"
+                           class="bg-green-600 text-white px-6 py-2.5 rounded-lg hover:bg-green-700 transition text-center font-medium shadow-md">
+                            + Top Up Account
+                        </a>
+                        @if($account->type === 'savings')
+                            <a href="{{ route('accounts.interest.form', $account) }}"
+                               class="bg-emerald-600 text-white px-6 py-2.5 rounded-lg hover:bg-emerald-700 transition text-center font-medium shadow-md">
+                                📈 Record Interest
+                            </a>
+                        @endif
+                    </div>
                 </div>
                 <p class="text-xs text-gray-600 dark:text-gray-400 mt-4 flex items-center gap-1">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -386,15 +394,17 @@
                                             </span>
                                         </td>
                                         <td class="px-4 py-3 text-right whitespace-nowrap">
-                                            <a href="{{ route('accounts.topup.reverse.form', ['account' => $account, 'transaction' => $txn]) }}"
-                                               title="Reverse this top-up"
-                                               class="inline-flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors">
-                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                          d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
-                                                </svg>
-                                                Reverse
-                                            </a>
+                                            @if($txn->created_at->diffInMinutes(now()) <= 30)
+                                                <a href="{{ route('accounts.topup.reverse.form', ['account' => $account, 'transaction' => $txn]) }}"
+                                                   title="Reverse this top-up"
+                                                   class="inline-flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                              d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+                                                    </svg>
+                                                    Reverse
+                                                </a>
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach

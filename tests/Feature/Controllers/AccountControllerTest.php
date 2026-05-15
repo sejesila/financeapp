@@ -403,3 +403,217 @@ it('top-up form excludes categories with no parent (top-level)', function () {
 
     expect($catNames)->not->toContain('Income');
 });
+
+// ─── Reverse top-up — 30-minute window ────────────────────────────────────
+
+it('shows the reverse top-up form within 30 minutes of creation', function () {
+    $user    = User::factory()->create();
+    $account = Account::factory()->create(['user_id' => $user->id, 'type' => 'mpesa', 'current_balance' => 1000, 'initial_balance' => 0]);
+
+    $category = Category::factory()->create(['user_id' => $user->id, 'type' => 'income', 'is_active' => true, 'parent_id' => null]);
+
+    $transaction = Transaction::factory()->create([
+        'user_id'     => $user->id,
+        'account_id'  => $account->id,
+        'category_id' => $category->id,
+        'amount'      => 500,
+        'date'        => now()->toDateString(),
+        'created_at'  => now()->subMinutes(10), // 10 minutes ago — within window
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('accounts.topup.reverse.form', ['account' => $account, 'transaction' => $transaction]))
+        ->assertOk()
+        ->assertViewIs('accounts.reverse-topup');
+});
+
+it('blocks the reverse top-up form after 30 minutes', function () {
+    $user    = User::factory()->create();
+    $account = Account::factory()->create(['user_id' => $user->id, 'type' => 'mpesa', 'current_balance' => 1000, 'initial_balance' => 0]);
+
+    $category = Category::factory()->create(['user_id' => $user->id, 'type' => 'income', 'is_active' => true, 'parent_id' => null]);
+
+    $transaction = Transaction::factory()->create([
+        'user_id'     => $user->id,
+        'account_id'  => $account->id,
+        'category_id' => $category->id,
+        'amount'      => 500,
+        'date'        => now()->toDateString(),
+        'created_at'  => now()->subMinutes(31), // 31 minutes ago — outside window
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('accounts.topup.reverse.form', ['account' => $account, 'transaction' => $transaction]))
+        ->assertRedirect()
+        ->assertSessionHas('error');
+});
+
+it('blocks the reverse top-up form at exactly 31 minutes', function () {
+    $user    = User::factory()->create();
+    $account = Account::factory()->create(['user_id' => $user->id, 'type' => 'mpesa', 'current_balance' => 1000, 'initial_balance' => 0]);
+
+    $category = Category::factory()->create(['user_id' => $user->id, 'type' => 'income', 'is_active' => true, 'parent_id' => null]);
+
+    $transaction = Transaction::factory()->create([
+        'user_id'     => $user->id,
+        'account_id'  => $account->id,
+        'category_id' => $category->id,
+        'amount'      => 500,
+        'date'        => now()->toDateString(),
+        'created_at'  => now()->subMinutes(31),
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('accounts.topup.reverse.form', ['account' => $account, 'transaction' => $transaction]))
+        ->assertRedirect(route('accounts.show', ['account' => $account, 'tab' => 'topups']))
+        ->assertSessionHas('error');
+});
+
+it('allows reversal at exactly 30 minutes (boundary)', function () {
+    $user    = User::factory()->create();
+    $account = Account::factory()->create(['user_id' => $user->id, 'type' => 'mpesa', 'current_balance' => 1000, 'initial_balance' => 0]);
+
+    $category = Category::factory()->create(['user_id' => $user->id, 'type' => 'income', 'is_active' => true, 'parent_id' => null]);
+
+    $transaction = Transaction::factory()->create([
+        'user_id'     => $user->id,
+        'account_id'  => $account->id,
+        'category_id' => $category->id,
+        'amount'      => 500,
+        'date'        => now()->toDateString(),
+        'created_at'  => now()->subMinutes(29), // inside the window (30 can race)
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('accounts.topup.reverse.form', ['account' => $account, 'transaction' => $transaction]))
+        ->assertOk()
+        ->assertViewIs('accounts.reverse-topup');
+});
+
+it('executes reversal within 30 minutes and soft-deletes the transaction', function () {
+    $user    = User::factory()->create();
+    $account = Account::factory()->create(['user_id' => $user->id, 'type' => 'mpesa', 'current_balance' => 1000, 'initial_balance' => 0]);
+
+    $category = Category::factory()->create(['user_id' => $user->id, 'type' => 'income', 'is_active' => true, 'parent_id' => null]);
+
+    $transaction = Transaction::factory()->create([
+        'user_id'     => $user->id,
+        'account_id'  => $account->id,
+        'category_id' => $category->id,
+        'amount'      => 500,
+        'date'        => now()->toDateString(),
+        'created_at'  => now()->subMinutes(5),
+    ]);
+
+    $this->actingAs($user)
+        ->delete(route('accounts.topup.reverse', ['account' => $account, 'transaction' => $transaction]))
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    $this->assertSoftDeleted('transactions', ['id' => $transaction->id]);
+});
+
+it('blocks post reversal after 30 minutes even if form was somehow reached', function () {
+    $user    = User::factory()->create();
+    $account = Account::factory()->create(['user_id' => $user->id, 'type' => 'mpesa', 'current_balance' => 1000, 'initial_balance' => 0]);
+
+    $category = Category::factory()->create(['user_id' => $user->id, 'type' => 'income', 'is_active' => true, 'parent_id' => null]);
+
+    $transaction = Transaction::factory()->create([
+        'user_id'     => $user->id,
+        'account_id'  => $account->id,
+        'category_id' => $category->id,
+        'amount'      => 500,
+        'date'        => now()->toDateString(),
+        'created_at'  => now()->subMinutes(45), // stale — window expired
+    ]);
+
+    $this->actingAs($user)
+        ->delete(route('accounts.topup.reverse', ['account' => $account, 'transaction' => $transaction]))
+        ->assertRedirect()
+        ->assertSessionHas('error');
+
+    // Transaction must NOT have been deleted
+    $this->assertDatabaseHas('transactions', ['id' => $transaction->id, 'deleted_at' => null]);
+});
+
+it('redirects expired reversal post to the topups tab', function () {
+    $user    = User::factory()->create();
+    $account = Account::factory()->create(['user_id' => $user->id, 'type' => 'mpesa', 'current_balance' => 1000, 'initial_balance' => 0]);
+
+    $category = Category::factory()->create(['user_id' => $user->id, 'type' => 'income', 'is_active' => true, 'parent_id' => null]);
+
+    $transaction = Transaction::factory()->create([
+        'user_id'     => $user->id,
+        'account_id'  => $account->id,
+        'category_id' => $category->id,
+        'amount'      => 500,
+        'date'        => now()->toDateString(),
+        'created_at'  => now()->subHour(),
+    ]);
+
+    $this->actingAs($user)
+        ->delete(route('accounts.topup.reverse', ['account' => $account, 'transaction' => $transaction]))
+        ->assertRedirect(route('accounts.show', ['account' => $account, 'tab' => 'topups']));
+});
+
+it('returns 403 when reversing another users top-up', function () {
+    $user  = User::factory()->create();
+    $other = User::factory()->create();
+
+    $account = Account::withoutGlobalScopes()->create([
+        'user_id'         => $other->id,
+        'name'            => 'Other Account',
+        'type'            => 'mpesa',
+        'initial_balance' => 0,
+        'current_balance' => 1000,
+        'currency'        => 'KES',
+        'is_active'       => true,
+    ]);
+
+    $category = Category::factory()->create(['user_id' => $other->id, 'type' => 'income', 'is_active' => true, 'parent_id' => null]);
+
+    $transaction = Transaction::factory()->create([
+        'user_id'     => $other->id,
+        'account_id'  => $account->id,
+        'category_id' => $category->id,
+        'amount'      => 500,
+        'date'        => now()->toDateString(),
+        'created_at'  => now()->subMinutes(5),
+    ]);
+
+    $this->actingAs($user)
+        ->delete(route('accounts.topup.reverse', ['account' => $account, 'transaction' => $transaction]))
+        ->assertForbidden();
+});
+
+it('the 30-minute window is based on created_at not the transaction date', function () {
+    $user    = User::factory()->create();
+    $account = Account::factory()->create(['user_id' => $user->id, 'type' => 'mpesa', 'current_balance' => 1000, 'initial_balance' => 0]);
+
+    $category = Category::factory()->create(['user_id' => $user->id, 'type' => 'income', 'is_active' => true, 'parent_id' => null]);
+
+    // Transaction date is today but created_at is 2 hours ago
+    $transaction = Transaction::factory()->create([
+        'user_id'     => $user->id,
+        'account_id'  => $account->id,
+        'category_id' => $category->id,
+        'amount'      => 500,
+        'date'        => now()->toDateString(), // date = today
+        'created_at'  => now()->subHours(2),   // but was actually created 2h ago
+    ]);
+
+    // Form must be blocked despite the transaction date being today
+    $this->actingAs($user)
+        ->get(route('accounts.topup.reverse.form', ['account' => $account, 'transaction' => $transaction]))
+        ->assertRedirect()
+        ->assertSessionHas('error');
+
+    // Post must also be blocked
+    $this->actingAs($user)
+        ->delete(route('accounts.topup.reverse', ['account' => $account, 'transaction' => $transaction]))
+        ->assertRedirect()
+        ->assertSessionHas('error');
+
+    $this->assertDatabaseHas('transactions', ['id' => $transaction->id, 'deleted_at' => null]);
+});
