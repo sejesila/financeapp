@@ -118,7 +118,7 @@
                             ['label' => 'Total Transactions', 'value' => number_format($totalTransactions), 'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', 'color' => 'blue'],
                             ['label' => 'Total Interest', 'value' => 'KES ' . number_format($savingsStats->total_interest ?? 0, 0), 'icon' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'emerald'],
                             ['label' => 'Total Expenses', 'value' => 'KES ' . number_format($savingsStats->total_expenses ?? 0, 0), 'icon' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'red'],
-                            ['label' => 'This Month', 'value' => 'KES ' . number_format($thisMonthTotal, 0), 'icon' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', 'color' => 'purple'],
+                            ['label' => 'All-Time Net', 'value' => 'KES ' . number_format($savingsNetAllTime, 0), 'icon' => 'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z', 'color' => $savingsNetAllTime >= 0 ? 'emerald' : 'red'],
                         ];
                     @endphp
                 @else
@@ -232,14 +232,13 @@
                     @if($interestByPeriod->isEmpty() && $expensesByPeriod->isEmpty())
                         <p class="text-sm text-gray-500 dark:text-gray-400 text-center py-6">No data for this period.</p>
                     @else
-                        {{-- Merge all period labels --}}
                         @php
                             $allLabels = $interestByPeriod->pluck('period_label')
                                 ->merge($expensesByPeriod->pluck('period_label'))
                                 ->unique()->values();
 
-                            $interestMap  = $interestByPeriod->keyBy('period_label');
-                            $expensesMap  = $expensesByPeriod->keyBy('period_label');
+                            $interestMap = $interestByPeriod->keyBy('period_label');
+                            $expensesMap = $expensesByPeriod->keyBy('period_label');
                         @endphp
 
                         <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
