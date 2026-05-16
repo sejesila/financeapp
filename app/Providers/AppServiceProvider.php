@@ -1,7 +1,5 @@
 <?php
-
 namespace App\Providers;
-
 use App\Models\Transaction;
 use App\Models\User;
 use App\Observers\TransactionObserver;
@@ -9,7 +7,6 @@ use App\Observers\UserObserver;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Browsershot\Browsershot;
 use Spatie\LaravelPdf\Facades\Pdf;
-
 class AppServiceProvider extends ServiceProvider
 {
     /**
@@ -19,7 +16,6 @@ class AppServiceProvider extends ServiceProvider
     {
         //
     }
-
     /**
      * Bootstrap any application services.
      */
@@ -27,15 +23,16 @@ class AppServiceProvider extends ServiceProvider
     {
         User::observe(UserObserver::class);
         Transaction::observe(TransactionObserver::class);
-        $chromePath = glob('/home/farmpedia-finance/.cache/puppeteer/chrome/linux-*/chrome-linux64/chrome')[0]
-            ?? glob('/usr/local/share/puppeteer/chrome/linux-*/chrome-linux64/chrome')[0]
-            ?? null;
 
-        if (!$chromePath) {
-            throw new \RuntimeException('Chrome not found');
-        }
+        Pdf::default()->withBrowsershot(function (Browsershot $browsershot) {
+            $chromePath = glob('/home/farmpedia-finance/.cache/puppeteer/chrome/linux-*/chrome-linux64/chrome')[0]
+                ?? glob('/usr/local/share/puppeteer/chrome/linux-*/chrome-linux64/chrome')[0]
+                ?? null;
 
-        Pdf::default()->withBrowsershot(function (Browsershot $browsershot) use ($chromePath) {
+            if (!$chromePath) {
+                throw new \RuntimeException('Chrome not found');
+            }
+
             $browsershot
                 ->setChromePath($chromePath)
                 ->noSandbox()
