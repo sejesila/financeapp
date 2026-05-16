@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Category;
 use App\Models\Transaction;
 use App\Models\Transfer;
+use App\Services\InterestService;
 use App\Services\TopUpService;
 use App\Services\TransferFeeCalculator;
 use App\Services\TransferService;
@@ -21,6 +22,7 @@ class AccountController extends Controller
         private readonly TransferService       $transferService,
         private readonly TransferFeeCalculator $feeCalculator,
         private readonly TopUpService          $topUpService,
+        private readonly InterestService       $interestService,
     ) {}
 
     // ── index ─────────────────────────────────────────────────────────────────
@@ -614,6 +616,10 @@ class AccountController extends Controller
      * @return \Illuminate\View\View
      * @throws \Illuminate\Auth\Access\AuthorizationException
      */
+    /**
+     * Show interest recording form for savings accounts
+     * Includes information about skipped days if applicable
+     */
     public function recordInterestForm(Account $account)
     {
         if ($account->user_id !== Auth::id()) {
@@ -625,16 +631,30 @@ class AccountController extends Controller
                 ->with('error', 'Interest can only be recorded for savings accounts.');
         }
 
-        return view('accounts.record-interest', compact('account'));
+        // Check if interest was already recorded today
+        $canRecordToday = $this->interestService->canRecordTodayKey($account);
+
+        if (!$canRecordToday) {
+            return redirect()->route('accounts.show', $account)
+                ->with('info', 'Interest has already been recorded for today. Come back tomorrow!');
+        }
+
+        // Get information about skipped days
+        $skippedDaysCount = $this->interestService->getSkippedDaysCount($account);
+        $skippedDateRange = $this->interestService->getSkippedDateRange($account);
+        $lastInterestDate = $this->interestService->getLastInterestDate($account);
+
+        return view('accounts.record-interest', compact(
+            'account',
+            'skippedDaysCount',
+            'skippedDateRange',
+            'lastInterestDate',
+        ));
     }
 
     /**
      * Store an interest transaction for a savings account
-     *
-     * @param Request $request
-     * @param Account $account
-     * @return \Illuminate\Http\RedirectResponse
-     * @throws \Illuminate\Auth\Access\AuthorizationException
+     * Validates that interest is being recorded for the correct period
      */
     public function recordInterest(Request $request, Account $account)
     {
@@ -647,30 +667,59 @@ class AccountController extends Controller
                 ->with('error', 'Interest can only be recorded for savings accounts.');
         }
 
+        // Check if already recorded today
+        $canRecordToday = $this->interestService->canRecordTodayKey($account);
+
+        if (!$canRecordToday) {
+            return redirect()->route('accounts.show', $account)
+                ->with('error', 'Interest has already been recorded for today.');
+        }
+
         $request->validate([
-            'amount' => 'required|numeric|min:0.01',
-            'date' => 'required|date',
-            'rate' => 'nullable|numeric|min:0|max:100',
-            'description' => 'nullable|string|max:255',
+            'amount'              => 'required|numeric|min:0.01',
+            'date'                => 'required|date',
+            'rate'                => 'nullable|numeric|min:0|max:100',
+            'description'         => 'nullable|string|max:255',
+            'acknowledge_skipped' => 'nullable|boolean',
         ]);
+
+        // If there are skipped days, require acknowledgment
+        $skippedDaysCount = $this->interestService->getSkippedDaysCount($account);
+
+        if ($skippedDaysCount !== null && $skippedDaysCount > 0) {
+            $isAcknowledged = $request->boolean('acknowledge_skipped');
+
+            if (!$isAcknowledged) {
+                return redirect()->back()
+                    ->withInput()
+                    ->with('error', 'Please acknowledge that you understand the interest period being recorded.');
+            }
+        }
 
         // Get or create "Interest" category under Income
         $interestCategory = Category::firstOrCreate(
             [
-                'user_id' => Auth::id(),
-                'name' => 'Interest',
+                'user_id'   => Auth::id(),
+                'name'      => 'Interest',
                 'parent_id' => null,
             ],
             [
-                'type' => 'income',
-                'icon' => '📈',
+                'type'      => 'income',
+                'icon'      => '📈',
                 'is_active' => true,
             ]
         );
 
-        // Build description
+        // Build description with period info if there were skipped days
         if ($request->filled('description')) {
             $description = $request->description;
+        } elseif ($skippedDaysCount !== null && $skippedDaysCount > 0) {
+            $periodInfo = $skippedDaysCount + 1; // Total days including today
+            $description = "Interest earned ({$periodInfo}-day period)";
+
+            if ($request->filled('rate')) {
+                $description = "Interest earned ({$periodInfo}-day period, {$request->rate}% APY)";
+            }
         } elseif ($request->filled('rate')) {
             $description = "Interest earned ({$request->rate}% APY)";
         } else {
@@ -679,21 +728,31 @@ class AccountController extends Controller
 
         // Create transaction
         $account->transactions()->create([
-            'user_id' => Auth::id(),
-            'amount' => (float)$request->amount,
-            'date' => $request->date,
-            'description' => $description,
-            'category_id' => $interestCategory->id,
+            'user_id'       => Auth::id(),
+            'amount'        => (float)$request->amount,
+            'date'          => $request->date,
+            'description'   => $description,
+            'category_id'   => $interestCategory->id,
             'payment_method' => 'Interest',
         ]);
 
         // Update account balance
         $account->updateBalance();
 
-        // Clear cache if using it
+        // Clear cache
         Cache::forget("account.{$account->id}.stats");
 
+        $message = 'Interest of KES ' . number_format($request->amount, 0, '.', ',') . ' recorded successfully!';
+
+        if ($skippedDaysCount !== null && $skippedDaysCount > 0) {
+            $daysFormatted = $skippedDaysCount + 1;
+            $message .= " (for {$daysFormatted} days)";
+        }
+
+
         return redirect()->route('accounts.show', $account)
-            ->with('success', 'Interest of KES ' . number_format($request->amount, 0, '.', ',') . ' recorded successfully!');
+            ->with('success', $message);
     }
 }
+
+

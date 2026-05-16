@@ -95,11 +95,24 @@
                             + Top Up Account
                         </a>
                         @if($account->type === 'savings')
-                            <a href="{{ route('accounts.interest.form', $account) }}"
-                               class="bg-emerald-600 text-white px-6 py-2.5 rounded-lg hover:bg-emerald-700 transition text-center font-medium shadow-md">
-                                📈 Record Interest
-                            </a>
+                            @php
+                                // Check if interest was already recorded today
+                                $interestRecordedToday = $account->transactions()
+                                    ->whereNull('deleted_at')
+                                    ->join('categories', 'transactions.category_id', '=', 'categories.id')
+                                    ->where('categories.name', 'Interest')
+                                    ->whereDate('transactions.date', now()->toDateString())
+                                    ->exists();
+                            @endphp
+
+                            @if(!$interestRecordedToday)
+                                <a href="{{ route('accounts.interest.form', $account) }}"
+                                   class="bg-emerald-600 text-white px-6 py-2.5 rounded-lg hover:bg-emerald-700 transition text-center font-medium shadow-md">
+                                    📈 Record Interest
+                                </a>
+                            @endif
                         @endif
+
                     </div>
                 </div>
                 <p class="text-xs text-gray-600 dark:text-gray-400 mt-4 flex items-center gap-1">
