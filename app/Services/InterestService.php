@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Account;
 use App\Models\Transaction;
+use App\Models\Transfer;
 use Carbon\Carbon;
 
 /**
@@ -13,7 +14,7 @@ use Carbon\Carbon;
  */
 class InterestService
 {
-    const MAX_APY        = 25.0;           // Realistic MMF ceiling for Kenya
+    const MAX_APY        = 25.0;
     const MAX_DAILY_RATE = 25.0 / 365;
 
     // ════════════════════════════════════════════════════════════════════════════
@@ -92,9 +93,6 @@ class InterestService
      * Compute the effective daily interest rate (in percentage format).
      *
      * Formula: (interest_amount / opening_balance / period_days) * 100
-     *
-     * Passes the transaction's own ID so computeOpeningBalance() can exclude
-     * it from the same-day calculation, avoiding a circular reference.
      */
     public function computeDailyRate(Account $account, Transaction $interestTxn): ?float
     {
@@ -116,15 +114,18 @@ class InterestService
     /**
      * Compute the balance used as the base for interest rate calculation.
      *
-     * THE KEY FIX: same-day deposits ARE included in the base (uses <= date
-     * for income/liability), so large deposits made on the same day as the
-     * first interest entry are correctly counted.
+     * Includes BOTH transactions AND transfers so that accounts funded
+     * primarily via transfers (like an MMF) have a correct opening balance.
      *
-     * Rules:
-     *  - Income / liability ON OR BEFORE interest date  → added to base
-     *  - Expenses ON OR BEFORE interest date            → deducted from base
-     *  - Interest transactions ON THE SAME DAY          → excluded (circular)
-     *  - The transaction being saved ($excludeId)        → always excluded
+     * Transaction rules:
+     *  - Income / liability ON OR BEFORE date  → added
+     *  - Expenses ON OR BEFORE date            → deducted
+     *  - Interest on the SAME day              → excluded (circular reference)
+     *  - $excludeId transaction                → always excluded
+     *
+     * Transfer rules:
+     *  - Incoming transfers ON OR BEFORE date  → added
+     *  - Outgoing transfers ON OR BEFORE date  → deducted
      */
     public function computeOpeningBalance(Account $account, $date, ?int $excludeId = null): float
     {
@@ -132,7 +133,8 @@ class InterestService
             $date = $date->toDateString();
         }
 
-        $result = Transaction::withoutGlobalScopes()
+        // ── 1. Net from transactions ──────────────────────────────────────────
+        $txNet = (float) Transaction::withoutGlobalScopes()
             ->where('account_id', $account->id)
             ->whereNull('transactions.deleted_at')
             ->when($excludeId, fn($q) => $q->where('transactions.id', '!=', $excludeId))
@@ -140,28 +142,33 @@ class InterestService
             ->selectRaw("
                 SUM(
                     CASE
-                        -- Same-day interest: excluded to avoid circular reference
                         WHEN categories.name = 'Interest'
                              AND DATE(transactions.date) = ?
                         THEN 0
-
-                        -- Deposits on or before date: included in base
                         WHEN categories.type IN ('income', 'liability')
                              AND DATE(transactions.date) <= ?
                         THEN transactions.amount
-
-                        -- Expenses on or before date: deducted from base
                         WHEN categories.type = 'expense'
                              AND DATE(transactions.date) <= ?
                         THEN -transactions.amount
-
                         ELSE 0
                     END
                 ) AS net
             ", [$date, $date, $date])
             ->value('net');
 
-        return (float) $account->initial_balance + (float) $result;
+        // ── 2. Net from transfers ─────────────────────────────────────────────
+        $transfersIn = (float) Transfer::withoutGlobalScopes()
+            ->where('to_account_id', $account->id)
+            ->whereDate('date', '<=', $date)
+            ->sum('amount');
+
+        $transfersOut = (float) Transfer::withoutGlobalScopes()
+            ->where('from_account_id', $account->id)
+            ->whereDate('date', '<=', $date)
+            ->sum('amount');
+
+        return (float) $account->initial_balance + $txNet + $transfersIn - $transfersOut;
     }
 
     /**
@@ -182,12 +189,6 @@ class InterestService
     // SECTION 3: Validation
     // ════════════════════════════════════════════════════════════════════════════
 
-    /**
-     * Validate an interest amount before recording.
-     *
-     * Uses the same same-day-aware computeOpeningBalance() so validation
-     * and rate storage are always consistent with each other.
-     */
     public function validateInterestAmount(Account $account, float $amount, $date): array
     {
         $dateStr = $date instanceof Carbon ? $date->toDateString() : $date;
@@ -203,7 +204,6 @@ class InterestService
             return $errors;
         }
 
-        // Transaction doesn't exist yet so no $excludeId needed.
         $openingBalance = $this->computeOpeningBalance($account, $dateStr);
 
         if ($openingBalance <= 0) {
