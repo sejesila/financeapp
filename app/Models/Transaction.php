@@ -30,6 +30,7 @@ class Transaction extends Model
         'fee_for_transaction_id',
         'is_transaction_fee',
         'is_split',
+        'computed_rate',
     ];
 
     protected $casts = [
@@ -39,6 +40,7 @@ class Transaction extends Model
         'is_reversal'        => 'boolean',
         'is_transaction_fee' => 'boolean',
         'is_split'           => 'boolean',
+        'computed_rate'      => 'float',
     ];
 
     protected $dates = ['deleted_at'];
