@@ -238,8 +238,7 @@ class AccountController extends Controller
                     ->where('categories.name', 'Interest')
                     ->selectRaw('
                         YEAR(transactions.date)              as period_label,
-                        SUM(transactions.amount)             as total,
-                        AVG(transactions.computed_rate)      as avg_daily_rate
+                        SUM(transactions.amount)             as total
                     ')
                     ->groupByRaw('YEAR(transactions.date)')
                     ->orderByRaw('YEAR(transactions.date)')
@@ -262,8 +261,7 @@ class AccountController extends Controller
                     ->whereYear('transactions.date', $selectedYear)
                     ->selectRaw('
                         WEEK(transactions.date, 1)           as week_num,
-                        SUM(transactions.amount)             as total,
-                        AVG(transactions.computed_rate)      as avg_daily_rate
+                        SUM(transactions.amount)             as total
                     ')
                     ->groupByRaw('WEEK(transactions.date, 1)')
                     ->orderByRaw('WEEK(transactions.date, 1)')
@@ -292,8 +290,7 @@ class AccountController extends Controller
                     ->whereYear('transactions.date', $selectedYear)
                     ->selectRaw('
                         MONTH(transactions.date)             as month_num,
-                        SUM(transactions.amount)             as total,
-                        AVG(transactions.computed_rate)      as avg_daily_rate
+                        SUM(transactions.amount)             as total
                     ')
                     ->groupByRaw('MONTH(transactions.date)')
                     ->orderByRaw('MONTH(transactions.date)')
@@ -701,9 +698,7 @@ class AccountController extends Controller
 
         // Service-level validation (rate ceiling, positive balance, etc.)
         $validationErrors = $this->interestService->validateInterestAmount(
-            $account,
-            (float) $request->amount,
-            $request->date
+            (float) $request->amount
         );
 
         if (!empty($validationErrors)) {
@@ -741,12 +736,6 @@ class AccountController extends Controller
             'category_id'    => $interestCategory->id,
             'payment_method' => 'Interest',
         ]);
-
-        // Compute and persist the daily rate.
-        $dailyRate = $this->interestService->computeDailyRate($account, $transaction);
-        if ($dailyRate !== null) {
-            $transaction->update(['computed_rate' => $dailyRate]);
-        }
 
         $account->updateBalance();
         Cache::forget("account.{$account->id}.stats");

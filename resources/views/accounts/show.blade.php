@@ -260,8 +260,6 @@
                                     <th class="px-4 py-3 text-right font-medium text-emerald-700 dark:text-emerald-400">Interest (KES)</th>
                                     <th class="px-4 py-3 text-right font-medium text-red-700 dark:text-red-400">Expenses (KES)</th>
                                     <th class="px-4 py-3 text-right font-medium text-indigo-700 dark:text-indigo-400">Net (KES)</th>
-                                    <th class="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Daily Rate</th>
-                                    <th class="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Implied APY</th>
                                 </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
@@ -274,12 +272,6 @@
                                         $grandInterest += $interest;
                                         $grandExpenses += $expenses;
 
-                                        // avg_daily_rate is now included in the selectRaw for all period modes.
-                                        // It is a percentage (e.g. 0.027397 for 0.0274%/day).
-                                        $dailyRate  = $interestMap[$label]->avg_daily_rate ?? null;
-
-                                        // Simple APY = daily_rate_pct × 365
-                                        $impliedApy = $dailyRate !== null ? round($dailyRate * 365, 2) : null;
                                     @endphp
                                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                                         <td class="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">{{ $label }}</td>
@@ -292,15 +284,6 @@
                                         <td class="px-4 py-3 text-right font-semibold {{ $net >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-red-600 dark:text-red-400' }}">
                                             {{ ($net >= 0 ? '+' : '') . number_format($net, 0) }}
                                         </td>
-                                        {{-- Daily rate as stored percentage, e.g. "0.0274%" --}}
-                                        <td class="px-4 py-3 text-right text-gray-500 dark:text-gray-400 text-xs font-mono">
-                                            {{ $dailyRate !== null ? number_format($dailyRate, 4) . '%' : '—' }}
-                                        </td>
-                                        {{-- Implied APY = daily_rate_pct × 365 --}}
-                                        <td class="px-4 py-3 text-right text-xs font-mono font-semibold
-                                                   {{ $impliedApy !== null ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400' }}">
-                                            {{ $impliedApy !== null ? number_format($impliedApy, 2) . '%' : '—' }}
-                                        </td>
                                     </tr>
                                 @endforeach
                                 </tbody>
@@ -312,9 +295,6 @@
                                     <td class="px-4 py-3 text-right {{ ($grandInterest - $grandExpenses) >= 0 ? 'text-indigo-700 dark:text-indigo-400' : 'text-red-700 dark:text-red-400' }}">
                                         {{ (($grandInterest - $grandExpenses) >= 0 ? '+' : '') . number_format($grandInterest - $grandExpenses, 0) }}
                                     </td>
-                                    {{-- Averaging per-period averages would be misleading — leave blank --}}
-                                    <td class="px-4 py-3 text-right text-gray-400 text-xs">—</td>
-                                    <td class="px-4 py-3 text-right text-gray-400 text-xs">—</td>
                                 </tr>
                                 </tfoot>
                             </table>
@@ -589,18 +569,6 @@
                                                         {{ $txn->description }}
                                                     @endif
                                                 </span>
-                                                {{-- Rate badge on interest rows --}}
-                                                @if($txn->category->name === 'Interest' && $txn->computed_rate !== null)
-                                                    @php
-                                                        $badgeApy = round($txn->computed_rate * 365, 2);
-                                                    @endphp
-                                                    <span class="ml-1 px-1.5 py-0.5 rounded text-xs font-mono
-                                                                 bg-emerald-50 dark:bg-emerald-900/30
-                                                                 text-emerald-700 dark:text-emerald-300"
-                                                          title="Implied APY: {{ $badgeApy }}%">
-                                                        {{ number_format($txn->computed_rate, 4) }}%/day
-                                                    </span>
-                                                @endif
                                             </div>
                                         </td>
                                         <td class="px-4 py-3 whitespace-nowrap font-semibold text-green-600 dark:text-green-400">
