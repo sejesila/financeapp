@@ -114,25 +114,24 @@ class AccountController extends Controller
 
     // ── show ──────────────────────────────────────────────────────────────────
 
-
     public function show(Request $request, Account $account)
     {
         if ($account->user_id !== Auth::id()) {
             abort(403);
         }
 
-        $search = $request->input('search');
+        $search    = $request->input('search');
         $activeTab = $request->input('tab', 'transactions');
 
         $allowedSorts = ['date', 'description', 'amount'];
 
-        $txSort = in_array($request->input('tx_sort'), $allowedSorts) ? $request->input('tx_sort') : 'date';
-        $txDirection = $request->input('tx_dir', 'desc') === 'asc' ? 'asc' : 'desc';
+        $txSort       = in_array($request->input('tx_sort'), $allowedSorts) ? $request->input('tx_sort') : 'date';
+        $txDirection  = $request->input('tx_dir', 'desc') === 'asc' ? 'asc' : 'desc';
 
-        $topSort = in_array($request->input('top_sort'), $allowedSorts) ? $request->input('top_sort') : 'date';
+        $topSort      = in_array($request->input('top_sort'), $allowedSorts) ? $request->input('top_sort') : 'date';
         $topDirection = $request->input('top_dir', 'desc') === 'asc' ? 'asc' : 'desc';
 
-        $transferSort = in_array($request->input('tr_sort'), $allowedSorts) ? $request->input('tr_sort') : 'date';
+        $transferSort      = in_array($request->input('tr_sort'), $allowedSorts) ? $request->input('tr_sort') : 'date';
         $transferDirection = $request->input('tr_dir', 'desc') === 'asc' ? 'asc' : 'desc';
 
         // ── Transactions query ────────────────────────────────────────────────
@@ -182,98 +181,120 @@ class AccountController extends Controller
             ->paginate(20, ['*'], 'tr_page')
             ->appends($request->query());
 
-        // ── Base stats (all accounts) ─────────────────────────────────────────
+        // ── Base stats ────────────────────────────────────────────────────────
         $stats = $account->transactions()
             ->whereNull('transactions.deleted_at')
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->selectRaw('
-            COUNT(*) as total_transactions,
-            SUM(CASE WHEN categories.type = "income"  THEN amount ELSE 0 END) as total_income,
-            SUM(CASE WHEN categories.type = "expense" THEN amount ELSE 0 END) as total_expenses,
-            SUM(CASE WHEN MONTH(date) = ? AND YEAR(date) = ? THEN amount ELSE 0 END) as this_month_total
-        ', [now()->month, now()->year])
+                COUNT(*) as total_transactions,
+                SUM(CASE WHEN categories.type = "income"  THEN amount ELSE 0 END) as total_income,
+                SUM(CASE WHEN categories.type = "expense" THEN amount ELSE 0 END) as total_expenses,
+                SUM(CASE WHEN MONTH(date) = ? AND YEAR(date) = ? THEN amount ELSE 0 END) as this_month_total
+            ', [now()->month, now()->year])
             ->first();
 
         // ── Savings-specific stats ────────────────────────────────────────────
-        $savingsStats = null;
+        $savingsStats    = null;
         $savingsNetAllTime = 0;
-        $interestByPeriod = collect();
-        $expensesByPeriod = collect();
-        $availableYears = collect();
-        $selectedYear = now()->year;
-        $selectedPeriod = 'monthly';
+        $interestByPeriod  = collect();
+        $expensesByPeriod  = collect();
+        $availableYears    = collect();
+        $selectedYear      = now()->year;
+        $selectedPeriod    = 'monthly';
 
         if ($account->type === 'savings') {
-            $selectedYear = (int)$request->input('year', now()->year);
+            $selectedYear   = (int) $request->input('year', now()->year);
             $selectedPeriod = $request->input('period', 'monthly'); // weekly | monthly | yearly
 
-            // Total interest earned & expenses
+            // All-time totals
             $savingsStats = $account->transactions()
                 ->whereNull('transactions.deleted_at')
                 ->join('categories', 'transactions.category_id', '=', 'categories.id')
                 ->selectRaw('
-                SUM(CASE WHEN categories.name = "Interest" THEN transactions.amount ELSE 0 END) as total_interest,
-                SUM(CASE WHEN categories.type = "expense"  THEN transactions.amount ELSE 0 END) as total_expenses
-            ')
+                    SUM(CASE WHEN categories.name = "Interest" THEN transactions.amount ELSE 0 END) as total_interest,
+                    SUM(CASE WHEN categories.type = "expense"  THEN transactions.amount ELSE 0 END) as total_expenses
+                ')
                 ->first();
 
             $savingsNetAllTime = ($savingsStats->total_interest ?? 0) - ($savingsStats->total_expenses ?? 0);
 
-            // Available years (for year selector)
+            // Available years for year selector
             $availableYears = $account->transactions()
-                ->whereNull('transactions.deleted_at')
+                ->whereNull('deleted_at')
                 ->selectRaw('YEAR(date) as year')
                 ->groupBy('year')
                 ->orderByDesc('year')
                 ->pluck('year');
 
-            // Period breakdown base query
+            // Period breakdown
             $periodBase = $account->transactions()
-                ->whereNull('transactions.deleted_at')
+                ->whereNull('deleted_at')
                 ->join('categories', 'transactions.category_id', '=', 'categories.id');
 
             if ($selectedPeriod === 'yearly') {
+                // ── Yearly ────────────────────────────────────────────────────
+                // No year filter — show all years.
                 $interestByPeriod = (clone $periodBase)
                     ->where('categories.name', 'Interest')
-                    ->selectRaw('YEAR(transactions.date) as period_label, SUM(transactions.amount) as total')
+                    ->selectRaw('
+                        YEAR(transactions.date)              as period_label,
+                        SUM(transactions.amount)             as total,
+                        AVG(transactions.computed_rate)      as avg_daily_rate
+                    ')
                     ->groupByRaw('YEAR(transactions.date)')
                     ->orderByRaw('YEAR(transactions.date)')
                     ->get();
 
                 $expensesByPeriod = (clone $periodBase)
                     ->where('categories.type', 'expense')
-                    ->selectRaw('YEAR(transactions.date) as period_label, SUM(transactions.amount) as total')
+                    ->selectRaw('
+                        YEAR(transactions.date) as period_label,
+                        SUM(transactions.amount) as total
+                    ')
                     ->groupByRaw('YEAR(transactions.date)')
                     ->orderByRaw('YEAR(transactions.date)')
                     ->get();
 
             } elseif ($selectedPeriod === 'weekly') {
+                // ── Weekly ────────────────────────────────────────────────────
                 $interestByPeriod = (clone $periodBase)
                     ->where('categories.name', 'Interest')
                     ->whereYear('transactions.date', $selectedYear)
-                    ->selectRaw('WEEK(transactions.date, 1) as period_label, SUM(transactions.amount) as total')
+                    ->selectRaw('
+                        WEEK(transactions.date, 1)           as week_num,
+                        SUM(transactions.amount)             as total,
+                        AVG(transactions.computed_rate)      as avg_daily_rate
+                    ')
                     ->groupByRaw('WEEK(transactions.date, 1)')
                     ->orderByRaw('WEEK(transactions.date, 1)')
                     ->get()
-                    ->map(fn($r) => tap($r, fn($r) => $r->period_label = 'Week ' . $r->period_label));
+                    ->map(fn($r) => tap($r, fn($r) => $r->period_label = 'Week ' . $r->week_num));
 
                 $expensesByPeriod = (clone $periodBase)
                     ->where('categories.type', 'expense')
                     ->whereYear('transactions.date', $selectedYear)
-                    ->selectRaw('WEEK(transactions.date, 1) as period_label, SUM(transactions.amount) as total')
+                    ->selectRaw('
+                        WEEK(transactions.date, 1) as week_num,
+                        SUM(transactions.amount)   as total
+                    ')
                     ->groupByRaw('WEEK(transactions.date, 1)')
                     ->orderByRaw('WEEK(transactions.date, 1)')
                     ->get()
-                    ->map(fn($r) => tap($r, fn($r) => $r->period_label = 'Week ' . $r->period_label));
+                    ->map(fn($r) => tap($r, fn($r) => $r->period_label = 'Week ' . $r->week_num));
 
             } else {
-                // Monthly (default)
-                $monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                // ── Monthly (default) ─────────────────────────────────────────
+                $monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
                 $interestByPeriod = (clone $periodBase)
                     ->where('categories.name', 'Interest')
                     ->whereYear('transactions.date', $selectedYear)
-                    ->selectRaw('MONTH(transactions.date) as month_num, SUM(transactions.amount) as total')
+                    ->selectRaw('
+                        MONTH(transactions.date)             as month_num,
+                        SUM(transactions.amount)             as total,
+                        AVG(transactions.computed_rate)      as avg_daily_rate
+                    ')
                     ->groupByRaw('MONTH(transactions.date)')
                     ->orderByRaw('MONTH(transactions.date)')
                     ->get()
@@ -282,7 +303,10 @@ class AccountController extends Controller
                 $expensesByPeriod = (clone $periodBase)
                     ->where('categories.type', 'expense')
                     ->whereYear('transactions.date', $selectedYear)
-                    ->selectRaw('MONTH(transactions.date) as month_num, SUM(transactions.amount) as total')
+                    ->selectRaw('
+                        MONTH(transactions.date) as month_num,
+                        SUM(transactions.amount) as total
+                    ')
                     ->groupByRaw('MONTH(transactions.date)')
                     ->orderByRaw('MONTH(transactions.date)')
                     ->get()
@@ -291,30 +315,32 @@ class AccountController extends Controller
         }
 
         return view('accounts.show', [
-            'account' => $account,
+            'account'      => $account,
             'transactions' => $transactions,
-            'topUps' => $topUps,
-            'transfers' => $transfers,
+            'topUps'       => $topUps,
+            'transfers'    => $transfers,
+            // base stats
             'totalTransactions' => $stats->total_transactions ?? 0,
-            'totalIncome' => $stats->total_income ?? 0,
-            'totalExpenses' => $stats->total_expenses ?? 0,
-            'thisMonthTotal' => $stats->this_month_total ?? 0,
-            'search' => $search,
-            'activeTab' => $activeTab,
-            'txSort' => $txSort,
-            'txDirection' => $txDirection,
-            'topSort' => $topSort,
-            'topDirection' => $topDirection,
-            'transferSort' => $transferSort,
+            'totalIncome'       => $stats->total_income ?? 0,
+            'totalExpenses'     => $stats->total_expenses ?? 0,
+            'thisMonthTotal'    => $stats->this_month_total ?? 0,
+            // ui state
+            'search'            => $search,
+            'activeTab'         => $activeTab,
+            'txSort'            => $txSort,
+            'txDirection'       => $txDirection,
+            'topSort'           => $topSort,
+            'topDirection'      => $topDirection,
+            'transferSort'      => $transferSort,
             'transferDirection' => $transferDirection,
             // savings-only
-            'savingsStats' => $savingsStats,
+            'savingsStats'      => $savingsStats,
             'savingsNetAllTime' => $savingsNetAllTime,
-            'interestByPeriod' => $interestByPeriod,
-            'expensesByPeriod' => $expensesByPeriod,
-            'availableYears' => $availableYears,
-            'selectedYear' => $selectedYear,
-            'selectedPeriod' => $selectedPeriod,
+            'interestByPeriod'  => $interestByPeriod,
+            'expensesByPeriod'  => $expensesByPeriod,
+            'availableYears'    => $availableYears,
+            'selectedYear'      => $selectedYear,
+            'selectedPeriod'    => $selectedPeriod,
         ]);
     }
 
@@ -609,16 +635,11 @@ class AccountController extends Controller
             ->with('success', 'Top-up of KES ' . number_format($transaction->amount, 0, '.', ',') . ' has been reversed.');
     }
 
+    // ── record interest form ──────────────────────────────────────────────────
+
     /**
-     * Show interest recording form for savings accounts
-     *
-     * @param Account $account
-     * @return \Illuminate\View\View
-     * @throws \Illuminate\Auth\Access\AuthorizationException
-     */
-    /**
-     * Show interest recording form for savings accounts
-     * Includes information about skipped days if applicable
+     * Show the interest recording form for a savings account.
+     * Passes skipped-day information so the view can prompt the user.
      */
     public function recordInterestForm(Account $account)
     {
@@ -631,15 +652,11 @@ class AccountController extends Controller
                 ->with('error', 'Interest can only be recorded for savings accounts.');
         }
 
-        // Check if interest was already recorded today
-        $canRecordToday = $this->interestService->canRecordTodayKey($account);
-
-        if (!$canRecordToday) {
+        if (!$this->interestService->canRecordTodayKey($account)) {
             return redirect()->route('accounts.show', $account)
                 ->with('info', 'Interest has already been recorded for today. Come back tomorrow!');
         }
 
-        // Get information about skipped days
         $skippedDaysCount = $this->interestService->getSkippedDaysCount($account);
         $skippedDateRange = $this->interestService->getSkippedDateRange($account);
         $lastInterestDate = $this->interestService->getLastInterestDate($account);
@@ -652,25 +669,25 @@ class AccountController extends Controller
         ));
     }
 
+    // ── record interest post ──────────────────────────────────────────────────
+
     /**
-     * Store an interest transaction for a savings account
-     * Validates that interest is being recorded for the correct period
+     * Store an interest transaction for a savings account.
+     *
+     * Validates the amount, builds the description (including multi-day period
+     * label when days were skipped), persists the transaction, then computes
+     * and stores the daily rate.
      */
     public function recordInterest(Request $request, Account $account)
     {
-        if ($account->user_id !== Auth::id()) {
-            abort(403);
-        }
+        if ($account->user_id !== Auth::id()) abort(403);
 
         if ($account->type !== 'savings') {
             return redirect()->route('accounts.show', $account)
                 ->with('error', 'Interest can only be recorded for savings accounts.');
         }
 
-        // Check if already recorded today
-        $canRecordToday = $this->interestService->canRecordTodayKey($account);
-
-        if (!$canRecordToday) {
+        if (!$this->interestService->canRecordTodayKey($account)) {
             return redirect()->route('accounts.show', $account)
                 ->with('error', 'Interest has already been recorded for today.');
         }
@@ -678,81 +695,67 @@ class AccountController extends Controller
         $request->validate([
             'amount'              => 'required|numeric|min:0.01',
             'date'                => 'required|date',
-            'rate'                => 'nullable|numeric|min:0|max:100',
             'description'         => 'nullable|string|max:255',
             'acknowledge_skipped' => 'nullable|boolean',
         ]);
 
-        // If there are skipped days, require acknowledgment
-        $skippedDaysCount = $this->interestService->getSkippedDaysCount($account);
-
-        if ($skippedDaysCount !== null && $skippedDaysCount > 0) {
-            $isAcknowledged = $request->boolean('acknowledge_skipped');
-
-            if (!$isAcknowledged) {
-                return redirect()->back()
-                    ->withInput()
-                    ->with('error', 'Please acknowledge that you understand the interest period being recorded.');
-            }
-        }
-
-        // Get or create "Interest" category under Income
-        $interestCategory = Category::firstOrCreate(
-            [
-                'user_id'   => Auth::id(),
-                'name'      => 'Interest',
-                'parent_id' => null,
-            ],
-            [
-                'type'      => 'income',
-                'icon'      => '📈',
-                'is_active' => true,
-            ]
+        // Service-level validation (rate ceiling, positive balance, etc.)
+        $validationErrors = $this->interestService->validateInterestAmount(
+            $account,
+            (float) $request->amount,
+            $request->date
         );
 
-        // Build description with period info if there were skipped days
+        if (!empty($validationErrors)) {
+            return redirect()->back()->withInput()
+                ->withErrors(['amount' => $validationErrors]);
+        }
+
+        $skippedDaysCount = $this->interestService->getSkippedDaysCount($account);
+
+        if ($skippedDaysCount !== null && $skippedDaysCount > 0 && !$request->boolean('acknowledge_skipped')) {
+            return redirect()->back()->withInput()
+                ->with('error', 'Please acknowledge that you understand the interest period being recorded.');
+        }
+
+        $interestCategory = Category::firstOrCreate(
+            ['user_id' => Auth::id(), 'name' => 'Interest', 'parent_id' => null],
+            ['type' => 'income', 'icon' => '📈', 'is_active' => true]
+        );
+
+        // Build description — user-supplied takes priority, then auto-generate.
         if ($request->filled('description')) {
             $description = $request->description;
         } elseif ($skippedDaysCount !== null && $skippedDaysCount > 0) {
-            $periodInfo = $skippedDaysCount + 1; // Total days including today
-            $description = "Interest earned ({$periodInfo}-day period)";
-
-            if ($request->filled('rate')) {
-                $description = "Interest earned ({$periodInfo}-day period, {$request->rate}% APY)";
-            }
-        } elseif ($request->filled('rate')) {
-            $description = "Interest earned ({$request->rate}% APY)";
+            $periodDays  = $skippedDaysCount + 1;
+            $description = "Interest earned ({$periodDays}-day period)";
         } else {
-            $description = "Interest earned";
+            $description = 'Interest earned';
         }
 
-        // Create transaction
-        $account->transactions()->create([
-            'user_id'       => Auth::id(),
-            'amount'        => (float)$request->amount,
-            'date'          => $request->date,
-            'description'   => $description,
-            'category_id'   => $interestCategory->id,
+        $transaction = $account->transactions()->create([
+            'user_id'        => Auth::id(),
+            'amount'         => (float) $request->amount,
+            'date'           => $request->date,
+            'description'    => $description,
+            'category_id'    => $interestCategory->id,
             'payment_method' => 'Interest',
         ]);
 
-        // Update account balance
-        $account->updateBalance();
+        // Compute and persist the daily rate.
+        $dailyRate = $this->interestService->computeDailyRate($account, $transaction);
+        if ($dailyRate !== null) {
+            $transaction->update(['computed_rate' => $dailyRate]);
+        }
 
-        // Clear cache
+        $account->updateBalance();
         Cache::forget("account.{$account->id}.stats");
 
         $message = 'Interest of KES ' . number_format($request->amount, 0, '.', ',') . ' recorded successfully!';
-
         if ($skippedDaysCount !== null && $skippedDaysCount > 0) {
-            $daysFormatted = $skippedDaysCount + 1;
-            $message .= " (for {$daysFormatted} days)";
+            $message .= ' (for ' . ($skippedDaysCount + 1) . ' days)';
         }
 
-
-        return redirect()->route('accounts.show', $account)
-            ->with('success', $message);
+        return redirect()->route('accounts.show', $account)->with('success', $message);
     }
 }
-
-

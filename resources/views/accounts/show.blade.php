@@ -96,7 +96,6 @@
                         </a>
                         @if($account->type === 'savings')
                             @php
-                                // Check if interest was already recorded today
                                 $interestRecordedToday = $account->transactions()
                                     ->whereNull('deleted_at')
                                     ->join('categories', 'transactions.category_id', '=', 'categories.id')
@@ -104,7 +103,6 @@
                                     ->whereDate('transactions.date', now()->toDateString())
                                     ->exists();
                             @endphp
-
                             @if(!$interestRecordedToday)
                                 <a href="{{ route('accounts.interest.form', $account) }}"
                                    class="bg-emerald-600 text-white px-6 py-2.5 rounded-lg hover:bg-emerald-700 transition text-center font-medium shadow-md">
@@ -112,7 +110,6 @@
                                 </a>
                             @endif
                         @endif
-
                     </div>
                 </div>
                 <p class="text-xs text-gray-600 dark:text-gray-400 mt-4 flex items-center gap-1">
@@ -148,11 +145,11 @@
                 @foreach($stats as $stat)
                     @php
                         $colorMap = [
-                            'blue'     => 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300',
-                            'emerald'  => 'bg-emerald-100 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-300',
-                            'green'    => 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300',
-                            'red'      => 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300',
-                            'purple'   => 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300',
+                            'blue'    => 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300',
+                            'emerald' => 'bg-emerald-100 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-300',
+                            'green'   => 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300',
+                            'red'     => 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300',
+                            'purple'  => 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300',
                         ];
                         $classes = $colorMap[$stat['color']] ?? $colorMap['blue'];
                     @endphp
@@ -170,13 +167,12 @@
                 @endforeach
             </div>
 
-            {{-- Savings Analytics (savings accounts only) --}}
+            {{-- Savings Analytics --}}
             @if($account->type === 'savings')
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-6">
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
                         <h3 class="text-base font-semibold text-gray-900 dark:text-white">📊 Interest & Expenses Breakdown</h3>
 
-                        {{-- Period & Year Selector using Alpine.js --}}
                         <div class="flex flex-wrap items-center gap-3 ml-auto">
                             {{-- Period Dropdown --}}
                             <div class="relative" x-data="{ open: false }">
@@ -187,10 +183,9 @@
                                 >
                                     <span class="font-medium capitalize">{{ $selectedPeriod }}</span>
                                     <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                                     </svg>
                                 </button>
-
                                 <div
                                     x-show="open"
                                     x-transition
@@ -218,10 +213,9 @@
                                     >
                                         <span class="font-medium">{{ $selectedYear }}</span>
                                         <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                                         </svg>
                                     </button>
-
                                     <div
                                         x-show="open"
                                         x-transition
@@ -246,10 +240,12 @@
                         <p class="text-sm text-gray-500 dark:text-gray-400 text-center py-6">No data for this period.</p>
                     @else
                         @php
-                            $allLabels = $interestByPeriod->pluck('period_label')
+                            // Merge all period labels from both collections.
+                            $allLabels   = $interestByPeriod->pluck('period_label')
                                 ->merge($expensesByPeriod->pluck('period_label'))
                                 ->unique()->values();
 
+                            // Key by period_label so Blade can look up a row by label.
                             $interestMap = $interestByPeriod->keyBy('period_label');
                             $expensesMap = $expensesByPeriod->keyBy('period_label');
                         @endphp
@@ -264,17 +260,26 @@
                                     <th class="px-4 py-3 text-right font-medium text-emerald-700 dark:text-emerald-400">Interest (KES)</th>
                                     <th class="px-4 py-3 text-right font-medium text-red-700 dark:text-red-400">Expenses (KES)</th>
                                     <th class="px-4 py-3 text-right font-medium text-indigo-700 dark:text-indigo-400">Net (KES)</th>
+                                    <th class="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Daily Rate</th>
+                                    <th class="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Implied APY</th>
                                 </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
                                 @php $grandInterest = 0; $grandExpenses = 0; @endphp
                                 @foreach($allLabels as $label)
                                     @php
-                                        $interest = $interestMap[$label]->total ?? 0;
-                                        $expenses = $expensesMap[$label]->total ?? 0;
-                                        $net      = $interest - $expenses;
+                                        $interest  = $interestMap[$label]->total ?? 0;
+                                        $expenses  = $expensesMap[$label]->total ?? 0;
+                                        $net       = $interest - $expenses;
                                         $grandInterest += $interest;
                                         $grandExpenses += $expenses;
+
+                                        // avg_daily_rate is now included in the selectRaw for all period modes.
+                                        // It is a percentage (e.g. 0.027397 for 0.0274%/day).
+                                        $dailyRate  = $interestMap[$label]->avg_daily_rate ?? null;
+
+                                        // Simple APY = daily_rate_pct × 365
+                                        $impliedApy = $dailyRate !== null ? round($dailyRate * 365, 2) : null;
                                     @endphp
                                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                                         <td class="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">{{ $label }}</td>
@@ -287,6 +292,15 @@
                                         <td class="px-4 py-3 text-right font-semibold {{ $net >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-red-600 dark:text-red-400' }}">
                                             {{ ($net >= 0 ? '+' : '') . number_format($net, 0) }}
                                         </td>
+                                        {{-- Daily rate as stored percentage, e.g. "0.0274%" --}}
+                                        <td class="px-4 py-3 text-right text-gray-500 dark:text-gray-400 text-xs font-mono">
+                                            {{ $dailyRate !== null ? number_format($dailyRate, 4) . '%' : '—' }}
+                                        </td>
+                                        {{-- Implied APY = daily_rate_pct × 365 --}}
+                                        <td class="px-4 py-3 text-right text-xs font-mono font-semibold
+                                                   {{ $impliedApy !== null ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400' }}">
+                                            {{ $impliedApy !== null ? number_format($impliedApy, 2) . '%' : '—' }}
+                                        </td>
                                     </tr>
                                 @endforeach
                                 </tbody>
@@ -298,6 +312,9 @@
                                     <td class="px-4 py-3 text-right {{ ($grandInterest - $grandExpenses) >= 0 ? 'text-indigo-700 dark:text-indigo-400' : 'text-red-700 dark:text-red-400' }}">
                                         {{ (($grandInterest - $grandExpenses) >= 0 ? '+' : '') . number_format($grandInterest - $grandExpenses, 0) }}
                                     </td>
+                                    {{-- Averaging per-period averages would be misleading — leave blank --}}
+                                    <td class="px-4 py-3 text-right text-gray-400 text-xs">—</td>
+                                    <td class="px-4 py-3 text-right text-gray-400 text-xs">—</td>
                                 </tr>
                                 </tfoot>
                             </table>
@@ -312,7 +329,6 @@
                 {{-- Tab Bar --}}
                 <div class="flex flex-wrap border-b border-gray-200 dark:border-gray-700 mb-5 gap-1">
 
-                    {{-- Transactions --}}
                     <a href="{{ request()->fullUrlWithQuery(['tab' => 'transactions', 'tx_page' => 1]) }}"
                        class="px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors
                               {{ $activeTab === 'transactions'
@@ -325,7 +341,6 @@
                         </span>
                     </a>
 
-                    {{-- Top Ups --}}
                     <a href="{{ request()->fullUrlWithQuery(['tab' => 'topups', 'top_page' => 1]) }}"
                        class="px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors
                               {{ $activeTab === 'topups'
@@ -338,7 +353,6 @@
                         </span>
                     </a>
 
-                    {{-- Transfers --}}
                     <a href="{{ request()->fullUrlWithQuery(['tab' => 'transfers', 'tr_page' => 1]) }}"
                        class="px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors
                               {{ $activeTab === 'transfers'
@@ -351,14 +365,12 @@
                         </span>
                     </a>
 
-                    {{-- View All link (transactions tab only) --}}
                     @if($activeTab === 'transactions')
                         <a href="{{ route('transactions.index', ['account_id' => $account->id]) }}"
                            class="ml-auto text-sm text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 font-medium self-center whitespace-nowrap">
                             View All →
                         </a>
                     @endif
-
                 </div>
 
                 {{-- Search Bar --}}
@@ -389,9 +401,9 @@
                     @if(!empty($search))
                         @php
                             $resultCount = match($activeTab) {
-                                'topups'     => $topUps->total(),
-                                'transfers'  => $transfers->total(),
-                                default      => $transactions->total(),
+                                'topups'    => $topUps->total(),
+                                'transfers' => $transfers->total(),
+                                default     => $transactions->total(),
                             };
                         @endphp
                         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
@@ -577,6 +589,18 @@
                                                         {{ $txn->description }}
                                                     @endif
                                                 </span>
+                                                {{-- Rate badge on interest rows --}}
+                                                @if($txn->category->name === 'Interest' && $txn->computed_rate !== null)
+                                                    @php
+                                                        $badgeApy = round($txn->computed_rate * 365, 2);
+                                                    @endphp
+                                                    <span class="ml-1 px-1.5 py-0.5 rounded text-xs font-mono
+                                                                 bg-emerald-50 dark:bg-emerald-900/30
+                                                                 text-emerald-700 dark:text-emerald-300"
+                                                          title="Implied APY: {{ $badgeApy }}%">
+                                                        {{ number_format($txn->computed_rate, 4) }}%/day
+                                                    </span>
+                                                @endif
                                             </div>
                                         </td>
                                         <td class="px-4 py-3 whitespace-nowrap font-semibold text-green-600 dark:text-green-400">
