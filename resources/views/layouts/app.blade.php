@@ -133,6 +133,10 @@
                         </button>
 
                         <div id="userMenu" class="hidden absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg z-50 overflow-hidden">
+                            <a href="{{ url('/cafeteria') }}"
+                               class="block px-4 py-3 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('loans*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                                Cafeteria
+                            </a>
                             <a href="{{ url('/loans') }}"
                                class="block px-4 py-3 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 transition {{ request()->is('loans*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
                                 Loans
@@ -201,6 +205,10 @@
                         <div class="px-4 py-1 text-sm text-gray-500 dark:text-gray-400 mb-1">
                             {{ Auth::user()->email }}
                         </div>
+                        <a href="{{ url('/cafeteria') }}"
+                           class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('loans*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">
+                            Cafeteria
+                        </a>
 
                         <a href="{{ url('/loans') }}"
                            class="block px-4 py-2 text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded transition {{ request()->is('loans*') ? 'bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-blue-400 font-semibold' : '' }}">

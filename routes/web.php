@@ -8,6 +8,7 @@ use Illuminate\Auth\Events\Verified;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use App\Http\Controllers\{AccountController,
     BudgetController,
+    CafeteriaController,
     CategoryController,
     ClientFundController,
     DashboardController,
@@ -181,6 +182,22 @@ Route::middleware('auth')->group(function () {
         Route::post('/{rollingFund}/record-outcome', [RollingFundController::class, 'recordOutcome'])->name('record-outcome');
         Route::delete('/{rollingFund}', [RollingFundController::class, 'destroy'])->name('destroy');
     });
+    // ======================================================================
+// Cafeteria
+// ======================================================================
+    Route::prefix('cafeteria')->name('cafeteria.')->group(function () {
+        // Menu management
+        Route::get('menu', [CafeteriaController::class, 'menu'])->name('menu');
+        Route::post('menu', [CafeteriaController::class, 'storeMenuItem'])->name('menu.store');
+        Route::put('menu/{menuItem}', [CafeteriaController::class, 'updateMenuItem'])->name('menu.update');
+        Route::delete('menu/{menuItem}', [CafeteriaController::class, 'hideMenuItem'])->name('menu.destroy');
+        Route::post('seed-menu', [CafeteriaController::class, 'seedMenu'])->name('seed-menu');
+    });
+
+    Route::resource('cafeteria', CafeteriaController::class)
+        ->parameters(['cafeteria' => 'order']);
+    Route::patch('cafeteria/budget/limit', [CafeteriaController::class, 'updateBudgetLimit'])
+        ->name('cafeteria.budget.update');
 
     // ======================================================================
     // User Settings
