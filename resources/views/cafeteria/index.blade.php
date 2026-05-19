@@ -2,37 +2,14 @@
 <x-app-layout>
     <style>
         @media (max-width: 640px) {
-            body {
-                font-size: 13px;
-            }
-
-            h1 {
-                font-size: 1.5rem !important;
-            }
-
-            h2 {
-                font-size: 1.25rem !important;
-            }
-
-            h3 {
-                font-size: 1rem !important;
-            }
-
-            h4 {
-                font-size: 0.875rem !important;
-            }
-
-            .text-3xl {
-                font-size: 1.5rem !important;
-            }
-
-            .text-2xl {
-                font-size: 1.25rem !important;
-            }
-
-            .text-xl {
-                font-size: 1.125rem !important;
-            }
+            body { font-size: 13px; }
+            h1 { font-size: 1.5rem !important; }
+            h2 { font-size: 1.25rem !important; }
+            h3 { font-size: 1rem !important; }
+            h4 { font-size: 0.875rem !important; }
+            .text-3xl { font-size: 1.5rem !important; }
+            .text-2xl { font-size: 1.25rem !important; }
+            .text-xl { font-size: 1.125rem !important; }
         }
 
         .stat-card {
@@ -51,37 +28,6 @@
         .meal-card:hover {
             transform: translateY(-4px);
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15);
-        }
-
-        .read-only-badge {
-            display: inline-block;
-            padding: 0.25rem 0.75rem;
-            background-color: #fee2e2;
-            color: #991b1b;
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        .dark .read-only-badge {
-            background-color: #7f1d1d;
-            color: #fecaca;
-        }
-
-        .edit-time-remaining {
-            font-size: 0.75rem;
-            color: #9ca3af;
-            font-weight: 500;
-        }
-
-        .dark .edit-time-remaining {
-            color: #d1d5db;
-        }
-
-        .action-disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            pointer-events: none;
         }
     </style>
 
@@ -326,23 +272,18 @@
 
                         {{-- Budget Stats Grid --}}
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            {{-- Total Spent --}}
                             <div class="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                                 <p class="text-xs text-gray-600 dark:text-gray-400 mb-1 font-medium">Total Spent</p>
                                 <p class="text-2xl font-bold text-gray-900 dark:text-white">
                                     KES {{ number_format($spent, 0) }}
                                 </p>
                             </div>
-
-                            {{-- Monthly Limit --}}
                             <div class="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                                 <p class="text-xs text-gray-600 dark:text-gray-400 mb-1 font-medium">Monthly Limit</p>
                                 <p class="text-2xl font-bold text-gray-900 dark:text-white">
                                     KES {{ number_format($limit, 0) }}
                                 </p>
                             </div>
-
-                            {{-- Remaining --}}
                             <div class="p-4 bg-{{ $color }}-50 dark:bg-{{ $color }}-900/30 rounded-lg border border-{{ $color }}-200 dark:border-{{ $color }}-800">
                                 <p class="text-xs text-{{ $color }}-700 dark:text-{{ $color }}-300 mb-1 font-medium">Remaining</p>
                                 <p class="text-2xl font-bold text-{{ $color }}-900 dark:text-{{ $color }}-100">
@@ -367,8 +308,6 @@
                                 <div class="h-full bg-gradient-to-r from-{{ $color }}-400 to-{{ $color }}-600 transition-all duration-500 rounded-full"
                                      style="width: {{ min(100, $percentage) }}%"></div>
                             </div>
-
-                            {{-- Status Text --}}
                             <div class="text-center">
                                 <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
                                     {{ $budgetUser->getBudgetStatus() }}
@@ -392,8 +331,6 @@
                                     </p>
                                 </div>
                             </div>
-
-                            {{-- Lock notice when editing is not available --}}
                             @if(!$budgetUser->canEditMonthlyLimit())
                                 <p class="mt-3 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
                                     🔒 Budget limit locked until {{ $budgetUser->nextLimitEditAllowedAt() }}.
@@ -494,79 +431,39 @@
                         <table class="w-full">
                             <thead class="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
                             <tr>
-                                <th class="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">Date</th>
-                                <th class="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">Meal Time</th>
+                                <th class="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">Date</th>
+                                <th class="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">Meal Time</th>
                                 <th class="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">Items</th>
-                                <th class="px-4 sm:px-6 py-3 text-right text-xs font-semibold text-gray-700 dark:text-gray-300">Amount</th>
-                                <th class="px-4 sm:px-6 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300">Status</th>
-                                <th class="px-4 sm:px-6 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300">Actions</th>
+                                <th class="px-4 sm:px-6 py-3 text-right text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">Amount</th>
+                                <th class="px-4 sm:px-6 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">Actions</th>
                             </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                             @foreach($orders as $order)
-                                @php
-                                    $isEditable = $order->isEditable();
-                                    $timeRemaining = $order->getEditTimeRemainingFormatted();
-                                @endphp
                                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-                                    <td class="px-4 sm:px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">
+                                    <td class="px-4 sm:px-6 py-4 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
                                         {{ $order->order_date->format('M d, Y') }}
                                     </td>
-                                    <td class="px-4 sm:px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                                    <td class="px-4 sm:px-6 py-4 whitespace-nowrap">
                                             <span class="inline-block px-2 py-1 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200">
                                                 {{ ucfirst($order->meal_time) }}
                                             </span>
                                     </td>
                                     <td class="px-4 sm:px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                                        <div class="space-y-1 max-h-16 overflow-y-auto">
+                                        <div class="space-y-1">
                                             @foreach($order->items as $item)
-                                                <div class="text-xs">
-                                                    {{ $item->menuItem->name }} x{{ $item->quantity }}
-                                                </div>
+                                                <div class="text-xs">{{ $item->menuItem->name }} x{{ $item->quantity }}</div>
                                             @endforeach
                                         </div>
                                     </td>
-                                    <td class="px-4 sm:px-6 py-4 text-right text-sm font-bold text-gray-900 dark:text-white">
+                                    <td class="px-4 sm:px-6 py-4 text-right text-sm font-bold text-gray-900 dark:text-white whitespace-nowrap">
                                         KES {{ number_format($order->total_amount, 0) }}
                                     </td>
-                                    <td class="px-4 sm:px-6 py-4 text-center">
-                                        @if($isEditable)
-                                            <span class="text-xs font-medium text-green-700 dark:text-green-400">
-                                                ✓ {{ $timeRemaining }}
-                                            </span>
-                                        @else
-                                            <span class="read-only-badge">🔒 Read-only</span>
-                                        @endif
-                                    </td>
-                                    <td class="px-4 sm:px-6 py-4 text-center">
-                                        <div class="flex gap-2 justify-center {{ !$isEditable ? 'opacity-75' : '' }}">
-                                            <a href="{{ route('cafeteria.show', $order) }}"
-                                               class="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 text-sm">
-                                                View
-                                            </a>
-                                            @if($isEditable)
-                                                <a href="{{ route('cafeteria.edit', $order) }}"
-                                                   class="text-blue-600 hover:text-blue-700 dark:text-blue-400 text-sm">
-                                                    Edit
-                                                </a>
-                                                <form action="{{ route('cafeteria.destroy', $order) }}" method="POST" class="inline">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit"
-                                                            onclick="return confirm('Delete this meal entry?')"
-                                                            class="text-red-600 hover:text-red-700 dark:text-red-400 text-sm">
-                                                        Delete
-                                                    </button>
-                                                </form>
-                                            @else
-                                                <span class="text-gray-400 dark:text-gray-600 text-sm cursor-not-allowed" title="Edit disabled after 1 hour">
-                                                    Edit
-                                                </span>
-                                                <span class="text-gray-400 dark:text-gray-600 text-sm cursor-not-allowed" title="Delete disabled after 1 hour">
-                                                    Delete
-                                                </span>
-                                            @endif
-                                        </div>
+                                    <td class="px-4 sm:px-6 py-4 text-center whitespace-nowrap">
+                                        <a href="{{ route('cafeteria.show', $order) }}"
+                                           class="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 text-sm">
+                                            View
+                                        </a>
                                     </td>
                                 </tr>
                             @endforeach
@@ -606,7 +503,6 @@
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const scrollBtn = document.getElementById('scrollToTop');
-
             if (scrollBtn) {
                 window.addEventListener('scroll', function () {
                     if (window.pageYOffset > 300) {
@@ -617,12 +513,8 @@
                         scrollBtn.classList.remove('opacity-100');
                     }
                 });
-
                 scrollBtn.addEventListener('click', function () {
-                    window.scrollTo({
-                        top: 0,
-                        behavior: 'smooth'
-                    });
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
             }
         });
