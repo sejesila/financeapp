@@ -63,7 +63,11 @@ class TransactionController extends Controller
         }
 
         if ($search) {
-            $query->where('description', 'like', '%' . $search . '%');
+            $query->where(function ($q) use ($search) {
+                $q->where('transactions.description', 'like', '%' . $search . '%')
+                    ->orWhereHas('category', fn($c) => $c->where('name', 'like', '%' . $search . '%'))
+                    ->orWhereHas('account', fn($a) => $a->where('name', 'like', '%' . $search . '%'));
+            });
         }
 
         if ($categoryId) {

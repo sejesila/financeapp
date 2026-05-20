@@ -693,7 +693,7 @@ class AccountController extends Controller
             'amount'              => 'required|numeric|min:0.01',
             'date'                => 'required|date',
             'description'         => 'nullable|string|max:255',
-            'acknowledge_skipped' => 'nullable|boolean',
+            'acknowledge_skipped' => 'nullable',
         ]);
 
         // Service-level validation (rate ceiling, positive balance, etc.)
@@ -708,7 +708,7 @@ class AccountController extends Controller
 
         $skippedDaysCount = $this->interestService->getSkippedDaysCount($account);
 
-        if ($skippedDaysCount !== null && $skippedDaysCount > 0 && !$request->boolean('acknowledge_skipped')) {
+        if ($skippedDaysCount !== null && $skippedDaysCount > 0 && !$request->input('acknowledge_skipped')) {
             return redirect()->back()->withInput()
                 ->with('error', 'Please acknowledge that you understand the interest period being recorded.');
         }

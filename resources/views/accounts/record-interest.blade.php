@@ -31,42 +31,6 @@
                 </div>
             @endif
 
-            {{-- Skipped Days Alert --}}
-            @if($skippedDaysCount !== null && $skippedDaysCount > 0 && $skippedDateRange)
-                <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-6">
-                    <div class="flex gap-3">
-                        <svg class="w-5 h-5 text-amber-600 dark:text-amber-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
-                        </svg>
-                        <div class="flex-1">
-                            <h3 class="font-semibold text-amber-900 dark:text-amber-100 mb-2">
-                                Skipped {{ $skippedDaysCount }} {{ $skippedDaysCount === 1 ? 'Day' : 'Days' }}
-                            </h3>
-                            <p class="text-sm text-amber-800 dark:text-amber-200 mb-2">
-                                The last interest was recorded on <span class="font-medium">{{ $skippedDateRange['last_recorded'] }}</span>.
-                            </p>
-                            <p class="text-sm text-amber-800 dark:text-amber-200 mb-3">
-                                You are about to record interest for
-                                <span class="font-semibold">{{ $skippedDateRange['gap_start'] }} through {{ now()->format('M d, Y') }}</span>
-                                — a total of <span class="font-semibold">{{ $skippedDateRange['total_days'] }} days</span>.
-                            </p>
-
-                            {{-- Acknowledgment Checkbox --}}
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox"
-                                       id="acknowledge_skipped"
-                                       name="acknowledge_skipped"
-                                       value="1"
-                                       class="rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 text-amber-600 focus:ring-amber-500">
-                                <span class="text-sm text-amber-900 dark:text-amber-200">
-                                    I confirm this interest is for all <span class="font-semibold">{{ $skippedDateRange['total_days'] }}</span> days
-                                </span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-            @endif
-
             {{-- Last Recording Info --}}
             @if($lastInterestDate)
                 <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
@@ -89,6 +53,42 @@
                     @csrf
 
                     <div class="space-y-6">
+
+                        {{-- Skipped Days Alert (inside form so checkbox submits) --}}
+                        @if($skippedDaysCount !== null && $skippedDaysCount > 0 && $skippedDateRange)
+                            <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                                <div class="flex gap-3">
+                                    <svg class="w-5 h-5 text-amber-600 dark:text-amber-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <div class="flex-1">
+                                        <h3 class="font-semibold text-amber-900 dark:text-amber-100 mb-2">
+                                            Skipped {{ $skippedDaysCount }} {{ $skippedDaysCount === 1 ? 'Day' : 'Days' }}
+                                        </h3>
+                                        <p class="text-sm text-amber-800 dark:text-amber-200 mb-2">
+                                            The last interest was recorded on <span class="font-medium">{{ $skippedDateRange['last_recorded'] }}</span>.
+                                        </p>
+                                        <p class="text-sm text-amber-800 dark:text-amber-200 mb-3">
+                                            You are about to record interest for
+                                            <span class="font-semibold">{{ $skippedDateRange['gap_start'] }} through {{ now()->format('M d, Y') }}</span>
+                                            — a total of <span class="font-semibold">{{ $skippedDateRange['total_days'] }} days</span>.
+                                        </p>
+
+                                        {{-- Acknowledgment Checkbox --}}
+                                        <label class="flex items-center gap-2 cursor-pointer">
+                                            <input type="checkbox"
+                                                   id="acknowledge_skipped"
+                                                   name="acknowledge_skipped"
+                                                   value="1"
+                                                   class="rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 text-amber-600 focus:ring-amber-500">
+                                            <span class="text-sm text-amber-900 dark:text-amber-200">
+                                                I confirm this interest is for all <span class="font-semibold">{{ $skippedDateRange['total_days'] }}</span> days
+                                            </span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
 
                         {{-- Amount --}}
                         <div>
@@ -130,33 +130,6 @@
                             @enderror
                             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                 The date when this interest is being recorded
-                            </p>
-                        </div>
-
-                        {{-- Interest Rate (Optional) --}}
-                        <div>
-                            <label for="rate" class="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
-                                Interest Rate (APY) <span class="text-gray-500 text-xs font-normal">Optional</span>
-                            </label>
-                            <div class="relative">
-                                <input type="number"
-                                       id="rate"
-                                       name="rate"
-                                       step="0.01"
-                                       min="0"
-                                       max="100"
-                                       value="{{ old('rate') }}"
-                                       placeholder="e.g., 3.5"
-                                       class="w-full px-4 pr-8 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                                <span class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-600 dark:text-gray-400 font-medium">
-                                    %
-                                </span>
-                            </div>
-                            @error('rate')
-                            <p class="text-red-600 dark:text-red-400 text-sm mt-1">{{ $message }}</p>
-                            @enderror
-                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                The annual percentage yield (used in the description)
                             </p>
                         </div>
 
@@ -229,7 +202,6 @@
     {{-- Live Preview Script --}}
     <script>
         const amountInput = document.getElementById('amount');
-        const rateInput = document.getElementById('rate');
         const descInput = document.getElementById('description');
         const previewAmount = document.getElementById('preview-amount');
         const previewDesc = document.getElementById('preview-desc');
@@ -237,56 +209,35 @@
         const submitBtn = document.getElementById('submit-btn');
 
         function updatePreview() {
-            // Update amount
             const amount = parseFloat(amountInput.value) || 0;
             previewAmount.textContent = 'KES ' + new Intl.NumberFormat('en-US').format(Math.round(amount));
 
-            // Update description
             if (descInput.value.trim()) {
                 previewDesc.textContent = descInput.value;
             } else {
-                const rate = rateInput.value;
-                let desc = 'Interest earned';
                 @if($skippedDaysCount !== null && $skippedDaysCount > 0)
-                    desc = 'Interest earned ({{ $skippedDateRange["total_days"] }}-day period)';
-                if (rate) {
-                    desc = `Interest earned ({{ $skippedDateRange["total_days"] }}-day period, ${rate}% APY)`;
-                }
+                    previewDesc.textContent = 'Interest earned ({{ $skippedDateRange["total_days"] }}-day period)';
                 @else
-                if (rate) {
-                    desc = `Interest earned (${rate}% APY)`;
-                }
+                    previewDesc.textContent = 'Interest earned';
                 @endif
-                    previewDesc.textContent = desc;
             }
         }
 
         amountInput.addEventListener('input', updatePreview);
-        rateInput.addEventListener('input', updatePreview);
         descInput.addEventListener('input', updatePreview);
 
-        // Handle acknowledge checkbox for skipped days
         @if($skippedDaysCount !== null && $skippedDaysCount > 0)
         acknowledgeCheckbox.addEventListener('change', function() {
             submitBtn.disabled = !this.checked;
             submitBtn.classList.toggle('opacity-60');
             submitBtn.classList.toggle('cursor-not-allowed');
-            submitBtn.classList.toggle('bg-gray-400', this.checked === false);
-            submitBtn.classList.toggle('bg-emerald-600', this.checked === true);
-            submitBtn.classList.toggle('dark:bg-gray-600', this.checked === false);
-            submitBtn.classList.toggle('dark:bg-emerald-600', this.checked === true);
-        });
-
-        // Form submission validation
-        document.querySelector('form').addEventListener('submit', function(e) {
-            if (!acknowledgeCheckbox.checked) {
-                e.preventDefault();
-                alert('Please acknowledge that you understand the interest period.');
-            }
+            submitBtn.classList.toggle('bg-gray-400', !this.checked);
+            submitBtn.classList.toggle('bg-emerald-600', this.checked);
+            submitBtn.classList.toggle('dark:bg-gray-600', !this.checked);
+            submitBtn.classList.toggle('dark:bg-emerald-600', this.checked);
         });
         @endif
 
-        // Initialize preview
         updatePreview();
     </script>
 </x-app-layout>

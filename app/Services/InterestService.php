@@ -1,16 +1,12 @@
 <?php
-
 namespace App\Services;
-
 use App\Models\Account;
 use Carbon\Carbon;
-
 class InterestService
 {
     // ════════════════════════════════════════════════════════════════════════════
     // SECTION 1: Date Tracking
     // ════════════════════════════════════════════════════════════════════════════
-
     public function getLastInterestDate(Account $account): ?Carbon
     {
         $lastInterest = $account->transactions()
@@ -21,7 +17,6 @@ class InterestService
             ->orderByDesc('transactions.id')
             ->select('transactions.date')
             ->first();
-
         return $lastInterest ? Carbon::parse($lastInterest->date) : null;
     }
 
@@ -36,12 +31,9 @@ class InterestService
     {
         $lastDate = $this->getLastInterestDate($account);
         if (!$lastDate) return null;
-
-        $daysSinceLastRecording = $lastDate->diffInDays(now());
-
+        $daysSinceLastRecording = (int) $lastDate->copy()->startOfDay()->diffInDays(now()->startOfDay());
         if ($daysSinceLastRecording === 0) return null;
         if ($daysSinceLastRecording === 1) return 0;
-
         return $daysSinceLastRecording - 1;
     }
 
@@ -49,11 +41,9 @@ class InterestService
     {
         $skippedDays = $this->getSkippedDaysCount($account);
         if ($skippedDays === null || $skippedDays === 0) return null;
-
         $totalDays = $skippedDays + 1;
         $dayWord   = $skippedDays === 1 ? 'day' : 'days';
         $daysWord  = $totalDays === 1 ? 'day' : 'days';
-
         return "You skipped {$skippedDays} {$dayWord}. " .
             "Is the interest being recorded for the last {$totalDays} {$daysWord}?";
     }
@@ -62,10 +52,8 @@ class InterestService
     {
         $lastDate = $this->getLastInterestDate($account);
         if (!$lastDate) return null;
-
-        $daysSinceLastRecording = $lastDate->diffInDays(now());
+        $daysSinceLastRecording = (int) $lastDate->copy()->startOfDay()->diffInDays(now()->startOfDay());
         if ($daysSinceLastRecording <= 1) return null;
-
         return [
             'last_recorded' => $lastDate->format('M d, Y'),
             'gap_start'     => $lastDate->copy()->addDay()->format('M d, Y'),
@@ -78,20 +66,16 @@ class InterestService
     // ════════════════════════════════════════════════════════════════════════════
     // SECTION 2: Validation
     // ════════════════════════════════════════════════════════════════════════════
-
     public function validateInterestAmount(float $amount): array
     {
         $errors = [];
-
         if ($amount < 0) {
             $errors[] = 'Interest amount cannot be negative.';
             return $errors;
         }
-
         if ($amount == 0) {
             $errors[] = 'Interest amount must be greater than zero.';
         }
-
         return $errors;
     }
 }
