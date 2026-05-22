@@ -38,17 +38,29 @@ class TransactionRecorder
 
         $paymentMethod = $parsed['bank'] === 'im_bank' ? 'I&M Bank' : 'Mpesa';
 
-        // ── Main transaction ──────────────────────────────────────────────
+        // Map subtype → mobile_money_type
+        $mobileMoneyType = match($parsed['subtype'] ?? '') {
+            'send_money'  => 'send_money',
+            'paybill'     => 'paybill',
+            'till'        => 'till_number',
+            'withdrawal'  => 'withdrawal',
+            'airtime'     => 'airtime',
+            'pochi'       => 'pochi_la_biashara',
+            'receive_money' => 'receive_money',
+            default       => null,
+        };
+
         $transaction = Transaction::withoutGlobalScopes()->create([
-            'user_id'        => $user->id,
-            'account_id'     => $account->id,
-            'category_id'    => $category->id,
-            'amount'         => $parsed['amount'],
-            'date'           => $parsed['date'],
-            'description'    => $parsed['description'] . ' [' . $parsed['reference'] . ']',
-            'payment_method' => $paymentMethod,
-            'is_reversal'    => false,
-            'is_split'       => false,
+            'user_id'            => $user->id,
+            'account_id'         => $account->id,
+            'category_id'        => $category->id,
+            'amount'             => $parsed['amount'],
+            'date'               => $parsed['date'],
+            'description'        => $parsed['description'] . ' [' . $parsed['reference'] . ']',
+            'payment_method'     => $paymentMethod,
+            'mobile_money_type'  => $mobileMoneyType,
+            'is_reversal'        => false,
+            'is_split'           => false,
         ]);
 
         // ── Fee transaction (optional) ────────────────────────────────────
@@ -70,6 +82,7 @@ class TransactionRecorder
                 'payment_method'             => $paymentMethod,
                 'is_transaction_fee'         => true,
                 'related_fee_transaction_id' => $transaction->id,
+                'fee_for_transaction_id'     => $transaction->id,
                 'is_reversal'                => false,
                 'is_split'                   => false,
             ]);

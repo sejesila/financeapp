@@ -280,7 +280,7 @@
 
                 init() {
                     this.$nextTick(() => {
-                        this.onAccountChange();
+                        this.onAccountChange(true);
                         // Restore type options for existing splits
                         this.splits.forEach((split, i) => {
                             if (split.showMobileType) {
@@ -358,19 +358,25 @@
                     }
                 },
 
-                onAccountChange() {
+                onAccountChange(restoring = false) {
                     const select = document.querySelector('select[name="account_id"]');
-                    if (!select || !select.value) { this.accountType = ''; this.showTransactionTypeSelector = false; return; }
+                    if (!select || !select.value) {
+                        this.accountType = '';
+                        this.showTransactionTypeSelector = false;
+                        return;
+                    }
                     const selectedOption = select.options[select.selectedIndex];
                     this.accountType = selectedOption.getAttribute('data-type');
+
                     if (this.accountType === 'mpesa' || this.accountType === 'airtel_money') {
                         this.showTransactionTypeSelector = true;
                         if (this.accountType === 'mpesa') {
                             this.transactionTypeOptions = this.mpesaTypes;
-                            if (!this.mobileMoneyType) this.mobileMoneyType = this.defaultMpesaType;
+                            // ✅ Only set default if NOT restoring a saved value
+                            if (!restoring && !this.mobileMoneyType) this.mobileMoneyType = this.defaultMpesaType;
                         } else {
                             this.transactionTypeOptions = this.airtelTypes;
-                            if (!this.mobileMoneyType) this.mobileMoneyType = this.defaultAirtelType;
+                            if (!restoring && !this.mobileMoneyType) this.mobileMoneyType = this.defaultAirtelType;
                             if (this.mobileMoneyType === 'pochi_la_biashara') this.mobileMoneyType = 'send_money';
                         }
                     } else {

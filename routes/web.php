@@ -191,7 +191,7 @@ Route::middleware('auth')->group(function () {
         Route::post('menu', [CafeteriaController::class, 'storeMenuItem'])->name('menu.store');
         Route::put('menu/{menuItem}', [CafeteriaController::class, 'updateMenuItem'])->name('menu.update');
         Route::delete('menu/{menuItem}', [CafeteriaController::class, 'hideMenuItem'])->name('menu.destroy');
-        Route::post('seed-menu', [CafeteriaController::class, 'seedMenu'])->name('seed-menu');
+       // Route::post('seed-menu', [CafeteriaController::class, 'seedMenu'])->name('seed-menu');
     });
 
     Route::resource('cafeteria', CafeteriaController::class)

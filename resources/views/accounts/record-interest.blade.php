@@ -181,13 +181,12 @@
                             Cancel
                         </a>
                         <button type="submit"
-                                @if($skippedDaysCount !== null && $skippedDaysCount > 0)
-                                    id="submit-btn"
-                                disabled
-                                class="flex-1 px-6 py-2.5 rounded-lg bg-gray-400 dark:bg-gray-600 text-white font-medium cursor-not-allowed opacity-60 transition"
-                                @else
-                                    class="flex-1 px-6 py-2.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition font-medium"
-                            @endif
+                                id="submit-btn"
+                                @if($skippedDaysCount !== null && $skippedDaysCount > 0) disabled @endif
+                                class="flex-1 px-6 py-2.5 rounded-lg font-medium text-white transition
+           {{ ($skippedDaysCount !== null && $skippedDaysCount > 0)
+               ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed opacity-60'
+               : 'bg-emerald-600 hover:bg-emerald-700' }}"
                         >
                             📈 Record Interest
                         </button>
