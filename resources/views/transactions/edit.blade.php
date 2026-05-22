@@ -255,7 +255,7 @@
                 totalAmount: {{ old('amount', $transaction->amount) }},
                 accountId: '{{ old('account_id', $transaction->account_id) }}',
                 accountType: '',
-                mobileMoneyType: '{{ old('mobile_money_type', $transaction->mobile_money_type ?? 'send_money') }}',
+                mobileMoneyType: '{{ old('mobile_money_type', $transaction->mobile_money_type ?? '') }}',
                 showTransactionTypeSelector: false,
                 defaultMpesaType: '{{ $defaultMpesaType ?? 'send_money' }}',
                 defaultAirtelType: '{{ $defaultAirtelType ?? 'send_money' }}',
@@ -365,30 +365,29 @@
                         this.showTransactionTypeSelector = false;
                         return;
                     }
+
                     const selectedOption = select.options[select.selectedIndex];
                     this.accountType = selectedOption.getAttribute('data-type');
 
                     if (this.accountType === 'mpesa' || this.accountType === 'airtel_money') {
-                        this.showTransactionTypeSelector = true;
-                        if (this.accountType === 'mpesa') {
-                            this.transactionTypeOptions = this.mpesaTypes;
-                        } else {
-                            this.transactionTypeOptions = this.airtelTypes;
+                        // Always set options first so Alpine has valid choices to bind against
+                        this.transactionTypeOptions = this.accountType === 'mpesa'
+                            ? this.mpesaTypes
+                            : this.airtelTypes;
+
+                        if (!restoring) {
+                            // User changed account — reset to their most-used default
+                            this.mobileMoneyType = this.accountType === 'mpesa'
+                                ? this.defaultMpesaType
+                                : this.defaultAirtelType;
                         }
-                        // ✅ Set mobileMoneyType AFTER options are populated
-                        this.$nextTick(() => {
-                            if (!restoring) {
-                                this.mobileMoneyType = this.accountType === 'mpesa'
-                                    ? this.defaultMpesaType
-                                    : this.defaultAirtelType;
-                            }
-                            // Force Alpine to re-sync the select element
-                            const typeSelect = document.querySelector('select[name="mobile_money_type"]');
-                            if (typeSelect) typeSelect.value = this.mobileMoneyType;
-                        });
+                        // When restoring, mobileMoneyType is already set from PHP (the saved DB value).
+                        // Alpine will bind it to the select automatically once options are in place.
+
+                        this.showTransactionTypeSelector = true;
                     } else {
                         this.showTransactionTypeSelector = false;
-                        this.mobileMoneyType = 'send_money';
+                        this.mobileMoneyType = '';
                         this.transactionTypeOptions = [];
                     }
                 }
