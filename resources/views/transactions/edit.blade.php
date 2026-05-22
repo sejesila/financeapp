@@ -372,13 +372,20 @@
                         this.showTransactionTypeSelector = true;
                         if (this.accountType === 'mpesa') {
                             this.transactionTypeOptions = this.mpesaTypes;
-                            // ✅ Only set default if NOT restoring a saved value
-                            if (!restoring && !this.mobileMoneyType) this.mobileMoneyType = this.defaultMpesaType;
                         } else {
                             this.transactionTypeOptions = this.airtelTypes;
-                            if (!restoring && !this.mobileMoneyType) this.mobileMoneyType = this.defaultAirtelType;
-                            if (this.mobileMoneyType === 'pochi_la_biashara') this.mobileMoneyType = 'send_money';
                         }
+                        // ✅ Set mobileMoneyType AFTER options are populated
+                        this.$nextTick(() => {
+                            if (!restoring) {
+                                this.mobileMoneyType = this.accountType === 'mpesa'
+                                    ? this.defaultMpesaType
+                                    : this.defaultAirtelType;
+                            }
+                            // Force Alpine to re-sync the select element
+                            const typeSelect = document.querySelector('select[name="mobile_money_type"]');
+                            if (typeSelect) typeSelect.value = this.mobileMoneyType;
+                        });
                     } else {
                         this.showTransactionTypeSelector = false;
                         this.mobileMoneyType = 'send_money';
