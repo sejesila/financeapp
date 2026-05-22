@@ -345,12 +345,10 @@
                     @forelse($transactions as $t)
                         @php
                             $isFee    = $t->is_transaction_fee;
-                            $isSplit  = $t->is_split;
                             $isIncome = $t->category->type === 'income';
                         @endphp
                         <tr class="hover:bg-blue-50/40 dark:hover:bg-gray-700/50 transition-colors duration-150
-                               {{ $isFee   ? 'bg-yellow-50/60 dark:bg-yellow-900/10' : '' }}
-                               {{ $isSplit ? 'bg-indigo-50/40 dark:bg-indigo-900/10' : '' }}">
+                               {{ $isFee ? 'bg-yellow-50/60 dark:bg-yellow-900/10' : '' }}">
 
                             {{-- Date --}}
                             <td class="px-4 py-3 whitespace-nowrap text-gray-700 dark:text-gray-300 text-xs font-medium">
@@ -368,31 +366,13 @@
                                         FEE
                                     </span>
                                     @endif
-                                    @if($isSplit)
-                                        <span class="inline-flex items-center rounded-full bg-indigo-100 dark:bg-indigo-900/40 px-1.5 py-0.5 text-xs font-medium text-indigo-700 dark:text-indigo-400">
-                                        ⇄ Split
-                                    </span>
-                                    @endif
                                     <span>{{ $t->description }}</span>
-                                    @if(!$isFee && !$isSplit && $t->hasFee())
+                                    @if(!$isFee && $t->hasFee())
                                         <span class="text-xs text-gray-400 dark:text-gray-500">
                                         (+{{ number_format($t->total_amount - $t->amount, 0) }} fee)
                                     </span>
                                     @endif
                                 </div>
-                                @if($isSplit)
-                                    <div class="sm:hidden mt-1 flex flex-wrap gap-1">
-                                        @foreach($t->splits as $split)
-                                            <span class="inline-flex items-center gap-1 rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-xs text-gray-600 dark:text-gray-400">
-                                            {{ $split->account->name ?? '—' }}
-                                            <span class="font-medium text-gray-800 dark:text-gray-200">{{ number_format($split->amount, 0) }}</span>
-                                            @if($split->related_fee_transaction_id && $split->feeTransaction)
-                                                    <span class="text-yellow-600 dark:text-yellow-400">+{{ number_format($split->feeTransaction->amount, 0) }}</span>
-                                                @endif
-                                        </span>
-                                        @endforeach
-                                    </div>
-                                @endif
                             </td>
 
                             {{-- Amount --}}
@@ -406,18 +386,7 @@
                                             : 'text-red-600 dark:text-red-400') }}">
                                     {{ $isIncome ? '+' : '−' }}{{ number_format($t->amount, 0) }}
                                 </span>
-                                    @if($isSplit)
-                                        @php $splitFeeTotal = $t->splits->sum(fn($s) => $s->feeTransaction?->amount ?? 0); @endphp
-                                        @if($splitFeeTotal > 0)
-                                            <span class="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
-                                            Total: {{ number_format($t->amount + $splitFeeTotal, 0) }}
-                                        </span>
-                                        @else
-                                            <span class="text-xs text-gray-400 dark:text-gray-500">
-                                            {{ $t->splits->count() }} accounts
-                                        </span>
-                                        @endif
-                                    @elseif(!$isFee && $t->hasFee())
+                                    @if(!$isFee && $t->hasFee())
                                         <span class="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
                                         Total: {{ number_format($t->total_amount, 0) }}
                                     </span>
@@ -427,25 +396,7 @@
 
                             {{-- Account --}}
                             <td class="px-4 py-3 hidden sm:table-cell text-gray-700 dark:text-gray-300">
-                                @if($isSplit)
-                                    <div class="space-y-1.5">
-                                        @foreach($t->splits as $split)
-                                            <div class="flex items-center justify-between gap-4">
-                                                <span class="text-xs text-gray-600 dark:text-gray-400">{{ $split->account->name ?? '—' }}</span>
-                                                <div class="flex items-center gap-1 text-xs tabular-nums">
-                                                    <span class="font-medium text-gray-800 dark:text-gray-200">{{ number_format($split->amount, 0) }}</span>
-                                                    @if($split->related_fee_transaction_id && $split->feeTransaction)
-                                                        <span class="text-yellow-600 dark:text-yellow-500" title="Includes fee">
-                                                        +{{ number_format($split->feeTransaction->amount, 0) }}
-                                                    </span>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                @else
-                                    {{ $t->account->name ?? '—' }}
-                                @endif
+                                {{ $t->account->name ?? '—' }}
                             </td>
 
                             {{-- Category --}}

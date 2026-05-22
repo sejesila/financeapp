@@ -14,14 +14,12 @@ class StoreTransactionRequest extends FormRequest
 
     public function rules(): array
     {
-        $isSplit = $this->boolean('is_split');
-
         return [
             'date'              => 'required|date',
             'description'       => 'required|string',
             'amount'            => 'required|numeric|min:0.01',
             'category_id'       => 'required|exists:categories,id',
-            'account_id'        => $isSplit ? 'nullable' : [
+            'account_id'        => [
                 'required',
                 'exists:accounts,id',
                 function ($attribute, $value, $fail) {
@@ -34,11 +32,7 @@ class StoreTransactionRequest extends FormRequest
                     }
                 },
             ],
-            'mobile_money_type'          => 'nullable|in:send_money,paybill,buy_goods,pochi_la_biashara',
-            'splits'                     => $isSplit ? 'required|array|min:2' : 'nullable',
-            'splits.*.account_id'        => $isSplit ? 'required|exists:accounts,id' : 'nullable',
-            'splits.*.amount'            => $isSplit ? 'required|numeric|min:0.01' : 'nullable',
-            'splits.*.mobile_money_type' => 'nullable|in:send_money,paybill,buy_goods,pochi_la_biashara',
+            'mobile_money_type' => 'nullable|in:send_money,paybill,buy_goods,pochi_la_biashara',
         ];
     }
 
@@ -57,6 +51,4 @@ class StoreTransactionRequest extends FormRequest
         ];
     }
 
-    // Note: We don't validate uniqueness of idempotency_key here
-    // The controller handles duplicate detection and returns the existing transaction
 }

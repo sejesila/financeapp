@@ -179,8 +179,7 @@ class TransferRecorder
                 'description'        => 'ATM fee for ' . $parsed['reference'],
                 'payment_method'     => 'I&M Bank',
                 'is_transaction_fee' => true,
-                'is_reversal'        => false,
-                'is_split'           => false,
+
             ]);
 
             $bankAccount->updateBalance();
@@ -254,8 +253,7 @@ class TransferRecorder
                 'date'           => $parsed['date'],
                 'description'    => $parsed['description'] . ' [' . $parsed['reference'] . ']',
                 'payment_method' => 'Mpesa',
-                'is_reversal'    => false,
-                'is_split'       => false,
+
             ]);
 
             if (!empty($parsed['fee']) && $parsed['fee'] > 0) {
@@ -270,8 +268,7 @@ class TransferRecorder
                     'payment_method'             => 'Mpesa',
                     'is_transaction_fee'         => true,
                     'related_fee_transaction_id' => $transaction->id,
-                    'is_reversal'                => false,
-                    'is_split'                   => false,
+
                 ]);
                 $transaction->update(['related_fee_transaction_id' => $feeTransaction->id]);
             }
@@ -310,8 +307,7 @@ class TransferRecorder
                     'description'        => 'Transaction fee for ' . $parsed['reference'],
                     'payment_method'     => 'Mpesa',
                     'is_transaction_fee' => true,
-                    'is_reversal'        => false,
-                    'is_split'           => false,
+
                 ]);
             }
 
@@ -379,8 +375,6 @@ class TransferRecorder
                 'date'           => $parsed['date'],
                 'description'    => $parsed['description'] . ' [' . $parsed['reference'] . ']',
                 'payment_method' => 'Mpesa',
-                'is_reversal'    => false,
-                'is_split'       => false,
             ]);
 
             $mpesaAccount->updateBalance();

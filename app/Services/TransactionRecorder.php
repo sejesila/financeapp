@@ -59,8 +59,7 @@ class TransactionRecorder
             'description'        => $parsed['description'] . ' [' . $parsed['reference'] . ']',
             'payment_method'     => $paymentMethod,
             'mobile_money_type'  => $mobileMoneyType,
-            'is_reversal'        => false,
-            'is_split'           => false,
+
         ]);
 
         // ── Fee transaction (optional) ────────────────────────────────────
@@ -83,8 +82,7 @@ class TransactionRecorder
                 'is_transaction_fee'         => true,
                 'related_fee_transaction_id' => $transaction->id,
                 'fee_for_transaction_id'     => $transaction->id,
-                'is_reversal'                => false,
-                'is_split'                   => false,
+
             ]);
 
             $transaction->update(['related_fee_transaction_id' => $feeTransaction->id]);

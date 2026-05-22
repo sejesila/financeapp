@@ -34,8 +34,6 @@ class TransactionController extends Controller
         protected TransactionStatsService $stats,
     ) {}
 
-    // ── index ─────────────────────────────────────────────────────────────────
-
     public function index(Request $request)
     {
         $filter     = $request->get('filter', 'all');
@@ -53,10 +51,7 @@ class TransactionController extends Controller
         $minYear = Transaction::selectRaw('YEAR(MIN(date)) as min_year')->value('min_year') ?? date('Y');
         $maxYear = date('Y');
 
-        $query = Transaction::with([
-            'category', 'account', 'feeTransaction',
-            'splits.account', 'splits.feeTransaction',
-        ]);
+        $query = Transaction::with(['category', 'account', 'feeTransaction']);
 
         if (!$showFees) {
             $query->where('is_transaction_fee', false);
@@ -75,10 +70,7 @@ class TransactionController extends Controller
         }
 
         if ($accountId) {
-            $query->where(function ($q) use ($accountId) {
-                $q->where('account_id', $accountId)
-                    ->orWhereHas('splits', fn($s) => $s->where('account_id', $accountId));
-            });
+            $query->where('account_id', $accountId);
         }
 
         TransactionFilter::applyDateFilter($query, $filter, $startDate, $endDate);
@@ -113,14 +105,10 @@ class TransactionController extends Controller
         ));
     }
 
-    // ── create ────────────────────────────────────────────────────────────────
-
     public function create()
     {
         return view('transactions.create', $this->formData());
     }
-
-    // ── store ─────────────────────────────────────────────────────────────────
 
     public function store(StoreTransactionRequest $request)
     {
@@ -158,21 +146,14 @@ class TransactionController extends Controller
         }
     }
 
-    // ── show ──────────────────────────────────────────────────────────────────
-
     public function show(Transaction $transaction)
     {
         $this->authorize('view', $transaction);
 
-        $transaction->load([
-            'account', 'category', 'feeTransaction',
-            'mainTransaction', 'splits.account', 'splits.feeTransaction',
-        ]);
+        $transaction->load(['account', 'category', 'feeTransaction', 'mainTransaction']);
 
         return view('transactions.show', compact('transaction'));
     }
-
-    // ── edit ──────────────────────────────────────────────────────────────────
 
     public function edit(Transaction $transaction)
     {
@@ -182,26 +163,11 @@ class TransactionController extends Controller
             return redirect()->back()->with('error', 'System-generated transaction fees cannot be edited.');
         }
 
-        $existingSplits = [];
-        if ($transaction->is_split) {
-            $transaction->load('splits.account');
-            $existingSplits = $transaction->splits->map(fn($s) => [
-                'id'                => $s->id,
-                'account_id'        => (string) $s->account_id,
-                'amount'            => $s->amount,
-                'mobile_money_type' => $s->mobile_money_type ?? 'send_money',
-                'showMobileType'    => in_array($s->account->type, ['mpesa', 'airtel_money']),
-                'typeOptions'       => [],
-            ])->values()->toArray();
-        }
-
         return view('transactions.edit', array_merge(
             $this->formData(),
-            compact('transaction', 'existingSplits'),
+            compact('transaction'),
         ));
     }
-
-    // ── update ────────────────────────────────────────────────────────────────
 
     public function update(UpdateTransactionRequest $request, Transaction $transaction)
     {
@@ -222,8 +188,6 @@ class TransactionController extends Controller
             return back()->with('error', $e->getMessage())->withInput();
         }
     }
-
-    // ── destroy ───────────────────────────────────────────────────────────────
 
     public function destroy(Transaction $transaction)
     {
@@ -252,8 +216,6 @@ class TransactionController extends Controller
         }
     }
 
-    // ── restore ───────────────────────────────────────────────────────────────
-
     public function restore($id)
     {
         $transaction = Transaction::onlyTrashed()->where('user_id', Auth::id())->findOrFail($id);
@@ -274,8 +236,6 @@ class TransactionController extends Controller
             return back()->with('error', 'Failed to restore transaction: ' . $e->getMessage());
         }
     }
-
-    // ── force destroy ─────────────────────────────────────────────────────────
 
     public function forceDestroy($id)
     {
@@ -299,8 +259,6 @@ class TransactionController extends Controller
             return back()->with('error', 'Failed to permanently delete transaction: ' . $e->getMessage());
         }
     }
-
-    // ── private helpers ───────────────────────────────────────────────────────
 
     private function formData(): array
     {

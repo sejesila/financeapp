@@ -72,12 +72,14 @@ class Account extends Model
     {
         return 'slug';
     }
+
     public function resolveRouteBinding($value, $field = null)
     {
         return $this->withoutGlobalScopes()
             ->where($field ?? $this->getRouteKeyName(), $value)
             ->firstOrFail();
     }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -98,7 +100,6 @@ class Account extends Model
         // ✅ SINGLE QUERY - Let database do the heavy lifting
         $stats = $this->transactions()
             ->whereNull('deleted_at')
-            ->where('is_split', false)
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->selectRaw("
             -- Regular Income (excluding loan credits and adjustments)
@@ -165,15 +166,6 @@ class Account extends Model
             SUM(CASE WHEN to_account_id = ? THEN amount ELSE 0 END) as transfers_in
         ', [$this->id, $this->id])
             ->first();
-        $splitStats = DB::table('transaction_splits')
-            ->join('transactions', 'transaction_splits.transaction_id', '=', 'transactions.id')
-            ->join('categories', 'transactions.category_id', '=', 'categories.id')
-            ->where('transaction_splits.account_id', $this->id)
-            ->whereNull('transactions.deleted_at')
-            ->selectRaw("
-        SUM(CASE WHEN categories.type = 'expense' THEN transaction_splits.amount ELSE 0 END) as split_expenses,
-        SUM(CASE WHEN categories.type = 'income' THEN transaction_splits.amount ELSE 0 END) as split_income
-    ")->first();
 
         // ✅ CALCULATE BALANCE - Simple arithmetic
         $newBalance = (float) $this->initial_balance
@@ -183,13 +175,11 @@ class Account extends Model
             - ($stats->client_funds_reduction ?? 0)
             + ($stats->loan_credits ?? 0)
             - ($stats->total_expenses ?? 0)
-            - ($splitStats->split_expenses ?? 0)  // ← add these
-            + ($splitStats->split_income ?? 0)
             + ($stats->balance_adjustments ?? 0)
             - ($transferStats->transfers_out ?? 0)
             + ($transferStats->transfers_in ?? 0);
 
-        // ✅ SINGLE UPDATE - No additional queries
+
         $this->timestamps = false; // Don't update timestamps for balance recalc
         $this->current_balance = $newBalance;
         $this->save();

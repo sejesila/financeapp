@@ -196,54 +196,11 @@ it('throws an exception when account balance is insufficient for expense + fee',
     ]))->toThrow(\Exception::class, 'Insufficient balance');
 });
 
-// ─── Split Transactions ───────────────────────────────────────────────────────
-
-it('creates split transactions across two accounts', function () {
-    $user    = User::factory()->create();
-    Auth::login($user);
-
-    $mpesa = Account::factory()->create(['user_id' => $user->id, 'type' => 'mpesa', 'current_balance' => 999999]);
-    $cash  = Account::factory()->create(['user_id' => $user->id, 'type' => 'cash',  'current_balance' => 999999]);
-    $cat   = expenseCategory($user);
-
-    $transaction = makeService()->createTransaction([
-        'user_id'     => $user->id,
-        'date'        => now()->toDateString(),
-        'description' => 'Split expense',
-        'amount'      => 1000,
-        'category_id' => $cat->id,
-        'account_id'  => $mpesa->id,
-        'splits'      => [
-            ['account_id' => $mpesa->id, 'amount' => 600, 'mobile_money_type' => 'send_money'],
-            ['account_id' => $cash->id,  'amount' => 400],
-        ],
-    ]);
-
-    expect($transaction->is_split)->toBeTrue()
-        ->and($transaction->splits)->toHaveCount(2);
-});
-
-it('rejects splits where amounts do not add up to total', function () {
-    $user    = User::factory()->create();
-    Auth::login($user);
-
-    $mpesa = Account::factory()->create(['user_id' => $user->id, 'type' => 'mpesa', 'current_balance' => 999999]);
-    $cash  = Account::factory()->create(['user_id' => $user->id, 'type' => 'cash',  'current_balance' => 999999]);
-    $cat   = expenseCategory($user);
-
-    expect(fn () => makeService()->createTransaction([
-        'user_id'     => $user->id,
-        'date'        => now()->toDateString(),
-        'description' => 'Bad split',
-        'amount'      => 1000,
-        'category_id' => $cat->id,
-        'account_id'  => $mpesa->id,
-        'splits'      => [
-            ['account_id' => $mpesa->id, 'amount' => 400, 'mobile_money_type' => 'send_money'],
-            ['account_id' => $cash->id,  'amount' => 400],
-        ],
-    ]))->toThrow(\Exception::class, 'Split amounts');
-});
+// ─── Split Transactions - REMOVED (feature deprecated) ───────────────────────
+// The following tests have been removed as split transaction functionality
+// has been removed from the application:
+// - it('creates split transactions across two accounts')
+// - it('rejects splits where amounts do not add up to total')
 
 // ─── Update Transaction ───────────────────────────────────────────────────────
 

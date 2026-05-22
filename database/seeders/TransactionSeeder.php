@@ -171,8 +171,6 @@ class TransactionSeeder extends Seeder
             'user_id'     => $user->id,
             'account_id'  => $account->id,
             'category_id' => $category->id,
-            'is_reversal' => false,
-            'is_split'    => false,
         ], $data));
     }
 }

@@ -27,8 +27,6 @@ class TransactionFactory extends Factory
             'payment_method'             => 'Cash',
             'mobile_money_type'          => null,
             'is_transaction_fee'         => false,
-            'is_split'                   => false,
-            'is_reversal'                => false,
             'related_fee_transaction_id' => null,
             'fee_for_transaction_id'     => null,
         ];

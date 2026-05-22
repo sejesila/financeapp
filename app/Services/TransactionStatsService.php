@@ -88,28 +88,29 @@ class TransactionStatsService
         $y  = now()->year;
         $lm = now()->subMonth()->month;
         $ly = now()->subMonth()->year;
+        $lastYear = now()->subYear()->year;
 
         $result = $this->summaryBaseQuery()
             ->selectRaw("
-                SUM(CASE WHEN categories.type='income'  AND MONTH(COALESCE(transactions.period_date,transactions.date))=? AND YEAR(COALESCE(transactions.period_date,transactions.date))=? THEN transactions.amount ELSE 0 END) as month_in,
-                SUM(CASE WHEN categories.type='expense' AND MONTH(COALESCE(transactions.period_date,transactions.date))=? AND YEAR(COALESCE(transactions.period_date,transactions.date))=? THEN transactions.amount ELSE 0 END) as month_out,
-                SUM(CASE WHEN categories.type='income'  AND MONTH(COALESCE(transactions.period_date,transactions.date))=? AND YEAR(COALESCE(transactions.period_date,transactions.date))=? THEN transactions.amount ELSE 0 END) as last_month_in,
-                SUM(CASE WHEN categories.type='expense' AND MONTH(COALESCE(transactions.period_date,transactions.date))=? AND YEAR(COALESCE(transactions.period_date,transactions.date))=? THEN transactions.amount ELSE 0 END) as last_month_out,
-                SUM(CASE WHEN categories.type='income'  AND YEAR(COALESCE(transactions.period_date,transactions.date))=? THEN transactions.amount ELSE 0 END) as year_in,
-                SUM(CASE WHEN categories.type='expense' AND YEAR(COALESCE(transactions.period_date,transactions.date))=? THEN transactions.amount ELSE 0 END) as year_out,
-                SUM(CASE WHEN categories.type='income'  AND YEAR(COALESCE(transactions.period_date,transactions.date))=? THEN transactions.amount ELSE 0 END) as last_year_in,
-                SUM(CASE WHEN categories.type='expense' AND YEAR(COALESCE(transactions.period_date,transactions.date))=? THEN transactions.amount ELSE 0 END) as last_year_out,
+                SUM(CASE WHEN categories.type='income'  AND MONTH(transactions.date)=? AND YEAR(transactions.date)=? THEN transactions.amount ELSE 0 END) as month_in,
+                SUM(CASE WHEN categories.type='expense' AND MONTH(transactions.date)=? AND YEAR(transactions.date)=? THEN transactions.amount ELSE 0 END) as month_out,
+                SUM(CASE WHEN categories.type='income'  AND MONTH(transactions.date)=? AND YEAR(transactions.date)=? THEN transactions.amount ELSE 0 END) as last_month_in,
+                SUM(CASE WHEN categories.type='expense' AND MONTH(transactions.date)=? AND YEAR(transactions.date)=? THEN transactions.amount ELSE 0 END) as last_month_out,
+                SUM(CASE WHEN categories.type='income'  AND YEAR(transactions.date)=? THEN transactions.amount ELSE 0 END) as year_in,
+                SUM(CASE WHEN categories.type='expense' AND YEAR(transactions.date)=? THEN transactions.amount ELSE 0 END) as year_out,
+                SUM(CASE WHEN categories.type='income'  AND YEAR(transactions.date)=? THEN transactions.amount ELSE 0 END) as last_year_in,
+                SUM(CASE WHEN categories.type='expense' AND YEAR(transactions.date)=? THEN transactions.amount ELSE 0 END) as last_year_out,
                 SUM(CASE WHEN categories.type='income'  THEN transactions.amount ELSE 0 END) as all_in,
                 SUM(CASE WHEN categories.type='expense' THEN transactions.amount ELSE 0 END) as all_out
-            ", [$m, $y, $m, $y, $lm, $ly, $lm, $ly, $y, $y, now()->subYear()->year, now()->subYear()->year])
+            ", [$m, $y, $m, $y, $lm, $ly, $lm, $ly, $y, $y, $lastYear, $lastYear])
             ->first();
 
         $periods = [
-            'This Month' => ['in' => $result->month_in,      'out' => $result->month_out],
-            'Last Month' => ['in' => $result->last_month_in, 'out' => $result->last_month_out],
-            'This Year'  => ['in' => $result->year_in,       'out' => $result->year_out],
-            'Last Year'  => ['in' => $result->last_year_in,  'out' => $result->last_year_out],
-            'All Time'   => ['in' => $result->all_in,        'out' => $result->all_out],
+            'This Month' => ['in' => (float) ($result->month_in ?? 0),      'out' => (float) ($result->month_out ?? 0)],
+            'Last Month' => ['in' => (float) ($result->last_month_in ?? 0), 'out' => (float) ($result->last_month_out ?? 0)],
+            'This Year'  => ['in' => (float) ($result->year_in ?? 0),       'out' => (float) ($result->year_out ?? 0)],
+            'Last Year'  => ['in' => (float) ($result->last_year_in ?? 0),  'out' => (float) ($result->last_year_out ?? 0)],
+            'All Time'   => ['in' => (float) ($result->all_in ?? 0),        'out' => (float) ($result->all_out ?? 0)],
         ];
 
         foreach ($periods as &$data) {
