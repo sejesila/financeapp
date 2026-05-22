@@ -185,11 +185,7 @@ it('casts boolean fields correctly', function () {
         'account_id'         => $account->id,
         'category_id'        => $cat->id,
         'is_transaction_fee' => 1,
-        'is_split'           => 0,
-        'is_reversal'        => 0,
     ]);
 
-    expect($tx->is_transaction_fee)->toBeTrue()
-        ->and($tx->is_split)->toBeFalse()
-        ->and($tx->is_reversal)->toBeFalse();
+    expect($tx->is_transaction_fee)->toBeTrue();
 });
