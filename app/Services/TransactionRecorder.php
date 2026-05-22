@@ -42,7 +42,7 @@ class TransactionRecorder
         $mobileMoneyType = match($parsed['subtype'] ?? '') {
             'send_money'  => 'send_money',
             'paybill'     => 'paybill',
-            'till'        => 'till_number',
+            'till'          => 'buy_goods',
             'withdrawal'  => 'withdrawal',
             'airtime'     => 'airtime',
             'pochi'       => 'pochi_la_biashara',
