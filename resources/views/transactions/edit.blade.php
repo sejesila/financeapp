@@ -161,14 +161,19 @@
                 transactionTypeOptions: [],
                 mpesaTypes: @json($mpesaTransactionTypes),
                 airtelTypes: @json($airtelTransactionTypes),
+                // Use the transaction's actual mobile money type
+                originalMobileMoneyType: '{{ $transaction->mobile_money_type ?? '' }}',
 
                 init() {
+                    console.log('Original mobile money type:', this.originalMobileMoneyType);
+                    console.log('Current mobileMoneyType:', this.mobileMoneyType);
                     this.$nextTick(() => {
-                        this.onAccountChange(true);
+                        this.onAccountChange();
+                        console.log('After onAccountChange - mobileMoneyType:', this.mobileMoneyType);
                     });
                 },
 
-                onAccountChange(restoring = false) {
+                onAccountChange() {
                     const select = document.querySelector('select[name="account_id"]');
                     if (!select || !select.value) {
                         this.accountType = '';
@@ -184,7 +189,18 @@
                             ? this.mpesaTypes
                             : this.airtelTypes;
 
-                        if (!restoring) {
+                        // CRITICAL: Always use the original transaction type if it exists
+                        if (this.originalMobileMoneyType) {
+                            // Check if the type exists in our options
+                            const typeExists = this.transactionTypeOptions.some(t => t.key === this.originalMobileMoneyType);
+                            if (typeExists) {
+                                this.mobileMoneyType = this.originalMobileMoneyType;
+                            } else if (this.transactionTypeOptions.length > 0) {
+                                this.mobileMoneyType = this.transactionTypeOptions[0].key;
+                            }
+                        }
+                        // Only for new transactions (no original type) use defaults
+                        else if (!this.mobileMoneyType && this.transactionTypeOptions.length > 0) {
                             this.mobileMoneyType = this.accountType === 'mpesa'
                                 ? this.defaultMpesaType
                                 : this.defaultAirtelType;
@@ -200,6 +216,7 @@
             }
         }
 
+        // Your existing categoryDropdown function remains exactly the same
         function categoryDropdown(categoryGroups, allCategoriesArray, oldId = null) {
             return {
                 open: false, search: '', selectedId: oldId, selectedName: '', isSearching: false,

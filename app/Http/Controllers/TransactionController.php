@@ -163,10 +163,21 @@ class TransactionController extends Controller
             return redirect()->back()->with('error', 'System-generated transaction fees cannot be edited.');
         }
 
-        return view('transactions.edit', array_merge(
-            $this->formData(),
-            compact('transaction'),
-        ));
+        // Get form data first
+        $formData = $this->formData();
+
+        // Override the default types with the transaction's actual type for editing
+        // But also keep the original most-used types for other purposes
+        $formData['defaultMpesaType'] = MobileMoneyTypeUsage::getMostUsedType(Auth::id(), 'mpesa') ?? 'send_money';
+        $formData['defaultAirtelType'] = MobileMoneyTypeUsage::getMostUsedType(Auth::id(), 'airtel_money') ?? 'send_money';
+
+        // Add the transaction's current mobile money type separately
+        $formData['transactionMobileMoneyType'] = $transaction->mobile_money_type;
+
+        // Add transaction to the array
+        $formData['transaction'] = $transaction;
+
+        return view('transactions.edit', $formData);
     }
 
     public function update(UpdateTransactionRequest $request, Transaction $transaction)
