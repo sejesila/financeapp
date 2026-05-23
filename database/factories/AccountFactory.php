@@ -15,8 +15,6 @@ class AccountFactory extends Factory
         return [
             'user_id'         => User::factory(),
             'name'            => $this->faker->words(2, true),
-            // slug omitted intentionally — Account::creating() always derives
-            // it from `name`, so pre-setting it here would bypass that logic.
             'type'            => $this->faker->randomElement(['cash', 'mpesa', 'airtel_money', 'bank', 'savings']),
             'initial_balance' => 10000,
             'current_balance' => 10000,
