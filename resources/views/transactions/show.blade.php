@@ -5,8 +5,8 @@
                 {{ __('Transaction Details') }}
             </h2>
             <div class="flex items-center gap-2">
-                <a href="{{ route('transactions.index') }}"
-                   class="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-xs sm:text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                <a onclick="window.history.length > 1 ? history.back() : window.location='{{ route('transactions.index') }}'"
+                   class="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-xs sm:text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors cursor-pointer">
                     <svg class="w-3 h-3 sm:w-4 sm:h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
                     </svg>

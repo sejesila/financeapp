@@ -413,11 +413,18 @@
 
                             {{-- Actions --}}
                             <td class="px-4 py-3 text-center">
-                                <a href="{{ route('transactions.show', $t) }}"
-                                   class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium
-                                      bg-indigo-50 text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 transition-colors">
-                                    View
-                                </a>
+                                <div class="inline-flex items-center gap-1.5">
+                                    <a href="{{ route('transactions.show', $t) }}"
+                                       class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium
+              bg-indigo-50 text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 transition-colors">
+                                        View
+                                    </a>
+                                    <a href="{{ route('transactions.edit', $t) }}"
+                                       class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium
+              bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-700/50 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors">
+                                        Edit
+                                    </a>
+                                </div>
                             </td>
                         </tr>
                     @empty

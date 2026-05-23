@@ -363,7 +363,7 @@ describe('Standard Top-up Functionality', function () {
 
     it('validates required fields on top-up store', function () {
         $user = User::factory()->create();
-        $account = Account::factory()->create(['user_id' => $user->id]);
+        $account = Account::factory()->create(['user_id' => $user->id, 'type' => 'mpesa']); // ← add type
 
         $this->actingAs($user)
             ->post(route('accounts.topup.store', $account), [])
