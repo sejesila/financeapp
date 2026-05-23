@@ -590,9 +590,9 @@ class AccountController extends Controller
     {
         if ($account->user_id !== Auth::id()) abort(403);
 
-        if ($transaction->created_at->diffInMinutes(now()) > 30) {
+        if ($transaction->created_at->diffInMinutes(now()) > 60) {
             return redirect()->route('accounts.show', ['account' => $account, 'tab' => 'topups'])
-                ->with('error', 'Top-ups can only be reversed within 30 minutes of being recorded.');
+                ->with('error', 'Top-ups can only be reversed within 60 minutes of being recorded.');
         }
 
         if (!in_array($transaction->category->type, ['income', 'liability'])) {
