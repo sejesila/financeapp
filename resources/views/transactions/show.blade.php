@@ -199,21 +199,7 @@
                 </div>
             </div>
         @else
-            <div class="mt-4 sm:mt-6 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 dark:border-blue-400 p-3 sm:p-4 rounded-lg">
-                <div class="flex items-start">
-                    <svg class="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 dark:text-blue-400 mr-2 sm:mr-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
-                    </svg>
-                    <div>
-                        <p class="text-xs sm:text-sm font-medium text-blue-900 dark:text-blue-200 mb-1">
-                            {{ __('Need to Make Changes?') }}
-                        </p>
-                        <p class="text-xs sm:text-sm text-blue-800 dark:text-blue-300">
-                            {{ __('You can edit or delete this transaction. Account balances will be automatically recalculated.') }}
-                        </p>
-                    </div>
-                </div>
-            </div>
+
         @endif
     </div>
 
