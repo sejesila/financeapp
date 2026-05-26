@@ -47,6 +47,8 @@
                                 <img src="{{ asset('images/mpesa.png') }}" alt="M-Pesa" class="w-12 h-12 object-contain">
                             @elseif(strtolower($account->type) === 'airtel_money')
                                 <img src="{{ asset('images/airtel-money.png') }}" alt="Airtel Money" class="w-12 h-12 object-contain">
+                            @elseif(str_contains(strtolower($account->name), 'etica'))
+                                    <img src="{{ asset('images/etica.webp') }}" alt="Etica" class="w-8 h-8 object-contain">
                             @else
                                 <span class="font-bold text-2xl text-gray-700 dark:text-gray-300">{{ substr($account->name, 0, 1) }}</span>
                             @endif
