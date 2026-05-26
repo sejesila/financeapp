@@ -186,8 +186,8 @@
 
                                     <div class="flex items-center gap-3 mb-3">
                                         <div class="w-10 h-10 rounded-full flex items-center justify-center bg-green-100 dark:bg-green-800">
-                                            @if(str_contains(strtolower($account->name), 'sanlam'))
-                                                <span class="text-green-700 dark:text-green-300 font-bold text-xs">SAN</span>
+                                            @if(str_contains(strtolower($account->name), 'etica'))
+                                                <img src="{{ asset('images/etica.webp') }}" alt="Etica" class="w-8 h-8 object-contain">
                                             @else
                                                 <span class="text-green-700 dark:text-green-300 font-bold">💵</span>
                                             @endif

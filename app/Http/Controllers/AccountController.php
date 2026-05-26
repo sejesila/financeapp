@@ -92,7 +92,7 @@ class AccountController extends Controller
             'type'            => 'required|string',
             'initial_balance' => 'required|numeric|min:0',
             'notes'           => 'nullable|string',
-            'logo'            => 'nullable|image|mimes:jpeg,jpg,png,gif,svg|max:2048',
+            'logo' => 'nullable|image|mimes:jpeg,jpg,png,gif,svg,webp|max:2048',
         ]);
 
         $logoPath = $request->hasFile('logo')
