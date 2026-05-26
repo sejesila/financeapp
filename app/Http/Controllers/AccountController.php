@@ -361,7 +361,7 @@ class AccountController extends Controller
         $request->validate([
             'name'        => 'required|string|max:255',
             'notes'       => 'nullable|string',
-            'logo'        => 'nullable|image|mimes:jpeg,jpg,png,gif,svg|max:2048',
+            'logo' => 'nullable|image|mimes:jpeg,jpg,png,gif,svg,webp|max:2048',
             'remove_logo' => 'nullable',
         ]);
 

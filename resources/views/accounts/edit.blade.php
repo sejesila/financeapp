@@ -87,7 +87,7 @@
                                     type="file"
                                     name="logo"
                                     id="logo"
-                                    accept="image/*"
+                                    accept="image/jpeg,image/png,image/gif,image/svg+xml,image/webp"
                                     class="block w-full text-sm text-gray-500 dark:text-gray-400
                                         file:mr-4 file:py-2 file:px-4
                                         file:rounded-lg file:border-0
