@@ -670,6 +670,7 @@
                                     @endforeach
                                     <th class="px-4 py-3 text-left font-medium">Direction</th>
                                     <th class="px-4 py-3 text-left font-medium hidden sm:table-cell">Counterpart</th>
+                                        <th class="px-4 py-3"></th>
                                 </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
@@ -707,6 +708,19 @@
                                         </td>
                                         <td class="px-4 py-3 hidden sm:table-cell text-gray-600 dark:text-gray-400 text-sm">
                                             {{ $counterpart->name ?? '—' }}
+                                        </td>
+                                        <td class="px-4 py-3 text-right whitespace-nowrap">
+                                            @if($transfer->created_at->diffInMinutes(now()) <= 60)
+                                                <a href="{{ route('accounts.transfer.reverse.form', ['account' => $account, 'transfer' => $transfer]) }}"
+                                                   title="Reverse this transfer"
+                                                   class="inline-flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                              d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+                                                    </svg>
+                                                    Reverse
+                                                </a>
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach
