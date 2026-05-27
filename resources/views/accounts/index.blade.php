@@ -67,10 +67,14 @@
                     <div class="bg-gradient-to-r from-teal-500 to-emerald-600 text-white p-4 sm:p-6 rounded-lg shadow-lg">
                         <div class="flex items-center justify-between mb-2">
                             <p class="text-xs sm:text-sm font-semibold">💰 Total Savings</p>
+                            <button onclick="toggleSavings()" class="text-white/80 hover:text-white text-xs flex items-center gap-1">
+                                <span id="savings-toggle-icon">👁️</span>
+                                <span id="savings-toggle-text">Show</span>
+                            </button>
                         </div>
-                        <p class="text-2xl sm:text-3xl lg:text-4xl font-bold balance-hidden">
-                            <span class="balance-amount hidden">KES {{ number_format($totalSavings, 0, '.', ',') }}</span>
-                            <span class="balance-placeholder">KES ••••••</span>
+                        <p class="text-2xl sm:text-3xl lg:text-4xl font-bold savings-balance-hidden">
+                            <span class="savings-balance-amount hidden">KES {{ number_format($totalSavings, 0, '.', ',') }}</span>
+                            <span class="savings-balance-placeholder">KES ••••••</span>
                         </p>
                         <p class="text-xs mt-1 opacity-90">
                             Across {{ $savingsAccounts->count() }} {{ Str::plural('account', $savingsAccounts->count()) }}
@@ -200,11 +204,12 @@
                                         </div>
                                     </div>
 
-                                    <div class="mb-3 balance-hidden">
+                                    {{-- Uses savings-specific classes, independent from main toggle --}}
+                                    <div class="mb-3 savings-balance-hidden">
                                         <p class="text-xs text-gray-600 dark:text-gray-400">Saved Amount</p>
                                         <p class="text-xl font-bold text-green-600 dark:text-green-400">
-                                            <span class="balance-amount hidden">KES {{ number_format($account->current_balance, 0, '.', ',') }}</span>
-                                            <span class="balance-placeholder">KES ••••••</span>
+                                            <span class="savings-balance-amount hidden">KES {{ number_format($account->current_balance, 0, '.', ',') }}</span>
+                                            <span class="savings-balance-placeholder">KES ••••••</span>
                                         </p>
                                     </div>
 
@@ -257,6 +262,7 @@
                                         </div>
                                     </div>
 
+                                    {{-- Wallets use the main balance toggle --}}
                                     <div class="mb-3 balance-hidden">
                                         <p class="text-xs text-gray-600 dark:text-gray-400">Available Balance</p>
                                         <p class="text-xl font-bold {{ $account->current_balance >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600' }}">
@@ -380,24 +386,21 @@
     </div>
 
     <script>
-        let balancesVisible = localStorage.getItem('balancesVisible') === 'true';
+        // ── State (persisted independently) ──────────────────────────────────
+        let balancesVisible        = localStorage.getItem('balancesVisible')        === 'true';
+        let savingsVisible         = localStorage.getItem('savingsVisible')         === 'true';
         let lowBalanceAccountsVisible = localStorage.getItem('lowBalanceAccountsVisible') === 'true';
 
+        // ── Main cash / wallet toggle ─────────────────────────────────────────
         function toggleBalances() {
             balancesVisible = !balancesVisible;
             localStorage.setItem('balancesVisible', balancesVisible);
             updateBalanceVisibility();
         }
 
-        function toggleLowBalanceAccounts() {
-            lowBalanceAccountsVisible = !lowBalanceAccountsVisible;
-            localStorage.setItem('lowBalanceAccountsVisible', lowBalanceAccountsVisible);
-            updateLowBalanceAccountsVisibility();
-        }
-
         function updateBalanceVisibility() {
             document.querySelectorAll('.balance-hidden').forEach(container => {
-                const amount = container.querySelector('.balance-amount');
+                const amount      = container.querySelector('.balance-amount');
                 const placeholder = container.querySelector('.balance-placeholder');
                 if (amount && placeholder) {
                     amount.classList.toggle('hidden', !balancesVisible);
@@ -408,16 +411,49 @@
             document.getElementById('toggle-text').textContent = balancesVisible ? 'Hide' : 'Show';
         }
 
+        // ── Savings-only toggle ───────────────────────────────────────────────
+        function toggleSavings() {
+            savingsVisible = !savingsVisible;
+            localStorage.setItem('savingsVisible', savingsVisible);
+            updateSavingsVisibility();
+        }
+
+        function updateSavingsVisibility() {
+            document.querySelectorAll('.savings-balance-hidden').forEach(container => {
+                const amount      = container.querySelector('.savings-balance-amount');
+                const placeholder = container.querySelector('.savings-balance-placeholder');
+                if (amount && placeholder) {
+                    amount.classList.toggle('hidden', !savingsVisible);
+                    placeholder.classList.toggle('hidden', savingsVisible);
+                }
+            });
+            const icon = document.getElementById('savings-toggle-icon');
+            const text = document.getElementById('savings-toggle-text');
+            if (icon) icon.textContent = savingsVisible ? '🙈' : '👁️';
+            if (text) text.textContent = savingsVisible ? 'Hide' : 'Show';
+        }
+
+        // ── Low-balance accounts toggle ───────────────────────────────────────
+        function toggleLowBalanceAccounts() {
+            lowBalanceAccountsVisible = !lowBalanceAccountsVisible;
+            localStorage.setItem('lowBalanceAccountsVisible', lowBalanceAccountsVisible);
+            updateLowBalanceAccountsVisibility();
+        }
+
         function updateLowBalanceAccountsVisibility() {
-            document.querySelectorAll('.low-balance-account').forEach(el => el.classList.toggle('hidden', !lowBalanceAccountsVisible));
+            document.querySelectorAll('.low-balance-account').forEach(el =>
+                el.classList.toggle('hidden', !lowBalanceAccountsVisible)
+            );
             document.getElementById('toggle-accounts-icon').textContent = lowBalanceAccountsVisible ? '🙈' : '👁️';
             document.getElementById('toggle-accounts-text').textContent = lowBalanceAccountsVisible
                 ? 'Hide accounts with low balance'
                 : 'Show accounts with low balance';
         }
 
+        // ── Init on load ──────────────────────────────────────────────────────
         document.addEventListener('DOMContentLoaded', function () {
             updateBalanceVisibility();
+            updateSavingsVisibility();
             updateLowBalanceAccountsVisibility();
         });
     </script>
