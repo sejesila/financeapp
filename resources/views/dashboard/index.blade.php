@@ -81,15 +81,28 @@
                     </p>
                 </div>
 
-                {{-- Toggle Balance Button --}}
-                <button id="toggleBalance"
-                        class="self-start sm:self-auto flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl shadow-md hover:shadow-lg transition-all duration-200">
-                    <svg id="eyeIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                              d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
-                    </svg>
-                    <span id="toggleText" class="font-medium text-sm">Show Balance</span>
-                </button>
+                {{-- Toggle Balance Buttons --}}
+                <div class="flex flex-col sm:flex-row gap-2">
+                    {{-- Main Balance Toggle --}}
+                    <button id="toggleBalance"
+                            class="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl shadow-md hover:shadow-lg transition-all duration-200">
+                        <svg id="eyeIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                        </svg>
+                        <span id="toggleText" class="font-medium text-sm">Show Balance</span>
+                    </button>
+
+                    {{-- Savings Balance Toggle --}}
+                    <button id="toggleSavingsBalance"
+                            class="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl shadow-md hover:shadow-lg transition-all duration-200">
+                        <svg id="savingsEyeIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                        </svg>
+                        <span id="savingsToggleText" class="font-medium text-sm">Show Savings</span>
+                    </button>
+                </div>
             </div>
 
             {{-- Main Financial Overview Cards --}}
@@ -101,55 +114,84 @@
                             'amount' => $totalAssets,
                             'subtitle' => 'Across ' . $accounts->count() . ' account' . ($accounts->count() != 1 ? 's' : ''),
                             'gradient' => 'from-emerald-500 to-green-600',
-                            'icon' => 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z'
+                            'icon' => 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z',
+                            'isSavings' => false
                         ],
                         [
                             'title' => 'Total Savings',
                             'amount' => $totalSavings,
-                            'subtitle' => $savingsAccounts->count() . ' savings account' . ($savingsAccounts->count() != 1 ? 's' : ''),
+                            'subtitle' => 'Across all savings accounts',
                             'gradient' => 'from-teal-500 to-cyan-600',
-                            'icon' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+                            'icon' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+                            'isSavings' => true
                         ],
                         [
                             'title' => 'Total Liabilities',
                             'amount' => $totalLiabilities,
                             'subtitle' => $activeLoans->count() . ' active loan' . ($activeLoans->count() != 1 ? 's' : ''),
                             'gradient' => 'from-rose-500 to-pink-600',
-                            'icon' => 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z'
+                            'icon' => 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z',
+                            'isSavings' => false
                         ],
                         [
                             'title' => 'Net Balance',
                             'amount' => $netWorth,
                             'subtitle' => 'Debt ratio: ' . number_format($debtToAssetRatio, 1) . '%',
                             'gradient' => $netWorth >= 0 ? 'from-blue-500 to-indigo-600' : 'from-orange-500 to-amber-600',
-                            'icon' => 'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z'
+                            'icon' => 'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z',
+                            'isSavings' => false
                         ]
                     ];
                 @endphp
 
                 @foreach($mainCards as $card)
-                    <div class="stat-card rounded-2xl shadow-lg p-5 sm:p-6 text-white bg-gradient-to-br {{ $card['gradient'] }}">
-                        <div class="flex items-center justify-between mb-4">
-                            <div class="p-3 rounded-xl bg-white/20 backdrop-blur-sm">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $card['icon'] }}"/>
-                                </svg>
+                    @if($card['isSavings'])
+                        <div class="stat-card rounded-2xl shadow-lg p-5 sm:p-6 text-white bg-gradient-to-br {{ $card['gradient'] }} savings-balance-hidden">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="p-3 rounded-xl bg-white/20 backdrop-blur-sm">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $card['icon'] }}"/>
+                                    </svg>
+                                </div>
+                                <span class="text-sm font-medium opacity-90">{{ $card['title'] }}</span>
                             </div>
-                            <span class="text-sm font-medium opacity-90">{{ $card['title'] }}</span>
-                        </div>
 
-                        <div class="space-y-1">
-                            <h3 class="text-3xl font-bold balance-amount">
-                                KES {{ number_format($card['amount'], 0, '.', ',') }}
-                            </h3>
-                            <div class="flex items-center gap-2 balance-hidden hidden">
-                                <h3 class="text-3xl font-bold">KES</h3>
-                                <div class="w-20 h-8 bg-white/20 rounded animate-pulse"></div>
+                            <div class="space-y-1">
+                                <h3 class="text-3xl font-bold savings-balance-amount">
+                                    KES {{ number_format($card['amount'], 0, '.', ',') }}
+                                </h3>
+                                <div class="flex items-center gap-2 savings-balance-hidden-placeholder hidden">
+                                    <h3 class="text-3xl font-bold">KES</h3>
+                                    <div class="w-20 h-8 bg-white/20 rounded animate-pulse"></div>
+                                </div>
+                                <p class="text-sm opacity-80 savings-balance-amount">{{ $card['subtitle'] }}</p>
+                                <p class="text-sm opacity-80 savings-balance-hidden-placeholder hidden">Hidden</p>
                             </div>
-                            <p class="text-sm opacity-80 balance-amount">{{ $card['subtitle'] }}</p>
-                            <p class="text-sm opacity-80 balance-hidden hidden">Hidden</p>
                         </div>
-                    </div>
+                    @else
+                        <div class="stat-card rounded-2xl shadow-lg p-5 sm:p-6 text-white bg-gradient-to-br {{ $card['gradient'] }} balance-hidden">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="p-3 rounded-xl bg-white/20 backdrop-blur-sm">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $card['icon'] }}"/>
+                                    </svg>
+                                </div>
+                                <span class="text-sm font-medium opacity-90">{{ $card['title'] }}</span>
+                            </div>
+
+                            <div class="space-y-1">
+                                <h3 class="text-3xl font-bold balance-amount">
+                                    KES {{ number_format($card['amount'], 0, '.', ',') }}
+                                </h3>
+                                <div class="flex items-center gap-2 balance-hidden hidden">
+                                    <h3 class="text-3xl font-bold">KES</h3>
+                                    <div class="w-20 h-8 bg-white/20 rounded animate-pulse"></div>
+                                </div>
+                                <p class="text-sm opacity-80 balance-amount">{{ $card['subtitle'] }}</p>
+                                <p class="text-sm opacity-80 balance-hidden hidden">Hidden</p>
+                            </div>
+                        </div>
+                    @endif
                 @endforeach
             </div>
 
@@ -294,7 +336,7 @@
                             <div
                                 class="relative group {{ $isLowBalance ? 'dashboard-low-balance-account hidden' : '' }}">
                                 <div
-                                    class="bg-gradient-to-br {{ $accountGradients[$loop->index % count($accountGradients)] }} rounded-xl p-4 text-white shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 {{ $isLowBalance ? 'opacity-60' : '' }}">
+                                    class="bg-gradient-to-br {{ $accountGradients[$loop->index % count($accountGradients)] }} rounded-xl p-4 text-white shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 {{ $isLowBalance ? 'opacity-60' : '' }} balance-hidden">
                                     <div class="flex justify-between items-start mb-3">
                                         <div class="flex items-center gap-2">
                                             <span
@@ -321,9 +363,9 @@
 
                                     <div>
                                         <p class="text-xs opacity-70 mb-1">Balance</p>
-                                        <p class="text-xl font-bold balance-amount">{{ number_format($account->current_balance, 0, '.', ',') }}</p>
+                                        <p class="text-xl font-bold balance-amount">KES {{ number_format($account->current_balance, 0, '.', ',') }}</p>
                                         <div class="flex items-center gap-2 balance-hidden hidden">
-                                            <p class="text-xl font-bold">***</p>
+                                            <p class="text-xl font-bold">KES ••••••</p>
                                         </div>
                                         @if($account->current_balance < 0)
                                             <p class="text-xs mt-1 opacity-70 flex items-center gap-1">
@@ -382,13 +424,14 @@
                                 @endphp
 
                                 @foreach($accountStats as $stat)
-                                    <div class="text-center">
+                                    <div class="text-center balance-hidden">
                                         <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ $stat['label'] }}</p>
                                         <p class="text-base font-bold text-{{ $stat['color'] }}-600 dark:text-{{ $stat['color'] }}-400 balance-amount">
-                                            {{ number_format($stat['value'], 0) }}
+                                            KES {{ number_format($stat['value'], 0) }}
                                         </p>
                                         <p class="text-base font-bold text-{{ $stat['color'] }}-600 dark:text-{{ $stat['color'] }}-400 balance-hidden hidden">
-                                            ***</p>
+                                            KES ••••••
+                                        </p>
                                     </div>
                                 @endforeach
                             </div>
@@ -546,36 +589,82 @@
 
     {{-- JavaScript for Toggle --}}
     <script>
+        // ── State (persisted independently) ──────────────────────────────────
+        let balancesVisible = localStorage.getItem('balancesVisible') === 'true';
+        let savingsVisible = localStorage.getItem('savingsVisible') === 'true';
+        let lowBalanceAccountsVisible = localStorage.getItem('lowBalanceAccountsVisible') === 'true';
+
+        // ── Main cash / wallet toggle ─────────────────────────────────────────
+        function updateBalanceVisibility() {
+            document.querySelectorAll('.balance-hidden').forEach(container => {
+                const amount = container.querySelector('.balance-amount');
+                const placeholder = container.querySelector('.balance-hidden');
+                if (amount && placeholder) {
+                    amount.classList.toggle('hidden', !balancesVisible);
+                    placeholder.classList.toggle('hidden', balancesVisible);
+                }
+            });
+            document.getElementById('toggleText').textContent = balancesVisible ? 'Hide Balance' : 'Show Balance';
+            document.getElementById('eyeIcon').innerHTML = balancesVisible
+                ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>'
+                : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>';
+        }
+
+        // ── Savings-only toggle ───────────────────────────────────────────────
+        function updateSavingsVisibility() {
+            document.querySelectorAll('.savings-balance-hidden').forEach(container => {
+                const amount = container.querySelector('.savings-balance-amount');
+                const placeholder = container.querySelector('.savings-balance-hidden-placeholder');
+                if (amount && placeholder) {
+                    amount.classList.toggle('hidden', !savingsVisible);
+                    placeholder.classList.toggle('hidden', savingsVisible);
+                }
+            });
+            document.getElementById('savingsToggleText').textContent = savingsVisible ? 'Hide Savings' : 'Show Savings';
+            document.getElementById('savingsEyeIcon').innerHTML = savingsVisible
+                ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>'
+                : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>';
+        }
+
+        // ── Low-balance accounts toggle ───────────────────────────────────────
+        function toggleDashboardLowBalanceAccounts() {
+            lowBalanceAccountsVisible = !lowBalanceAccountsVisible;
+            localStorage.setItem('lowBalanceAccountsVisible', lowBalanceAccountsVisible);
+            updateLowBalanceAccountsVisibility();
+        }
+
+        function updateLowBalanceAccountsVisibility() {
+            document.querySelectorAll('.dashboard-low-balance-account').forEach(el =>
+                el.classList.toggle('hidden', !lowBalanceAccountsVisible)
+            );
+            document.getElementById('toggle-dashboard-accounts-icon').textContent = lowBalanceAccountsVisible ? '🙈' : '👁️';
+            document.getElementById('toggle-dashboard-accounts-text').textContent = lowBalanceAccountsVisible
+                ? 'Hide low'
+                : 'Show low';
+        }
+
+        // ── Init on load ──────────────────────────────────────────────────────
         document.addEventListener('DOMContentLoaded', function () {
+            // Set up balance toggle
             const toggleBtn = document.getElementById('toggleBalance');
-            const toggleText = document.getElementById('toggleText');
-            const eyeIcon = document.getElementById('eyeIcon');
-            const balanceAmounts = document.querySelectorAll('.balance-amount');
-            const balanceHidden = document.querySelectorAll('.balance-hidden');
-
-            let isVisible = localStorage.getItem('balanceVisible') === 'true';
-
-            updateVisibility();
-
             toggleBtn.addEventListener('click', function () {
-                isVisible = !isVisible;
-                localStorage.setItem('balanceVisible', isVisible);
-                updateVisibility();
+                balancesVisible = !balancesVisible;
+                localStorage.setItem('balancesVisible', balancesVisible);
+                updateBalanceVisibility();
             });
 
-            function updateVisibility() {
-                if (isVisible) {
-                    balanceAmounts.forEach(el => el.classList.remove('hidden'));
-                    balanceHidden.forEach(el => el.classList.add('hidden'));
-                    toggleText.textContent = 'Hide Balance';
-                    eyeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>';
-                } else {
-                    balanceAmounts.forEach(el => el.classList.add('hidden'));
-                    balanceHidden.forEach(el => el.classList.remove('hidden'));
-                    toggleText.textContent = 'Show Balance';
-                    eyeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>';
-                }
-            }
+            // Set up savings toggle
+            const toggleSavingsBtn = document.getElementById('toggleSavingsBalance');
+            toggleSavingsBtn.addEventListener('click', function () {
+                savingsVisible = !savingsVisible;
+                localStorage.setItem('savingsVisible', savingsVisible);
+                updateSavingsVisibility();
+            });
+
+            // Initialize visibility on load
+            updateBalanceVisibility();
+            updateSavingsVisibility();
+            updateLowBalanceAccountsVisibility();
         });
     </script>
 
