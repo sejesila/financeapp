@@ -41,7 +41,7 @@
             <!-- Amount Header (Featured) -->
             <div class="text-center px-4 sm:px-6 pt-6 sm:pt-8 pb-4 sm:pb-6 bg-gradient-to-br {{ $transaction->category->type === 'income' ? 'from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20' : 'from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20' }}">
                 <time datetime="{{ $transaction->date->format('Y-m-d') }}" class="block text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2 sm:mb-3 font-medium">
-                    {{ $transaction->date->format('l, F j, Y') }}
+                    {{ $transaction->date->format('l, F j, Y \a\t g:i A') }}
                 </time>
 
                 <p class="font-bold text-3xl sm:text-4xl md:text-5xl {{ $transaction->category->type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }} mb-2 sm:mb-3">

@@ -351,8 +351,15 @@
                                {{ $isFee ? 'bg-yellow-50/60 dark:bg-yellow-900/10' : '' }}">
 
                             {{-- Date --}}
-                            <td class="px-4 py-3 whitespace-nowrap text-gray-700 dark:text-gray-300 text-xs font-medium">
-                                {{ \Carbon\Carbon::parse($t->date)->format('M d, Y') }}
+                            <td class="px-4 py-3 whitespace-nowrap text-xs font-medium">
+                                <div class="flex flex-col gap-0.5">
+        <span class="text-gray-700 dark:text-gray-300">
+            {{ \Carbon\Carbon::parse($t->date)->format('M d, Y') }}
+        </span>
+                                    <span class="text-gray-400 dark:text-gray-500">
+            {{ \Carbon\Carbon::parse($t->date)->format('g:i A') }}
+        </span>
+                                </div>
                             </td>
 
                             {{-- Description --}}

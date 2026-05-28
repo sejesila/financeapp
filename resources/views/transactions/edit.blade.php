@@ -33,7 +33,7 @@
                 <!-- Date -->
                 <div class="mb-4 sm:mb-5">
                     <label class="block text-sm sm:text-base font-semibold mb-1 dark:text-gray-200">Date</label>
-                    <input type="date" name="date" value="{{ old('date', $transaction->date->format('Y-m-d')) }}"
+                    <input type="datetime-local" name="date" value="{{ old('date', $transaction->date->format('Y-m-d\TH:i')) }}"
                            class="w-full text-sm sm:text-base border dark:border-gray-600 p-2 sm:p-2.5 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200" required>
                 </div>
 
