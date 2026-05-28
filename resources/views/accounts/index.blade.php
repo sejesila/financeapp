@@ -341,7 +341,10 @@
                                             <span class="text-teal-600 dark:text-teal-400">{{ $transfer->toAccount->name }}</span>
                                         </p>
                                         <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                                            {{ \Carbon\Carbon::parse($transfer->date)->format('M d, Y') }}
+                                            <span>{{ \Carbon\Carbon::parse($transfer->date)->format('M d, Y') }}</span>
+                                            <span class="text-gray-400 dark:text-gray-500 ml-1">
+    {{ \Carbon\Carbon::parse($transfer->date)->format('g:i A') }}
+</span>
                                         </p>
                                         @if($transfer->description)
                                             <p class="text-xs text-gray-500 dark:text-gray-500 mt-1 italic">

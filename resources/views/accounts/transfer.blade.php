@@ -196,11 +196,7 @@
                 <!-- Date -->
                 <div class="mb-4">
                     <label for="date" class="block text-gray-700 dark:text-gray-200 font-semibold mb-2">Date</label>
-                    <input
-                        type="date"
-                        name="date"
-                        id="date"
-                        x-model="date"
+                    <input type="datetime-local" name="date" id="date" x-model="date"
                         class="w-full border border-gray-300 dark:border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
                         required
                     >
@@ -241,7 +237,7 @@
                 fromAccountId: '{{ old('from_account_id') }}',
                 toAccountId: '{{ old('to_account_id') }}',
                 amount: {{ old('amount') ?: 'null' }},
-                date: '{{ old('date', date('Y-m-d')) }}',
+                date: '{{ old('date', now()->format('Y-m-d\TH:i')) }}',
                 description: '{{ old('description') }}',
                 transactionFee: {{ old('transaction_fee', 0) }},
                 showFee: false,

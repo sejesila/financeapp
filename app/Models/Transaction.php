@@ -26,7 +26,7 @@ class Transaction extends Model
     ];
 
     protected $casts = [
-        'date'               => 'date',
+        'date'               => 'datetime',
         'amount'             => 'decimal:2',
         'is_transaction_fee' => 'boolean',
     ];

@@ -114,12 +114,8 @@
                 <label for="date" class="block text-gray-700 font-semibold mb-2">
                     Date <span class="text-red-500">*</span>
                 </label>
-                <input
-                    type="date"
-                    name="date"
-                    id="date"
-                    x-model="date"
-                    value="{{ old('date', date('Y-m-d')) }}"
+                <input type="datetime-local" name="date" id="date" x-model="date"
+                       value="{{ old('date', now()->format('Y-m-d\TH:i')) }}"
                     class="w-full border border-gray-300 rounded px-4 py-2"
                     required
                 >
@@ -182,7 +178,7 @@
         function topupForm() {
             return {
                 amount: '{{ old('amount') }}',
-                date: '{{ old('date', date('Y-m-d')) }}',
+                date: '{{ old('date', now()->format('Y-m-d\TH:i')) }}',
                 description: '{{ old('description') }}',
                 isClientFund: @if($isSavings) {{ old('is_client_fund') ? 'true' : 'false' }} @else false @endif,
 

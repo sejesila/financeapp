@@ -119,11 +119,8 @@
                             <label for="date" class="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
                                 Recording Date <span class="text-red-600">*</span>
                             </label>
-                            <input type="date"
-                                   id="date"
-                                   name="date"
-                                   required
-                                   value="{{ old('date', now()->toDateString()) }}"
+                            <input type="datetime-local" id="date" name="date" required
+                                   value="{{ old('date', now()->format('Y-m-d\TH:i')) }}"
                                    class="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                             @error('date')
                             <p class="text-red-600 dark:text-red-400 text-sm mt-1">{{ $message }}</p>

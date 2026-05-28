@@ -48,7 +48,7 @@ class TransferRecorder
                 'from_account_id' => $bankAccount->id,
                 'to_account_id'   => $mpesaAccount->id,
                 'amount'          => $parsed['amount'],
-                'date'            => $parsed['date'],
+                'date'            => now(),
                 'description'     => $parsed['description'] . ' [' . $parsed['reference'] . ']',
             ]);
 
@@ -106,7 +106,7 @@ class TransferRecorder
                 'from_account_id' => $bankAccount->id,
                 'to_account_id'   => $airtelAccount->id,
                 'amount'          => $parsed['amount'],
-                'date'            => $parsed['date'],
+                'date'            => now(),
                 'description'     => $parsed['description'] . ' [' . $parsed['reference'] . ']',
             ]);
 
@@ -164,7 +164,7 @@ class TransferRecorder
                 'from_account_id' => $bankAccount->id,
                 'to_account_id'   => $cashAccount->id,
                 'amount'          => $parsed['amount'],
-                'date'            => $parsed['date'],
+                'date'            => now(),
                 'description'     => $parsed['description'] . ' [' . $parsed['reference'] . ']',
             ]);
 
@@ -292,7 +292,7 @@ class TransferRecorder
                 'from_account_id' => $mpesaAccount->id,
                 'to_account_id'   => $destinationAccount->id,
                 'amount'          => $parsed['amount'],
-                'date'            => $parsed['date'],
+                'date'            => now(),
                 'description'     => $parsed['description'] . ' [' . $parsed['reference'] . ']',
             ]);
 
@@ -395,7 +395,7 @@ class TransferRecorder
                 'from_account_id' => $sourceAccount->id,
                 'to_account_id'   => $mpesaAccount->id,
                 'amount'          => $parsed['amount'],
-                'date'            => $parsed['date'],
+                'date'            => now(),
                 'description'     => $parsed['description'] . ' [' . $parsed['reference'] . ']',
             ]);
 
