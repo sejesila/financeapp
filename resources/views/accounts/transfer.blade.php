@@ -136,11 +136,11 @@
                             'text-purple-700 dark:text-purple-300': feeType === 'savings'
                         }">
                         <span x-text="
-    feeType === 'atm'      ? '🏧 ATM Withdrawal Fee' :
-    feeType === 'savings'  ? '💰 Savings Withdrawal Fee' :
-    feeType === 'withdrawal' ? '📱 ' + (fromAccountType === 'mpesa' ? 'M-Pesa' : 'Airtel Money') + ' Withdrawal Fee' :
-                              '📱 ' + (fromAccountType === 'mpesa' ? 'M-Pesa' : 'Airtel Money') + ' PayBill Fee'
-"></span>
+                            feeType === 'atm'        ? '🏧 ATM Withdrawal Fee' :
+                            feeType === 'savings'    ? '💰 Savings Withdrawal Fee' :
+                            feeType === 'withdrawal' ? '📱 ' + (fromAccountType === 'mpesa' ? 'M-Pesa' : 'Airtel Money') + ' Withdrawal Fee' :
+                                                       '📱 ' + (fromAccountType === 'mpesa' ? 'M-Pesa' : 'Airtel Money') + ' PayBill Fee'
+                        "></span>
                         <span class="text-xs font-normal text-gray-500 dark:text-gray-400 ml-1">(auto-calculated, editable)</span>
                     </label>
 
@@ -197,8 +197,8 @@
                 <div class="mb-4">
                     <label for="date" class="block text-gray-700 dark:text-gray-200 font-semibold mb-2">Date</label>
                     <input type="datetime-local" name="date" id="date" x-model="date"
-                        class="w-full border border-gray-300 dark:border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
-                        required
+                           class="w-full border border-gray-300 dark:border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
+                           required
                     >
                     @error('date')
                     <p class="text-red-500 text-sm mt-2">{{ $message }}</p>
@@ -280,7 +280,7 @@
                     this.fromAccountName = fromAccount.name;
                     this.toAccountType   = toAccount.type;
 
-                    // Savings transfers: show fee field at 0 for manual entry
+                    // Savings → anywhere: show fee field at 0 for manual entry
                     if (fromAccount.type === 'savings') {
                         this.feeType        = 'savings';
                         this.transactionFee = 0;
@@ -309,6 +309,12 @@
                         this.transactionFee = this.ATM_FEE;
                         this.showFee        = true;
                     }
+                    // Bank → Savings = no fee
+                    else if (fromAccount.type === 'bank' && toAccount.type === 'savings') {
+                        this.feeType        = null;
+                        this.transactionFee = 0;
+                        this.showFee        = false;
+                    }
                     // All other transfers = no fee
                     else {
                         this.feeType        = null;
@@ -316,6 +322,7 @@
                         this.showFee        = false;
                     }
                 },
+
                 getWithdrawalFee(amount, accountType) {
                     if (!amount || amount < 50) return 0;
 
@@ -392,9 +399,9 @@
                             return;
                         }
 
-                        // Bank source: allow mpesa, airtel_money, cash
+                        // Bank source: allow mpesa, airtel_money, cash, savings
                         if (fromAccount && fromAccount.type === 'bank') {
-                            const allowed = ['mpesa', 'airtel_money', 'cash'];
+                            const allowed = ['mpesa', 'airtel_money', 'cash', 'savings'];
                             option.disabled = !allowed.includes(optionType);
                             option.hidden   = !allowed.includes(optionType);
                         }

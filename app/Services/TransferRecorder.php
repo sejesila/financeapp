@@ -4,6 +4,7 @@
 namespace App\Services;
 
 use App\Models\Account;
+use App\Models\Category;
 use App\Models\Transaction;
 use App\Models\Transfer;
 use App\Models\User;
@@ -17,8 +18,6 @@ class TransferRecorder
 
     // ─────────────────────────────────────────────────────────────────────
     // Bank → Own Mpesa (self transfer)
-    // Both the I&M bank SMS and the Mpesa confirmation SMS share the same
-    // M-PESA Ref ID, so whichever arrives second is caught by dedup.
     // ─────────────────────────────────────────────────────────────────────
 
     public function bankToMpesaSelf(User $user, array $parsed): JsonResponse
@@ -76,7 +75,6 @@ class TransferRecorder
 
     // ─────────────────────────────────────────────────────────────────────
     // Bank → Own Airtel Money (self transfer)
-    // Both SMS legs are linked by the Airtel Money Ref ID.
     // ─────────────────────────────────────────────────────────────────────
 
     public function bankToAirtelSelf(User $user, array $parsed): JsonResponse
@@ -179,7 +177,6 @@ class TransferRecorder
                 'description'        => 'ATM fee for ' . $parsed['reference'],
                 'payment_method'     => 'I&M Bank',
                 'is_transaction_fee' => true,
-
             ]);
 
             $bankAccount->updateBalance();
@@ -206,16 +203,130 @@ class TransferRecorder
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // Outgoing account transfer — e.g. Mpesa → Airtel Money, Mpesa → Sanlam
-    // Falls back to an expense transaction when the destination account is
-    // not found in the user's account list.
+    // PesaLink — Bank → Savings account (e.g. Etica at Equity Bank)
+    // Records the transfer + PesaLink fee as an expense on the bank account.
     // ─────────────────────────────────────────────────────────────────────
 
-    /**
-     * Outgoing account transfer — e.g. Mpesa → Airtel Money, Mpesa → Sanlam, Mpesa → Etica
-     * Falls back to an expense transaction when the destination account is
-     * not found in the user's account list.
-     */
+    public function pesaLinkToSavings(User $user, array $parsed): JsonResponse
+    {
+        $bankAccount = Account::withoutGlobalScopes()
+            ->where('user_id', $user->id)
+            ->where('type', 'bank')
+            ->where('is_active', true)
+            ->first();
+
+        // Find savings account by name — fuzzy match on "etica"
+        $savingsAccount = Account::withoutGlobalScopes()
+            ->where('user_id', $user->id)
+            ->where('type', 'savings')
+            ->where('is_active', true)
+            ->whereRaw('LOWER(name) LIKE ?', ['%etica%'])
+            ->first();
+
+        if (!$bankAccount) {
+            Log::warning('Webhook: PesaLink→savings — bank account not found', [
+                'user_id' => $user->id,
+            ]);
+            return response()->json(['error' => 'Bank account not found'], 404);
+        }
+
+        if (!$savingsAccount) {
+            // Fallback: record as a bank expense if savings account not configured
+            Log::warning('Webhook: PesaLink→savings — Etica savings account not found, recording as expense', [
+                'user_id' => $user->id,
+            ]);
+
+            $category = $this->categories->findOrCreate($user, 'Savings', 'expense');
+
+            DB::transaction(function () use ($user, $parsed, $bankAccount, $category) {
+                Transaction::withoutGlobalScopes()->create([
+                    'user_id'        => $user->id,
+                    'account_id'     => $bankAccount->id,
+                    'category_id'    => $category->id,
+                    'amount'         => $parsed['amount'],
+                    'date'           => $parsed['date'],
+                    'description'    => $parsed['description'] . ' [' . $parsed['reference'] . ']',
+                    'payment_method' => 'PesaLink',
+                ]);
+
+                if ($parsed['fee'] > 0) {
+                    $feeCategory = $this->categories->findOrCreate($user, 'Transaction Fees', 'expense');
+                    Transaction::withoutGlobalScopes()->create([
+                        'user_id'            => $user->id,
+                        'account_id'         => $bankAccount->id,
+                        'category_id'        => $feeCategory->id,
+                        'amount'             => $parsed['fee'],
+                        'date'               => $parsed['date'],
+                        'description'        => 'PesaLink fee for ' . $parsed['reference'],
+                        'payment_method'     => 'I&M Bank',
+                        'is_transaction_fee' => true,
+                    ]);
+                }
+
+                $bankAccount->updateBalance();
+            });
+
+            return response()->json([
+                'status'  => 'created',
+                'subtype' => 'pesalink_fallback',
+                'amount'  => $parsed['amount'],
+                'fee'     => $parsed['fee'],
+                'note'    => 'Etica savings account not found — recorded as expense',
+            ], 201);
+        }
+
+        // ── Happy path: Transfer + fee transaction ────────────────────────
+        DB::transaction(function () use ($user, $parsed, $bankAccount, $savingsAccount) {
+            Transfer::create([
+                'user_id'         => $user->id,
+                'from_account_id' => $bankAccount->id,
+                'to_account_id'   => $savingsAccount->id,
+                'amount'          => $parsed['amount'],
+                'date'            => $parsed['date'],
+                'description'     => $parsed['description'] . ' [' . $parsed['reference'] . ']',
+            ]);
+
+            if ($parsed['fee'] > 0) {
+                $feeCategory = $this->categories->findOrCreate($user, 'Transaction Fees', 'expense');
+                Transaction::withoutGlobalScopes()->create([
+                    'user_id'            => $user->id,
+                    'account_id'         => $bankAccount->id,
+                    'category_id'        => $feeCategory->id,
+                    'amount'             => $parsed['fee'],
+                    'date'               => $parsed['date'],
+                    'description'        => 'PesaLink fee for ' . $parsed['reference'],
+                    'payment_method'     => 'I&M Bank',
+                    'is_transaction_fee' => true,
+                ]);
+            }
+
+            $bankAccount->updateBalance();
+            $savingsAccount->updateBalance();
+        });
+
+        Log::info('Webhook: PesaLink → savings transfer recorded', [
+            'user_id'   => $user->id,
+            'reference' => $parsed['reference'],
+            'amount'    => $parsed['amount'],
+            'fee'       => $parsed['fee'],
+            'from'      => $bankAccount->name,
+            'to'        => $savingsAccount->name,
+        ]);
+
+        return response()->json([
+            'status'  => 'created',
+            'subtype' => 'pesalink_to_savings',
+            'amount'  => $parsed['amount'],
+            'fee'     => $parsed['fee'],
+            'from'    => $bankAccount->name,
+            'to'      => $savingsAccount->name,
+        ], 201);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Outgoing account transfer — e.g. Mpesa → Airtel Money, Mpesa → Sanlam
+    // ─────────────────────────────────────────────────────────────────────
+
     public function outgoing(User $user, array $parsed): JsonResponse
     {
         $mpesaAccount = Account::withoutGlobalScopes()
@@ -230,14 +341,12 @@ class TransferRecorder
 
         $hint = $parsed['to_account_hint'] ?? '';
 
-        // Fuzzy match destination account by hint (case-insensitive LIKE search)
         $destinationAccount = Account::withoutGlobalScopes()
             ->where('user_id', $user->id)
             ->where('is_active', true)
             ->whereRaw('LOWER(name) LIKE ?', ['%' . strtolower($hint) . '%'])
             ->first();
 
-        // ── Fallback: destination not found — record as expense ───────────────
         if (!$destinationAccount) {
             Log::info('Webhook: outgoing transfer — destination not found, recording as expense', [
                 'user_id' => $user->id,
@@ -253,7 +362,6 @@ class TransferRecorder
                 'date'           => $parsed['date'],
                 'description'    => $parsed['description'] . ' [' . $parsed['reference'] . ']',
                 'payment_method' => 'Mpesa',
-
             ]);
 
             if (!empty($parsed['fee']) && $parsed['fee'] > 0) {
@@ -268,7 +376,6 @@ class TransferRecorder
                     'payment_method'             => 'Mpesa',
                     'is_transaction_fee'         => true,
                     'related_fee_transaction_id' => $transaction->id,
-
                 ]);
                 $transaction->update(['related_fee_transaction_id' => $feeTransaction->id]);
             }
@@ -285,7 +392,6 @@ class TransferRecorder
             ], 201);
         }
 
-        // ── Happy path: create transfer ───────────────────────────────────────
         DB::transaction(function () use ($user, $parsed, $mpesaAccount, $destinationAccount) {
             Transfer::create([
                 'user_id'         => $user->id,
@@ -307,7 +413,6 @@ class TransferRecorder
                     'description'        => 'Transaction fee for ' . $parsed['reference'],
                     'payment_method'     => 'Mpesa',
                     'is_transaction_fee' => true,
-
                 ]);
             }
 
@@ -336,8 +441,6 @@ class TransferRecorder
 
     // ─────────────────────────────────────────────────────────────────────
     // Incoming account transfer — e.g. Airtel Money → Mpesa
-    // Falls back to an income transaction when the source account is not
-    // found in the user's account list.
     // ─────────────────────────────────────────────────────────────────────
 
     public function incoming(User $user, array $parsed): JsonResponse
@@ -359,7 +462,6 @@ class TransferRecorder
             ->whereRaw('LOWER(name) LIKE ?', ['%' . strtolower($hint) . '%'])
             ->first();
 
-        // ── Fallback: source not found — record as income ─────────────────
         if (!$sourceAccount) {
             Log::info('Webhook: incoming transfer — source account not found, recording as income', [
                 'user_id' => $user->id,
@@ -388,7 +490,6 @@ class TransferRecorder
             ], 201);
         }
 
-        // ── Happy path: create transfer (source → mpesa) ──────────────────
         DB::transaction(function () use ($user, $parsed, $sourceAccount, $mpesaAccount) {
             Transfer::create([
                 'user_id'         => $user->id,

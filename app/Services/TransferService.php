@@ -89,15 +89,17 @@ readonly class TransferService
      * Enforce account-type transfer rules.
      *
      * Rules:
-     *   1. Cash → Savings  : blocked (go through mobile money first)
+     *   1. Cash → Savings  : blocked (go through mobile money or bank first)
      *   2. Savings → *     : only Cash, M-Pesa, Airtel Money, or Bank allowed
+     *   3. Bank → Savings  : allowed (direct bank-to-savings deposit)
+     *   4. M-Pesa minimum withdrawal enforced
      */
     private function enforceTransferRules(Account $from, Account $to, float $amount): void
     {
         // Rule: Cash cannot transfer directly to Savings
         if ($from->type === 'cash' && $to->type === 'savings') {
             throw ValidationException::withMessages([
-                'to_account_id' => 'Direct transfers from cash to savings accounts are not allowed. Please transfer to M-Pesa or Airtel Money first.',
+                'to_account_id' => 'Direct transfers from cash to savings accounts are not allowed. Please transfer to M-Pesa, Airtel Money, or Bank first.',
             ]);
         }
 
@@ -117,6 +119,8 @@ readonly class TransferService
                 'amount' => 'Minimum M-Pesa withdrawal amount is KES 50.',
             ]);
         }
+
+        // Bank → Savings is explicitly allowed — no rule needed, falls through cleanly.
     }
 
     // ── Balance check ─────────────────────────────────────────────────────────
@@ -153,7 +157,7 @@ readonly class TransferService
         Transaction::create([
             'user_id'            => Auth::id(),
             'date'               => $date,
-            'description' => $userDescription
+            'description'        => $userDescription
                 ? "{$from->name} to {$to->name} fee: {$userDescription}"
                 : "{$from->name} to {$to->name} fee",
             'amount'             => $fee->amount,
