@@ -99,6 +99,9 @@ class MpesaSmsController extends Controller
         if ($parsed['subtype'] === 'account_transfer' && $parsed['type'] === 'transfer' && isset($parsed['from_account_hint'])) {
             return $this->transfers->incoming($user, $parsed);
         }
+        if ($parsed['subtype'] === 'pesalink_to_savings') {
+            return $this->transfers->pesaLinkToSavings($user, $parsed);
+        }
 
         // ── 6. Record expense / income ────────────────────────────────────
         return $this->transactions->record($user, $parsed);
