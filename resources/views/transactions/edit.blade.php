@@ -127,10 +127,11 @@
                 <!-- Transaction Type (for mobile money) -->
                 <div class="mb-4 sm:mb-5" x-show="showTransactionTypeSelector">
                     <label class="block text-sm sm:text-base font-semibold mb-1 dark:text-gray-200">Transaction Type</label>
-                    <select name="mobile_money_type" x-model="mobileMoneyType"
+                    <select name="mobile_money_type"
+                            x-ref="mobileMoneySelect"
                             class="w-full text-sm sm:text-base border dark:border-gray-600 p-2 sm:p-2.5 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200">
                         <template x-for="type in transactionTypeOptions" :key="type.key">
-                            <option :value="type.key" x-text="type.label"></option>
+                            <option :value="type.key" x-text="type.label" :selected="type.key === mobileMoneyType"></option>
                         </template>
                     </select>
                 </div>
@@ -190,18 +191,12 @@
                             ? this.mpesaTypes
                             : this.airtelTypes;
 
-                        // CRITICAL: Always use the original transaction type if it exists
                         if (this.originalMobileMoneyType) {
-                            // Check if the type exists in our options
                             const typeExists = this.transactionTypeOptions.some(t => t.key === this.originalMobileMoneyType);
-                            if (typeExists) {
-                                this.mobileMoneyType = this.originalMobileMoneyType;
-                            } else if (this.transactionTypeOptions.length > 0) {
-                                this.mobileMoneyType = this.transactionTypeOptions[0].key;
-                            }
-                        }
-                        // Only for new transactions (no original type) use defaults
-                        else if (!this.mobileMoneyType && this.transactionTypeOptions.length > 0) {
+                            this.mobileMoneyType = typeExists
+                                ? this.originalMobileMoneyType
+                                : (this.transactionTypeOptions[0]?.key ?? '');
+                        } else if (!this.mobileMoneyType) {
                             this.mobileMoneyType = this.accountType === 'mpesa'
                                 ? this.defaultMpesaType
                                 : this.defaultAirtelType;

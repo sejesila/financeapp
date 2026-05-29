@@ -281,8 +281,8 @@ class TransactionController extends Controller
                 'accounts'               => $accounts,
                 'mpesaCosts'             => MobileMoneyRates::costs('mpesa'),
                 'airtelCosts'            => MobileMoneyRates::costs('airtel_money'),
-                'mpesaTransactionTypes'  => $this->getSortedTransactionTypes('mpesa'),
-                'airtelTransactionTypes' => $this->getSortedTransactionTypes('airtel_money'),
+                'mpesaTransactionTypes'  => $this->getTransactionTypes('mpesa'),
+                'airtelTransactionTypes' => $this->getTransactionTypes('airtel_money'),
                 'defaultMpesaType'       => MobileMoneyTypeUsage::getMostUsedType(Auth::id(), 'mpesa') ?? 'send_money',
                 'defaultAirtelType'      => MobileMoneyTypeUsage::getMostUsedType(Auth::id(), 'airtel_money') ?? 'send_money',
                 'mpesaAccount'           => $accounts->where('type', 'mpesa')->first(),
@@ -350,23 +350,14 @@ class TransactionController extends Controller
             ->get();
     }
 
-    private function getSortedTransactionTypes(string $accountType): array
+    private function getTransactionTypes(string $accountType): array
     {
-        $baseTypes  = MobileMoneyRates::types($accountType);
-        $usageStats = MobileMoneyTypeUsage::where('user_id', Auth::id())
-            ->where('account_type', $accountType)
-            ->orderByDesc('usage_count')
-            ->pluck('usage_count', 'transaction_type')
-            ->toArray();
+        $baseTypes = MobileMoneyRates::types($accountType);
 
-        $sorted = array_map(
-            fn($key, $label) => ['key' => $key, 'label' => $label, 'usageCount' => $usageStats[$key] ?? 0],
+        return array_map(
+            fn($key, $label) => ['key' => $key, 'label' => $label],
             array_keys($baseTypes),
             $baseTypes,
         );
-
-        usort($sorted, fn($a, $b) => $b['usageCount'] <=> $a['usageCount']);
-
-        return $sorted;
     }
 }
