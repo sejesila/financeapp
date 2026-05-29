@@ -291,14 +291,14 @@ class AccountController extends Controller
         }
 
         // ── "Record Interest" button guard (monthly) ──────────────────────────
-        $interestRecordedThisMonth = false;
+        $interestRecordedLastMonth = false;
         if ($account->type === 'savings') {
-            $interestRecordedThisMonth = $account->transactions()
+            $interestRecordedLastMonth = $account->transactions()
                 ->whereNull('deleted_at')
                 ->join('categories', 'transactions.category_id', '=', 'categories.id')
                 ->where('categories.name', 'Interest')
-                ->whereYear('transactions.date', now()->year)
-                ->whereMonth('transactions.date', now()->month)
+                ->whereYear('transactions.date', now()->subMonth()->year)
+                ->whereMonth('transactions.date', now()->subMonth()->month)
                 ->exists();
         }
 
@@ -329,7 +329,7 @@ class AccountController extends Controller
             'availableYears'             => $availableYears,
             'selectedYear'               => $selectedYear,
             'selectedPeriod'             => $selectedPeriod,
-            'interestRecordedThisMonth'  => $interestRecordedThisMonth,
+            'interestRecordedLastMonth'  => $interestRecordedLastMonth,
         ]);
     }
 
@@ -649,12 +649,14 @@ class AccountController extends Controller
         $skippedDaysCount = $this->interestService->getSkippedDaysCount($account);
         $skippedDateRange = $this->interestService->getSkippedDateRange($account);
         $lastInterestDate = $this->interestService->getLastInterestDate($account);
+        $targetMonth = $this->interestService->getTargetMonth();
 
         return view('accounts.record-interest', compact(
             'account',
             'skippedDaysCount',
             'skippedDateRange',
             'lastInterestDate',
+            'targetMonth',
         ));
     }
 
@@ -707,28 +709,32 @@ class AccountController extends Controller
         );
 
         // Build description — user-supplied takes priority, then auto-generate.
+        $targetMonth = $this->interestService->getTargetMonth();
         if ($request->filled('description')) {
             $description = $request->description;
         } elseif ($skippedMonthsCount !== null && $skippedMonthsCount > 0) {
             $totalMonths = $skippedMonthsCount + 1;
-            $description = 'Interest earned – ' . now()->format('M Y') . " ({$totalMonths}-month period)";
+            $description = 'Interest earned – ' . $targetMonth->format('M Y') . " ({$totalMonths}-month period)";
         } else {
-            $description = 'Interest earned – ' . now()->format('M Y');
+            $description = 'Interest earned – ' . $targetMonth->format('M Y');
         }
+
+        $targetMonth = $this->interestService->getTargetMonth();
 
         $account->transactions()->create([
             'user_id'        => Auth::id(),
             'amount'         => (float) $request->amount,
-            'date'           => $request->date,
+            'date'           => $targetMonth->format('Y-m-') . $targetMonth->daysInMonth,
             'description'    => $description,
             'category_id'    => $interestCategory->id,
             'payment_method' => 'Interest',
+            'type'           => 'income',
         ]);
 
         $account->updateBalance();
         Cache::forget("account.{$account->id}.stats");
 
-        $message = 'Interest of KES ' . number_format($request->amount, 0, '.', ',') . ' recorded for ' . now()->format('M Y') . '!';
+        $message = 'Interest of KES ' . number_format($request->amount, 0, '.', ',') . ' recorded for ' . $targetMonth->format('M Y') . '!';
         if ($skippedMonthsCount !== null && $skippedMonthsCount > 0) {
             $message .= ' (covering ' . ($skippedMonthsCount + 1) . ' months)';
         }

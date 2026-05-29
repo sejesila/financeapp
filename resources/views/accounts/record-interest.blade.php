@@ -145,7 +145,7 @@
                             <p class="text-red-600 dark:text-red-400 text-sm mt-1">{{ $message }}</p>
                             @enderror
                             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                Leave blank to auto-generate: "Interest earned – {{ now()->format('M Y') }}"
+                                Leave blank to auto-generate: "Interest earned – {{ $targetMonth->format('M Y') }}"
                             </p>
                         </div>
 
@@ -164,7 +164,7 @@
                                 </p>
                                 <p class="text-sm text-gray-700 dark:text-gray-300">
                                     <span class="font-medium">Description:</span>
-                                    <span id="preview-desc" class="italic">Interest earned – {{ now()->format('M Y') }}</span>
+                                    <span id="preview-desc" class="italic">Interest earned – {{ $targetMonth->format('M Y') }}</span>
                                 </p>
                             </div>
                         </div>
@@ -212,9 +212,9 @@
                 previewDesc.textContent = descInput.value;
             } else {
                 @if($skippedDaysCount !== null && $skippedDaysCount > 0)
-                    previewDesc.textContent = 'Interest earned – {{ now()->format("M Y") }} ({{ $skippedDateRange["total_days"] }}-month period)';
+                    previewDesc.textContent = 'Interest earned – {{ $targetMonth->format("M Y") }} ({{ $skippedDateRange["total_days"] }}-month period)';
                 @else
-                    previewDesc.textContent = 'Interest earned – {{ now()->format("M Y") }}';
+                    previewDesc.textContent = 'Interest earned – {{ $targetMonth->format("M Y") }}';
                 @endif
             }
         }

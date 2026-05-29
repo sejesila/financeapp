@@ -34,8 +34,10 @@ class InterestService
 
         if (!$lastDate) return true;
 
-        // Block if already recorded this calendar month
-        return !($lastDate->month === now()->month && $lastDate->year === now()->year);
+        $targetMonth = now()->subMonth();
+
+        // Block if the target month already has an interest record
+        return !($lastDate->month === $targetMonth->month && $lastDate->year === $targetMonth->year);
     }
 
     /**
@@ -122,5 +124,9 @@ class InterestService
         }
 
         return $errors;
+    }
+    public function getTargetMonth(): Carbon
+    {
+        return now()->subMonth()->startOfMonth();
     }
 }

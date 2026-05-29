@@ -96,21 +96,11 @@
                            class="bg-green-600 text-white px-6 py-2.5 rounded-lg hover:bg-green-700 transition text-center font-medium shadow-md">
                             + Top Up Account
                         </a>
-                        @if($account->type === 'savings')
-                            @php
-                                $interestRecordedToday = $account->transactions()
-                                    ->whereNull('deleted_at')
-                                    ->join('categories', 'transactions.category_id', '=', 'categories.id')
-                                    ->where('categories.name', 'Interest')
-                                    ->whereDate('transactions.date', now()->toDateString())
-                                    ->exists();
-                            @endphp
-                            @if(!$interestRecordedToday)
-                                <a href="{{ route('accounts.interest.form', $account) }}"
-                                   class="bg-emerald-600 text-white px-6 py-2.5 rounded-lg hover:bg-emerald-700 transition text-center font-medium shadow-md">
-                                    📈 Record Interest
-                                </a>
-                            @endif
+                        @if($account->type === 'savings' && !$interestRecordedLastMonth)
+                            <a href="{{ route('accounts.interest.form', $account) }}"
+                               class="bg-emerald-600 text-white px-6 py-2.5 rounded-lg hover:bg-emerald-700 transition text-center font-medium shadow-md">
+                                📈 Record Interest
+                            </a>
                         @endif
                     </div>
                 </div>
