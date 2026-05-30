@@ -310,11 +310,11 @@
                     <tr>
                         @php
                             $columns = [
-                                'date'        => ['Date',        'px-4 py-3 text-left'],
+                                'date'        => ['Date',        'px-4 py-3 text-left hidden sm:table-cell'],
                                 'description' => ['Description', 'px-4 py-3 text-left'],
                                 'amount'      => ['Amount',      'px-4 py-3 text-right'],
                                 'account'     => ['Account',     'px-4 py-3 text-left hidden sm:table-cell'],
-                                'category'    => ['Category',    'px-4 py-3 text-left hidden md:table-cell'],
+                                'category'    => ['Category',    'px-4 py-3 text-left'],
                             ];
                         @endphp
                         @foreach($columns as $col => [$label, $thClass])
@@ -346,24 +346,40 @@
                         @php
                             $isFee    = $t->is_transaction_fee;
                             $isIncome = $t->category->type === 'income';
+                            $txDate   = \Carbon\Carbon::parse($t->date);
+                            $isToday  = $txDate->isToday();
                         @endphp
                         <tr class="hover:bg-blue-50/40 dark:hover:bg-gray-700/50 transition-colors duration-150
                                {{ $isFee ? 'bg-yellow-50/60 dark:bg-yellow-900/10' : '' }}">
 
-                            {{-- Date --}}
-                            <td class="px-4 py-3 whitespace-nowrap text-xs font-medium">
+                            {{-- Date (hidden on mobile, shown sm+) --}}
+                            <td class="px-4 py-3 whitespace-nowrap text-xs font-medium hidden sm:table-cell">
                                 <div class="flex flex-col gap-0.5">
-        <span class="text-gray-700 dark:text-gray-300">
-            {{ \Carbon\Carbon::parse($t->date)->format('M d, Y') }}
-        </span>
-                                    <span class="text-gray-400 dark:text-gray-500">
-            {{ \Carbon\Carbon::parse($t->date)->format('g:i A') }}
-        </span>
+                                    @if($isToday)
+                                        <span class="text-gray-700 dark:text-gray-300">
+                                            {{ $txDate->format('H:i') }}
+                                        </span>
+                                    @else
+                                        <span class="text-gray-700 dark:text-gray-300">
+                                            {{ $txDate->format('M d, Y') }}
+                                        </span>
+                                        <span class="text-gray-400 dark:text-gray-500">
+                                            {{ $txDate->format('H:i') }}
+                                        </span>
+                                    @endif
                                 </div>
                             </td>
 
                             {{-- Description --}}
                             <td class="px-4 py-3 text-gray-800 dark:text-gray-200">
+                                {{-- Date shown only on mobile, inside description cell --}}
+                                <div class="sm:hidden text-xs text-gray-400 dark:text-gray-500 mb-0.5">
+                                    @if($isToday)
+                                        {{ $txDate->format('H:i') }}
+                                    @else
+                                        {{ $txDate->format('M d, Y') }} · {{ $txDate->format('H:i') }}
+                                    @endif
+                                </div>
                                 <div class="flex flex-wrap items-center gap-1.5">
                                     @if($isFee)
                                         <span class="inline-flex items-center gap-1 rounded-full bg-yellow-100 dark:bg-yellow-900/40 px-1.5 py-0.5 text-xs font-medium text-yellow-700 dark:text-yellow-400">
@@ -401,13 +417,13 @@
                                 </div>
                             </td>
 
-                            {{-- Account --}}
+                            {{-- Account (hidden on mobile) --}}
                             <td class="px-4 py-3 hidden sm:table-cell text-gray-700 dark:text-gray-300">
                                 {{ $t->account->name ?? '—' }}
                             </td>
 
-                            {{-- Category --}}
-                            <td class="px-4 py-3 hidden md:table-cell">
+                            {{-- Category (visible on all screen sizes) --}}
+                            <td class="px-4 py-3">
                             <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium
                                 {{ $isIncome
                                     ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
