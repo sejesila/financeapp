@@ -226,6 +226,8 @@ Route::middleware('auth')->group(function () {
         // Test email reports
         Route::post('test-monthly', [EmailPreferenceController::class, 'sendTestMonthly'])->name('test-monthly');
         Route::post('test-annual', [EmailPreferenceController::class, 'sendTestAnnual'])->name('test-annual');
+        Route::post('test-etica', [EmailPreferenceController::class, 'sendTestEtica'])
+            ->name('test-etica');
         Route::post('send-custom', [EmailPreferenceController::class, 'sendCustom'])->name('send-custom');
         // In routes/web.php, inside the email-preferences prefix group:
         Route::get('preview-monthly', [EmailPreferenceController::class, 'previewMonthly'])

@@ -20,6 +20,32 @@
         .header h1 { color: #8B5CF6; margin: 0; font-size: 22px; }
         .header .subtitle { font-size: 13px; color: #6B7280; margin-top: 4px; }
 
+        .attachment-note {
+            background: #F5F3FF;
+            border: 1px solid #DDD6FE;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin: 18px 0;
+            font-size: 12.5px;
+            color: #4B5563;
+        }
+        .attachment-note ul {
+            margin: 8px 0 0 0;
+            padding-left: 18px;
+        }
+        .attachment-note li { margin-bottom: 4px; }
+        .attachment-note .etica-tag {
+            display: inline-block;
+            background: #0d2b5e;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 1px 7px;
+            border-radius: 3px;
+            margin-left: 4px;
+            vertical-align: middle;
+            letter-spacing: 0.4px;
+        }
 
         .footer {
             margin-top: 30px;
@@ -33,7 +59,6 @@
 </head>
 <body>
 <div class="container">
-
     <div class="header">
         <h1>{{ config('app.name') }}</h1>
         <div class="subtitle">Monthly Financial Report · {{ now()->subMonth()->format('F Y') }}</div>
@@ -42,11 +67,33 @@
     <p style="font-size:14px;">Dear <strong>{{ $user->name }}</strong>,</p>
 
     <p style="font-size:13px; color:#4B5563;">
-        Your monthly financial report for <strong>{{ $data['start_date'] }} – {{ $data['end_date'] }}</strong>
-        is attached. Please find a full breakdown of your income, expenses, and financial activity for the period.
+        Your monthly financial report for
+        <strong>{{ $data['start_date'] }} – {{ $data['end_date'] }}</strong>
+        is attached. Please find a full breakdown of your income, expenses, and financial
+        activity for the period.
     </p>
 
+    {{-- Attachment summary — shows Etica statement line only when present --}}
+    @php
+        $hasEtica = $user->accounts()
+            ->where('type', 'savings')
+            ->where('is_active', true)
+            ->whereRaw("LOWER(name) LIKE '%etica%'")
+            ->exists();
+    @endphp
 
+    <div class="attachment-note">
+        <strong>📎 Attachments in this email:</strong>
+        <ul>
+            <li>Monthly Financial Report — {{ now()->subMonth()->format('F Y') }}.pdf</li>
+            @if($hasEtica)
+                <li>
+                    Etica Fixed Income Statement — {{ now()->subMonth()->format('F Y') }}.pdf
+                    <span class="etica-tag">Etica Capital</span>
+                </li>
+            @endif
+        </ul>
+    </div>
 
     <p style="font-size:13px; color:#4B5563;">
         If you have any questions about your report, feel free to reach out to us at
@@ -54,7 +101,8 @@
     </p>
 
     <p style="font-size:13px;">
-        <a href="{{ route('email-preferences.edit') }}">Manage email preferences</a> &nbsp;·&nbsp;
+        <a href="{{ route('email-preferences.edit') }}">Manage email preferences</a>
+        &nbsp;·&nbsp;
         <a href="{{ url('/dashboard') }}">Go to Dashboard</a>
     </p>
 
@@ -64,9 +112,10 @@
             Regards,<br>
             <strong>{{ config('app.name') }} Team</strong>
         </p>
-        <p style="margin-top:16px; font-size:11px;">© {{ date('Y') }} {{ config('app.name') }}. All rights reserved.</p>
+        <p style="margin-top:16px; font-size:11px;">
+            © {{ date('Y') }} {{ config('app.name') }}. All rights reserved.
+        </p>
     </div>
-
 </div>
 </body>
 </html>

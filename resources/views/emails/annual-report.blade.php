@@ -31,6 +31,33 @@
             text-transform: uppercase;
         }
 
+        .attachment-note {
+            background: #EEF2FF;
+            border: 1px solid #C7D2FE;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin: 18px 0;
+            font-size: 12.5px;
+            color: #4B5563;
+        }
+        .attachment-note ul {
+            margin: 8px 0 0 0;
+            padding-left: 18px;
+        }
+        .attachment-note li { margin-bottom: 4px; }
+        .attachment-note .etica-tag {
+            display: inline-block;
+            background: #0d2b5e;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 1px 7px;
+            border-radius: 3px;
+            margin-left: 4px;
+            vertical-align: middle;
+            letter-spacing: 0.4px;
+        }
+
         .footer {
             margin-top: 30px;
             padding-top: 20px;
@@ -43,7 +70,6 @@
 </head>
 <body>
 <div class="container">
-
     <div class="header">
         <h1>{{ config('app.name') }}</h1>
         <span class="year-badge">{{ $data['year'] }} Annual Report</span>
@@ -54,9 +80,31 @@
     <p style="font-size:13px; color:#4B5563;">
         Your annual financial report for <strong>{{ $data['year'] }}</strong> is attached.
         It covers a full year of your financial activity, including income, expenses, savings,
-        and account performance from <strong>{{ $data['start_date'] }} – {{ $data['end_date'] }}</strong>.
+        and account performance from
+        <strong>{{ $data['start_date'] }} – {{ $data['end_date'] }}</strong>.
     </p>
 
+    {{-- Attachment summary --}}
+    @php
+        $hasEtica = $user->accounts()
+            ->where('type', 'savings')
+            ->where('is_active', true)
+            ->whereRaw("LOWER(name) LIKE '%etica%'")
+            ->exists();
+    @endphp
+
+    <div class="attachment-note">
+        <strong>📎 Attachments in this email:</strong>
+        <ul>
+            <li>Annual Financial Report — {{ $data['year'] }}.pdf</li>
+            @if($hasEtica)
+                <li>
+                    Etica Fixed Income Statement — {{ $data['year'] }}.pdf
+                    <span class="etica-tag">Etica Capital</span>
+                </li>
+            @endif
+        </ul>
+    </div>
 
     <p style="font-size:13px; color:#4B5563;">
         If you have any questions about your report, feel free to reach out to us at
@@ -64,7 +112,8 @@
     </p>
 
     <p style="font-size:13px;">
-        <a href="{{ route('email-preferences.edit') }}">Manage email preferences</a> &nbsp;·&nbsp;
+        <a href="{{ route('email-preferences.edit') }}">Manage email preferences</a>
+        &nbsp;·&nbsp;
         <a href="{{ url('/dashboard') }}">Go to Dashboard</a>
     </p>
 
@@ -74,9 +123,10 @@
             Regards,<br>
             <strong>{{ config('app.name') }} Team</strong>
         </p>
-        <p style="margin-top:16px; font-size:11px;">© {{ date('Y') }} {{ config('app.name') }}. All rights reserved.</p>
+        <p style="margin-top:16px; font-size:11px;">
+            © {{ date('Y') }} {{ config('app.name') }}. All rights reserved.
+        </p>
     </div>
-
 </div>
 </body>
 </html>

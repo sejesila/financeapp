@@ -133,4 +133,45 @@ class EmailPreferenceController extends Controller
                 ->with('error', 'Failed to send custom report: ' . $e->getMessage());
         }
     }
+    public function sendTestEtica()
+    {
+        $user = Auth::user();
+
+        $eticaAccount = $user->accounts()
+            ->where('type', 'savings')
+            ->where('is_active', true)
+            ->whereRaw("LOWER(name) LIKE '%etica%'")
+            ->first();
+
+        if (! $eticaAccount) {
+            return redirect()->route('email-preferences.edit')
+                ->with('error', 'No active Etica account found on your profile.');
+        }
+
+        try {
+            // Reuse the same statement builder as the command
+            $command = new \App\Console\Commands\SendEticaStatements();
+            $from    = now()->subMonth()->startOfMonth();
+            $to      = now()->subMonth()->endOfMonth();
+            $period  = now()->subMonth()->format('F Y');
+
+            $buildMethod = new \ReflectionMethod($command, 'buildStatementData');
+            $buildMethod->setAccessible(true);
+            $statementData = $buildMethod->invoke($command, $eticaAccount, $from, $to);
+
+            Mail::to($user->email)->send(new \App\Mail\EticaStatementMail(
+                user:          $user,
+                account:       $eticaAccount,
+                statementData: $statementData,
+                period:        $period,
+            ));
+
+            return redirect()->route('email-preferences.edit')
+                ->with('success', 'Test Etica statement sent to ' . $user->email . '!');
+
+        } catch (\Exception $e) {
+            return redirect()->route('email-preferences.edit')
+                ->with('error', 'Failed to send test statement: ' . $e->getMessage());
+        }
+    }
 }
