@@ -18,9 +18,6 @@
         .container { background: white; padding: 30px; border-radius: 8px; }
 
         .header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
             border-bottom: 2px solid #0d2b5e;
             padding-bottom: 15px;
             margin-bottom: 25px;
@@ -28,15 +25,6 @@
         .header h1 { color: #0d2b5e; margin: 0; font-size: 22px; }
         .header .subtitle { font-size: 13px; color: #6B7280; margin-top: 4px; }
 
-        .logo-box {
-            background: #0d2b5e;
-            color: #fff;
-            padding: 8px 14px;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-        }
 
         .summary-box {
             background: #f0f4ff;
@@ -69,13 +57,10 @@
 
     {{-- Header --}}
     <div class="header">
-        <div>
-            <h1>{{ config('app.name') }}</h1>
-            <div class="subtitle">
-                {{ $account->name }} Statement &middot; {{ $period }}
-            </div>
+        <h1>{{ config('app.name') }}</h1>
+        <div class="subtitle">
+            {{ $account->name }} Statement &middot; {{ $period }}
         </div>
-        <div class="logo-box">Etica Capital</div>
     </div>
 
     <p style="font-size:14px;">Dear <strong>{{ explode(' ', $user->name)[0] }}</strong>,</p>
