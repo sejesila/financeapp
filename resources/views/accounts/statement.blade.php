@@ -176,9 +176,15 @@
             margin-bottom: 28px;
         }
 
+        /* Repeat column headers on every page, totals row only once */
+        thead { display: table-header-group; }
+        tfoot  { display: table-row-group; }
+
         thead tr {
             background: #0d2b5e;
             color: #fff;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
         }
 
         thead th {
@@ -191,7 +197,7 @@
 
         thead th:not(:first-child) { text-align: right; }
 
-        tbody tr { border-bottom: 1px solid #dde3ec; }
+        tbody tr { border-bottom: 1px solid #dde3ec; page-break-inside: avoid; }
         tbody tr:last-child { border-bottom: none; }
 
         tbody td {
@@ -207,10 +213,10 @@
             color: #333;
         }
 
-        .amount-inflow    { color: #1a5e2a; }
+        .amount-inflow     { color: #1a5e2a; }
         .amount-withdrawal { color: #8b1a1a; }
-        .amount-interest  { color: #1a3a6e; }
-        .amount-balance   { font-weight: 600; }
+        .amount-interest   { color: #1a3a6e; }
+        .amount-balance    { font-weight: 600; }
 
         /* Opening balance row */
         tr.opening-row td {
@@ -218,13 +224,17 @@
             color: #555;
             background: #f7f9fb;
             border-bottom: 1px solid #c8d3e6;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
         }
 
-        /* Pending (future value_date) row — shown but greyed, balance unchanged */
+        /* Pending row */
         tr.pending-row td {
             color: #999;
             font-style: italic;
             background: #fffbf0;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
         }
 
         tr.pending-row .amount-inflow { color: #b8860b; }
@@ -241,29 +251,36 @@
             font-style: normal;
         }
 
-        /* Totals row */
-        tfoot tr {
+        /* Totals row — inside tbody so it renders exactly once */
+        tr.totals-row {
             background: #e8edf5;
             border-top: 2px solid #0d2b5e;
-        }
-
-        tfoot td {
-            padding: 9px 10px;
             font-weight: bold;
             font-size: 10.5pt;
+            page-break-before: avoid;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
         }
 
-        tfoot td:not(:first-child):not(:nth-child(2)) { text-align: right; }
+        tr.totals-row td {
+            padding: 9px 10px;
+        }
+
+        tr.totals-row td:not(:first-child):not(:nth-child(2)) {
+            text-align: right;
+        }
 
         /* ── Closing section ─────────────────────────────────────────── */
         .closing {
             font-size: 11pt;
             margin-bottom: 30px;
             line-height: 1.6;
+            page-break-inside: avoid;
         }
 
         .sig-block {
             margin-bottom: 40px;
+            page-break-inside: avoid;
         }
 
         .sig-italic {
@@ -291,6 +308,7 @@
             align-items: flex-start;
             flex-wrap: wrap;
             gap: 8px;
+            page-break-inside: avoid;
         }
 
         .footer a { color: #0d2b5e; text-decoration: none; }
@@ -305,9 +323,6 @@
                 max-width: 100%;
                 padding: 20px 30px 40px;
             }
-
-            thead tr { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            tfoot tr  { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
             table { font-size: 10pt; }
         }
@@ -424,9 +439,9 @@
                 </td>
             </tr>
         @endforelse
-        </tbody>
-        <tfoot>
-        <tr>
+
+        {{-- Totals row — inside tbody so it only renders once, never repeated per page --}}
+        <tr class="totals-row">
             <td>{{ $to->format('M d, Y') }}</td>
             <td>Total (KES)</td>
             <td class="amount-inflow">
@@ -440,7 +455,7 @@
             </td>
             <td class="amount-balance">{{ number_format($closingBalance, 2) }}</td>
         </tr>
-        </tfoot>
+        </tbody>
     </table>
 
     {{-- ── Closing ──────────────────────────────────────────────────────── --}}
