@@ -97,12 +97,10 @@ class Account extends Model
 
     public function updateBalance()
     {
-        // ✅ SINGLE QUERY - Let database do the heavy lifting
         $stats = $this->transactions()
             ->whereNull('deleted_at')
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->selectRaw("
-            -- Regular Income (excluding loan credits and adjustments)
             SUM(CASE
                 WHEN categories.type = 'income'
                 AND categories.name NOT IN ('Loan Fees Refund', 'Facility Fee Refund', 'Balance Adjustment')
@@ -110,14 +108,12 @@ class Account extends Model
                 ELSE 0
             END) as total_income,
 
-            -- Loan Credits (early repayment refunds)
             SUM(CASE
                 WHEN categories.name IN ('Loan Fees Refund', 'Facility Fee Refund')
                 THEN transactions.amount
                 ELSE 0
             END) as loan_credits,
 
-            -- Loan Disbursements (money borrowed)
             SUM(CASE
                 WHEN categories.type = 'liability'
                 AND categories.name = 'Loan Receipt'
@@ -125,7 +121,6 @@ class Account extends Model
                 ELSE 0
             END) as loan_disbursements,
 
-            -- Client Funds Received (positive liability)
             SUM(CASE
                 WHEN categories.type = 'liability'
                 AND categories.name = 'Client Funds'
@@ -134,7 +129,6 @@ class Account extends Model
                 ELSE 0
             END) as client_funds_received,
 
-            -- Client Funds Reduction (negative liability)
             SUM(CASE
                 WHEN categories.type = 'liability'
                 AND categories.name = 'Client Funds'
@@ -143,23 +137,29 @@ class Account extends Model
                 ELSE 0
             END) as client_funds_reduction,
 
-            -- All Expenses
             SUM(CASE
                 WHEN categories.type = 'expense'
                 THEN transactions.amount
                 ELSE 0
             END) as total_expenses,
 
-            -- Balance Adjustments (can be positive or negative)
             SUM(CASE
                 WHEN categories.name = 'Balance Adjustment'
                 THEN transactions.amount
                 ELSE 0
-            END) as balance_adjustments
+            END) as balance_adjustments,
+
+            SUM(CASE
+                WHEN categories.type = 'income'
+                AND categories.name NOT IN ('Loan Fees Refund', 'Facility Fee Refund', 'Balance Adjustment', 'Interest')
+                AND transactions.value_date IS NOT NULL
+                AND transactions.value_date > CURDATE()
+                THEN transactions.amount
+                ELSE 0
+            END) as pending_deposits
         ")
             ->first();
 
-        // ✅ EFFICIENT TRANSFER QUERIES - Use aggregation
         $transferStats = DB::table('transfers')
             ->selectRaw('
             SUM(CASE WHEN from_account_id = ? THEN amount ELSE 0 END) as transfers_out,
@@ -167,7 +167,6 @@ class Account extends Model
         ', [$this->id, $this->id])
             ->first();
 
-        // ✅ CALCULATE BALANCE - Simple arithmetic
         $newBalance = (float) $this->initial_balance
             + ($stats->total_income ?? 0)
             + ($stats->loan_disbursements ?? 0)
@@ -177,15 +176,14 @@ class Account extends Model
             - ($stats->total_expenses ?? 0)
             + ($stats->balance_adjustments ?? 0)
             - ($transferStats->transfers_out ?? 0)
-            + ($transferStats->transfers_in ?? 0);
+            + ($transferStats->transfers_in ?? 0)
+            - ($stats->pending_deposits ?? 0);
 
-
-        $this->timestamps = false; // Don't update timestamps for balance recalc
+        $this->timestamps = false;
         $this->current_balance = $newBalance;
         $this->save();
         $this->timestamps = true;
     }
-
     /**
      * Get net profit (excluding loans and client work)
      * Regular Income + Loan Credits - Regular Expenses

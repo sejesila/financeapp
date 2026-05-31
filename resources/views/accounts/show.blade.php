@@ -547,39 +547,58 @@
                                 <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
                                 @foreach($topUps as $txn)
                                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+
+                                        {{-- Date / Value Date --}}
                                         <td class="px-4 py-3 whitespace-nowrap text-gray-600 dark:text-gray-400 text-xs">
-                                            {{ $txn->date->format('M d, Y') }}
+                                            @if($account->type === 'savings' && ($txn->is_grouped ?? false))
+                                                {{ $txn->date->format('M Y') }}
+                                            @elseif($account->type === 'savings' && !empty($txn->value_date))
+                                                <div>{{ \Carbon\Carbon::parse($txn->date)->format('M d, Y') }}</div>
+                                                <div class="text-indigo-500 dark:text-indigo-400 mt-0.5">
+                                                    eff. {{ \Carbon\Carbon::parse($txn->value_date)->format('M d') }}
+                                                </div>
+                                            @else
+                                                {{ $txn->date->format('M d, Y') }}
+                                            @endif
                                         </td>
+
+                                        {{-- Description --}}
                                         <td class="px-4 py-3">
                                             <div class="flex items-center gap-2">
                                                 <span>{{ $txn->category->icon ?? '💰' }}</span>
                                                 <span class="text-gray-900 dark:text-white font-medium">
-                                                    @if(!empty($search))
+                    @if(!empty($search))
                                                         <span class="sr-only">{{ $txn->description }}</span>
                                                         {!! str_ireplace($search, '<mark class="bg-yellow-100 dark:bg-yellow-800 rounded px-0.5">' . e($search) . '</mark>', e($txn->description)) !!}
                                                     @else
                                                         {{ $txn->description }}
                                                     @endif
-                                                </span>
+                </span>
+                                                @if($account->type === 'savings' && !($txn->is_grouped ?? false) && !empty($txn->value_date) && \Carbon\Carbon::parse($txn->value_date)->isFuture())
+                                                    <span class="px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 rounded text-xs font-medium">
+                        Pending
+                    </span>
+                                                @endif
                                             </div>
                                         </td>
-                                        <td class="px-4 py-3 whitespace-nowrap font-semibold text-green-600 dark:text-green-400">
+
+                                        {{-- Amount --}}
+                                        <td class="px-4 py-3 whitespace-nowrap font-semibold {{ ($account->type === 'savings' && !($txn->is_grouped ?? false) && !empty($txn->value_date) && \Carbon\Carbon::parse($txn->value_date)->isFuture()) ? 'text-amber-500 dark:text-amber-400' : 'text-green-600 dark:text-green-400' }}">
                                             @if(!empty($search))
                                                 {!! str_ireplace($search, '<mark class="bg-yellow-100 dark:bg-yellow-800 rounded px-0.5">' . e($search) . '</mark>', e(number_format($txn->amount, 0))) !!}
                                             @else
                                                 +{{ number_format($txn->amount, 0) }}
                                             @endif
                                         </td>
-                                        {{-- Date cell --}}
-                                        <td class="px-4 py-3 whitespace-nowrap text-gray-600 dark:text-gray-400 text-xs">
-                                            @if($account->type === 'savings' && ($txn->is_grouped ?? false))
-                                                {{ $txn->date->format('M Y') }}
-                                            @else
-                                                {{ $txn->date->format('M d, Y') }}
-                                            @endif
+
+                                        {{-- Category --}}
+                                        <td class="px-4 py-3 hidden sm:table-cell">
+            <span class="inline-flex rounded-full px-2 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                {{ $txn->category->name ?? '—' }}
+            </span>
                                         </td>
 
-                                        {{-- Reverse button — only for non-grouped rows within the 2-minute window --}}
+                                        {{-- Reverse button — only for non-grouped, non-pending rows within the 2-minute window --}}
                                         <td class="px-4 py-3 text-right whitespace-nowrap">
                                             @if(!($txn->is_grouped ?? false) && $txn->created_at->diffInMinutes(now()) <= 2)
                                                 <a href="{{ route('accounts.topup.reverse.form', ['account' => $account, 'transaction' => $txn]) }}"
@@ -593,6 +612,7 @@
                                                 </a>
                                             @endif
                                         </td>
+
                                     </tr>
                                 @endforeach
                                 </tbody>

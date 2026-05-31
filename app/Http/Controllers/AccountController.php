@@ -7,9 +7,11 @@ use App\Models\Category;
 use App\Models\Transaction;
 use App\Models\Transfer;
 use App\Services\InterestService;
+use App\Services\KenyanBusinessDays;
 use App\Services\TopUpService;
 use App\Services\TransferFeeCalculator;
 use App\Services\TransferService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -611,11 +613,18 @@ class AccountController extends Controller
                 'notes'      => $request->description,
             ])->with('info', 'Loans require additional details. Please complete the loan form.');
         }
+        $transactionDate = Carbon::parse($request->date);
+
+        // For savings accounts, deposits are effective the next business day
+        $valueDate = ($account->type === 'savings')
+            ? KenyanBusinessDays::nextBusinessDay($transactionDate)
+            : $transactionDate;
 
         $account->transactions()->create([
             'user_id'        => Auth::id(),
             'amount'         => $request->amount,
             'date'           => $request->date,
+            'value_date'     => $valueDate->format('Y-m-d'),
             'period_date'    => $request->period_date ?? $request->date,
             'description'    => $request->description ?: (
             $account->type === 'savings'
@@ -626,7 +635,8 @@ class AccountController extends Controller
             'payment_method' => $category->name,
         ]);
 
-        $account->updateBalance();
+
+            $account->updateBalance();
         $this->clearAccountCache($account->id);
 
         $verb = $account->type === 'savings' ? 'deposited to' : 'topped up';
