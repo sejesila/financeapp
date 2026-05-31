@@ -220,6 +220,27 @@
             border-bottom: 1px solid #c8d3e6;
         }
 
+        /* Pending (future value_date) row — shown but greyed, balance unchanged */
+        tr.pending-row td {
+            color: #999;
+            font-style: italic;
+            background: #fffbf0;
+        }
+
+        tr.pending-row .amount-inflow { color: #b8860b; }
+        tr.pending-row .pending-badge {
+            display: inline-block;
+            font-size: 7.5pt;
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fcd34d;
+            border-radius: 3px;
+            padding: 1px 5px;
+            vertical-align: middle;
+            margin-left: 4px;
+            font-style: normal;
+        }
+
         /* Totals row */
         tfoot tr {
             background: #e8edf5;
@@ -367,12 +388,21 @@
         </tr>
 
         @forelse($rows as $row)
-            <tr>
+            <tr class="{{ ($row['pending'] ?? false) ? 'pending-row' : '' }}">
                 <td style="white-space:nowrap">{{ $row['date'] }}</td>
-                <td class="narration-cell">{{ $row['narration'] }}</td>
+                <td class="narration-cell">
+                    {{ $row['narration'] }}
+                    @if($row['pending'] ?? false)
+                        <span class="pending-badge">Pending</span>
+                    @endif
+                </td>
 
                 <td class="amount-inflow">
-                    {{ $row['inflow'] !== null ? number_format($row['inflow'], 2) : '' }}
+                    @if($row['inflow'] !== null)
+                        {{ number_format($row['inflow'], 2) }}
+                    @elseif(($row['pending_amount'] ?? null) !== null)
+                        {{ number_format($row['pending_amount'], 2) }}
+                    @endif
                 </td>
 
                 <td class="amount-withdrawal">

@@ -29,71 +29,108 @@ class StatementController extends Controller
             ? Carbon::parse($request->input('to'))->endOfDay()
             : now()->endOfDay();
 
-        // Opening balance = everything before the period start
+        // Opening balance = everything settled before the period start
         $openingBalance = $this->computeBalanceAt($account, $from->copy()->subSecond());
 
-        // ── 1. Transactions (interest + expenses) ─────────────────────────────
+        // ── 1. Transactions (interest, expenses, non-transfer income) ─────────
+        //
+        // Pending deposit rule (mirrors updateBalance):
+        //   income transactions with a future value_date are NOT yet settled,
+        //   so we show them on the statement date but flag them as pending —
+        //   they should NOT move the running balance until value_date <= today.
+        //   Interest is always settled immediately (no value_date gate).
+        //
         $transactions = $account->transactions()
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->whereNull('transactions.deleted_at')
             ->whereBetween('transactions.date', [$from->toDateString(), $to->toDateString()])
             ->select('transactions.*', 'categories.type as cat_type', 'categories.name as cat_name')
+            ->orderBy('transactions.date')
+            ->orderBy('transactions.id')
             ->get()
             ->map(function ($txn) {
                 $isInterest = $txn->cat_name === 'Interest';
                 $isExpense  = $txn->cat_type === 'expense';
+                $isIncome   = ! $isExpense && ! $isInterest;
+
+                // A deposit is "pending" when it has a future value_date
+                // (matches the `pending_deposits` exclusion in updateBalance)
+                $isPending = $isIncome
+                    && ! empty($txn->value_date)
+                    && Carbon::parse($txn->value_date)->isFuture();
 
                 return [
                     'sort_date'    => $txn->date,
                     'sort_id'      => $txn->id,
                     'date'         => Carbon::parse($txn->date)->format('M d, Y'),
-                    'narration'    => $txn->description,
-                    'inflow'       => null,
-                    'withdrawal'   => $isExpense  ? $txn->amount : null,
-                    'net_interest' => $isInterest ? $txn->amount : null,
-                    // non-interest income treated as inflow
-                    'inflow'       => (! $isExpense && ! $isInterest) ? $txn->amount : null,
+                    'narration'    => $txn->description
+                        . ($isPending
+                            ? ' (pending – eff. ' . Carbon::parse($txn->value_date)->format('M d') . ')'
+                            : ''),
+                    'inflow'       => ($isIncome   && ! $isPending) ? $txn->amount : null,
+                    'withdrawal'   => $isExpense                    ? $txn->amount : null,
+                    'net_interest' => $isInterest                   ? $txn->amount : null,
+                    'pending'      => $isPending,
+                    // Pending inflows are shown in the inflow column but bracketed
+                    'pending_amount' => $isPending ? $txn->amount : null,
                     'source'       => 'txn',
                 ];
             });
 
-        // ── 2. Transfers IN (money arriving at this account) ──────────────────
+        // ── 2. Transfers IN ───────────────────────────────────────────────────
+        //
+        // Mirrors updateBalance: `value_date IS NULL OR value_date <= CURDATE()`
+        // Pending transfers (future value_date) are shown on their transaction
+        // date but do NOT affect the running balance yet.
+        //
         $transfersIn = Transfer::where('to_account_id', $account->id)
             ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
             ->get()
             ->map(function ($t) {
                 $counterpart = $t->fromAccount?->name ?? 'Transfer';
+                $isPending   = ! empty($t->value_date)
+                    && Carbon::parse($t->value_date)->isFuture();
+
                 return [
-                    'sort_date'    => $t->date,
-                    'sort_id'      => $t->id,
-                    'date'         => Carbon::parse($t->date)->format('M d, Y'),
-                    'narration'    => $t->description ?: "Transfer from {$counterpart}",
-                    'inflow'       => $t->amount,
-                    'withdrawal'   => null,
-                    'net_interest' => null,
-                    'source'       => 'transfer_in',
+                    'sort_date'      => $t->date,
+                    'sort_id'        => $t->id,
+                    'date'           => Carbon::parse($t->date)->format('M d, Y'),
+                    'narration'      => ($t->description ?: "Transfer from {$counterpart}")
+                        . ($isPending
+                            ? ' (pending – eff. ' . Carbon::parse($t->value_date)->format('M d') . ')'
+                            : ''),
+                    'inflow'         => ! $isPending ? $t->amount : null,
+                    'withdrawal'     => null,
+                    'net_interest'   => null,
+                    'pending'        => $isPending,
+                    'pending_amount' => $isPending ? $t->amount : null,
+                    'source'         => 'transfer_in',
                 ];
             });
 
-        // ── 3. Transfers OUT (money leaving this account) ─────────────────────
+        // ── 3. Transfers OUT ──────────────────────────────────────────────────
+        // Outgoing transfers are always deducted immediately (no value_date gate
+        // in updateBalance for transfers_out).
         $transfersOut = Transfer::where('from_account_id', $account->id)
             ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
             ->get()
             ->map(function ($t) {
                 $counterpart = $t->toAccount?->name ?? 'Transfer';
                 return [
-                    'sort_date'    => $t->date,
-                    'sort_id'      => $t->id,
-                    'date'         => Carbon::parse($t->date)->format('M d, Y'),
-                    'narration'    => $t->description ?: "Transfer to {$counterpart}",
-                    'inflow'       => null,
-                    'withdrawal'   => $t->amount,
-                    'net_interest' => null,
-                    'source'       => 'transfer_out',
+                    'sort_date'      => $t->date,
+                    'sort_id'        => $t->id,
+                    'date'           => Carbon::parse($t->date)->format('M d, Y'),
+                    'narration'      => $t->description ?: "Transfer to {$counterpart}",
+                    'inflow'         => null,
+                    'withdrawal'     => $t->amount,
+                    'net_interest'   => null,
+                    'pending'        => false,
+                    'pending_amount' => null,
+                    'source'         => 'transfer_out',
                 ];
             });
 
-        // ── 4. Merge & sort by date asc, then id asc ─────────────────────────
+        // ── 4. Merge & sort chronologically ──────────────────────────────────
         $merged = $transactions
             ->concat($transfersIn)
             ->concat($transfersOut)
@@ -103,7 +140,7 @@ class StatementController extends Controller
             ])
             ->values();
 
-        // ── 5. Build running balance ──────────────────────────────────────────
+        // ── 5. Build running balance (only settled amounts move the balance) ──
         $runningBalance  = $openingBalance;
         $totalInflow     = 0;
         $totalWithdrawal = 0;
@@ -144,34 +181,60 @@ class StatementController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Balance at a given moment = initial_balance
-     *   + all income/liability transactions up to that date
-     *   - all expense transactions up to that date
-     *   + all transfers IN up to that date
-     *   - all transfers OUT up to that date
+     * Compute the settled balance at a given point in time.
+     *
+     * Mirrors updateBalance() exactly:
+     *
+     *   + initial_balance
+     *   + income transactions (excl. future value_date deposits)
+     *   + liability transactions (loan receipts, client funds)
+     *   - expense transactions
+     *   + transfers IN  where value_date IS NULL OR value_date <= $at
+     *   - transfers OUT (always immediate)
      */
     private function computeBalanceAt(Account $account, Carbon $at): float
     {
-        // Transactions component
+        $atDate = $at->toDateString();
+
+        // Transaction net: mirrors the CASE logic in updateBalance()
+        // — income with a future value_date is excluded (pending_deposits)
+        // — interest has no value_date gate
         $txNet = $account->transactions()
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->whereNull('transactions.deleted_at')
-            ->where('transactions.date', '<=', $at->toDateString())
+            ->where('transactions.date', '<=', $atDate)
             ->selectRaw("
-                SUM(CASE WHEN categories.type IN ('income','liability') THEN transactions.amount ELSE 0 END) -
-                SUM(CASE WHEN categories.type = 'expense'              THEN transactions.amount ELSE 0 END)
-                AS net
-            ")
+                SUM(CASE
+                    WHEN categories.type IN ('income', 'liability')
+                     AND NOT (
+                            categories.type = 'income'
+                            AND categories.name NOT IN ('Interest')
+                            AND transactions.value_date IS NOT NULL
+                            AND transactions.value_date > ?
+                         )
+                    THEN transactions.amount
+                    ELSE 0
+                END) -
+                SUM(CASE
+                    WHEN categories.type = 'expense'
+                    THEN transactions.amount
+                    ELSE 0
+                END) AS net
+            ", [$atDate])
             ->value('net');
 
-        // Transfers IN
+        // Transfers IN: only settled ones (value_date IS NULL OR <= $at)
         $transfersInNet = Transfer::where('to_account_id', $account->id)
-            ->where('date', '<=', $at->toDateString())
+            ->where('date', '<=', $atDate)
+            ->where(function ($q) use ($atDate) {
+                $q->whereNull('value_date')
+                    ->orWhere('value_date', '<=', $atDate);
+            })
             ->sum('amount');
 
-        // Transfers OUT
+        // Transfers OUT: always deducted immediately
         $transfersOutNet = Transfer::where('from_account_id', $account->id)
-            ->where('date', '<=', $at->toDateString())
+            ->where('date', '<=', $atDate)
             ->sum('amount');
 
         return (float) ($account->initial_balance ?? 0)

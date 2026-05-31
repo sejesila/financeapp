@@ -2,7 +2,6 @@
 
 namespace App\Mail;
 
-use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Attachment;
@@ -10,15 +9,30 @@ use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 use Spatie\LaravelPdf\Facades\Pdf;
+use App\Models\User;
 
 class MonthlyReportMail extends Mailable
 {
     use Queueable, SerializesModels;
 
+    /** @var Attachment[] Extra PDFs bolted on by SendMonthlyReportsWithStatement */
+    protected array $extraAttachments = [];
+
     public function __construct(
         public User  $user,
-        public array $reportData
+        public array $reportData,
     ) {}
+
+    /**
+     * Fluently attach extra PDFs without changing existing callers.
+     *
+     * @param  Attachment[]  $attachments
+     */
+    public function withAttachments(array $attachments): static
+    {
+        $this->extraAttachments = array_merge($this->extraAttachments, $attachments);
+        return $this;
+    }
 
     public function envelope(): Envelope
     {
@@ -33,30 +47,33 @@ class MonthlyReportMail extends Mailable
             view: 'emails.monthly-report',
             with: [
                 'user' => $this->user,
-                'data' => $this->reportData,
+                'data' => $this->reportData,   // ← keep 'data' as the view variable name
             ],
         );
     }
 
     public function attachments(): array
     {
-        if (!$this->user->emailPreference?->include_pdf) {
-            return [];
+        $attachments = [];
+
+        // Original monthly report PDF, gated by user preference
+        if ($this->user->emailPreference?->include_pdf) {
+            $filename      = 'monthly-report-' . now()->subMonth()->format('Y-m') . '.pdf';
+            $attachments[] = Attachment::fromData(
+                fn() => $this->generateMonthlyReportPdf(),
+                $filename
+            )->withMime('application/pdf');
         }
 
-        $filename = 'monthly-report-' . now()->format('Y-m') . '.pdf';
-
-        return [
-            Attachment::fromData(fn () => $this->generatePdf(), $filename)
-                ->withMime('application/pdf'),
-        ];
+        // Statement PDFs added by the combined command via withAttachments()
+        return array_merge($attachments, $this->extraAttachments);
     }
 
-    protected function generatePdf(): string
+    protected function generateMonthlyReportPdf(): string
     {
         $tempPath = tempnam(sys_get_temp_dir(), 'monthly_report_') . '.pdf';
 
-        Pdf::view('emails.pdf.monthly-report', [
+        Pdf::view('emails.pdf.monthly-report', [  // ← Spatie API
             'user' => $this->user,
             'data' => $this->reportData,
         ])
@@ -64,9 +81,8 @@ class MonthlyReportMail extends Mailable
             ->save($tempPath);
 
         $contents = file_get_contents($tempPath);
-        unlink($tempPath);
+        @unlink($tempPath);
 
         return $contents;
     }
-
 }
