@@ -76,7 +76,12 @@
                                     </div>
                                     <div class="ml-3">
                                         <label for="monthly_reports" class="font-medium text-gray-900 dark:text-white">Monthly Reports</label>
-                                        <p class="text-sm text-gray-600 dark:text-gray-400">Receive a comprehensive monthly overview with budget analysis and insights</p>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                                            Receive a comprehensive monthly overview with budget analysis and insights
+                                            @if(auth()->user()->accounts()->where('type','savings')->where('is_active',true)->whereRaw("LOWER(name) LIKE '%etica%'")->exists())
+                                                <span class="inline-flex items-center ml-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-900 text-white">+ Etica Statement</span>
+                                            @endif
+                                        </p>
                                     </div>
                                 </div>
 
@@ -94,7 +99,7 @@
                             </div>
                         </div>
 
-                        {{-- Schedule Settings (monthly only — annual is always Jan 1st) --}}
+                        {{-- Schedule Settings --}}
                         <div class="border-b border-gray-200 dark:border-gray-700 pb-6">
                             <h4 class="text-md font-semibold text-gray-900 dark:text-white mb-1">Schedule</h4>
                             <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
@@ -229,6 +234,19 @@
                                     Send Test Annual Report
                                 </button>
                             </form>
+
+                            {{-- Etica test button — only shown when user has an Etica account --}}
+                            @if(auth()->user()->accounts()->where('type','savings')->where('is_active',true)->whereRaw("LOWER(name) LIKE '%etica%'")->exists())
+                                <form method="POST" action="{{ route('email-preferences.test-etica') }}">
+                                    @csrf
+                                    <button type="submit" class="w-full bg-blue-900 hover:bg-blue-800 text-white font-medium px-4 py-2 rounded-lg transition flex items-center justify-center">
+                                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                        </svg>
+                                        Send Test Etica Statement
+                                    </button>
+                                </form>
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -274,6 +292,42 @@
                 </div>
             </div>
 
+            {{-- Etica Account Info Card — only shown when relevant --}}
+            @php
+                $eticaAccounts = auth()->user()->accounts()
+                    ->where('type', 'savings')
+                    ->where('is_active', true)
+                    ->whereRaw("LOWER(name) LIKE '%etica%'")
+                    ->get();
+            @endphp
+
+            @if($eticaAccounts->isNotEmpty())
+                <div class="bg-blue-950 text-white rounded-lg p-5 shadow-sm">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 bg-white text-blue-900 font-black italic text-2xl font-serif w-10 h-10 rounded flex items-center justify-center">
+                            E
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="font-semibold text-base mb-1">Etica Capital Statements</h3>
+                            <p class="text-sm text-blue-200 mb-3">
+                                You have {{ $eticaAccounts->count() === 1 ? 'an active Etica account' : $eticaAccounts->count() . ' active Etica accounts' }}.
+                                A statement PDF will automatically be included alongside your monthly report email each month.
+                            </p>
+                            <div class="space-y-1">
+                                @foreach($eticaAccounts as $ea)
+                                    <div class="flex items-center gap-2 text-sm text-blue-100">
+                                        <svg class="w-4 h-4 text-blue-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                        </svg>
+                                        {{ $ea->name }}
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             {{-- Info Card --}}
             <div class="bg-blue-50 dark:bg-blue-900 border-l-4 border-blue-400 p-4 rounded-lg">
                 <div class="flex">
@@ -289,6 +343,9 @@
                             <li>Annual reports are sent on January 1st and cover the full previous year</li>
                             <li>PDF attachments are great for keeping offline records</li>
                             <li>You can send test reports to preview the content anytime</li>
+                            @if($eticaAccounts->isNotEmpty())
+                                <li>Your Etica Capital statement is automatically included with your monthly report</li>
+                            @endif
                         </ul>
                     </div>
                 </div>
