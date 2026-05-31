@@ -19,8 +19,8 @@ class EticaStatementMail extends Mailable
     public function __construct(
         public readonly User    $user,
         public readonly Account $account,
-        public readonly array   $statementData,  // same shape StatementController uses
-        public readonly string  $period,         // e.g. "May 2026"
+        public readonly array   $statementData,
+        public readonly string  $period,
     ) {}
 
     public function envelope(): Envelope
@@ -55,7 +55,9 @@ class EticaStatementMail extends Mailable
         ];
     }
 
-    protected function generateStatementPdf(): string
+    // Public so EmailPreferenceController can call it directly
+    // without reflection when building combined emails.
+    public function generateStatementPdf(): string
     {
         $tempPath = tempnam(sys_get_temp_dir(), 'etica_statement_') . '.pdf';
 
