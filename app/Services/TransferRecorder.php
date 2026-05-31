@@ -7,6 +7,7 @@ use App\Models\Account;
 use App\Models\Transaction;
 use App\Models\Transfer;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -276,12 +277,17 @@ class TransferRecorder
 
         // ── Happy path: Transfer + fee transaction ────────────────────────
         DB::transaction(function () use ($user, $parsed, $bankAccount, $savingsAccount) {
+            $valueDate = KenyanBusinessDays::nextBusinessDay(
+                Carbon::parse($parsed['date'])
+            )->format('Y-m-d');
+
             Transfer::create([
                 'user_id'         => $user->id,
                 'from_account_id' => $bankAccount->id,
                 'to_account_id'   => $savingsAccount->id,
                 'amount'          => $parsed['amount'],
                 'date'            => $parsed['date'],
+                'value_date'      => $valueDate,
                 'description'     => $parsed['description'] . ' [' . $parsed['reference'] . ']',
             ]);
 

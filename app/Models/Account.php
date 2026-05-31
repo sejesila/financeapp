@@ -162,9 +162,9 @@ class Account extends Model
 
         $transferStats = DB::table('transfers')
             ->selectRaw('
-            SUM(CASE WHEN from_account_id = ? THEN amount ELSE 0 END) as transfers_out,
-            SUM(CASE WHEN to_account_id = ? THEN amount ELSE 0 END) as transfers_in
-        ', [$this->id, $this->id])
+        SUM(CASE WHEN from_account_id = ? THEN amount ELSE 0 END) as transfers_out,
+        SUM(CASE WHEN to_account_id = ? AND (value_date IS NULL OR value_date <= CURDATE()) THEN amount ELSE 0 END) as transfers_in
+    ', [$this->id, $this->id])
             ->first();
 
         $newBalance = (float) $this->initial_balance

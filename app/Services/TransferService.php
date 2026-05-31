@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Category;
 use App\Models\Transaction;
 use App\Models\Transfer;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -63,11 +64,17 @@ readonly class TransferService
         $this->enforceBalanceCheck($from, $amount, $fee);
 
         DB::transaction(function () use ($from, $to, $amount, $date, $description, $fee) {
+            // Calculate value_date for savings destination accounts
+            $valueDate = ($to->type === 'savings')
+                ? KenyanBusinessDays::nextBusinessDay(Carbon::parse($date))->format('Y-m-d')
+                : null;
+
             Transfer::create([
                 'from_account_id' => $from->id,
                 'to_account_id'   => $to->id,
                 'amount'          => $amount,
                 'date'            => $date,
+                'value_date'      => $valueDate,
                 'description'     => $description,
                 'user_id'         => Auth::id(),
             ]);
