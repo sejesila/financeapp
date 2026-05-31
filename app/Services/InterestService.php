@@ -8,9 +8,12 @@ use Carbon\Carbon;
 class InterestService
 {
     // ════════════════════════════════════════════════════════════════════════════
-    // SECTION 1: Date Tracking
+    // SECTION 1: Date Tracking (day-based)
     // ════════════════════════════════════════════════════════════════════════════
 
+    /**
+     * Returns the date of the most recent interest transaction, or null if none exist.
+     */
     public function getLastInterestDate(Account $account): ?Carbon
     {
         $lastInterest = $account->transactions()
@@ -26,88 +29,142 @@ class InterestService
     }
 
     /**
-     * Returns true if no interest has been recorded in the current calendar month.
+     * Returns true if no interest has been recorded today.
+     * Recording is allowed at most once per calendar day.
      */
-    public function canRecordTodayKey(Account $account): bool
+    public function canRecordToday(Account $account): bool
     {
         $lastDate = $this->getLastInterestDate($account);
 
-        if (!$lastDate) return true;
+        if (! $lastDate) {
+            return true;
+        }
 
-        $targetMonth = now()->subMonth();
-
-        // Block if the target month already has an interest record
-        return !($lastDate->month === $targetMonth->month && $lastDate->year === $targetMonth->year);
+        // Block if the last interest was already recorded today
+        return ! $lastDate->isToday();
     }
 
     /**
-     * Returns the number of calendar months skipped since the last recording.
-     * Returns null if no previous recording exists.
-     * Returns 0 if only one month has elapsed (i.e. no skip).
-     */
-    public function getSkippedMonthsCount(Account $account): ?int
-    {
-        $lastDate = $this->getLastInterestDate($account);
-
-        if (!$lastDate) return null;
-
-        $monthsElapsed = (int) $lastDate->copy()->startOfMonth()->diffInMonths(now()->startOfMonth());
-
-        if ($monthsElapsed === 0) return null; // already recorded this month
-        if ($monthsElapsed === 1) return 0;    // normal — one month gap, no skip
-
-        return $monthsElapsed - 1; // number of skipped months
-    }
-
-    /**
-     * @deprecated Use getSkippedMonthsCount() instead.
+     * Returns the number of calendar days that have been skipped since the last
+     * interest recording (not counting today, which is the day being recorded).
+     *
+     * Examples:
+     *   Last recorded: today        → null  (already done today, canRecordToday() would block)
+     *   Last recorded: yesterday    → 0     (normal — no skip)
+     *   Last recorded: 3 days ago   → 2     (today + 2 skipped days in between)
+     *
+     * Returns null when there is no previous recording.
      */
     public function getSkippedDaysCount(Account $account): ?int
     {
-        return $this->getSkippedMonthsCount($account);
-    }
+        $lastDate = $this->getLastInterestDate($account);
 
-    public function getSkippedMonthsMessage(Account $account): ?string
-    {
-        $skipped = $this->getSkippedMonthsCount($account);
+        if (! $lastDate) {
+            return null;
+        }
 
-        if ($skipped === null || $skipped === 0) return null;
+        // Days elapsed from last recording up to and including today
+        $daysElapsed = (int) $lastDate->copy()->startOfDay()->diffInDays(now()->startOfDay());
 
-        $totalMonths   = $skipped + 1;
-        $monthWord     = $skipped === 1 ? 'month' : 'months';
-        $monthsWord    = $totalMonths === 1 ? 'month' : 'months';
+        if ($daysElapsed === 0) {
+            return null; // already recorded today
+        }
 
-        return "You skipped {$skipped} {$monthWord}. " .
-            "Is the interest being recorded for the last {$totalMonths} {$monthsWord}?";
+        if ($daysElapsed === 1) {
+            return 0;    // normal — consecutive day, no skip
+        }
+
+        // Number of days being backfilled (yesterday back to day-after-last)
+        return $daysElapsed - 1;
     }
 
     /**
-     * Returns date range info for display when months have been skipped.
+     * Returns the full list of dates that need an interest transaction,
+     * ordered from oldest to newest. When there are no skips this is just [today].
+     * When days were skipped, it includes the gap days plus today.
      */
-    public function getSkippedDateRange(Account $account): ?array
+    public function getTargetDates(Account $account): array
     {
         $lastDate = $this->getLastInterestDate($account);
 
-        if (!$lastDate) return null;
+        $startDate = $lastDate
+            ? $lastDate->copy()->addDay()->startOfDay()
+            : now()->startOfDay();
 
-        $monthsElapsed = (int) $lastDate->copy()->startOfMonth()->diffInMonths(now()->startOfMonth());
+        $endDate = now()->startOfDay();
 
-        if ($monthsElapsed <= 1) return null;
+        $dates = [];
+        $cursor = $startDate->copy();
 
-        $skipped     = $monthsElapsed - 1;
-        $totalMonths = $monthsElapsed;
+        while ($cursor->lte($endDate)) {
+            $dates[] = $cursor->copy();
+            $cursor->addDay();
+        }
+
+        return $dates;
+    }
+
+    /**
+     * Returns date range info for Blade display when days have been skipped.
+     */
+    public function getSkippedDateRange(Account $account): ?array
+    {
+        $lastDate    = $this->getLastInterestDate($account);
+        $skippedDays = $this->getSkippedDaysCount($account);
+
+        if ($skippedDays === null || $skippedDays === 0) {
+            return null;
+        }
+
+        $gapStart = $lastDate->copy()->addDay();
+        $gapEnd   = now()->copy()->subDay();    // everything before today
+        $totalDays = $skippedDays + 1;          // gap days + today
 
         return [
-            'last_recorded' => $lastDate->format('M Y'),
-            'gap_start'     => $lastDate->copy()->addMonth()->format('M Y'),
-            'gap_end'       => now()->copy()->subMonth()->format('M Y'),
-            'days_count'    => $skipped,      // kept for Blade compatibility (= skipped months)
-            'total_days'    => $totalMonths,   // kept for Blade compatibility (= total months)
+            'last_recorded' => $lastDate->format('M d, Y'),
+            'gap_start'     => $gapStart->format('M d, Y'),
+            'gap_end'       => $gapEnd->format('M d, Y'),
+            'days_count'    => $skippedDays,   // number of skipped (gap) days
+            'total_days'    => $totalDays,      // total days being covered incl. today
         ];
     }
 
     // ════════════════════════════════════════════════════════════════════════════
-    // SECTION 2: Validation
+    // SECTION 2: Transaction Building
+    // ════════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Splits a total interest amount evenly across all target dates and returns
+     * an array of ['date' => Carbon, 'amount' => float, 'description' => string].
+     *
+     * Any rounding remainder (due to cents) is added to the last entry so that
+     * the amounts always sum exactly to $totalAmount.
+     */
+    public function buildDailyEntries(Account $account, float $totalAmount): array
+    {
+        $dates     = $this->getTargetDates($account);
+        $count     = count($dates);
+        $perDay    = round($totalAmount / $count, 2);
+        $entries   = [];
+
+        foreach ($dates as $i => $date) {
+            // Put rounding remainder on the last entry
+            $amount = ($i === $count - 1)
+                ? round($totalAmount - ($perDay * ($count - 1)), 2)
+                : $perDay;
+
+            $entries[] = [
+                'date'        => $date,
+                'amount'      => $amount,
+                'description' => 'Interest earned – ' . $date->format('M d, Y'),
+            ];
+        }
+
+        return $entries;
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // SECTION 3: Validation
     // ════════════════════════════════════════════════════════════════════════════
 
     public function validateInterestAmount(float $amount): array
@@ -125,7 +182,69 @@ class InterestService
 
         return $errors;
     }
-    public function getTargetMonth(): Carbon
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // SECTION 4: Etica Gate
+    // ════════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Returns true if the given savings account requires an interest recording
+     * before a withdrawal/transfer can proceed.
+     *
+     * This applies to any savings account whose name contains "etica" (case-insensitive).
+     */
+    public function requiresInterestBeforeWithdrawal(Account $account): bool
+    {
+        if ($account->type !== 'savings') {
+            return false;
+        }
+
+        return str_contains(strtolower($account->name), 'etica');
+    }
+
+    /**
+     * Returns true if the Etica interest gate is satisfied — i.e. interest has
+     * already been recorded today (so a withdrawal can proceed).
+     */
+    public function isInterestGateSatisfied(Account $account): bool
+    {
+        return ! $this->canRecordToday($account);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // SECTION 5: Deprecated / Legacy shims
+    // ════════════════════════════════════════════════════════════════════════════
+
+    /** @deprecated Use canRecordToday() */
+    public function canRecordTodayKey(Account $account): bool
+    {
+        return $this->canRecordToday($account);
+    }
+
+    /** @deprecated Use getSkippedDaysCount() */
+    public function getSkippedMonthsCount(Account $account): ?int
+    {
+        return $this->getSkippedDaysCount($account);
+    }
+
+    /** @deprecated Use getSkippedDaysCount() */
+    public function getSkippedMonthsMessage(Account $account): ?string
+    {
+        $skipped = $this->getSkippedDaysCount($account);
+
+        if ($skipped === null || $skipped === 0) {
+            return null;
+        }
+
+        $totalDays = $skipped + 1;
+        $dayWord   = $skipped === 1 ? 'day' : 'days';
+
+        return "You skipped {$skipped} {$dayWord}. "
+            . "Is the interest being recorded for the last {$totalDays} days?";
+    }
+
+    /** @deprecated Not used in day-based logic */
+    public function getTargetMonth(): \Carbon\Carbon
     {
         return now()->subMonth()->startOfMonth();
     }

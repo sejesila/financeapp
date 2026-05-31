@@ -96,7 +96,7 @@
                            class="bg-green-600 text-white px-6 py-2.5 rounded-lg hover:bg-green-700 transition text-center font-medium shadow-md">
                             + Top Up Account
                         </a>
-                        @if($account->type === 'savings' && !$interestRecordedLastMonth)
+                        @if($account->type === 'savings' && !$interestRecordedToday)
                             <a href="{{ route('accounts.interest.form', $account) }}"
                                class="bg-emerald-600 text-white px-6 py-2.5 rounded-lg hover:bg-emerald-700 transition text-center font-medium shadow-md">
                                 📈 Record Interest
@@ -570,13 +570,18 @@
                                                 +{{ number_format($txn->amount, 0) }}
                                             @endif
                                         </td>
-                                        <td class="px-4 py-3 hidden sm:table-cell">
-                                            <span class="inline-flex rounded-full px-2 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-                                                {{ $txn->category->name }}
-                                            </span>
+                                        {{-- Date cell --}}
+                                        <td class="px-4 py-3 whitespace-nowrap text-gray-600 dark:text-gray-400 text-xs">
+                                            @if($account->type === 'savings' && ($txn->is_grouped ?? false))
+                                                {{ $txn->date->format('M Y') }}
+                                            @else
+                                                {{ $txn->date->format('M d, Y') }}
+                                            @endif
                                         </td>
+
+                                        {{-- Reverse button — only for non-grouped rows within the 2-minute window --}}
                                         <td class="px-4 py-3 text-right whitespace-nowrap">
-                                            @if($txn->created_at->diffInMinutes(now()) <= 60)
+                                            @if(!($txn->is_grouped ?? false) && $txn->created_at->diffInMinutes(now()) <= 2)
                                                 <a href="{{ route('accounts.topup.reverse.form', ['account' => $account, 'transaction' => $txn]) }}"
                                                    title="Reverse this top-up"
                                                    class="inline-flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors">
