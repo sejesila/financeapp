@@ -82,7 +82,7 @@ class SendMonthlyReportsWithStatement extends Command
                 $reportPath  = sys_get_temp_dir()
                     . "/monthly_report_{$user->id}_{$targetMonth->format('Y_m')}.pdf";
 
-                Pdf::view('reports.monthly-pdf', [
+                Pdf::view('emails.pdf.monthly-report', [
                     'user' => $user,
                     'data' => $reportData,
                 ])
