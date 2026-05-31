@@ -75,7 +75,29 @@ class StatementController extends Controller
                     'pending_amount' => $isPending ? $txn->amount : null,
                     'source'       => 'txn',
                 ];
-            });
+            })
+        // After the ->map() call on transactions, add this:
+        ->groupBy(function ($item) {
+        // Group interest rows by year-month, everything else by its unique id
+        return $item['net_interest'] !== null
+            ? 'interest_' . substr($item['sort_date'], 0, 7)   // e.g. interest_2026-05
+            : 'txn_' . $item['sort_id'];
+    })
+        ->map(function ($group) {
+            if ($group->count() === 1) {
+                return $group->first();
+            }
+
+            // Multiple interest rows → consolidate into the last one
+            $last = $group->sortBy('sort_date')->last();
+
+            return array_merge($last, [
+                'net_interest' => $group->sum('net_interest'),
+                'narration'    => 'Interest earned – ' . Carbon::parse($last['sort_date'])->format('F Y')
+                    . ' (consolidated)',
+            ]);
+        })
+        ->values();
 
         // ── 2. Transfers IN ───────────────────────────────────────────────────
         //
