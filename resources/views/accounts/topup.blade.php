@@ -177,10 +177,10 @@
     <script>
         function topupForm() {
             return {
-                amount: '{{ old('amount') }}',
-                date: '{{ old('date', now()->format('Y-m-d\TH:i')) }}',
-                description: '{{ old('description') }}',
-                isClientFund: @if($isSavings) {{ old('is_client_fund') ? 'true' : 'false' }} @else false @endif,
+                amount: @json(old('amount', '')),
+                description: @json(old('description', '')),
+                date: @json(old('date', now()->format('Y-m-d\TH:i'))),
+                isClientFund: @json((bool) old('is_client_fund', false)),
 
                 init() {
                     this.updateCategoryRequired();

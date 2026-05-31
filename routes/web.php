@@ -15,6 +15,7 @@ use App\Http\Controllers\{AccountController,
     ProfileController,
     ReportsController,
     RollingFundController,
+    StatementController,
     TransactionController};
 use App\Http\Controllers\Auth\{AuthenticatedSessionController,
     EmailVerificationNotificationController,
@@ -110,6 +111,8 @@ Route::middleware('auth')->group(function () {
             ->name('interest.form');
         Route::post('{account}/record-interest', [AccountController::class, 'recordInterest'])
             ->name('interest.store');
+        Route::get('{account}/statement', [StatementController::class, 'show'])
+            ->name('statement');
 
     });
 

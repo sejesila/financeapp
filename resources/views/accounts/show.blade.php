@@ -102,6 +102,13 @@
                                 📈 Record Interest
                             </a>
                         @endif
+                        @if($account->type === 'savings')
+                            <a href="{{ route('accounts.statement', $account) }}"
+                               target="_blank"
+                               class="bg-indigo-700 text-white px-6 py-2.5 rounded-lg hover:bg-indigo-800 transition text-center font-medium shadow-md">
+                                📄 View Statement
+                            </a>
+                        @endif
                     </div>
                 </div>
                 <p class="text-xs text-gray-600 dark:text-gray-400 mt-4 flex items-center gap-1">
