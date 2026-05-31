@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Account;
-use App\Models\Transaction;
+use App\Models\Transfer;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -21,7 +21,6 @@ class StatementController extends Controller
                 ->with('error', 'Statements are only available for savings accounts.');
         }
 
-        // Default: current month
         $from = $request->input('from')
             ? Carbon::parse($request->input('from'))->startOfDay()
             : now()->startOfMonth();
@@ -30,82 +29,131 @@ class StatementController extends Controller
             ? Carbon::parse($request->input('to'))->endOfDay()
             : now()->endOfDay();
 
-        // Opening balance = sum of all transactions (income - expense) strictly BEFORE $from
+        // Opening balance = everything before the period start
         $openingBalance = $this->computeBalanceAt($account, $from->copy()->subSecond());
 
-        // All transactions within the range, ordered by date then id
+        // ── 1. Transactions (interest + expenses) ─────────────────────────────
         $transactions = $account->transactions()
-            ->with('category')
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->whereNull('transactions.deleted_at')
             ->whereBetween('transactions.date', [$from->toDateString(), $to->toDateString()])
             ->select('transactions.*', 'categories.type as cat_type', 'categories.name as cat_name')
-            ->orderBy('transactions.date')
-            ->orderBy('transactions.id')
-            ->get();
+            ->get()
+            ->map(function ($txn) {
+                $isInterest = $txn->cat_name === 'Interest';
+                $isExpense  = $txn->cat_type === 'expense';
 
-        // Build statement rows with running balance
-        $runningBalance = $openingBalance;
-        $rows = [];
+                return [
+                    'sort_date'    => $txn->date,
+                    'sort_id'      => $txn->id,
+                    'date'         => Carbon::parse($txn->date)->format('M d, Y'),
+                    'narration'    => $txn->description,
+                    'inflow'       => null,
+                    'withdrawal'   => $isExpense  ? $txn->amount : null,
+                    'net_interest' => $isInterest ? $txn->amount : null,
+                    // non-interest income treated as inflow
+                    'inflow'       => (! $isExpense && ! $isInterest) ? $txn->amount : null,
+                    'source'       => 'txn',
+                ];
+            });
 
-        $totalInflow    = 0;
+        // ── 2. Transfers IN (money arriving at this account) ──────────────────
+        $transfersIn = Transfer::where('to_account_id', $account->id)
+            ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
+            ->get()
+            ->map(function ($t) {
+                $counterpart = $t->fromAccount?->name ?? 'Transfer';
+                return [
+                    'sort_date'    => $t->date,
+                    'sort_id'      => $t->id,
+                    'date'         => Carbon::parse($t->date)->format('M d, Y'),
+                    'narration'    => $t->description ?: "Transfer from {$counterpart}",
+                    'inflow'       => $t->amount,
+                    'withdrawal'   => null,
+                    'net_interest' => null,
+                    'source'       => 'transfer_in',
+                ];
+            });
+
+        // ── 3. Transfers OUT (money leaving this account) ─────────────────────
+        $transfersOut = Transfer::where('from_account_id', $account->id)
+            ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
+            ->get()
+            ->map(function ($t) {
+                $counterpart = $t->toAccount?->name ?? 'Transfer';
+                return [
+                    'sort_date'    => $t->date,
+                    'sort_id'      => $t->id,
+                    'date'         => Carbon::parse($t->date)->format('M d, Y'),
+                    'narration'    => $t->description ?: "Transfer to {$counterpart}",
+                    'inflow'       => null,
+                    'withdrawal'   => $t->amount,
+                    'net_interest' => null,
+                    'source'       => 'transfer_out',
+                ];
+            });
+
+        // ── 4. Merge & sort by date asc, then id asc ─────────────────────────
+        $merged = $transactions
+            ->concat($transfersIn)
+            ->concat($transfersOut)
+            ->sortBy([
+                ['sort_date', 'asc'],
+                ['sort_id',   'asc'],
+            ])
+            ->values();
+
+        // ── 5. Build running balance ──────────────────────────────────────────
+        $runningBalance  = $openingBalance;
+        $totalInflow     = 0;
         $totalWithdrawal = 0;
-        $totalInterest  = 0;
+        $totalInterest   = 0;
+        $rows            = [];
 
-        foreach ($transactions as $txn) {
-            $isInterest   = $txn->cat_name === 'Interest';
-            $isExpense    = $txn->cat_type === 'expense';
-            $isIncome     = in_array($txn->cat_type, ['income', 'liability']) && ! $isInterest;
-
-            if ($isExpense) {
-                $runningBalance -= $txn->amount;
-                $totalWithdrawal += $txn->amount;
-            } elseif ($isInterest) {
-                $runningBalance += $txn->amount;
-                $totalInterest  += $txn->amount;
-            } else {
-                $runningBalance += $txn->amount;
-                $totalInflow    += $txn->amount;
+        foreach ($merged as $item) {
+            if ($item['inflow'] !== null) {
+                $runningBalance += $item['inflow'];
+                $totalInflow    += $item['inflow'];
+            }
+            if ($item['withdrawal'] !== null) {
+                $runningBalance  -= $item['withdrawal'];
+                $totalWithdrawal += $item['withdrawal'];
+            }
+            if ($item['net_interest'] !== null) {
+                $runningBalance += $item['net_interest'];
+                $totalInterest  += $item['net_interest'];
             }
 
-            $rows[] = [
-                'date'            => Carbon::parse($txn->date)->format('M d, Y'),
-                'narration'       => $txn->description,
-                'inflow'          => $isIncome   ? $txn->amount : null,
-                'withdrawal'      => $isExpense  ? $txn->amount : null,
-                'net_interest'    => $isInterest ? $txn->amount : null,
-                'running_balance' => $runningBalance,
-            ];
+            $rows[] = array_merge($item, ['running_balance' => $runningBalance]);
         }
 
-        $closingBalance = $runningBalance;
-
         return view('accounts.statement', [
-            'account'          => $account,
-            'from'             => $from,
-            'to'               => $to,
-            'openingBalance'   => $openingBalance,
-            'closingBalance'   => $closingBalance,
-            'rows'             => $rows,
-            'totalInflow'      => $totalInflow,
-            'totalWithdrawal'  => $totalWithdrawal,
-            'totalInterest'    => $totalInterest,
-            'user'             => auth()->user(),
+            'account'         => $account,
+            'from'            => $from,
+            'to'              => $to,
+            'openingBalance'  => $openingBalance,
+            'closingBalance'  => $runningBalance,
+            'rows'            => $rows,
+            'totalInflow'     => $totalInflow,
+            'totalWithdrawal' => $totalWithdrawal,
+            'totalInterest'   => $totalInterest,
+            'user'            => auth()->user(),
         ]);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Helpers
-    // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Compute the account balance at a given point in time by summing all
-     * non-deleted transactions up to (and including) that moment, plus the
-     * initial_balance seeded at account creation.
+     * Balance at a given moment = initial_balance
+     *   + all income/liability transactions up to that date
+     *   - all expense transactions up to that date
+     *   + all transfers IN up to that date
+     *   - all transfers OUT up to that date
      */
     private function computeBalanceAt(Account $account, Carbon $at): float
     {
-        $result = $account->transactions()
+        // Transactions component
+        $txNet = $account->transactions()
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->whereNull('transactions.deleted_at')
             ->where('transactions.date', '<=', $at->toDateString())
@@ -116,6 +164,19 @@ class StatementController extends Controller
             ")
             ->value('net');
 
-        return (float) ($account->initial_balance ?? 0) + (float) ($result ?? 0);
+        // Transfers IN
+        $transfersInNet = Transfer::where('to_account_id', $account->id)
+            ->where('date', '<=', $at->toDateString())
+            ->sum('amount');
+
+        // Transfers OUT
+        $transfersOutNet = Transfer::where('from_account_id', $account->id)
+            ->where('date', '<=', $at->toDateString())
+            ->sum('amount');
+
+        return (float) ($account->initial_balance ?? 0)
+            + (float) ($txNet ?? 0)
+            + (float) $transfersInNet
+            - (float) $transfersOutNet;
     }
 }
