@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Models\Account;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -15,8 +16,11 @@ class MonthlyReportMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    /** @var Attachment[] Extra PDFs bolted on by SendMonthlyReportsWithStatement */
-    protected array $extraAttachments = [];
+    /**
+     * Each entry: ['account' => Account, 'statementData' => array, 'period' => string]
+     * Populated via withEticaStatements(); empty = no Etica attachments.
+     */
+    protected array $eticaStatements = [];
 
     public function __construct(
         public User  $user,
@@ -24,13 +28,14 @@ class MonthlyReportMail extends Mailable
     ) {}
 
     /**
-     * Fluently attach extra PDFs without changing existing callers.
+     * Attach Etica statement data to be rendered as PDF(s) by this Mailable.
+     * Replaces the old withAttachments() pattern — callers no longer manage temp files.
      *
-     * @param  Attachment[]  $attachments
+     * @param  array{ account: Account, statementData: array, period: string }[]  $statements
      */
-    public function withAttachments(array $attachments): static
+    public function withEticaStatements(array $statements): static
     {
-        $this->extraAttachments = array_merge($this->extraAttachments, $attachments);
+        $this->eticaStatements = $statements;
         return $this;
     }
 
@@ -64,8 +69,22 @@ class MonthlyReportMail extends Mailable
             )->withMime('application/pdf');
         }
 
-        return array_merge($attachments, $this->extraAttachments);
+        foreach ($this->eticaStatements as $entry) {
+            $account       = $entry['account'];
+            $statementData = $entry['statementData'];
+            $period        = $entry['period'];
+            $filename      = "{$account->name}_Statement_{$period}.pdf";
+
+            $attachments[] = Attachment::fromData(
+                fn() => $this->generateEticaPdf($account, $statementData),
+                $filename
+            )->withMime('application/pdf');
+        }
+
+        return $attachments;
     }
+
+    // -------------------------------------------------------------------------
 
     protected function generateMonthlyReportPdf(): string
     {
@@ -75,6 +94,23 @@ class MonthlyReportMail extends Mailable
             'user' => $this->user,
             'data' => $this->reportData,
         ])
+            ->format('a4')
+            ->save($tempPath);
+
+        $contents = file_get_contents($tempPath);
+        @unlink($tempPath);
+
+        return $contents;
+    }
+
+    protected function generateEticaPdf(Account $account, array $statementData): string
+    {
+        $tempPath = tempnam(sys_get_temp_dir(), 'etica_statement_') . '.pdf';
+
+        Pdf::view('accounts.statement', array_merge($statementData, [
+            'account' => $account,
+            'user'    => $this->user,
+        ]))
             ->format('a4')
             ->save($tempPath);
 

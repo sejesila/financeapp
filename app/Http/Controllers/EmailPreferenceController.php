@@ -10,7 +10,6 @@ use App\Services\ReportDataService;
 use App\Services\StatementDataService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Spatie\LaravelPdf\Facades\Pdf;
@@ -120,11 +119,12 @@ class EmailPreferenceController extends Controller
         $user = Auth::user();
         try {
             $reportData = $reportService->generateMonthlyReport($user);
-            $mailable   = new MonthlyReportMail($user, $reportData);
+            $from       = now()->subMonth()->startOfMonth();
+            $to         = now()->subMonth()->endOfMonth();
+            $period     = now()->subMonth()->format('F Y');
 
-            foreach ($this->buildEticaAttachments($user) as $attachment) {
-                $mailable->withAttachments([$attachment]);
-            }
+            $mailable = (new MonthlyReportMail($user, $reportData))
+                ->withEticaStatements($this->buildEticaStatements($user, $from, $to, $period));
 
             Mail::to($user->email)->send($mailable);
 
@@ -142,11 +142,12 @@ class EmailPreferenceController extends Controller
         $user = Auth::user();
         try {
             $reportData = $reportService->generateAnnualReport($user);
-            $mailable   = new AnnualReportMail($user, $reportData);
+            $from       = now()->subYear()->startOfYear();
+            $to         = now()->subYear()->endOfYear();
+            $period     = now()->subYear()->format('Y');
 
-            foreach ($this->buildEticaAttachments($user) as $attachment) {
-                $mailable->withAttachments([$attachment]);
-            }
+            $mailable = (new AnnualReportMail($user, $reportData))
+                ->withEticaStatements($this->buildEticaStatements($user, $from, $to, $period));
 
             Mail::to($user->email)->send($mailable);
 
@@ -161,8 +162,7 @@ class EmailPreferenceController extends Controller
 
     public function sendTestEtica()
     {
-        $user = Auth::user();
-
+        $user         = Auth::user();
         $eticaAccount = $this->findEticaAccount($user);
 
         if (! $eticaAccount) {
@@ -177,6 +177,7 @@ class EmailPreferenceController extends Controller
 
             $statementData = $this->statementService->buildStatementData($eticaAccount, $from, $to);
 
+            // EticaStatementMail generates its own PDF via attachments() — no temp files here.
             Mail::to($user->email)->send(new EticaStatementMail(
                 user:          $user,
                 account:       $eticaAccount,
@@ -238,40 +239,27 @@ class EmailPreferenceController extends Controller
     }
 
     /**
-     * Build Spatie Attachment objects for every active Etica account the user holds.
-     * Returns an empty array when the user has no Etica accounts — callers can safely
-     * iterate without an explicit null check.
+     * Build the Etica statement data arrays for every active Etica account the user holds.
+     * Returns an empty array when the user has no Etica accounts — callers pass this
+     * directly to withEticaStatements() without any null check.
      *
-     * @return Attachment[]
+     * @return array{ account: Account, statementData: array, period: string }[]
      */
-    private function buildEticaAttachments($user): array
+    private function buildEticaStatements($user, string $period): array
     {
-        $from   = now()->subMonth()->startOfMonth();
-        $to     = now()->subMonth()->endOfMonth();
-        $period = now()->subMonth()->format('F Y');
+        $from = now()->subMonth()->startOfMonth();
+        $to   = now()->subMonth()->endOfMonth();
 
         return $user->accounts()
             ->where('type', 'savings')
             ->where('is_active', true)
             ->whereRaw("LOWER(name) LIKE '%etica%'")
             ->get()
-            ->map(function (Account $account) use ($user, $from, $to, $period) {
-                $statementData = $this->statementService->buildStatementData($account, $from, $to);
-
-                $statementMail = new EticaStatementMail(
-                    user:          $user,
-                    account:       $account,
-                    statementData: $statementData,
-                    period:        $period,
-                );
-
-                $filename = "{$account->name}_Statement_{$period}.pdf";
-
-                return Attachment::fromData(
-                    fn() => $statementMail->generateStatementPdf(),
-                    $filename
-                )->withMime('application/pdf');
-            })
+            ->map(fn(Account $account) => [
+                'account'       => $account,
+                'statementData' => $this->statementService->buildStatementData($account, $from, $to),
+                'period'        => $period,
+            ])
             ->all();
     }
 }
