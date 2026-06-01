@@ -842,7 +842,12 @@
             window.smDownload = function () {
                 const from = document.getElementById('smDownloadBtn').dataset.from;
                 const to   = document.getElementById('smDownloadBtn').dataset.to;
-                window.open(`${BASE_URL}?from=${from}&to=${to}`, '_blank');
+                const a    = document.createElement('a');
+                a.href     = `${BASE_URL}?from=${from}&to=${to}&download=1`;
+                a.download = `{{ $account->name }}_Statement_${from}_${to}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
             };
 
             function smLoad(from, to) {

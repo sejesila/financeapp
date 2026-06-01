@@ -7,11 +7,12 @@ use App\Models\Transfer;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Spatie\LaravelPdf\Facades\Pdf;
 
 class StatementController extends Controller
 {
     // =========================================================================
-    // MONTHLY / DATE-RANGE STATEMENT  (existing, unchanged)
+    // MONTHLY / DATE-RANGE STATEMENT
     // =========================================================================
 
     public function show(Request $request, Account $account)
@@ -27,7 +28,7 @@ class StatementController extends Controller
 
         $from = $request->input('from')
             ? Carbon::parse($request->input('from'))->startOfDay()
-            : now()->startOfMonth();
+            : Carbon::parse($account->created_at)->startOfDay();
 
         $to = $request->input('to')
             ? Carbon::parse($request->input('to'))->endOfDay()
@@ -64,6 +65,29 @@ class StatementController extends Controller
             'closingBalance'  => $closingBalance,
         ] = $this->buildRunningBalance($merged, $openingBalance);
 
+        // ── 6. PDF download mode ──────────────────────────────────────────────
+        if ($request->boolean('download')) {
+            $filename = $account->name
+                . '_Statement_'
+                . $from->format('Y-m-d')
+                . '_to_'
+                . $to->format('Y-m-d')
+                . '.pdf';
+
+            return Pdf::view('accounts.statement', [
+                'account'         => $account,
+                'from'            => $from,
+                'to'              => $to,
+                'openingBalance'  => $openingBalance,
+                'closingBalance'  => $closingBalance,
+                'rows'            => $rows,
+                'totalInflow'     => $totalInflow,
+                'totalWithdrawal' => $totalWithdrawal,
+                'totalInterest'   => $totalInterest,
+                'user'            => auth()->user(),
+            ])->format('a4')->download($filename);
+        }
+
         return view('accounts.statement', [
             'account'         => $account,
             'from'            => $from,
@@ -79,166 +103,9 @@ class StatementController extends Controller
     }
 
     // =========================================================================
-    // ANNUAL STATEMENT  (new)
+    // SHARED HELPERS
     // =========================================================================
 
-    /**
-     * Generate a full-year statement broken down by month.
-     *
-     * Route example:
-     *   GET /accounts/{account}/statement/annual?year=2025
-     *
-     * View receives:
-     *   $account, $year (int), $openingBalance, $closingBalance,
-     *   $months  (array of monthly summary objects – see below),
-     *   $annual  (year-level totals),
-     *   $user
-     *
-     * Each $months entry:
-     *   [
-     *     'label'          => 'January 2025',
-     *     'from'           => Carbon,
-     *     'to'             => Carbon,
-     *     'openingBalance' => float,
-     *     'closingBalance' => float,
-     *     'totalInflow'    => float,
-     *     'totalWithdrawal'=> float,
-     *     'totalInterest'  => float,
-     *     'netChange'      => float,   // closing - opening
-     *     'rows'           => array,   // same row structure as show()
-     *   ]
-     */
-    public function annual(Request $request, Account $account)
-    {
-        if ($account->user_id !== Auth::id()) {
-            abort(403);
-        }
-
-        if ($account->type !== 'savings') {
-            return redirect()->route('accounts.show', $account)
-                ->with('error', 'Statements are only available for savings accounts.');
-        }
-
-        // ── Resolve the target year ───────────────────────────────────────────
-        $year = (int) $request->input('year', now()->year);
-
-        // Guard: don't allow future years
-        if ($year > now()->year) {
-            $year = now()->year;
-        }
-
-        $yearStart = Carbon::create($year, 1, 1)->startOfDay();
-        $yearEnd   = Carbon::create($year, 12, 31)->endOfDay();
-
-        // Clamp the end to today so future months are excluded from data
-        // (but we still render them as empty months for the current year)
-        $dataEnd = $yearEnd->copy()->min(now()->endOfDay());
-
-        // Opening balance of the year = settled balance on Dec 31 of prior year
-        $openingBalance = $this->computeBalanceAt($account, $yearStart->copy()->subSecond());
-
-        // ── Fetch ALL data for the year in one pass ───────────────────────────
-        $allTransactions = $this->fetchTransactions($account, $yearStart, $dataEnd);
-        $allTransfersIn  = $this->fetchTransfersIn($account, $yearStart, $dataEnd);
-        $allTransfersOut = $this->fetchTransfersOut($account, $yearStart, $dataEnd);
-
-        $allMerged = $allTransactions
-            ->concat($allTransfersIn)
-            ->concat($allTransfersOut)
-            ->sortBy([['sort_date', 'asc'], ['sort_id', 'asc']])
-            ->values();
-
-        // ── Slice per month and accumulate running balance ────────────────────
-        $months          = [];
-        $runningBalance  = $openingBalance;
-
-        // Year-level accumulators
-        $annualInflow     = 0;
-        $annualWithdrawal = 0;
-        $annualInterest   = 0;
-
-        for ($m = 1; $m <= 12; $m++) {
-            $monthStart = Carbon::create($year, $m, 1)->startOfDay();
-            $monthEnd   = $monthStart->copy()->endOfMonth()->endOfDay();
-
-            // Rows that fall in this calendar month
-            $monthItems = $allMerged->filter(function ($item) use ($monthStart, $monthEnd) {
-                $d = Carbon::parse($item['sort_date']);
-                return $d->between($monthStart, $monthEnd);
-            })->values();
-
-            $monthOpeningBalance = $runningBalance;
-
-            [
-                'rows'            => $rows,
-                'totalInflow'     => $totalInflow,
-                'totalWithdrawal' => $totalWithdrawal,
-                'totalInterest'   => $totalInterest,
-                'closingBalance'  => $closingBalance,
-            ] = $this->buildRunningBalance($monthItems, $runningBalance);
-
-            $runningBalance = $closingBalance;
-
-            $annualInflow     += $totalInflow;
-            $annualWithdrawal += $totalWithdrawal;
-            $annualInterest   += $totalInterest;
-
-            $months[] = [
-                'label'           => $monthStart->format('F Y'),
-                'month'           => $m,
-                'from'            => $monthStart,
-                'to'              => $monthEnd,
-                'isFuture'        => $monthStart->isAfter(now()),
-                'openingBalance'  => $monthOpeningBalance,
-                'closingBalance'  => $closingBalance,
-                'totalInflow'     => $totalInflow,
-                'totalWithdrawal' => $totalWithdrawal,
-                'totalInterest'   => $totalInterest,
-                'netChange'       => $closingBalance - $monthOpeningBalance,
-                'rows'            => $rows,
-            ];
-        }
-
-        // ── Year-level summary ────────────────────────────────────────────────
-        $annual = [
-            'year'            => $year,
-            'openingBalance'  => $openingBalance,
-            'closingBalance'  => $runningBalance,
-            'totalInflow'     => $annualInflow,
-            'totalWithdrawal' => $annualWithdrawal,
-            'totalInterest'   => $annualInterest,
-            'netChange'       => $runningBalance - $openingBalance,
-        ];
-
-        // ── Available years for the year-picker (account creation year → now) ─
-        $accountCreatedYear = Carbon::parse($account->created_at)->year;
-        $availableYears     = range(now()->year, $accountCreatedYear);  // desc order
-
-        return view('accounts.statement-annual', [
-            'account'        => $account,
-            'year'           => $year,
-            'yearStart'      => $yearStart,
-            'yearEnd'        => $yearEnd,
-            'openingBalance' => $openingBalance,
-            'closingBalance' => $runningBalance,
-            'months'         => $months,
-            'annual'         => $annual,
-            'availableYears' => $availableYears,
-            'user'           => auth()->user(),
-        ]);
-    }
-
-    // =========================================================================
-    // SHARED HELPERS  (extracted so show() and annual() both use them)
-    // =========================================================================
-
-    /**
-     * Fetch, map, and consolidate transactions (interest, expenses, income)
-     * for a given account and date window.
-     *
-     * Pending-deposit logic and interest consolidation are identical to the
-     * original show() implementation.
-     */
     private function fetchTransactions(Account $account, Carbon $from, Carbon $to): \Illuminate\Support\Collection
     {
         return $account->transactions()
@@ -284,7 +151,6 @@ class StatementController extends Controller
                     return $group->first();
                 }
 
-                // Multiple interest rows in the same month → consolidate
                 $last = $group->sortBy('sort_date')->last();
 
                 return array_merge($last, [
@@ -296,11 +162,6 @@ class StatementController extends Controller
             })
             ->values();
     }
-
-    /**
-     * Fetch and map incoming transfers for an account within the date window.
-     * Pending transfers (future value_date) are shown but do not move the balance.
-     */
 
     private function fetchTransfersIn(Account $account, Carbon $from, Carbon $to): \Illuminate\Support\Collection
     {
@@ -357,14 +218,7 @@ class StatementController extends Controller
                 ];
             });
     }
-    /**
-     * Walk a sorted collection of merged rows, accumulate totals, and attach a
-     * running balance to every row.  Returns totals + annotated rows.
-     *
-     * @param  \Illuminate\Support\Collection  $merged
-     * @param  float  $openingBalance
-     * @return array{rows: array, totalInflow: float, totalWithdrawal: float, totalInterest: float, closingBalance: float}
-     */
+
     private function buildRunningBalance(\Illuminate\Support\Collection $merged, float $openingBalance): array
     {
         $runningBalance  = $openingBalance;
@@ -400,21 +254,9 @@ class StatementController extends Controller
     }
 
     // =========================================================================
-    // BALANCE HELPER  (unchanged logic, shared by both statement types)
+    // BALANCE HELPER
     // =========================================================================
 
-    /**
-     * Compute the settled balance at a given point in time.
-     *
-     * Mirrors updateBalance() exactly:
-     *
-     *   + initial_balance
-     *   + income transactions (excl. future value_date deposits)
-     *   + liability transactions (loan receipts, client funds)
-     *   - expense transactions
-     *   + transfers IN  where value_date IS NULL OR value_date <= $at
-     *   - transfers OUT (always immediate)
-     */
     private function computeBalanceAt(Account $account, Carbon $at): float
     {
         $atDate = $at->toDateString();

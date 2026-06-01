@@ -113,8 +113,7 @@ Route::middleware('auth')->group(function () {
             ->name('interest.store');
         Route::get('{account}/statement', [StatementController::class, 'show'])
             ->name('statement');
-        Route::get('{account}/statement/annual', [StatementController::class, 'annual'])
-            ->name('statement.annual');
+
 
     });
 
