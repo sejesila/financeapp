@@ -53,8 +53,9 @@ class AnnualReportMail extends Mailable
         return new Content(
             view: 'emails.annual-report',
             with: [
-                'user' => $this->user,
-                'data' => $this->reportData,
+                'user'     => $this->user,
+                'data'     => $this->reportData,
+                'hasEtica' => ! empty($this->eticaStatements),
             ],
         );
     }

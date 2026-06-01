@@ -84,15 +84,7 @@
         <strong>{{ $data['start_date'] }} – {{ $data['end_date'] }}</strong>.
     </p>
 
-    {{-- Attachment summary --}}
-    @php
-        $hasEtica = $user->accounts()
-            ->where('type', 'savings')
-            ->where('is_active', true)
-            ->whereRaw("LOWER(name) LIKE '%etica%'")
-            ->exists();
-    @endphp
-
+    {{-- $hasEtica is passed from AnnualReportMail::content() — no DB query here --}}
     <div class="attachment-note">
         <strong>📎 Attachments in this email:</strong>
         <ul>

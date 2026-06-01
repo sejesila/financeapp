@@ -3,15 +3,11 @@
 namespace App\Console\Commands;
 
 use App\Mail\AnnualReportMail;
-use App\Models\Account;
 use App\Models\User;
 use App\Services\ReportDataService;
 use App\Services\StatementDataService;
-use Carbon\Carbon;
 use Illuminate\Console\Command;
-use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Support\Facades\Mail;
-use Spatie\LaravelPdf\Facades\Pdf;
 
 class SendAnnualReports extends Command
 {
@@ -63,65 +59,35 @@ class SendAnnualReports extends Command
         $failCount    = 0;
 
         foreach ($users as $user) {
-            $tmpFiles = [];
-
             try {
                 $this->info("Generating annual report for {$user->name} ({$user->email})...");
 
                 $reportData = $reportService->generateAnnualReport($user);
-                $mailable   = new AnnualReportMail($user, $reportData);
 
-                // Attach Etica statement(s) for the full prior year if applicable.
-                $statementAttachments = [];
+                // Build Etica statement data for each account the user holds.
+                // The Mailable owns PDF generation — no temp files here.
+                $eticaStatements = $user->accounts
+                    ->map(fn($account) => [
+                        'account'       => $account,
+                        'statementData' => $statementService->buildStatementData($account, $from, $to),
+                        'period'        => $period,
+                    ])
+                    ->all();
 
-                foreach ($user->accounts as $account) {
-                    $statementData = $statementService->buildStatementData($account, $from, $to);
-                    $statementPath = sys_get_temp_dir()
-                        . "/etica_annual_{$user->id}_{$account->id}_{$period}.pdf";
-
-                    Pdf::view('accounts.statement', array_merge($statementData, [
-                        'account' => $account,
-                        'user'    => $user,
-                    ]))
-                        ->format('a4')
-                        ->save($statementPath);
-
-                    $tmpFiles[]             = $statementPath;
-                    $statementAttachments[] = [
-                        'path'     => $statementPath,
-                        'filename' => "{$account->name}_Statement_{$period}.pdf",
-                    ];
-
-                    $this->info("  Statement ready for {$account->name}");
-                }
-
-                if (! empty($statementAttachments)) {
-                    $mailable->withAttachments(
-                        collect($statementAttachments)
-                            ->map(fn($s) => Attachment::fromPath($s['path'])
-                                ->as($s['filename'])
-                                ->withMime('application/pdf'))
-                            ->all()
-                    );
-                }
+                $mailable = (new AnnualReportMail($user, $reportData))
+                    ->withEticaStatements($eticaStatements);
 
                 Mail::to($user->email)->send($mailable);
 
                 $user->emailPreference->update(['last_annual_sent' => now()]);
 
-                $label = empty($statementAttachments) ? '' : ' + Etica statement';
+                $label = empty($eticaStatements) ? '' : ' + Etica statement';
                 $this->info("  ✓ Report{$label} sent to {$user->email}");
                 $successCount++;
 
             } catch (\Throwable $e) {
                 $this->error("  ✗ Failed for {$user->email}: {$e->getMessage()}");
                 $failCount++;
-            } finally {
-                foreach ($tmpFiles as $path) {
-                    if (file_exists($path)) {
-                        @unlink($path);
-                    }
-                }
             }
         }
 

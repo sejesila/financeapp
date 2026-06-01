@@ -51,8 +51,9 @@ class MonthlyReportMail extends Mailable
         return new Content(
             view: 'emails.monthly-report',
             with: [
-                'user' => $this->user,
-                'data' => $this->reportData,
+                'user'     => $this->user,
+                'data'     => $this->reportData,
+                'hasEtica' => ! empty($this->eticaStatements),
             ],
         );
     }

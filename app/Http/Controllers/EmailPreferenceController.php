@@ -243,13 +243,13 @@ class EmailPreferenceController extends Controller
      * Returns an empty array when the user has no Etica accounts — callers pass this
      * directly to withEticaStatements() without any null check.
      *
+     * @param  Carbon  $from
+     * @param  Carbon  $to
+     * @param  string  $period
      * @return array{ account: Account, statementData: array, period: string }[]
      */
-    private function buildEticaStatements($user, string $period): array
+    private function buildEticaStatements($user, Carbon $from, Carbon $to, string $period): array
     {
-        $from = now()->subMonth()->startOfMonth();
-        $to   = now()->subMonth()->endOfMonth();
-
         return $user->accounts()
             ->where('type', 'savings')
             ->where('is_active', true)

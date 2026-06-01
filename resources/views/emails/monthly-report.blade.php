@@ -73,15 +73,7 @@
         activity for the period.
     </p>
 
-    {{-- Attachment summary — shows Etica statement line only when present --}}
-    @php
-        $hasEtica = $user->accounts()
-            ->where('type', 'savings')
-            ->where('is_active', true)
-            ->whereRaw("LOWER(name) LIKE '%etica%'")
-            ->exists();
-    @endphp
-
+    {{-- $hasEtica is passed from MonthlyReportMail::content() — no DB query here --}}
     <div class="attachment-note">
         <strong>📎 Attachments in this email:</strong>
         <ul>
