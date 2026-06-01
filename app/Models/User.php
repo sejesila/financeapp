@@ -151,6 +151,14 @@ class User extends Authenticatable implements MustVerifyEmail
             'cafeteria_monthly_limit'    => $newLimit,
             'cafeteria_limit_updated_at' => Carbon::now(),
         ]);
+
+        // Also update the current month's spending record if it already exists
+        $now = Carbon::now();
+        CafeteriaMonthlySpendings::where([
+            'user_id' => $this->id,
+            'year'    => $now->year,
+            'month'   => $now->month,
+        ])->update(['limit' => $newLimit]);
     }
 
     /**
@@ -215,16 +223,6 @@ class User extends Authenticatable implements MustVerifyEmail
 
         return max(1, $count);
     }
-
-// ============================================================
-// REPLACE the entire "Spending Limit Methods" section in
-// app/Models/User.php  (everything between the
-// "Spending Limit Methods" header comment and end of class)
-// with the code below.
-//
-// Everything above that section (relationships, booted,
-// budget-limit editing, working-days helpers) is unchanged.
-// ============================================================
 
     // -------------------------------------------------------------------------
     // Spending Limit Methods
