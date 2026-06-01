@@ -103,11 +103,10 @@
                             </a>
                         @endif
                         @if($account->type === 'savings')
-                            <a href="{{ route('accounts.statement', $account) }}"
-                               target="_blank"
-                               class="bg-indigo-700 text-white px-6 py-2.5 rounded-lg hover:bg-indigo-800 transition text-center font-medium shadow-md">
+                            <button onclick="document.getElementById('statementModal').showModal()"
+                                    class="bg-indigo-700 text-white px-6 py-2.5 rounded-lg hover:bg-indigo-800 transition text-center font-medium shadow-md">
                                 📄 View Statement
-                            </a>
+                            </button>
                         @endif
                     </div>
                 </div>
@@ -781,4 +780,297 @@
 
         </div>
     </div>
+    {{-- ── Statement Modal ──────────────────────────────────────────────── --}}
+    <dialog
+        id="statementModal"
+        class="sm-modal"
+        onclick="if(event.target===this)this.close()"
+    >
+        <div class="sm-inner">
+
+            {{-- Header --}}
+            <div class="sm-header">
+                <div class="sm-logo">
+                    <span class="sm-logo-icon">E</span>
+                    <div>
+                        <span class="sm-logo-text">Etica Capital</span>
+                        <span class="sm-logo-sub">imagine more</span>
+                    </div>
+                </div>
+                <div class="sm-header-actions">
+                    <button id="smDownloadBtn"
+                            class="sm-action-btn sm-download-btn"
+                            style="display:none"
+                            onclick="smDownload()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                        </svg>
+                        Download PDF
+                    </button>
+                    <button class="sm-close" onclick="document.getElementById('statementModal').close()" aria-label="Close">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                            <path d="M18 6 6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            {{-- Body --}}
+            <div class="sm-body" id="smBody">
+                <div class="sm-loading" id="smLoading">
+                    <div class="sm-spinner"></div>
+                    <p>Loading statement…</p>
+                </div>
+                <div id="smContent" style="display:none"></div>
+            </div>
+
+        </div>
+    </dialog>
+
+    {{-- ── Script ───────────────────────────────────────────────────────── --}}
+    <script>
+        (function () {
+            // Use account creation date as "from", today as "to"
+            const ACCOUNT_CREATED = '{{ $account->created_at->toDateString() }}';
+            const today           = new Date().toISOString().slice(0, 10);
+            const BASE_URL        = '{{ route('accounts.statement', $account) }}';
+
+            // Trigger auto-load when the modal opens
+            document.querySelector('[onclick*="statementModal"]')
+                ?.addEventListener('click', () => smLoad(ACCOUNT_CREATED, today));
+
+            window.smDownload = function () {
+                const from = document.getElementById('smDownloadBtn').dataset.from;
+                const to   = document.getElementById('smDownloadBtn').dataset.to;
+                window.open(`${BASE_URL}?from=${from}&to=${to}`, '_blank');
+            };
+
+            function smLoad(from, to) {
+                // Reset
+                document.getElementById('smLoading').style.display = '';
+                document.getElementById('smContent').style.display = 'none';
+                document.getElementById('smContent').innerHTML     = '';
+                document.getElementById('smDownloadBtn').style.display = 'none';
+
+                fetch(`${BASE_URL}?from=${from}&to=${to}`, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                })
+                    .then(r => r.text())
+                    .then(html => {
+                        const doc   = new DOMParser().parseFromString(html, 'text/html');
+                        const table = doc.querySelector('table');
+                        const tableHTML = table
+                            ? table.outerHTML
+                            : '<p style="color:#888;text-align:center;padding:32px">No transactions found.</p>';
+
+                        const fromFmt = new Date(from + 'T00:00:00')
+                            .toLocaleDateString('en-KE', { day:'numeric', month:'short', year:'numeric' });
+                        const toFmt   = new Date(to   + 'T00:00:00')
+                            .toLocaleDateString('en-KE', { day:'numeric', month:'short', year:'numeric' });
+
+                        document.getElementById('smContent').innerHTML = `
+                <div class="sm-stmt-meta">
+                    <div class="sm-meta-item">
+                        <span class="sm-meta-label">Account</span>
+                        <span class="sm-meta-value">{{ $account->name }}</span>
+                    </div>
+                    <div class="sm-meta-item">
+                        <span class="sm-meta-label">Period</span>
+                        <span class="sm-meta-value">${fromFmt} – ${toFmt}</span>
+                    </div>
+                </div>
+                <div class="sm-table-wrap">${tableHTML}</div>
+            `;
+
+                        document.getElementById('smLoading').style.display = 'none';
+                        document.getElementById('smContent').style.display = '';
+
+                        const btn = document.getElementById('smDownloadBtn');
+                        btn.dataset.from = from;
+                        btn.dataset.to   = to;
+                        btn.style.display = '';
+                    })
+                    .catch(() => {
+                        document.getElementById('smLoading').style.display = 'none';
+                        document.getElementById('smContent').innerHTML =
+                            '<p style="color:#c00;text-align:center;padding:32px">Could not load statement. Please try again.</p>';
+                        document.getElementById('smContent').style.display = '';
+                    });
+            }
+        })();
+    </script>
+
+    {{-- ── Styles ────────────────────────────────────────────────────────── --}}
+    <style>
+        #statementModal {
+            border: none; padding: 0;
+            background: transparent;
+            max-width: 100vw; max-height: 100vh;
+            overflow: visible;
+        }
+
+        #statementModal::backdrop {
+            background: rgba(10,18,40,.55);
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
+            animation: smBackdropIn .2s ease;
+        }
+
+        @keyframes smBackdropIn { from{opacity:0} to{opacity:1} }
+
+        .sm-modal[open] { display:flex; align-items:center; justify-content:center; }
+
+        .sm-inner {
+            background: #fff;
+            border-radius: 16px;
+            width: min(740px, calc(100vw - 32px));
+            max-height: calc(100vh - 48px);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 24px 60px rgba(10,18,40,.22), 0 4px 16px rgba(10,18,40,.10);
+            animation: smSlideIn .22s cubic-bezier(.32,1.2,.5,1);
+            overflow: hidden;
+        }
+
+        @keyframes smSlideIn {
+            from { opacity:0; transform:translateY(14px) scale(.97); }
+            to   { opacity:1; transform:translateY(0) scale(1); }
+        }
+
+        /* Header */
+        .sm-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #0d2b5e;
+            padding: 13px 18px;
+            flex-shrink: 0;
+        }
+
+        .sm-logo { display:flex; align-items:center; gap:10px; color:#fff; }
+        .sm-logo-icon { font-family:Georgia,serif; font-style:italic; font-weight:900; font-size:22px; letter-spacing:-1px; line-height:1; }
+        .sm-logo-text { font-size:13px; font-weight:700; letter-spacing:.5px; display:block; line-height:1.1; }
+        .sm-logo-sub  { font-size:9px; letter-spacing:1.5px; opacity:.65; display:block; margin-top:2px; }
+
+        .sm-header-actions { display:flex; align-items:center; gap:8px; }
+
+        .sm-action-btn {
+            display: inline-flex; align-items: center; gap:6px;
+            font-size: 12px; font-weight: 600; font-family: Arial, sans-serif;
+            border: none; border-radius: 7px; padding: 7px 14px;
+            cursor: pointer; transition: background .15s; white-space: nowrap;
+        }
+
+        .sm-download-btn { background:#1e7e4a; color:#fff; }
+        .sm-download-btn:hover { background:#165e36; }
+
+        .sm-close {
+            background: rgba(255,255,255,.12); border:none; color:#fff;
+            width:32px; height:32px; border-radius:8px;
+            display:flex; align-items:center; justify-content:center;
+            cursor:pointer; transition:background .15s;
+        }
+        .sm-close:hover { background:rgba(255,255,255,.22); }
+
+        /* Body */
+        .sm-body { flex:1; overflow-y:auto; min-height:200px; }
+
+        /* Loading */
+        .sm-loading {
+            display:flex; flex-direction:column; align-items:center;
+            justify-content:center; padding:60px 24px;
+            color:#666; font-family:Arial,sans-serif; font-size:13px; gap:14px;
+        }
+
+        .sm-spinner {
+            width:36px; height:36px;
+            border:3px solid #e2e8f0; border-top-color:#0d2b5e;
+            border-radius:50%; animation:smSpin .7s linear infinite;
+        }
+        @keyframes smSpin { to{transform:rotate(360deg)} }
+
+        /* Meta bar */
+        .sm-stmt-meta {
+            display:flex; gap:24px; padding:12px 18px;
+            border-bottom:1px solid #edf0f5;
+            background:#f7f9fb; flex-wrap:wrap; flex-shrink:0;
+        }
+
+        .sm-meta-item { display:flex; flex-direction:column; gap:1px; }
+
+        .sm-meta-label {
+            font-size:9.5px; font-weight:700; text-transform:uppercase;
+            letter-spacing:.5px; color:#888; font-family:Arial,sans-serif;
+        }
+
+        .sm-meta-value {
+            font-size:12.5px; font-weight:600; color:#0d2b5e; font-family:Arial,sans-serif;
+        }
+
+        /* Injected table */
+        .sm-table-wrap { overflow-x:auto; }
+
+        .sm-table-wrap table {
+            width:100%; border-collapse:collapse;
+            font-size:12px; font-family:Arial,sans-serif; margin:0;
+        }
+
+        .sm-table-wrap thead tr {
+            background:#0d2b5e !important; color:#fff !important;
+            -webkit-print-color-adjust:exact; print-color-adjust:exact;
+        }
+
+        .sm-table-wrap thead th {
+            padding:9px 12px; text-align:left; font-weight:600;
+            font-size:11px; white-space:nowrap; color:#fff !important;
+        }
+
+        .sm-table-wrap thead th:not(:first-child):not(:nth-child(2)) { text-align:right; }
+
+        .sm-table-wrap tbody tr  { border-bottom:1px solid #edf0f5; }
+        .sm-table-wrap tbody tr:last-child { border-bottom:none; }
+
+        .sm-table-wrap tbody td { padding:7px 12px; vertical-align:top; }
+        .sm-table-wrap tbody td:not(:first-child):not(:nth-child(2)) { text-align:right; }
+
+        .sm-table-wrap .amount-inflow     { color:#1a5e2a; }
+        .sm-table-wrap .amount-withdrawal { color:#8b1a1a; }
+        .sm-table-wrap .amount-interest   { color:#1a3a6e; }
+        .sm-table-wrap .amount-balance    { font-weight:600; }
+
+        .sm-table-wrap tr.opening-row td {
+            font-style:italic; color:#555;
+            background:#f7f9fb; border-bottom:1px solid #c8d3e6;
+        }
+
+        .sm-table-wrap tr.pending-row td {
+            color:#999; font-style:italic; background:#fffbf0;
+        }
+
+        .sm-table-wrap tr.totals-row {
+            background:#e8edf5 !important;
+            border-top:2px solid #0d2b5e; font-weight:bold;
+        }
+
+        .sm-table-wrap tr.totals-row td { padding:9px 12px; }
+        .sm-table-wrap tr.totals-row td:not(:first-child):not(:nth-child(2)) { text-align:right; }
+
+        /* Dark mode */
+        @media (prefers-color-scheme: dark) {
+            .sm-inner                { background:#1e2535; }
+            .sm-stmt-meta            { background:#232d42; border-color:#2d3748; }
+            .sm-meta-label           { color:#6b7280; }
+            .sm-meta-value           { color:#93c5fd; }
+            .sm-loading              { color:#9ca3af; }
+            .sm-spinner              { border-color:#2d3748; border-top-color:#93c5fd; }
+            .sm-table-wrap table     { color:#e2e8f0; }
+            .sm-table-wrap tbody tr  { border-color:#2d3748; }
+            .sm-table-wrap tbody td  { color:#e2e8f0; }
+            .sm-table-wrap tr.opening-row td { background:#1a2237; color:#9ca3af; border-color:#2d3748; }
+            .sm-table-wrap tr.totals-row     { background:#263050 !important; }
+            .sm-table-wrap .amount-inflow    { color:#6ee7b7; }
+            .sm-table-wrap .amount-withdrawal{ color:#fca5a5; }
+            .sm-table-wrap .amount-interest  { color:#93c5fd; }
+        }
+    </style>
 </x-app-layout>

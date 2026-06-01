@@ -10,6 +10,10 @@ use Illuminate\Support\Facades\Auth;
 
 class StatementController extends Controller
 {
+    // =========================================================================
+    // MONTHLY / DATE-RANGE STATEMENT  (existing, unchanged)
+    // =========================================================================
+
     public function show(Request $request, Account $account)
     {
         if ($account->user_id !== Auth::id()) {
@@ -32,15 +36,212 @@ class StatementController extends Controller
         // Opening balance = everything settled before the period start
         $openingBalance = $this->computeBalanceAt($account, $from->copy()->subSecond());
 
-        // ── 1. Transactions (interest, expenses, non-transfer income) ─────────
-        //
-        // Pending deposit rule (mirrors updateBalance):
-        //   income transactions with a future value_date are NOT yet settled,
-        //   so we show them on the statement date but flag them as pending —
-        //   they should NOT move the running balance until value_date <= today.
-        //   Interest is always settled immediately (no value_date gate).
-        //
-        $transactions = $account->transactions()
+        // ── 1. Transactions ───────────────────────────────────────────────────
+        $transactions = $this->fetchTransactions($account, $from, $to);
+
+        // ── 2. Transfers IN ───────────────────────────────────────────────────
+        $transfersIn = $this->fetchTransfersIn($account, $from, $to);
+
+        // ── 3. Transfers OUT ──────────────────────────────────────────────────
+        $transfersOut = $this->fetchTransfersOut($account, $from, $to);
+
+        // ── 4. Merge & sort chronologically ──────────────────────────────────
+        $merged = $transactions
+            ->concat($transfersIn)
+            ->concat($transfersOut)
+            ->sortBy([
+                ['sort_date', 'asc'],
+                ['sort_id',   'asc'],
+            ])
+            ->values();
+
+        // ── 5. Build running balance ──────────────────────────────────────────
+        [
+            'rows'            => $rows,
+            'totalInflow'     => $totalInflow,
+            'totalWithdrawal' => $totalWithdrawal,
+            'totalInterest'   => $totalInterest,
+            'closingBalance'  => $closingBalance,
+        ] = $this->buildRunningBalance($merged, $openingBalance);
+
+        return view('accounts.statement', [
+            'account'         => $account,
+            'from'            => $from,
+            'to'              => $to,
+            'openingBalance'  => $openingBalance,
+            'closingBalance'  => $closingBalance,
+            'rows'            => $rows,
+            'totalInflow'     => $totalInflow,
+            'totalWithdrawal' => $totalWithdrawal,
+            'totalInterest'   => $totalInterest,
+            'user'            => auth()->user(),
+        ]);
+    }
+
+    // =========================================================================
+    // ANNUAL STATEMENT  (new)
+    // =========================================================================
+
+    /**
+     * Generate a full-year statement broken down by month.
+     *
+     * Route example:
+     *   GET /accounts/{account}/statement/annual?year=2025
+     *
+     * View receives:
+     *   $account, $year (int), $openingBalance, $closingBalance,
+     *   $months  (array of monthly summary objects – see below),
+     *   $annual  (year-level totals),
+     *   $user
+     *
+     * Each $months entry:
+     *   [
+     *     'label'          => 'January 2025',
+     *     'from'           => Carbon,
+     *     'to'             => Carbon,
+     *     'openingBalance' => float,
+     *     'closingBalance' => float,
+     *     'totalInflow'    => float,
+     *     'totalWithdrawal'=> float,
+     *     'totalInterest'  => float,
+     *     'netChange'      => float,   // closing - opening
+     *     'rows'           => array,   // same row structure as show()
+     *   ]
+     */
+    public function annual(Request $request, Account $account)
+    {
+        if ($account->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        if ($account->type !== 'savings') {
+            return redirect()->route('accounts.show', $account)
+                ->with('error', 'Statements are only available for savings accounts.');
+        }
+
+        // ── Resolve the target year ───────────────────────────────────────────
+        $year = (int) $request->input('year', now()->year);
+
+        // Guard: don't allow future years
+        if ($year > now()->year) {
+            $year = now()->year;
+        }
+
+        $yearStart = Carbon::create($year, 1, 1)->startOfDay();
+        $yearEnd   = Carbon::create($year, 12, 31)->endOfDay();
+
+        // Clamp the end to today so future months are excluded from data
+        // (but we still render them as empty months for the current year)
+        $dataEnd = $yearEnd->copy()->min(now()->endOfDay());
+
+        // Opening balance of the year = settled balance on Dec 31 of prior year
+        $openingBalance = $this->computeBalanceAt($account, $yearStart->copy()->subSecond());
+
+        // ── Fetch ALL data for the year in one pass ───────────────────────────
+        $allTransactions = $this->fetchTransactions($account, $yearStart, $dataEnd);
+        $allTransfersIn  = $this->fetchTransfersIn($account, $yearStart, $dataEnd);
+        $allTransfersOut = $this->fetchTransfersOut($account, $yearStart, $dataEnd);
+
+        $allMerged = $allTransactions
+            ->concat($allTransfersIn)
+            ->concat($allTransfersOut)
+            ->sortBy([['sort_date', 'asc'], ['sort_id', 'asc']])
+            ->values();
+
+        // ── Slice per month and accumulate running balance ────────────────────
+        $months          = [];
+        $runningBalance  = $openingBalance;
+
+        // Year-level accumulators
+        $annualInflow     = 0;
+        $annualWithdrawal = 0;
+        $annualInterest   = 0;
+
+        for ($m = 1; $m <= 12; $m++) {
+            $monthStart = Carbon::create($year, $m, 1)->startOfDay();
+            $monthEnd   = $monthStart->copy()->endOfMonth()->endOfDay();
+
+            // Rows that fall in this calendar month
+            $monthItems = $allMerged->filter(function ($item) use ($monthStart, $monthEnd) {
+                $d = Carbon::parse($item['sort_date']);
+                return $d->between($monthStart, $monthEnd);
+            })->values();
+
+            $monthOpeningBalance = $runningBalance;
+
+            [
+                'rows'            => $rows,
+                'totalInflow'     => $totalInflow,
+                'totalWithdrawal' => $totalWithdrawal,
+                'totalInterest'   => $totalInterest,
+                'closingBalance'  => $closingBalance,
+            ] = $this->buildRunningBalance($monthItems, $runningBalance);
+
+            $runningBalance = $closingBalance;
+
+            $annualInflow     += $totalInflow;
+            $annualWithdrawal += $totalWithdrawal;
+            $annualInterest   += $totalInterest;
+
+            $months[] = [
+                'label'           => $monthStart->format('F Y'),
+                'month'           => $m,
+                'from'            => $monthStart,
+                'to'              => $monthEnd,
+                'isFuture'        => $monthStart->isAfter(now()),
+                'openingBalance'  => $monthOpeningBalance,
+                'closingBalance'  => $closingBalance,
+                'totalInflow'     => $totalInflow,
+                'totalWithdrawal' => $totalWithdrawal,
+                'totalInterest'   => $totalInterest,
+                'netChange'       => $closingBalance - $monthOpeningBalance,
+                'rows'            => $rows,
+            ];
+        }
+
+        // ── Year-level summary ────────────────────────────────────────────────
+        $annual = [
+            'year'            => $year,
+            'openingBalance'  => $openingBalance,
+            'closingBalance'  => $runningBalance,
+            'totalInflow'     => $annualInflow,
+            'totalWithdrawal' => $annualWithdrawal,
+            'totalInterest'   => $annualInterest,
+            'netChange'       => $runningBalance - $openingBalance,
+        ];
+
+        // ── Available years for the year-picker (account creation year → now) ─
+        $accountCreatedYear = Carbon::parse($account->created_at)->year;
+        $availableYears     = range(now()->year, $accountCreatedYear);  // desc order
+
+        return view('accounts.statement-annual', [
+            'account'        => $account,
+            'year'           => $year,
+            'yearStart'      => $yearStart,
+            'yearEnd'        => $yearEnd,
+            'openingBalance' => $openingBalance,
+            'closingBalance' => $runningBalance,
+            'months'         => $months,
+            'annual'         => $annual,
+            'availableYears' => $availableYears,
+            'user'           => auth()->user(),
+        ]);
+    }
+
+    // =========================================================================
+    // SHARED HELPERS  (extracted so show() and annual() both use them)
+    // =========================================================================
+
+    /**
+     * Fetch, map, and consolidate transactions (interest, expenses, income)
+     * for a given account and date window.
+     *
+     * Pending-deposit logic and interest consolidation are identical to the
+     * original show() implementation.
+     */
+    private function fetchTransactions(Account $account, Carbon $from, Carbon $to): \Illuminate\Support\Collection
+    {
+        return $account->transactions()
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->whereNull('transactions.deleted_at')
             ->whereBetween('transactions.date', [$from->toDateString(), $to->toDateString()])
@@ -53,60 +254,61 @@ class StatementController extends Controller
                 $isExpense  = $txn->cat_type === 'expense';
                 $isIncome   = ! $isExpense && ! $isInterest;
 
-                // A deposit is "pending" when it has a future value_date
-                // (matches the `pending_deposits` exclusion in updateBalance)
                 $isPending = $isIncome
                     && ! empty($txn->value_date)
                     && Carbon::parse($txn->value_date)->isFuture();
 
                 return [
-                    'sort_date'    => $txn->date,
-                    'sort_id'      => $txn->id,
-                    'date'         => Carbon::parse($txn->date)->format('M d, Y'),
-                    'narration'    => $txn->description
+                    'sort_date'      => $txn->date,
+                    'sort_id'        => $txn->id,
+                    'date'           => Carbon::parse($txn->date)->format('M d, Y'),
+                    'narration'      => $txn->description
                         . ($isPending
                             ? ' (pending – eff. ' . Carbon::parse($txn->value_date)->format('M d') . ')'
                             : ''),
-                    'inflow'       => ($isIncome   && ! $isPending) ? $txn->amount : null,
-                    'withdrawal'   => $isExpense                    ? $txn->amount : null,
-                    'net_interest' => $isInterest                   ? $txn->amount : null,
-                    'pending'      => $isPending,
-                    // Pending inflows are shown in the inflow column but bracketed
+                    'inflow'         => ($isIncome && ! $isPending) ? $txn->amount : null,
+                    'withdrawal'     => $isExpense                  ? $txn->amount : null,
+                    'net_interest'   => $isInterest                 ? $txn->amount : null,
+                    'pending'        => $isPending,
                     'pending_amount' => $isPending ? $txn->amount : null,
-                    'source'       => 'txn',
+                    'source'         => 'txn',
                 ];
             })
-        // After the ->map() call on transactions, add this:
-        ->groupBy(function ($item) {
-        // Group interest rows by year-month, everything else by its unique id
-        return $item['net_interest'] !== null
-            ? 'interest_' . substr($item['sort_date'], 0, 7)   // e.g. interest_2026-05
-            : 'txn_' . $item['sort_id'];
-    })
-        ->map(function ($group) {
-            if ($group->count() === 1) {
-                return $group->first();
-            }
+            ->groupBy(function ($item) {
+                return $item['net_interest'] !== null
+                    ? 'interest_' . substr($item['sort_date'], 0, 7)
+                    : 'txn_' . $item['sort_id'];
+            })
+            ->map(function ($group) {
+                if ($group->count() === 1) {
+                    return $group->first();
+                }
 
-            // Multiple interest rows → consolidate into the last one
-            $last = $group->sortBy('sort_date')->last();
+                // Multiple interest rows in the same month → consolidate
+                $last = $group->sortBy('sort_date')->last();
 
-            return array_merge($last, [
-                'net_interest' => $group->sum('net_interest'),
-                'narration'    => 'Interest earned – ' . Carbon::parse($last['sort_date'])->format('F Y')
-                    . ' (consolidated)',
-            ]);
-        })
-        ->values();
+                return array_merge($last, [
+                    'net_interest' => $group->sum('net_interest'),
+                    'narration'    => 'Interest earned – '
+                        . Carbon::parse($last['sort_date'])->format('F Y')
+                        . ' (consolidated)',
+                ]);
+            })
+            ->values();
+    }
 
-        // ── 2. Transfers IN ───────────────────────────────────────────────────
-        //
-        // Mirrors updateBalance: `value_date IS NULL OR value_date <= CURDATE()`
-        // Pending transfers (future value_date) are shown on their transaction
-        // date but do NOT affect the running balance yet.
-        //
-        $transfersIn = Transfer::where('to_account_id', $account->id)
-            ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
+    /**
+     * Fetch and map incoming transfers for an account within the date window.
+     * Pending transfers (future value_date) are shown but do not move the balance.
+     */
+
+    private function fetchTransfersIn(Account $account, Carbon $from, Carbon $to): \Illuminate\Support\Collection
+    {
+        return Transfer::where('to_account_id', $account->id)
+            ->whereRaw('DATE(date) BETWEEN ? AND ?', [
+                $from->toDateString(),
+                $to->toDateString(),
+            ])
             ->get()
             ->map(function ($t) {
                 $counterpart = $t->fromAccount?->name ?? 'Transfer';
@@ -129,12 +331,15 @@ class StatementController extends Controller
                     'source'         => 'transfer_in',
                 ];
             });
+    }
 
-        // ── 3. Transfers OUT ──────────────────────────────────────────────────
-        // Outgoing transfers are always deducted immediately (no value_date gate
-        // in updateBalance for transfers_out).
-        $transfersOut = Transfer::where('from_account_id', $account->id)
-            ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
+    private function fetchTransfersOut(Account $account, Carbon $from, Carbon $to): \Illuminate\Support\Collection
+    {
+        return Transfer::where('from_account_id', $account->id)
+            ->whereRaw('DATE(date) BETWEEN ? AND ?', [
+                $from->toDateString(),
+                $to->toDateString(),
+            ])
             ->get()
             ->map(function ($t) {
                 $counterpart = $t->toAccount?->name ?? 'Transfer';
@@ -151,18 +356,17 @@ class StatementController extends Controller
                     'source'         => 'transfer_out',
                 ];
             });
-
-        // ── 4. Merge & sort chronologically ──────────────────────────────────
-        $merged = $transactions
-            ->concat($transfersIn)
-            ->concat($transfersOut)
-            ->sortBy([
-                ['sort_date', 'asc'],
-                ['sort_id',   'asc'],
-            ])
-            ->values();
-
-        // ── 5. Build running balance (only settled amounts move the balance) ──
+    }
+    /**
+     * Walk a sorted collection of merged rows, accumulate totals, and attach a
+     * running balance to every row.  Returns totals + annotated rows.
+     *
+     * @param  \Illuminate\Support\Collection  $merged
+     * @param  float  $openingBalance
+     * @return array{rows: array, totalInflow: float, totalWithdrawal: float, totalInterest: float, closingBalance: float}
+     */
+    private function buildRunningBalance(\Illuminate\Support\Collection $merged, float $openingBalance): array
+    {
         $runningBalance  = $openingBalance;
         $totalInflow     = 0;
         $totalWithdrawal = 0;
@@ -186,21 +390,18 @@ class StatementController extends Controller
             $rows[] = array_merge($item, ['running_balance' => $runningBalance]);
         }
 
-        return view('accounts.statement', [
-            'account'         => $account,
-            'from'            => $from,
-            'to'              => $to,
-            'openingBalance'  => $openingBalance,
-            'closingBalance'  => $runningBalance,
+        return [
             'rows'            => $rows,
             'totalInflow'     => $totalInflow,
             'totalWithdrawal' => $totalWithdrawal,
             'totalInterest'   => $totalInterest,
-            'user'            => auth()->user(),
-        ]);
+            'closingBalance'  => $runningBalance,
+        ];
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // =========================================================================
+    // BALANCE HELPER  (unchanged logic, shared by both statement types)
+    // =========================================================================
 
     /**
      * Compute the settled balance at a given point in time.
@@ -218,9 +419,6 @@ class StatementController extends Controller
     {
         $atDate = $at->toDateString();
 
-        // Transaction net: mirrors the CASE logic in updateBalance()
-        // — income with a future value_date is excluded (pending_deposits)
-        // — interest has no value_date gate
         $txNet = $account->transactions()
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->whereNull('transactions.deleted_at')
@@ -245,7 +443,6 @@ class StatementController extends Controller
             ", [$atDate])
             ->value('net');
 
-        // Transfers IN: only settled ones (value_date IS NULL OR <= $at)
         $transfersInNet = Transfer::where('to_account_id', $account->id)
             ->where('date', '<=', $atDate)
             ->where(function ($q) use ($atDate) {
@@ -254,7 +451,6 @@ class StatementController extends Controller
             })
             ->sum('amount');
 
-        // Transfers OUT: always deducted immediately
         $transfersOutNet = Transfer::where('from_account_id', $account->id)
             ->where('date', '<=', $atDate)
             ->sum('amount');
