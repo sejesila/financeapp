@@ -11,7 +11,7 @@ use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Support\Facades\Mail;
-use Spatie\LaravelPdf\Facades\Pdf;          // ← Spatie, not DomPDF
+use Spatie\LaravelPdf\Facades\Pdf;
 
 class SendMonthlyReportsWithStatement extends Command
 {
