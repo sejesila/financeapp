@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Console\Commands\SendEticaStatements;
 use App\Mail\AnnualReportMail;
 use App\Mail\EticaStatementMail;
 use App\Mail\MonthlyReportMail;
+use App\Models\Account;
 use App\Services\ReportDataService;
+use App\Services\StatementDataService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Mail\Mailables\Attachment;
@@ -16,9 +17,18 @@ use Spatie\LaravelPdf\Facades\Pdf;
 
 class EmailPreferenceController extends Controller
 {
+    public function __construct(
+        private readonly StatementDataService $statementService,
+    ) {}
+
+    // =========================================================================
+    // SETTINGS PAGE
+    // =========================================================================
+
     public function edit()
     {
         $user = Auth::user();
+
         $preference = $user->emailPreference()->firstOrCreate(
             ['user_id' => $user->id],
             [
@@ -31,7 +41,14 @@ class EmailPreferenceController extends Controller
             ]
         );
 
-        return view('profile.email-preferences', compact('preference'));
+        // Resolve once here so the Blade view never hits the DB itself.
+        $eticaAccounts = $user->accounts()
+            ->where('type', 'savings')
+            ->where('is_active', true)
+            ->whereRaw("LOWER(name) LIKE '%etica%'")
+            ->get();
+
+        return view('profile.email-preferences', compact('preference', 'eticaAccounts'));
     }
 
     public function update(Request $request)
@@ -45,8 +62,7 @@ class EmailPreferenceController extends Controller
             'include_charts'  => 'nullable|in:on',
         ]);
 
-        $user = Auth::user();
-        $user->emailPreference->update([
+        Auth::user()->emailPreference->update([
             'annual_reports'  => $request->boolean('annual_reports'),
             'monthly_reports' => $request->boolean('monthly_reports'),
             'monthly_day'     => $validated['monthly_day'],
@@ -58,6 +74,10 @@ class EmailPreferenceController extends Controller
         return redirect()->route('email-preferences.edit')
             ->with('success', 'Email preferences updated successfully!');
     }
+
+    // =========================================================================
+    // PDF PREVIEWS (inline browser view)
+    // =========================================================================
 
     public function previewMonthly(ReportDataService $reportService)
     {
@@ -91,53 +111,9 @@ class EmailPreferenceController extends Controller
             ->inline('custom-report-preview.pdf');
     }
 
-    // ── Shared helper ─────────────────────────────────────────────────────────
-
-    /**
-     * Build the Etica statement attachment for the current user, or return null
-     * if they have no active Etica account. Avoids duplicating the lookup and
-     * PDF-generation logic across the three test methods.
-     */
-    private function buildEticaAttachment(): ?Attachment
-    {
-        $user = Auth::user();
-
-        $eticaAccount = $user->accounts()
-            ->where('type', 'savings')
-            ->where('is_active', true)
-            ->whereRaw("LOWER(name) LIKE '%etica%'")
-            ->first();
-
-        if (! $eticaAccount) {
-            return null;
-        }
-
-        $command     = new SendEticaStatements();
-        $from        = now()->subMonth()->startOfMonth();
-        $to          = now()->subMonth()->endOfMonth();
-        $period      = now()->subMonth()->format('F Y');
-
-        $buildMethod = new \ReflectionMethod($command, 'buildStatementData');
-        $buildMethod->setAccessible(true);
-        $statementData = $buildMethod->invoke($command, $eticaAccount, $from, $to);
-
-        // generateStatementPdf() is public on EticaStatementMail — no reflection needed
-        $statementMail = new EticaStatementMail(
-            user:          $user,
-            account:       $eticaAccount,
-            statementData: $statementData,
-            period:        $period,
-        );
-
-        $filename = "{$eticaAccount->name}_Statement_{$period}.pdf";
-
-        return Attachment::fromData(
-            fn() => $statementMail->generateStatementPdf(),
-            $filename
-        )->withMime('application/pdf');
-    }
-
-    // ── Test senders ──────────────────────────────────────────────────────────
+    // =========================================================================
+    // TEST SENDERS
+    // =========================================================================
 
     public function sendTestMonthly(ReportDataService $reportService)
     {
@@ -146,9 +122,8 @@ class EmailPreferenceController extends Controller
             $reportData = $reportService->generateMonthlyReport($user);
             $mailable   = new MonthlyReportMail($user, $reportData);
 
-            $eticaAttachment = $this->buildEticaAttachment();
-            if ($eticaAttachment) {
-                $mailable->withAttachments([$eticaAttachment]);
+            foreach ($this->buildEticaAttachments($user) as $attachment) {
+                $mailable->withAttachments([$attachment]);
             }
 
             Mail::to($user->email)->send($mailable);
@@ -169,9 +144,8 @@ class EmailPreferenceController extends Controller
             $reportData = $reportService->generateAnnualReport($user);
             $mailable   = new AnnualReportMail($user, $reportData);
 
-            $eticaAttachment = $this->buildEticaAttachment();
-            if ($eticaAttachment) {
-                $mailable->withAttachments([$eticaAttachment]);
+            foreach ($this->buildEticaAttachments($user) as $attachment) {
+                $mailable->withAttachments([$attachment]);
             }
 
             Mail::to($user->email)->send($mailable);
@@ -189,11 +163,7 @@ class EmailPreferenceController extends Controller
     {
         $user = Auth::user();
 
-        $eticaAccount = $user->accounts()
-            ->where('type', 'savings')
-            ->where('is_active', true)
-            ->whereRaw("LOWER(name) LIKE '%etica%'")
-            ->first();
+        $eticaAccount = $this->findEticaAccount($user);
 
         if (! $eticaAccount) {
             return redirect()->route('email-preferences.edit')
@@ -201,14 +171,11 @@ class EmailPreferenceController extends Controller
         }
 
         try {
-            $command     = new SendEticaStatements();
-            $from        = now()->subMonth()->startOfMonth();
-            $to          = now()->subMonth()->endOfMonth();
-            $period      = now()->subMonth()->format('F Y');
+            $from   = now()->subMonth()->startOfMonth();
+            $to     = now()->subMonth()->endOfMonth();
+            $period = now()->subMonth()->format('F Y');
 
-            $buildMethod = new \ReflectionMethod($command, 'buildStatementData');
-            $buildMethod->setAccessible(true);
-            $statementData = $buildMethod->invoke($command, $eticaAccount, $from, $to);
+            $statementData = $this->statementService->buildStatementData($eticaAccount, $from, $to);
 
             Mail::to($user->email)->send(new EticaStatementMail(
                 user:          $user,
@@ -226,7 +193,9 @@ class EmailPreferenceController extends Controller
         }
     }
 
-    // ── Custom date range ─────────────────────────────────────────────────────
+    // =========================================================================
+    // CUSTOM DATE RANGE
+    // =========================================================================
 
     public function sendCustom(Request $request, ReportDataService $reportService)
     {
@@ -250,5 +219,59 @@ class EmailPreferenceController extends Controller
             return redirect()->route('email-preferences.edit')
                 ->with('error', 'Failed to send custom report: ' . $e->getMessage());
         }
+    }
+
+    // =========================================================================
+    // PRIVATE HELPERS
+    // =========================================================================
+
+    /**
+     * Return the first active Etica savings account for the given user, or null.
+     */
+    private function findEticaAccount($user): ?Account
+    {
+        return $user->accounts()
+            ->where('type', 'savings')
+            ->where('is_active', true)
+            ->whereRaw("LOWER(name) LIKE '%etica%'")
+            ->first();
+    }
+
+    /**
+     * Build Spatie Attachment objects for every active Etica account the user holds.
+     * Returns an empty array when the user has no Etica accounts — callers can safely
+     * iterate without an explicit null check.
+     *
+     * @return Attachment[]
+     */
+    private function buildEticaAttachments($user): array
+    {
+        $from   = now()->subMonth()->startOfMonth();
+        $to     = now()->subMonth()->endOfMonth();
+        $period = now()->subMonth()->format('F Y');
+
+        return $user->accounts()
+            ->where('type', 'savings')
+            ->where('is_active', true)
+            ->whereRaw("LOWER(name) LIKE '%etica%'")
+            ->get()
+            ->map(function (Account $account) use ($user, $from, $to, $period) {
+                $statementData = $this->statementService->buildStatementData($account, $from, $to);
+
+                $statementMail = new EticaStatementMail(
+                    user:          $user,
+                    account:       $account,
+                    statementData: $statementData,
+                    period:        $period,
+                );
+
+                $filename = "{$account->name}_Statement_{$period}.pdf";
+
+                return Attachment::fromData(
+                    fn() => $statementMail->generateStatementPdf(),
+                    $filename
+                )->withMime('application/pdf');
+            })
+            ->all();
     }
 }

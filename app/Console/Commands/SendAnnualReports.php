@@ -3,61 +3,125 @@
 namespace App\Console\Commands;
 
 use App\Mail\AnnualReportMail;
+use App\Models\Account;
 use App\Models\User;
 use App\Services\ReportDataService;
+use App\Services\StatementDataService;
+use Carbon\Carbon;
 use Illuminate\Console\Command;
+use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Support\Facades\Mail;
+use Spatie\LaravelPdf\Facades\Pdf;
 
 class SendAnnualReports extends Command
 {
-    protected $signature   = 'reports:send-annual {--force : Force send regardless of schedule}';
-    protected $description = 'Send annual financial reports to users (runs on Jan 1st)';
+    protected $signature   = 'reports:send-annual
+                              {--force : Force send regardless of schedule}
+                              {--user= : Only send to this user ID}';
 
-    public function handle(ReportDataService $reportService)
+    protected $description = 'Send annual financial reports to users (runs on Jan 1st); attaches Etica statement PDF for users who have an Etica savings account';
+
+    public function handle(ReportDataService $reportService, StatementDataService $statementService): int
     {
         $this->info('Starting annual report generation...');
 
-        // Annual reports are always sent on January 1st.
-        // When not forced, enforce that constraint so this command is safe to
-        // schedule daily without accidentally sending on the wrong date.
-        if (!$this->option('force') && !(now()->month === 1 && now()->day === 1)) {
+        if (! $this->option('force') && ! (now()->month === 1 && now()->day === 1)) {
             $this->info('Not January 1st — skipping. Use --force to override.');
             return Command::SUCCESS;
         }
 
-        $users = User::whereHas('emailPreference', function ($query) {
-            $query->where('annual_reports', true);
+        // Annual statements cover the full previous year.
+        $from   = now()->subYear()->startOfYear();
+        $to     = now()->subYear()->endOfYear();
+        $period = $from->format('Y');
 
-            if (!$this->option('force')) {
-                $query->where(function ($q) {
-                    $q->whereNull('last_annual_sent')
+        $query = User::whereHas('emailPreference', function ($q) {
+            $q->where('annual_reports', true);
+
+            if (! $this->option('force')) {
+                $q->where(function ($inner) {
+                    $inner->whereNull('last_annual_sent')
                         ->orWhere('last_annual_sent', '<', now()->subDays(360));
                 });
             }
         })
-            ->with('emailPreference')
-            ->get();
+            ->with([
+                'emailPreference',
+                'accounts' => fn($q) => $q->where('type', 'savings')
+                    ->where('is_active', true)
+                    ->whereRaw("LOWER(name) LIKE '%etica%'"),
+            ]);
 
+        if ($this->option('user')) {
+            $query->where('id', $this->option('user'));
+        }
+
+        $users = $query->get();
         $this->info("Found {$users->count()} users to send reports to.");
 
         $successCount = 0;
         $failCount    = 0;
 
         foreach ($users as $user) {
+            $tmpFiles = [];
+
             try {
                 $this->info("Generating annual report for {$user->name} ({$user->email})...");
 
                 $reportData = $reportService->generateAnnualReport($user);
+                $mailable   = new AnnualReportMail($user, $reportData);
 
-                Mail::to($user->email)->send(new AnnualReportMail($user, $reportData));
+                // Attach Etica statement(s) for the full prior year if applicable.
+                $statementAttachments = [];
+
+                foreach ($user->accounts as $account) {
+                    $statementData = $statementService->buildStatementData($account, $from, $to);
+                    $statementPath = sys_get_temp_dir()
+                        . "/etica_annual_{$user->id}_{$account->id}_{$period}.pdf";
+
+                    Pdf::view('accounts.statement', array_merge($statementData, [
+                        'account' => $account,
+                        'user'    => $user,
+                    ]))
+                        ->format('a4')
+                        ->save($statementPath);
+
+                    $tmpFiles[]             = $statementPath;
+                    $statementAttachments[] = [
+                        'path'     => $statementPath,
+                        'filename' => "{$account->name}_Statement_{$period}.pdf",
+                    ];
+
+                    $this->info("  Statement ready for {$account->name}");
+                }
+
+                if (! empty($statementAttachments)) {
+                    $mailable->withAttachments(
+                        collect($statementAttachments)
+                            ->map(fn($s) => Attachment::fromPath($s['path'])
+                                ->as($s['filename'])
+                                ->withMime('application/pdf'))
+                            ->all()
+                    );
+                }
+
+                Mail::to($user->email)->send($mailable);
 
                 $user->emailPreference->update(['last_annual_sent' => now()]);
 
-                $this->info("  Report sent to {$user->email}");
+                $label = empty($statementAttachments) ? '' : ' + Etica statement';
+                $this->info("  ✓ Report{$label} sent to {$user->email}");
                 $successCount++;
-            } catch (\Exception $e) {
-                $this->error("  Failed for {$user->email}: {$e->getMessage()}");
+
+            } catch (\Throwable $e) {
+                $this->error("  ✗ Failed for {$user->email}: {$e->getMessage()}");
                 $failCount++;
+            } finally {
+                foreach ($tmpFiles as $path) {
+                    if (file_exists($path)) {
+                        @unlink($path);
+                    }
+                }
             }
         }
 

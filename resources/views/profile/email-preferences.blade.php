@@ -78,7 +78,7 @@
                                         <label for="monthly_reports" class="font-medium text-gray-900 dark:text-white">Monthly Reports</label>
                                         <p class="text-sm text-gray-600 dark:text-gray-400">
                                             Receive a comprehensive monthly overview with budget analysis and insights
-                                            @if(auth()->user()->accounts()->where('type','savings')->where('is_active',true)->whereRaw("LOWER(name) LIKE '%etica%'")->exists())
+                                            @if($eticaAccounts->isNotEmpty())
                                                 <span class="inline-flex items-center ml-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-900 text-white">+ Etica Statement</span>
                                             @endif
                                         </p>
@@ -235,8 +235,8 @@
                                 </button>
                             </form>
 
-                            {{-- Etica test button — only shown when user has an Etica account --}}
-                            @if(auth()->user()->accounts()->where('type','savings')->where('is_active',true)->whereRaw("LOWER(name) LIKE '%etica%'")->exists())
+                            {{-- Only shown when user has an Etica account --}}
+                            @if($eticaAccounts->isNotEmpty())
                                 <form method="POST" action="{{ route('email-preferences.test-etica') }}">
                                     @csrf
                                     <button type="submit" class="w-full bg-blue-900 hover:bg-blue-800 text-white font-medium px-4 py-2 rounded-lg transition flex items-center justify-center">
@@ -292,15 +292,7 @@
                 </div>
             </div>
 
-            {{-- Etica Account Info Card — only shown when relevant --}}
-            @php
-                $eticaAccounts = auth()->user()->accounts()
-                    ->where('type', 'savings')
-                    ->where('is_active', true)
-                    ->whereRaw("LOWER(name) LIKE '%etica%'")
-                    ->get();
-            @endphp
-
+            {{-- Etica Account Info Card — only shown when user has Etica accounts --}}
             @if($eticaAccounts->isNotEmpty())
                 <div class="bg-blue-950 text-white rounded-lg p-5 shadow-sm">
                     <div class="flex items-start gap-4">
