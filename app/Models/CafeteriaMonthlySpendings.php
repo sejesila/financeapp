@@ -16,11 +16,13 @@ class CafeteriaMonthlySpendings extends Model
         'month',
         'total_spent',
         'limit',
+        'carryover',
     ];
 
     protected $casts = [
         'total_spent' => 'decimal:2',
-        'limit' => 'decimal:2',
+        'limit'       => 'decimal:2',
+        'carryover'   => 'decimal:2',
     ];
 
     // ===================== RELATIONSHIPS =====================
@@ -30,150 +32,135 @@ class CafeteriaMonthlySpendings extends Model
         return $this->belongsTo(User::class);
     }
 
-    // ===================== SPENDING TRACKING =====================
+    // ===================== EFFECTIVE LIMIT =====================
 
     /**
-     * Get remaining budget for this month
+     * The limit the user actually has this month after carryover is applied.
+     *
+     * Examples:
+     *   limit=10000, carryover=+3000  →  effectiveLimit = 13,000  (had surplus last month)
+     *   limit=10000, carryover=-2000  →  effectiveLimit =  8,000  (overspent last month)
+     *   limit=10000, carryover=0      →  effectiveLimit = 10,000  (first month / exact spend)
+     *
+     * Never goes below 0.
      */
+    public function getEffectiveLimitAttribute(): float
+    {
+        return max(0.0, (float) $this->limit + (float) $this->carryover);
+    }
+
+    // ===================== SPENDING TRACKING =====================
+
     public function getRemainingBudget(): float
     {
-        $remaining = $this->limit - $this->total_spent;
-        return max(0, (float)$remaining);
+        return max(0.0, $this->effective_limit - (float) $this->total_spent);
     }
 
     /**
-     * Get spending percentage (0-100)
+     * Spending percentage against effective limit, capped at 100.
      */
     public function getSpendingPercentage(): float
     {
-        if ($this->limit <= 0) {
-            return 0;
+        if ($this->effective_limit <= 0) {
+            return 100.0;
         }
 
-        $percentage = ($this->total_spent / $this->limit) * 100;
-        return min(100, $percentage); // Cap at 100%
+        return min(100.0, ((float) $this->total_spent / $this->effective_limit) * 100);
     }
 
-    /**
-     * Check if over budget
-     */
     public function isOverBudget(): bool
     {
-        return $this->total_spent > $this->limit;
+        return (float) $this->total_spent > $this->effective_limit;
     }
 
-    /**
-     * Get amount over budget (0 if under)
-     */
     public function getAmountOverBudget(): float
     {
-        if (!$this->isOverBudget()) {
-            return 0;
-        }
-        return (float)($this->total_spent - $this->limit);
+        return $this->isOverBudget()
+            ? (float) $this->total_spent - $this->effective_limit
+            : 0.0;
     }
 
-    /**
-     * Get budget status as a string
-     */
     public function getBudgetStatus(): string
     {
+        $spent     = (float) $this->total_spent;
         $remaining = $this->getRemainingBudget();
-        $limit = (float)$this->limit;
-        $spent = (float)$this->total_spent;
+        $limit     = $this->effective_limit;
 
         if ($spent == 0) {
-            return "No spending this month";
+            return 'No spending this month';
         }
 
         if ($this->isOverBudget()) {
-            $over = $this->getAmountOverBudget();
-            return "Over budget by KES " . number_format($over, 0);
+            return 'Over budget by KES ' . number_format($this->getAmountOverBudget(), 0);
         }
 
-        if ($remaining < $limit * 0.1) { // Less than 10% remaining
-            return "Only KES " . number_format($remaining, 0) . " left";
+        if ($remaining < $limit * 0.1) {
+            return 'Only KES ' . number_format($remaining, 0) . ' left';
         }
 
-        return "KES " . number_format($remaining, 0) . " remaining";
+        return 'KES ' . number_format($remaining, 0) . ' remaining';
     }
 
-    /**
-     * Get budget status color (for UI indicators)
-     * green, yellow, orange, red
-     */
     public function getBudgetStatusColor(): string
     {
-        $percentage = $this->getSpendingPercentage();
-
-        if ($percentage >= 100) {
-            return 'red';
-        }
-
-        if ($percentage >= 90) {
-            return 'orange';
-        }
-
-        if ($percentage >= 75) {
-            return 'yellow';
-        }
-
-        return 'green';
+        return match (true) {
+            $this->getSpendingPercentage() >= 100 => 'red',
+            $this->getSpendingPercentage() >= 90  => 'orange',
+            $this->getSpendingPercentage() >= 75  => 'yellow',
+            default                               => 'green',
+        };
     }
 
-    /**
-     * Check if budget is critical (90%+ spent)
-     */
     public function isCritical(): bool
     {
         return $this->getSpendingPercentage() >= 90;
     }
 
-    /**
-     * Check if budget is warning level (75%+ spent)
-     */
     public function isWarning(): bool
     {
         return $this->getSpendingPercentage() >= 75 && !$this->isCritical();
     }
 
-    /**
-     * Add spending to this month's total
-     */
+    // ===================== MUTATION HELPERS =====================
+
     public function addSpending(float $amount): void
     {
-        $this->total_spent += $amount;
-        $this->save();
+        $this->increment('total_spent', $amount);
     }
 
-    /**
-     * Subtract spending from this month's total (for refunds/deletions)
-     */
     public function subtractSpending(float $amount): void
     {
-        $this->total_spent = max(0, $this->total_spent - $amount);
+        $this->total_spent = max(0.0, (float) $this->total_spent - $amount);
         $this->save();
     }
 
+    // ===================== CARRYOVER =====================
+
     /**
-     * Get the month name with year
+     * Compute the signed value that should be stored as `carryover` on the
+     * *next* month's record when it is first created.
+     *
+     *   result > 0  →  surplus (spent less than effective limit) → next month gets more
+     *   result < 0  →  deficit (overspent)                       → next month gets less
+     *   result = 0  →  exactly on budget
      */
+    public function computeCarryoverForNextMonth(): float
+    {
+        return $this->effective_limit - (float) $this->total_spent;
+    }
+
+    // ===================== DATE HELPERS =====================
+
     public function getMonthYearAttribute(): string
     {
         return Carbon::create($this->year, $this->month, 1)->format('F Y');
     }
 
-    /**
-     * Get the start date of this month
-     */
     public function getMonthStartAttribute(): Carbon
     {
         return Carbon::create($this->year, $this->month, 1);
     }
 
-    /**
-     * Get the end date of this month
-     */
     public function getMonthEndAttribute(): Carbon
     {
         return Carbon::create($this->year, $this->month, 1)->endOfMonth();

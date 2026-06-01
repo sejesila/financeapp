@@ -216,12 +216,32 @@ class User extends Authenticatable implements MustVerifyEmail
         return max(1, $count);
     }
 
+// ============================================================
+// REPLACE the entire "Spending Limit Methods" section in
+// app/Models/User.php  (everything between the
+// "Spending Limit Methods" header comment and end of class)
+// with the code below.
+//
+// Everything above that section (relationships, booted,
+// budget-limit editing, working-days helpers) is unchanged.
+// ============================================================
+
     // -------------------------------------------------------------------------
     // Spending Limit Methods
     // -------------------------------------------------------------------------
 
     /**
-     * Get or create the current month's spending record.
+     * Get or lazily create the current month's spending record.
+     *
+     * When a new month record is created for the first time it looks up the
+     * previous month and carries its surplus/deficit forward automatically:
+     *
+     *   prev effective_limit = prev.limit + prev.carryover
+     *   carryover_for_this_month = prev.effective_limit - prev.total_spent
+     *
+     * A positive result means the user underspent → this month's effective
+     * limit is boosted.  A negative result means they overspent → this month's
+     * effective limit is reduced.
      *
      * Usage: $user->getCurrentMonthlySpendings()
      */
@@ -229,17 +249,37 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         $now = Carbon::now();
 
-        return CafeteriaMonthlySpendings::firstOrCreate(
-            [
-                'user_id' => $this->id,
-                'year'    => $now->year,
-                'month'   => $now->month,
-            ],
-            [
-                'total_spent' => 0,
-                'limit'       => $this->cafeteria_monthly_limit,
-            ]
-        );
+        // Fast path — record already exists for this month.
+        $existing = CafeteriaMonthlySpendings::where([
+            'user_id' => $this->id,
+            'year'    => $now->year,
+            'month'   => $now->month,
+        ])->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
+        // --- New month: calculate carryover from previous month ---
+        $prevDate     = $now->copy()->subMonthNoOverflow();
+        $prevRecord   = CafeteriaMonthlySpendings::where([
+            'user_id' => $this->id,
+            'year'    => $prevDate->year,
+            'month'   => $prevDate->month,
+        ])->first();
+
+        $carryover = $prevRecord
+            ? $prevRecord->computeCarryoverForNextMonth()  // signed: + surplus / - deficit
+            : 0.0;
+
+        return CafeteriaMonthlySpendings::create([
+            'user_id'     => $this->id,
+            'year'        => $now->year,
+            'month'       => $now->month,
+            'total_spent' => 0,
+            'limit'       => $this->cafeteria_monthly_limit,
+            'carryover'   => $carryover,
+        ]);
     }
 
     /**
@@ -254,33 +294,30 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
-     * Get remaining budget for this month (0 if over budget).
+     * Get remaining budget for this month, respecting carryover.
+     * Uses the monthly record's effective_limit (limit + carryover).
      *
      * Usage: $user->getRemainingBudgetThisMonth()
-     * Returns: float
+     * Returns: float (0 when over budget)
      */
     public function getRemainingBudgetThisMonth(): float
     {
-        return max(0, $this->cafeteria_monthly_limit - $this->getTotalSpentThisMonth());
+        return $this->getCurrentMonthlySpendings()->getRemainingBudget();
     }
 
     /**
-     * Get spending percentage capped at 100.
+     * Spending percentage against the *effective* limit, capped at 100.
      *
      * Usage: $user->getSpendingPercentageThisMonth()
      * Returns: float
      */
     public function getSpendingPercentageThisMonth(): float
     {
-        if ($this->cafeteria_monthly_limit <= 0) {
-            return 0;
-        }
-
-        return min(100, ($this->getTotalSpentThisMonth() / $this->cafeteria_monthly_limit) * 100);
+        return $this->getCurrentMonthlySpendings()->getSpendingPercentage();
     }
 
     /**
-     * Check if user has enough budget for a given amount.
+     * Check if the user has enough remaining effective budget for a given amount.
      *
      * Usage: if ($user->hasEnoughBudget(500)) { ... }
      * Returns: bool
@@ -291,87 +328,64 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
-     * Check if the user has exceeded their monthly limit.
+     * Check if the user has exceeded their effective monthly limit.
      *
      * Usage: if ($user->hasExceededLimit()) { ... }
      * Returns: bool
      */
     public function hasExceededLimit(): bool
     {
-        return $this->getTotalSpentThisMonth() > $this->cafeteria_monthly_limit;
+        return $this->getCurrentMonthlySpendings()->isOverBudget();
     }
 
     /**
-     * Get the amount over budget (0 if under budget).
+     * Get the amount over the effective limit (0 if under).
      *
      * Usage: $user->getAmountOverBudget()
      * Returns: float
      */
     public function getAmountOverBudget(): float
     {
-        return max(0, $this->getTotalSpentThisMonth() - $this->cafeteria_monthly_limit);
+        return $this->getCurrentMonthlySpendings()->getAmountOverBudget();
     }
 
     /**
-     * Get budget status as a human-readable string.
+     * Human-readable budget status string.
      *
      * Usage: echo $user->getBudgetStatus()
      */
     public function getBudgetStatus(): string
     {
-        $spent     = $this->getTotalSpentThisMonth();
-        $limit     = $this->cafeteria_monthly_limit;
-        $remaining = $this->getRemainingBudgetThisMonth();
-
-        if ($spent == 0) {
-            return 'No spending this month';
-        }
-
-        if ($spent >= $limit) {
-            return 'Over budget by KES ' . number_format($spent - $limit, 0);
-        }
-
-        if ($remaining < $limit * 0.1) {
-            return 'Only KES ' . number_format($remaining, 0) . ' left';
-        }
-
-        return 'KES ' . number_format($remaining, 0) . ' remaining';
+        return $this->getCurrentMonthlySpendings()->getBudgetStatus();
     }
 
     /**
-     * Get budget status colour for UI: 'green', 'yellow', 'orange', or 'red'.
+     * UI colour token: 'green', 'yellow', 'orange', or 'red'.
      *
      * Usage: class="{{ $user->getBudgetStatusColor() }}-500"
      */
     public function getBudgetStatusColor(): string
     {
-        $p = $this->getSpendingPercentageThisMonth();
-
-        if ($p >= 100) return 'red';
-        if ($p >= 90)  return 'orange';
-        if ($p >= 75)  return 'yellow';
-
-        return 'green';
+        return $this->getCurrentMonthlySpendings()->getBudgetStatusColor();
     }
 
     /**
-     * Check if budget is critical (90%+ spent).
+     * Check if budget is critical (90%+ of effective limit spent).
      *
      * Usage: if ($user->isCriticalBudget()) { ... }
      */
     public function isCriticalBudget(): bool
     {
-        return $this->getSpendingPercentageThisMonth() >= 90;
+        return $this->getCurrentMonthlySpendings()->isCritical();
     }
 
     /**
-     * Check if budget is at warning level (75%–89% spent).
+     * Check if budget is at warning level (75%–89% of effective limit spent).
      *
      * Usage: if ($user->isWarningBudget()) { ... }
      */
     public function isWarningBudget(): bool
     {
-        $p = $this->getSpendingPercentageThisMonth();
-        return $p >= 75 && $p < 90;
+        return $this->getCurrentMonthlySpendings()->isWarning();
     }
 }

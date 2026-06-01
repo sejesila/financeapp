@@ -158,15 +158,18 @@
             {{-- Monthly Budget Card --}}
             <div class="mb-6 sm:mb-8">
                 @php
-                    $budgetUser = Auth::user();
-                    $spent      = $budgetUser->getTotalSpentThisMonth();
-                    $limit      = $budgetUser->cafeteria_monthly_limit;
-                    $remaining  = $budgetUser->getRemainingBudgetThisMonth();
-                    $percentage = $budgetUser->getSpendingPercentageThisMonth();
-                    $color      = $budgetUser->getBudgetStatusColor();
-                    $isCritical = $budgetUser->isCriticalBudget();
-                    $isWarning  = $budgetUser->isWarningBudget();
-                    $isExceeded = $budgetUser->hasExceededLimit();
+                    $budgetUser    = Auth::user();
+                    $monthRecord   = $budgetUser->getCurrentMonthlySpendings();   // ← use record directly
+                    $spent         = (float) $monthRecord->total_spent;
+                    $limit         = (float) $monthRecord->limit;                 // base limit (no carryover)
+                    $carryover     = (float) $monthRecord->carryover;             // signed carryover
+                    $effectiveLimit = $monthRecord->effective_limit;              // limit + carryover
+                    $remaining     = $monthRecord->getRemainingBudget();
+                    $percentage    = $monthRecord->getSpendingPercentage();
+                    $color         = $monthRecord->getBudgetStatusColor();
+                    $isCritical    = $monthRecord->isCritical();
+                    $isWarning     = $monthRecord->isWarning();
+                    $isExceeded    = $monthRecord->isOverBudget();
                 @endphp
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
                     {{-- Header --}}
@@ -239,7 +242,7 @@
                                     <div>
                                         <h4 class="font-bold text-red-800 dark:text-red-200 mb-1">Budget Exceeded!</h4>
                                         <p class="text-sm text-red-700 dark:text-red-300">
-                                            You have spent KES {{ number_format($budgetUser->getAmountOverBudget(), 0) }} more than your monthly limit of KES {{ number_format($limit, 0) }}.
+                                            You have spent KES {{ number_format( $monthRecord->getAmountOverBudget(), 0) }} more than your monthly limit of KES {{ number_format($effectiveLimit, 0) }}.
                                         </p>
                                     </div>
                                 </div>
@@ -278,17 +281,26 @@
                                     KES {{ number_format($spent, 0) }}
                                 </p>
                             </div>
+
                             <div class="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                                <p class="text-xs text-gray-600 dark:text-gray-400 mb-1 font-medium">Monthly Limit</p>
+                                <p class="text-xs text-gray-600 dark:text-gray-400 mb-1 font-medium">Effective Limit</p>
                                 <p class="text-2xl font-bold text-gray-900 dark:text-white">
-                                    KES {{ number_format($limit, 0) }}
+                                    KES {{ number_format($effectiveLimit, 0) }}
                                 </p>
+                                {{-- Show carryover detail when it is non-zero --}}
+                                @if($carryover != 0)
+                                    <p class="text-xs mt-1 {{ $carryover > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400' }}">
+                                        Base KES {{ number_format($limit, 0) }}
+                                        {{ $carryover > 0 ? '+' : '' }}{{ number_format($carryover, 0) }} carried over
+                                    </p>
+                                @endif
                             </div>
+
                             <div class="p-4 bg-{{ $color }}-50 dark:bg-{{ $color }}-900/30 rounded-lg border border-{{ $color }}-200 dark:border-{{ $color }}-800">
                                 <p class="text-xs text-{{ $color }}-700 dark:text-{{ $color }}-300 mb-1 font-medium">Remaining</p>
                                 <p class="text-2xl font-bold text-{{ $color }}-900 dark:text-{{ $color }}-100">
                                     @if($isExceeded)
-                                        -KES {{ number_format($budgetUser->getAmountOverBudget(), 0) }}
+                                        -KES {{ number_format($monthRecord->getAmountOverBudget(), 0) }}
                                     @else
                                         KES {{ number_format($remaining, 0) }}
                                     @endif
@@ -325,12 +337,25 @@
                                     </p>
                                 </div>
                                 <div>
-                                    <p class="text-gray-600 dark:text-gray-400 mb-1">Working Days Left</p>
+                                    <p class="text-gray-600 dark:text-gray-400 mb-1">Daily Budget Left</p>
                                     <p class="font-bold text-gray-900 dark:text-white">
-                                        {{ $budgetUser->workingDaysRemainingThisMonth() }} days
+                                        @php
+                                            $daysLeft = $budgetUser->workingDaysRemainingThisMonth();
+                                        @endphp
+                                        {{ $daysLeft > 0
+                                            ? 'KES ' . number_format($remaining / $daysLeft, 0) . ' / day'
+                                            : '—' }}
                                     </p>
                                 </div>
                             </div>
+                            @if($carryover != 0)
+                                <p class="mt-3 text-xs {{ $carryover > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400' }} flex items-center gap-1">
+                                    {{ $carryover > 0 ? '✅' : '⚠️' }}
+                                    {{ $carryover > 0
+                                        ? 'KES ' . number_format($carryover, 0) . ' surplus carried over from last month.'
+                                        : 'KES ' . number_format(abs($carryover), 0) . ' deficit carried over from last month.' }}
+                                </p>
+                            @endif
                             @if(!$budgetUser->canEditMonthlyLimit())
                                 <p class="mt-3 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
                                     🔒 Budget limit locked until {{ $budgetUser->nextLimitEditAllowedAt() }}.
