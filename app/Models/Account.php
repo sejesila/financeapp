@@ -97,6 +97,19 @@ class Account extends Model
 
     public function updateBalance()
     {
+        // For savings accounts (specifically Etica), deposits are only released
+        // once interest has been recorded for that day — not just at midnight.
+        // We find the latest date on which interest was recorded for this account
+        // and use that as the release threshold.
+        $lastInterestDateSql = $this->type === 'savings'
+            ? "(SELECT COALESCE(MAX(t2.date), '1970-01-01')
+             FROM transactions t2
+             JOIN categories c2 ON t2.category_id = c2.id
+             WHERE t2.account_id = {$this->id}
+               AND t2.deleted_at IS NULL
+               AND c2.name = 'Interest')"
+            : "CURDATE()";
+
         $stats = $this->transactions()
             ->whereNull('deleted_at')
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
@@ -153,7 +166,7 @@ class Account extends Model
                 WHEN categories.type = 'income'
                 AND categories.name NOT IN ('Loan Fees Refund', 'Facility Fee Refund', 'Balance Adjustment', 'Interest')
                 AND transactions.value_date IS NOT NULL
-                AND transactions.value_date > CURDATE()
+                AND transactions.value_date > {$lastInterestDateSql}
                 THEN transactions.amount
                 ELSE 0
             END) as pending_deposits
@@ -161,10 +174,10 @@ class Account extends Model
             ->first();
 
         $transferStats = DB::table('transfers')
-            ->selectRaw('
-        SUM(CASE WHEN from_account_id = ? THEN amount ELSE 0 END) as transfers_out,
-        SUM(CASE WHEN to_account_id = ? AND (value_date IS NULL OR value_date <= CURDATE()) THEN amount ELSE 0 END) as transfers_in
-    ', [$this->id, $this->id])
+            ->selectRaw("
+            SUM(CASE WHEN from_account_id = ? THEN amount ELSE 0 END) as transfers_out,
+            SUM(CASE WHEN to_account_id = ? AND (value_date IS NULL OR value_date <= {$lastInterestDateSql}) THEN amount ELSE 0 END) as transfers_in
+        ", [$this->id, $this->id])
             ->first();
 
         $newBalance = (float) $this->initial_balance

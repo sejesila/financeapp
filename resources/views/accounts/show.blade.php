@@ -604,7 +604,7 @@
             </span>
                                         </td>
 
-                                        {{-- Reverse button — only for non-grouped, non-pending rows within the 2-minute window --}}
+                                        {{-- Reverse button — only for non-grouped, non-pending rows within the 30-minute window --}}
                                         <td class="px-4 py-3 text-right whitespace-nowrap">
                                             @if(!($txn->is_grouped ?? false) && $txn->created_at->diffInMinutes(now()) <= 30)
                                                 <a href="{{ route('accounts.topup.reverse.form', ['account' => $account, 'transaction' => $txn]) }}"
