@@ -49,6 +49,7 @@ class TransferRecorder
                 'amount'          => $parsed['amount'],
                 'date'            => now(),
                 'description'     => $parsed['description'] . ' [' . $parsed['reference'] . ']',
+                'mpesa_reference'  => $parsed['reference'],
             ]);
 
             $bankAccount->updateBalance();
@@ -106,6 +107,7 @@ class TransferRecorder
                 'amount'          => $parsed['amount'],
                 'date'            => now(),
                 'description'     => $parsed['description'] . ' [' . $parsed['reference'] . ']',
+                'mpesa_reference'  => $parsed['reference'],
             ]);
 
             $bankAccount->updateBalance();
@@ -164,6 +166,7 @@ class TransferRecorder
                 'amount'          => $parsed['amount'],
                 'date'            => now(),
                 'description'     => $parsed['description'] . ' [' . $parsed['reference'] . ']',
+                'mpesa_reference'  => $parsed['reference'],
             ]);
 
             $feeCategory = $this->categories->findOrCreate($user, 'Transaction Fees', 'expense');
@@ -289,6 +292,7 @@ class TransferRecorder
                 'date'            => $parsed['date'],
                 'value_date'      => $valueDate,
                 'description'     => $parsed['description'] . ' [' . $parsed['reference'] . ']',
+                'mpesa_reference'  => $parsed['reference'],
             ]);
 
             if ($parsed['fee'] > 0) {
@@ -405,6 +409,7 @@ class TransferRecorder
                 'amount'          => $parsed['amount'],
                 'date'            => now(),
                 'description'     => $parsed['description'] . ' [' . $parsed['reference'] . ']',
+                'mpesa_reference'  => $parsed['reference'],
             ]);
 
             if (!empty($parsed['fee']) && $parsed['fee'] > 0) {
@@ -503,6 +508,7 @@ class TransferRecorder
                 'amount'          => $parsed['amount'],
                 'date'            => now(),
                 'description'     => $parsed['description'] . ' [' . $parsed['reference'] . ']',
+                'mpesa_reference'  => $parsed['reference'],
             ]);
 
             $sourceAccount->updateBalance();

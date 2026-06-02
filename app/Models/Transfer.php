@@ -14,7 +14,8 @@ class Transfer extends Model
         'amount',
         'date',
         'description',
-        'value_date'
+        'value_date',
+        'mpesa_reference'
     ];
 
     protected $casts = [

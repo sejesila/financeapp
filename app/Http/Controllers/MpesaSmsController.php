@@ -59,16 +59,19 @@ class MpesaSmsController extends Controller
             ]);
         }
 
-        // ── 4. Prevent duplicates ─────────────────────────────────────────
+        // ── 4. Duplicate guard ────────────────────────────────────────────
         $alreadyExists = Transaction::withoutGlobalScopes()
             ->where('user_id', $user->id)
             ->where('description', 'like', '%' . $parsed['reference'] . '%')
             ->exists();
 
-        if (!$alreadyExists && in_array($parsed['subtype'], ['atm_withdrawal', 'account_transfer', 'bank_to_mpesa_self', 'bank_to_airtel_self'])) {
+        if (!$alreadyExists) {
             $alreadyExists = Transfer::withoutGlobalScopes()
                 ->where('user_id', $user->id)
-                ->where('description', 'like', '%' . $parsed['reference'] . '%')
+                ->where(function ($q) use ($parsed) {
+                    $q->where('mpesa_reference', $parsed['reference'])
+                        ->orWhere('description', 'like', '%' . $parsed['reference'] . '%');
+                })
                 ->exists();
         }
 
@@ -79,31 +82,43 @@ class MpesaSmsController extends Controller
             ]);
         }
 
-        // ── 5. Route transfers ────────────────────────────────────────────
-        if ($parsed['subtype'] === 'atm_withdrawal' && $parsed['bank'] === 'im_bank') {
-            return $this->transfers->atmWithdrawal($user, $parsed);
-        }
+        // ── 5. Route transfers / record transaction ───────────────────────
+        // The try/catch is a safety net for simultaneous webhook hits that
+        // slip past the duplicate guard above due to a race condition.
+        try {
+            if ($parsed['subtype'] === 'atm_withdrawal' && $parsed['bank'] === 'im_bank') {
+                return $this->transfers->atmWithdrawal($user, $parsed);
+            }
 
-        if ($parsed['subtype'] === 'bank_to_mpesa_self') {
-            return $this->transfers->bankToMpesaSelf($user, $parsed);
-        }
+            if ($parsed['subtype'] === 'bank_to_mpesa_self') {
+                return $this->transfers->bankToMpesaSelf($user, $parsed);
+            }
 
-        if ($parsed['subtype'] === 'bank_to_airtel_self') {
-            return $this->transfers->bankToAirtelSelf($user, $parsed);
-        }
+            if ($parsed['subtype'] === 'bank_to_airtel_self') {
+                return $this->transfers->bankToAirtelSelf($user, $parsed);
+            }
 
-        if ($parsed['subtype'] === 'account_transfer' && $parsed['type'] === 'transfer' && isset($parsed['to_account_hint'])) {
-            return $this->transfers->outgoing($user, $parsed);
-        }
+            if ($parsed['subtype'] === 'account_transfer' && $parsed['type'] === 'transfer' && isset($parsed['to_account_hint'])) {
+                return $this->transfers->outgoing($user, $parsed);
+            }
 
-        if ($parsed['subtype'] === 'account_transfer' && $parsed['type'] === 'transfer' && isset($parsed['from_account_hint'])) {
-            return $this->transfers->incoming($user, $parsed);
-        }
-        if ($parsed['subtype'] === 'pesalink_to_savings') {
-            return $this->transfers->pesaLinkToSavings($user, $parsed);
-        }
+            if ($parsed['subtype'] === 'account_transfer' && $parsed['type'] === 'transfer' && isset($parsed['from_account_hint'])) {
+                return $this->transfers->incoming($user, $parsed);
+            }
 
-        // ── 6. Record expense / income ────────────────────────────────────
-        return $this->transactions->record($user, $parsed);
+            if ($parsed['subtype'] === 'pesalink_to_savings') {
+                return $this->transfers->pesaLinkToSavings($user, $parsed);
+            }
+
+            // ── 6. Record expense / income ────────────────────────────────
+            return $this->transactions->record($user, $parsed);
+
+        } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+            return response()->json([
+                'status'    => 'duplicate',
+                'reference' => $parsed['reference'],
+                'note'      => 'Caught by unique constraint',
+            ]);
+        }
     }
 }
