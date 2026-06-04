@@ -486,27 +486,36 @@
             {{-- Pagination --}}
             <div class="pt-2 pb-6">
                 @if($transactions->hasPages())
-                    <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <div class="text-sm text-gray-600 dark:text-gray-400 order-2 sm:order-1">
-                            Showing
-                            <span class="font-semibold text-gray-900 dark:text-white">{{ $transactions->firstItem() ?? 0 }}</span>
-                            to
-                            <span class="font-semibold text-gray-900 dark:text-white">{{ $transactions->lastItem() ?? 0 }}</span>
-                            of
-                            <span class="font-semibold text-gray-900 dark:text-white">{{ number_format($transactions->total()) }}</span>
-                            transactions
-                        </div>
-                        <div class="order-1 sm:order-2 w-full sm:w-auto">
-                            <div class="flex justify-center sm:justify-end">
-                                {{ $transactions->onEachSide(1)->links() }}
-                            </div>
-                        </div>
-                    </div>
-                @else
-                    <div class="text-sm text-gray-600 dark:text-gray-400 text-center">
-                        Showing
-                        <span class="font-semibold text-gray-900 dark:text-white">{{ $transactions->count() }}</span>
-                        {{ Str::plural('transaction', $transactions->count()) }}
+                    <div class="flex items-center justify-center gap-3">
+                        {{-- Previous --}}
+                        @if($transactions->onFirstPage())
+                            <span class="px-4 py-2 text-sm font-medium text-gray-400 bg-gray-100 dark:bg-gray-700 dark:text-gray-600 rounded-lg cursor-not-allowed">
+                    ← Prev
+                </span>
+                        @else
+                            <a href="{{ $transactions->previousPageUrl() }}"
+                               class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all">
+                                ← Prev
+                            </a>
+                        @endif
+
+                        {{-- Page indicator --}}
+                        <span class="text-sm text-gray-500 dark:text-gray-400 px-2">
+                Page <span class="font-semibold text-gray-900 dark:text-white">{{ $transactions->currentPage() }}</span>
+                of <span class="font-semibold text-gray-900 dark:text-white">{{ $transactions->lastPage() }}</span>
+            </span>
+
+                        {{-- Next --}}
+                        @if($transactions->hasMorePages())
+                            <a href="{{ $transactions->nextPageUrl() }}"
+                               class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all">
+                                Next →
+                            </a>
+                        @else
+                            <span class="px-4 py-2 text-sm font-medium text-gray-400 bg-gray-100 dark:bg-gray-700 dark:text-gray-600 rounded-lg cursor-not-allowed">
+                    Next →
+                </span>
+                        @endif
                     </div>
                 @endif
             </div>
