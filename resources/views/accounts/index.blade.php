@@ -360,16 +360,36 @@
                         </div>
 
                         <div class="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4">
-                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                                <div class="text-xs text-gray-600 dark:text-gray-400">
-                                    Showing <span class="font-semibold">{{ $recentTransfers->firstItem() }}</span> to
-                                    <span class="font-semibold">{{ $recentTransfers->lastItem() }}</span> of
-                                    <span class="font-semibold">{{ $recentTransfers->total() }}</span> transfers
+                            @if($recentTransfers->hasPages())
+                                <div class="flex items-center justify-center gap-3">
+                                    @if($recentTransfers->onFirstPage())
+                                        <span class="px-4 py-2 text-sm font-medium text-gray-400 bg-gray-100 dark:bg-gray-700 dark:text-gray-600 rounded-lg cursor-not-allowed">
+                    ← Prev
+                </span>
+                                    @else
+                                        <a href="{{ $recentTransfers->previousPageUrl() }}"
+                                           class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-purple-600 hover:text-white hover:border-purple-600 transition-all">
+                                            ← Prev
+                                        </a>
+                                    @endif
+
+                                    <span class="text-sm text-gray-500 dark:text-gray-400 px-2">
+                Page <span class="font-semibold text-gray-900 dark:text-white">{{ $recentTransfers->currentPage() }}</span>
+                of <span class="font-semibold text-gray-900 dark:text-white">{{ $recentTransfers->lastPage() }}</span>
+            </span>
+
+                                    @if($recentTransfers->hasMorePages())
+                                        <a href="{{ $recentTransfers->nextPageUrl() }}"
+                                           class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-purple-600 hover:text-white hover:border-purple-600 transition-all">
+                                            Next →
+                                        </a>
+                                    @else
+                                        <span class="px-4 py-2 text-sm font-medium text-gray-400 bg-gray-100 dark:bg-gray-700 dark:text-gray-600 rounded-lg cursor-not-allowed">
+                    Next →
+                </span>
+                                    @endif
                                 </div>
-                                <div class="flex justify-center sm:justify-end">
-                                    {{ $recentTransfers->links('pagination::tailwind') }}
-                                </div>
-                            </div>
+                            @endif
                         </div>
                     @else
                         <div class="text-center py-8">
