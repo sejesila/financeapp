@@ -4,8 +4,7 @@
             <h2 class="font-semibold text-base sm:text-lg md:text-xl text-gray-800 dark:text-gray-200 leading-tight">
                 {{ __('Edit Transaction') }}
             </h2>
-            <a onclick="window.history.length > 1 ? history.back() : window.location='{{ route('transactions.index') }}'"
-               class="text-sm sm:text-base text-indigo-600 hover:text-indigo-800 cursor-pointer">
+            <a href="{{ route('transactions.index') }}" class="text-sm sm:text-base text-indigo-600 hover:text-indigo-800">
                 ← Back
             </a>
         </div>

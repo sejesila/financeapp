@@ -265,7 +265,7 @@ it('updates a transaction successfully', function () {
             'category_id' => $cat->id,
             'account_id'  => $account->id,
         ])
-        ->assertRedirect(route('transactions.show', $tx));
+        ->assertRedirect(route('transactions.index', $tx));
 
     expect($tx->fresh()->description)->toBe('Updated description')
         ->and((float) $tx->fresh()->amount)->toBe(200.0);

@@ -192,7 +192,7 @@ class TransactionController extends Controller
                 Category::find($validated['category_id'])?->increment('usage_count');
             }
 
-            return redirect()->route('transactions.show', $updatedTransaction)
+            return redirect()->route('transactions.index', $updatedTransaction)
                 ->with('success', 'Transaction updated successfully!');
 
         } catch (Exception $e) {
