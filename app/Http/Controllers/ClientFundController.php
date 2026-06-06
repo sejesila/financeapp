@@ -16,7 +16,7 @@ class ClientFundController extends Controller
 {
     public function index(Request $request)
     {
-        $clientFilter = $request->get('client');
+        $clientFilter = $request->query('client');
         $showCompleted = $request->boolean('show_completed', false);
 
         $query = ClientFund::where('user_id', Auth::id())
@@ -69,8 +69,12 @@ class ClientFundController extends Controller
             ->get();
 
         return view('client-funds.index', compact(
-            'clientFunds', 'summary', 'allAccounts',
-            'clientTotals', 'clientFilter', 'showCompleted'
+            'clientFunds',
+            'summary',
+            'allAccounts',
+            'clientTotals',
+            'clientFilter',
+            'showCompleted'
         ));
     }
 
