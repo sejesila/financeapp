@@ -17,8 +17,8 @@ class ClientFundController extends Controller
     public function index(Request $request)
     {
         $clientFilter = $request->get('client');
+        $showCompleted = $request->boolean('show_completed', false);
 
-        // ── Paginated funds list (filtered if client selected) ────────
         $query = ClientFund::where('user_id', Auth::id())
             ->with('account')
             ->orderBy('status')
@@ -26,6 +26,10 @@ class ClientFundController extends Controller
 
         if ($clientFilter) {
             $query->where('client_name', $clientFilter);
+        }
+
+        if (!$showCompleted) {
+            $query->where('status', '!=', 'completed');
         }
 
         $clientFunds = $query->paginate(15)->withQueryString();
@@ -65,11 +69,8 @@ class ClientFundController extends Controller
             ->get();
 
         return view('client-funds.index', compact(
-            'clientFunds',
-            'summary',
-            'allAccounts',
-            'clientTotals',
-            'clientFilter'
+            'clientFunds', 'summary', 'allAccounts',
+            'clientTotals', 'clientFilter', 'showCompleted'
         ));
     }
 
