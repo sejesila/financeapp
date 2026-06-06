@@ -63,141 +63,158 @@
             </div>
 
             {{-- Per-Client Summary (only when not filtering) --}}
-            @if(!$clientFilter && $clientTotals->count() > 0)
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mb-6">
-                    <div class="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                        <h3 class="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200">
-                            Per-Client Summary
-                        </h3>
-                        <span class="text-xs text-gray-500 dark:text-gray-400">
-                            {{ $clientTotals->count() }} {{ Str::plural('client', $clientTotals->count()) }}
-                        </span>
-                    </div>
+            @if(!$clientFilter)
 
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead class="bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                            <tr>
-                                <th class="px-4 py-3 text-left font-medium">Client</th>
-                                <th class="px-4 py-3 text-center font-medium hidden sm:table-cell">Entries</th>
-                                <th class="px-4 py-3 text-right font-medium">Received</th>
-                                <th class="px-4 py-3 text-right font-medium hidden md:table-cell">Spent</th>
-                                <th class="px-4 py-3 text-right font-medium hidden md:table-cell">Profit</th>
-                                <th class="px-4 py-3 text-right font-medium">Pending</th>
-                            </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-                            @foreach($clientTotals as $client)
-                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                                    <td class="px-4 py-3">
-                                        <a href="{{ route('client-funds.index', ['client' => $client->client_name]) }}"
-                                           class="font-semibold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-200 hover:underline">
-                                            {{ $client->client_name }}
-                                        </a>
-                                        {{-- Mobile: show spent/profit inline --}}
-                                        <div class="md:hidden text-xs text-gray-500 mt-0.5">
-                                            Spent: <span class="text-orange-600 font-medium">{{ number_format($client->total_spent, 0) }}</span>
-                                            @if($client->total_profit > 0)
-                                                · Profit: <span class="text-green-600 font-medium">{{ number_format($client->total_profit, 0) }}</span>
-                                            @endif
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-3 text-center hidden sm:table-cell">
+                {{-- Toggle: show above the table --}}
+                <div class="flex justify-end mb-2">
+                    <a href="{{ request()->fullUrlWithQuery(['show_completed' => $showCompleted ? '0' : '1']) }}"
+                       class="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 flex items-center gap-1 transition-colors">
+                        @if($showCompleted)
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 4.411m0 0L21 21"/>
+                            </svg>
+                            Hide completed
+                        @else
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                            </svg>
+                            Show completed
+                        @endif
+                    </a>
+                </div>
+
+                @if($clientTotals->count() > 0)
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mb-6">
+                        <div class="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                            <h3 class="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200">
+                                Per-Client Summary
+                            </h3>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">
+                                {{ $clientTotals->count() }} {{ Str::plural('client', $clientTotals->count()) }}
+                                @if(!$showCompleted)
+                                    <span class="ml-1 text-gray-400">(active only)</span>
+                                @endif
+                            </span>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-medium">Client</th>
+                                    <th class="px-4 py-3 text-center font-medium hidden sm:table-cell">Entries</th>
+                                    <th class="px-4 py-3 text-right font-medium">Received</th>
+                                    <th class="px-4 py-3 text-right font-medium hidden md:table-cell">Spent</th>
+                                    <th class="px-4 py-3 text-right font-medium hidden md:table-cell">Profit</th>
+                                    <th class="px-4 py-3 text-right font-medium">Pending</th>
+                                </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                                @foreach($clientTotals as $client)
+                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                        <td class="px-4 py-3">
+                                            <a href="{{ route('client-funds.index', ['client' => $client->client_name]) }}"
+                                               class="font-semibold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-200 hover:underline">
+                                                {{ $client->client_name }}
+                                            </a>
+                                            {{-- Mobile: show spent/profit inline --}}
+                                            <div class="md:hidden text-xs text-gray-500 mt-0.5">
+                                                Spent: <span class="text-orange-600 font-medium">{{ number_format($client->total_spent, 0) }}</span>
+                                                @if($client->total_profit > 0)
+                                                    · Profit: <span class="text-green-600 font-medium">{{ number_format($client->total_profit, 0) }}</span>
+                                                @endif
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-3 text-center hidden sm:table-cell">
                                             <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 text-xs font-semibold">
                                                 {{ $client->total_entries }}
                                             </span>
-                                    </td>
-                                    <td class="px-4 py-3 text-right font-semibold text-blue-600 dark:text-blue-400 whitespace-nowrap">
-                                        {{ number_format($client->total_received, 0) }}
-                                    </td>
-                                    <td class="px-4 py-3 text-right text-orange-600 dark:text-orange-400 whitespace-nowrap hidden md:table-cell">
-                                        {{ number_format($client->total_spent, 0) }}
-                                    </td>
-                                    <td class="px-4 py-3 text-right whitespace-nowrap hidden md:table-cell">
-                                        @if($client->total_profit > 0)
-                                            <span class="text-green-600 dark:text-green-400 font-medium">
+                                        </td>
+                                        <td class="px-4 py-3 text-right font-semibold text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                                            {{ number_format($client->total_received, 0) }}
+                                        </td>
+                                        <td class="px-4 py-3 text-right text-orange-600 dark:text-orange-400 whitespace-nowrap hidden md:table-cell">
+                                            {{ number_format($client->total_spent, 0) }}
+                                        </td>
+                                        <td class="px-4 py-3 text-right whitespace-nowrap hidden md:table-cell">
+                                            @if($client->total_profit > 0)
+                                                <span class="text-green-600 dark:text-green-400 font-medium">
                                                     {{ number_format($client->total_profit, 0) }}
                                                 </span>
-                                        @else
-                                            <span class="text-gray-400">—</span>
-                                        @endif
-                                    </td>
-                                    <td class="px-4 py-3 text-right whitespace-nowrap">
-                                        @if($client->pending_balance > 0)
-                                            <span class="font-bold text-purple-600 dark:text-purple-400">
+                                            @else
+                                                <span class="text-gray-400">—</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-4 py-3 text-right whitespace-nowrap">
+                                            @if($client->pending_balance > 0)
+                                                <span class="font-bold text-purple-600 dark:text-purple-400">
                                                     {{ number_format($client->pending_balance, 0) }}
                                                 </span>
-                                        @else
-                                            <span class="inline-flex items-center gap-1 text-green-600 dark:text-green-400 text-xs font-medium">
+                                            @else
+                                                <span class="inline-flex items-center gap-1 text-green-600 dark:text-green-400 text-xs font-medium">
                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                                                     </svg>
                                                     Settled
                                                 </span>
-                                        @endif
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                                </tbody>
+
+                                {{-- Totals Footer --}}
+                                <tfoot class="bg-gray-50 dark:bg-gray-700 border-t-2 border-gray-200 dark:border-gray-600">
+                                <tr>
+                                    <td class="px-4 py-3 font-bold text-gray-900 dark:text-white">Total</td>
+                                    <td class="px-4 py-3 hidden sm:table-cell"></td>
+                                    <td class="px-4 py-3 text-right font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                                        {{ number_format($clientTotals->sum('total_received'), 0) }}
+                                    </td>
+                                    <td class="px-4 py-3 text-right font-bold text-orange-600 dark:text-orange-400 whitespace-nowrap hidden md:table-cell">
+                                        {{ number_format($clientTotals->sum('total_spent'), 0) }}
+                                    </td>
+                                    <td class="px-4 py-3 text-right font-bold text-green-600 dark:text-green-400 whitespace-nowrap hidden md:table-cell">
+                                        {{ number_format($clientTotals->sum('total_profit'), 0) }}
+                                    </td>
+                                    <td class="px-4 py-3 text-right font-bold text-purple-600 dark:text-purple-400 whitespace-nowrap">
+                                        {{ number_format($clientTotals->sum('pending_balance'), 0) }}
                                     </td>
                                 </tr>
-                            @endforeach
-                            </tbody>
-
-                            {{-- Totals Footer --}}
-                            <tfoot class="bg-gray-50 dark:bg-gray-700 border-t-2 border-gray-200 dark:border-gray-600">
-                            <tr>
-                                <td class="px-4 py-3 font-bold text-gray-900 dark:text-white">Total</td>
-                                <td class="px-4 py-3 hidden sm:table-cell"></td>
-                                <td class="px-4 py-3 text-right font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">
-                                    {{ number_format($clientTotals->sum('total_received'), 0) }}
-                                </td>
-                                <td class="px-4 py-3 text-right font-bold text-orange-600 dark:text-orange-400 whitespace-nowrap hidden md:table-cell">
-                                    {{ number_format($clientTotals->sum('total_spent'), 0) }}
-                                </td>
-                                <td class="px-4 py-3 text-right font-bold text-green-600 dark:text-green-400 whitespace-nowrap hidden md:table-cell">
-                                    {{ number_format($clientTotals->sum('total_profit'), 0) }}
-                                </td>
-                                <td class="px-4 py-3 text-right font-bold text-purple-600 dark:text-purple-400 whitespace-nowrap">
-                                    {{ number_format($clientTotals->sum('pending_balance'), 0) }}
-                                </td>
-                            </tr>
-                            </tfoot>
-                        </table>
+                                </tfoot>
+                            </table>
+                        </div>
                     </div>
-                </div>
 
-                {{-- Empty state when no clients yet --}}
-            @elseif(!$clientFilter && $clientTotals->count() === 0)
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center mb-6">
-                    <svg class="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
-                    </svg>
-                    <p class="text-gray-500 dark:text-gray-400 text-lg font-medium mb-2">No client funds recorded yet</p>
-                    <p class="text-gray-400 dark:text-gray-500 text-sm mb-4">Start by recording your first client fund</p>
-                    <a href="{{ route('client-funds.create') }}"
-                       class="inline-block bg-indigo-600 text-white px-6 py-2 rounded text-sm hover:bg-indigo-700 transition">
-                        Record Your First Client Fund
-                    </a>
-                </div>
-            @endif
-            {{-- Show/Hide Completed Toggle --}}
-            <div class="mb-4 flex justify-end">
-                @if($showCompleted)
-                    <a href="{{ request()->fullUrlWithQuery(['show_completed' => '0']) }}"
-                       class="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 flex items-center gap-1">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 4.411m0 0L21 21"/>
-                        </svg>
-                        Hide completed
-                    </a>
                 @else
-                    <a href="{{ request()->fullUrlWithQuery(['show_completed' => '1']) }}"
-                       class="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 flex items-center gap-1">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                        </svg>
-                        Show completed
-                    </a>
+                    {{-- Empty state when no clients (or all hidden) --}}
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center mb-6">
+                        @if(!$showCompleted)
+                            <svg class="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <p class="text-gray-500 dark:text-gray-400 text-lg font-medium mb-2">All clients are settled!</p>
+                            <p class="text-gray-400 dark:text-gray-500 text-sm mb-4">
+                                <a href="{{ request()->fullUrlWithQuery(['show_completed' => '1']) }}"
+                                   class="text-indigo-500 hover:underline">Show completed clients</a>
+                                or record a new fund.
+                            </p>
+                        @else
+                            <svg class="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
+                            <p class="text-gray-500 dark:text-gray-400 text-lg font-medium mb-2">No client funds recorded yet</p>
+                            <p class="text-gray-400 dark:text-gray-500 text-sm mb-4">Start by recording your first client fund</p>
+                        @endif
+                        <a href="{{ route('client-funds.create') }}"
+                           class="inline-block bg-indigo-600 text-white px-6 py-2 rounded text-sm hover:bg-indigo-700 transition">
+                            Record Client Fund
+                        </a>
+                    </div>
                 @endif
-            </div>
+
+            @endif
 
             {{-- Filtered Client Funds List (only when a client is selected) --}}
             @if($clientFilter)
@@ -208,13 +225,32 @@
                         Showing funds for <span class="font-bold">{{ $clientFilter }}</span>
                         <span class="ml-2 text-indigo-500">({{ $clientFunds->total() }} {{ Str::plural('entry', $clientFunds->total()) }})</span>
                     </p>
-                    <a href="{{ route('client-funds.index') }}"
-                       class="text-xs text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 font-medium flex items-center gap-1">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                        Back to all clients
-                    </a>
+                    <div class="flex items-center gap-4">
+                        {{-- Toggle for filtered view --}}
+                        <a href="{{ request()->fullUrlWithQuery(['show_completed' => $showCompleted ? '0' : '1']) }}"
+                           class="text-xs text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 flex items-center gap-1 transition-colors">
+                            @if($showCompleted)
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 4.411m0 0L21 21"/>
+                                </svg>
+                                Hide completed
+                            @else
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                </svg>
+                                Show completed
+                            @endif
+                        </a>
+
+                        <a href="{{ route('client-funds.index') }}"
+                           class="text-xs text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 font-medium flex items-center gap-1">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                            Back to all clients
+                        </a>
+                    </div>
                 </div>
 
                 {{-- Funds List --}}
@@ -282,9 +318,17 @@
                         </div>
                     @empty
                         <div class="p-8 text-center">
-                            <p class="text-gray-500 text-sm mb-3">
-                                No funds found for <span class="font-semibold">{{ $clientFilter }}</span>.
-                            </p>
+                            @if(!$showCompleted)
+                                <p class="text-gray-500 text-sm mb-3">
+                                    No active funds for <span class="font-semibold">{{ $clientFilter }}</span>.
+                                    <a href="{{ request()->fullUrlWithQuery(['show_completed' => '1']) }}"
+                                       class="text-indigo-500 hover:underline ml-1">Show completed?</a>
+                                </p>
+                            @else
+                                <p class="text-gray-500 text-sm mb-3">
+                                    No funds found for <span class="font-semibold">{{ $clientFilter }}</span>.
+                                </p>
+                            @endif
                             <a href="{{ route('client-funds.index') }}"
                                class="inline-block bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded text-sm hover:bg-gray-200 transition">
                                 Back to All Clients

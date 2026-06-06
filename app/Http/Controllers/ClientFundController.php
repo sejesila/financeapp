@@ -50,15 +50,16 @@ class ClientFundController extends Controller
 
         // ── Per-client totals (always global, for the summary table) ──
         $clientTotals = ClientFund::where('user_id', Auth::id())
+            ->when(!$showCompleted, fn($q) => $q->where('status', '!=', 'completed')) // add this
             ->selectRaw('
-            client_name,
-            COUNT(*) as total_entries,
-            SUM(amount_received) as total_received,
-            SUM(amount_spent) as total_spent,
-            SUM(profit_amount) as total_profit,
-            SUM(balance) as total_balance,
-            SUM(CASE WHEN status != "completed" THEN balance ELSE 0 END) as pending_balance
-        ')
+        client_name,
+        COUNT(*) as total_entries,
+        SUM(amount_received) as total_received,
+        SUM(amount_spent) as total_spent,
+        SUM(profit_amount) as total_profit,
+        SUM(balance) as total_balance,
+        SUM(CASE WHEN status != "completed" THEN balance ELSE 0 END) as pending_balance
+    ')
             ->groupBy('client_name')
             ->orderByRaw('COUNT(*) DESC, SUM(amount_received) DESC')
             ->get();
