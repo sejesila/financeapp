@@ -36,7 +36,11 @@ class TransactionRecorder
         $categoryName = $this->categories->resolveName($parsed);
         $category     = $this->categories->findOrCreate($user, $categoryName, $parsed['type']);
 
-        $paymentMethod = $parsed['bank'] === 'im_bank' ? 'I&M Bank' : 'Mpesa';
+        $paymentMethod = match($parsed['bank']) {
+            'im_bank' => 'I&M Bank',
+            'airtel'  => 'Airtel Money',
+            default   => 'Mpesa',
+        };
 
         // Map subtype → mobile_money_type
         $mobileMoneyType = match($parsed['subtype'] ?? '') {
@@ -130,6 +134,13 @@ class TransactionRecorder
             return Account::withoutGlobalScopes()
                 ->where('user_id', $user->id)
                 ->where('type', 'bank')
+                ->where('is_active', true)
+                ->first();
+        }
+        if ($parsed['bank'] === 'airtel') {
+            return Account::withoutGlobalScopes()
+                ->where('user_id', $user->id)
+                ->where('type', 'airtel_money')
                 ->where('is_active', true)
                 ->first();
         }
