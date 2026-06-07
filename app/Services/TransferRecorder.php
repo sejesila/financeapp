@@ -156,7 +156,7 @@ class TransferRecorder
             return response()->json(['error' => 'Bank or cash account not found'], 404);
         }
 
-        $atmFee = round(33 + (33 * 0.15), 2); // KES 37.95
+        $atmFee = round(33 * 1.15, 2); // KES 37.95 (base KES 33 + 15% excise duty)
 
         DB::transaction(function () use ($user, $parsed, $bankAccount, $cashAccount, $atmFee) {
             Transfer::create([
@@ -177,7 +177,7 @@ class TransferRecorder
                 'category_id'        => $feeCategory->id,
                 'amount'             => $atmFee,
                 'date'               => $parsed['date'],
-                'description'        => 'ATM fee for ' . $parsed['reference'],
+                'description'        => 'ATM fee (incl. 15% excise duty) for ' . $parsed['reference'],
                 'payment_method'     => 'I&M Bank',
                 'is_transaction_fee' => true,
             ]);
@@ -207,7 +207,8 @@ class TransferRecorder
 
     // ─────────────────────────────────────────────────────────────────────
     // PesaLink — Bank → Savings account (e.g. Etica at Equity Bank)
-    // Records the transfer + PesaLink fee as an expense on the bank account.
+    // Records the transfer + PesaLink fee (incl. 15% excise duty) as an
+    // expense on the bank account.
     // ─────────────────────────────────────────────────────────────────────
 
     public function pesaLinkToSavings(User $user, array $parsed): JsonResponse
@@ -260,7 +261,7 @@ class TransferRecorder
                         'category_id'        => $feeCategory->id,
                         'amount'             => $parsed['fee'],
                         'date'               => $parsed['date'],
-                        'description'        => 'PesaLink fee for ' . $parsed['reference'],
+                        'description'        => 'PesaLink fee (incl. 15% excise duty) for ' . $parsed['reference'],
                         'payment_method'     => 'I&M Bank',
                         'is_transaction_fee' => true,
                     ]);
@@ -303,7 +304,7 @@ class TransferRecorder
                     'category_id'        => $feeCategory->id,
                     'amount'             => $parsed['fee'],
                     'date'               => $parsed['date'],
-                    'description'        => 'PesaLink fee for ' . $parsed['reference'],
+                    'description'        => 'PesaLink fee (incl. 15% excise duty) for ' . $parsed['reference'],
                     'payment_method'     => 'I&M Bank',
                     'is_transaction_fee' => true,
                 ]);

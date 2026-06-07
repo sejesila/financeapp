@@ -409,16 +409,17 @@ class MpesaSmsParser
 
     public static function getPesaLinkFee(float $amount): float
     {
-        return match (true) {
-            $amount <= 500              => 0,
-            $amount <= 10_000           => 44,
-            $amount <= 50_000           => 66,
-            $amount <= 100_000          => 87,
-            $amount <= 200_000          => 109,
-            $amount <= 500_000          => 131,
-            $amount < 1_000_000         => 163,
-            default                     => 163,
+        $baseFee = match (true) {
+            $amount <= 500     => 0,
+            $amount <= 10_000  => 44,
+            $amount <= 50_000  => 66,
+            $amount <= 100_000 => 87,
+            $amount <= 200_000 => 109,
+            $amount <= 500_000 => 131,
+            default            => 163,
         };
+
+        return round($baseFee * 1.15, 2);
     }
 
     private static function isKnownTransferAccount(string $recipient, string $accountNo): ?string
