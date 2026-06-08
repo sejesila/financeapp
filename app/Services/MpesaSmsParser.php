@@ -405,7 +405,8 @@ class MpesaSmsParser
         // Airtel → Paybill
         // "S3MHML58P3E Confirmed. Ksh 200 successfully paid to Kenya Power and Lighting Co Ltd on 17/05/26 at 09:17 AM. Fee: Ksh 4. Bal: Ksh 97.0."
         if (preg_match(
-            '/^(\w+)\s+Confirmed\.\s*Ksh\s*([\d,]+\.?\d*)\s+successfully paid to\s+(.+?)\s+on\s+([\d\/]+)\s+at\s+([\d:]+\s*(?:AM|PM))\.\s*Fee:\s*Ksh\s*([\d,]+\.?\d*)\.\s*Bal:\s*Ksh\s*([\d,]+\.?\d*)/si',
+            '/^(\w+)\s+Confirmed\.\s*KES\s*([\d,]+\.?\d*)\s+successfully paid to\s+(.+?)\s+on\s+([\d\/]+)\s+at\s+([\d:]+\s*(?:AM|PM))\.\s*Fee:\s*KES\s*([\d,]+\.?\d*)\.\s*Bal:\s*KES\s*([\d,]+\.?\d*)/si',
+
             $sms, $m
         )) {
             return [
@@ -424,7 +425,8 @@ class MpesaSmsParser
 
         // Airtel → Pochi la Biashara
         if (preg_match(
-            '/^(\w+)\.\s*Ksh\s*([\d,]+\.?\d*)\s+sent to\s+(.+?)\s+(\d{10,12})\s+on\s+([\d\/]+)\s+at\s+([\d:]+\s*(?:AM|PM))\.\s*Fee:\s*Ksh\s*([\d,]+\.?\d*)\.\s*Bal:\s*Ksh\s*([\d,]+\.?\d*)\.\s*MPESA ID:\s*(\w+)/si',
+            '/^(\w+)\.\s*KES\s*([\d,]+\.?\d*)\s+sent to\s+(.+?)\s+(\d{10,12})\s+on\s+([\d\/]+)\s+at\s+([\d:]+\s*(?:AM|PM))\.\s*Fee:\s*KES\s*([\d,]+\.?\d*)\.\s*Bal:\s*KES\s*([\d,]+\.?\d*)\.\s*MPESA ID:\s*(\w+)/si',
+
             $sms, $m
         )) {
             $phone = $m[4];
@@ -454,7 +456,7 @@ class MpesaSmsParser
         // Airtel → Airtime purchase
         // "37779704577 Successful. Airtime top up for line 731609277 of Ksh 250 is successful. 25% bonus airtime received. Bal: Ksh 12.0."
         if (preg_match(
-            '/^(\w+)\s+Successful\.\s*Airtime top up for line\s+(\d+)\s+of\s+Ksh\s*([\d,]+\.?\d*)\s+is successful.*?Bal:\s*Ksh\s*([\d,]+\.?\d*)/si',
+            '/^(\w+)\s+Successful\.\s*Airtime top up for line\s+(\d+)\s+of\s+KES\s*([\d,]+\.?\d*)\s+is successful.*?Bal:\s*KES\s*([\d,]+\.?\d*)/si',
             $sms, $m
         )) {
             return [
