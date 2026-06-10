@@ -153,66 +153,122 @@ class AccountController extends Controller
             ->appends($request->query());
 
         if ($account->type === 'savings') {
-            // 1. Interest rows grouped by month
-            $interestTopUps = $account->transactions()
-                ->join('categories', 'transactions.category_id', '=', 'categories.id')
-                ->whereIn('categories.type', ['income', 'liability'])
-                ->whereNull('transactions.deleted_at')
-                ->where('categories.name', 'Interest')
-                ->selectRaw("
-            MIN(transactions.id)             AS id,
-            MIN(transactions.user_id)        AS user_id,
-            MIN(transactions.account_id)     AS account_id,
-            MIN(transactions.category_id)    AS category_id,
-            SUM(transactions.amount)         AS amount,
-            MAX(transactions.date)           AS date,
-            DATE_FORMAT(MAX(transactions.date), 'Interest earned – %b %Y') AS description,
-            MIN(transactions.payment_method) AS payment_method,
-            MIN(transactions.created_at)     AS created_at,
-            MAX(transactions.created_at)     AS last_created_at
-        ")
-                ->groupByRaw("YEAR(transactions.date), MONTH(transactions.date)")
-                ->get();
+            $isEtica = strtolower($account->name) === 'etica';
 
-            $interestCategory = Category::where('user_id', Auth::id())
-                ->where('name', 'Interest')
-                ->first();
+            if ($isEtica) {
+                // ── Etica: aggregate ALL income/liability rows by month ────────
+                $allTopUps = $account->transactions()
+                    ->join('categories', 'transactions.category_id', '=', 'categories.id')
+                    ->whereIn('categories.type', ['income', 'liability'])
+                    ->whereNull('transactions.deleted_at')
+                    ->selectRaw("
+                    MIN(transactions.id)                                                          AS id,
+                    MIN(transactions.user_id)                                                     AS user_id,
+                    MIN(transactions.account_id)                                                  AS account_id,
+                    MIN(transactions.category_id)                                                 AS category_id,
+                    SUM(transactions.amount)                                                      AS amount,
+                    MAX(transactions.date)                                                        AS date,
+                    DATE_FORMAT(MAX(transactions.date), 'Summary – %b %Y')                       AS description,
+                    MIN(transactions.payment_method)                                              AS payment_method,
+                    MIN(transactions.created_at)                                                  AS created_at,
+                    MAX(transactions.created_at)                                                  AS last_created_at,
+                    GROUP_CONCAT(DISTINCT categories.name ORDER BY categories.name SEPARATOR ', ') AS category_names
+                ")
+                    ->groupByRaw("YEAR(transactions.date), MONTH(transactions.date)")
+                    ->get();
 
-            $interestTopUps->transform(function ($row) use ($interestCategory) {
-                $row->category      = $interestCategory;
-                $row->date          = \Carbon\Carbon::parse($row->date);
-                $row->created_at    = \Carbon\Carbon::parse($row->created_at);
-                $row->is_grouped    = true;
-                return $row;
-            });
+                $interestCategory = Category::where('user_id', Auth::id())
+                    ->where('name', 'Interest')
+                    ->first();
 
-            // 2. All other income/liability rows (non-Interest) shown individually
-            $otherTopUps = $account->transactions()
-                ->with(['category'])
-                ->join('categories', 'transactions.category_id', '=', 'categories.id')
-                ->whereIn('categories.type', ['income', 'liability'])
-                ->whereNull('transactions.deleted_at')
-                ->where('categories.name', '!=', 'Interest')
-                ->select('transactions.*')
-                ->get()
-                ->each(fn($row) => $row->is_grouped = false);
+                $allTopUps->transform(function ($row) use ($interestCategory) {
+                    $row->category   = $interestCategory; // used for icon fallback
+                    $row->date       = \Carbon\Carbon::parse($row->date);
+                    $row->created_at = \Carbon\Carbon::parse($row->created_at);
+                    $row->is_grouped = true;
+                    return $row;
+                });
 
-            // 3. Merge, sort newest first, then paginate manually
-            $merged = $interestTopUps
-                ->concat($otherTopUps)
-                ->sortByDesc(fn($row) => $row->date->timestamp)
-                ->values();
+                $merged = $allTopUps
+                    ->sortByDesc(fn($row) => $row->date->timestamp)
+                    ->values();
 
-            $currentPage  = (int) ($request->input('top_page') ?? 1);
-            $perPage      = 20;
-            $topUps       = new \Illuminate\Pagination\LengthAwarePaginator(
-                $merged->forPage($currentPage, $perPage),
-                $merged->count(),
-                $perPage,
-                $currentPage,
-                ['pageName' => 'top_page', 'path' => $request->url(), 'query' => $request->query()]
-            );
+                $currentPage = (int) ($request->input('top_page') ?? 1);
+                $perPage     = 20;
+                $topUps      = new \Illuminate\Pagination\LengthAwarePaginator(
+                    $merged->forPage($currentPage, $perPage),
+                    $merged->count(),
+                    $perPage,
+                    $currentPage,
+                    ['pageName' => 'top_page', 'path' => $request->url(), 'query' => $request->query()]
+                );
+
+            } else {
+                // ── Non-Etica savings: Interest grouped, others individual ─────
+
+                // 1. Interest rows grouped by month
+                $interestTopUps = $account->transactions()
+                    ->join('categories', 'transactions.category_id', '=', 'categories.id')
+                    ->whereIn('categories.type', ['income', 'liability'])
+                    ->whereNull('transactions.deleted_at')
+                    ->where('categories.name', 'Interest')
+                    ->selectRaw("
+                    MIN(transactions.id)             AS id,
+                    MIN(transactions.user_id)        AS user_id,
+                    MIN(transactions.account_id)     AS account_id,
+                    MIN(transactions.category_id)    AS category_id,
+                    SUM(transactions.amount)         AS amount,
+                    MAX(transactions.date)           AS date,
+                    DATE_FORMAT(MAX(transactions.date), 'Interest earned – %b %Y') AS description,
+                    MIN(transactions.payment_method) AS payment_method,
+                    MIN(transactions.created_at)     AS created_at,
+                    MAX(transactions.created_at)     AS last_created_at
+                ")
+                    ->groupByRaw("YEAR(transactions.date), MONTH(transactions.date)")
+                    ->get();
+
+                $interestCategory = Category::where('user_id', Auth::id())
+                    ->where('name', 'Interest')
+                    ->first();
+
+                $interestTopUps->transform(function ($row) use ($interestCategory) {
+                    $row->category   = $interestCategory;
+                    $row->date       = \Carbon\Carbon::parse($row->date);
+                    $row->created_at = \Carbon\Carbon::parse($row->created_at);
+                    $row->is_grouped = true;
+                    return $row;
+                });
+
+                // 2. All other income/liability rows (non-Interest) shown individually
+                $otherTopUps = $account->transactions()
+                    ->with(['category'])
+                    ->join('categories', 'transactions.category_id', '=', 'categories.id')
+                    ->whereIn('categories.type', ['income', 'liability'])
+                    ->whereNull('transactions.deleted_at')
+                    ->where('categories.name', '!=', 'Interest')
+                    ->select('transactions.*')
+                    ->get()
+                    ->each(fn($row) => $row->is_grouped = false);
+
+                // 3. Merge, sort newest first, then paginate manually
+                $merged = $interestTopUps
+                    ->concat($otherTopUps)
+                    ->sortByDesc(fn($row) => $row->date->timestamp)
+                    ->values();
+
+                $currentPage = (int) ($request->input('top_page') ?? 1);
+                $perPage     = 20;
+                $topUps      = new \Illuminate\Pagination\LengthAwarePaginator(
+                    $merged->forPage($currentPage, $perPage),
+                    $merged->count(),
+                    $perPage,
+                    $currentPage,
+                    ['pageName' => 'top_page', 'path' => $request->url(), 'query' => $request->query()]
+                );
+            }
+
         } else {
+            // ── Non-savings accounts ──────────────────────────────────────────
             $topUps = $account->transactions()
                 ->with(['category'])
                 ->join('categories', 'transactions.category_id', '=', 'categories.id')
@@ -249,11 +305,11 @@ class AccountController extends Controller
             ->whereNull('transactions.deleted_at')
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->selectRaw('
-                COUNT(*) as total_transactions,
-                SUM(CASE WHEN categories.type = "income"  THEN amount ELSE 0 END) as total_income,
-                SUM(CASE WHEN categories.type = "expense" THEN amount ELSE 0 END) as total_expenses,
-                SUM(CASE WHEN MONTH(date) = ? AND YEAR(date) = ? THEN amount ELSE 0 END) as this_month_total
-            ', [now()->month, now()->year])
+            COUNT(*) as total_transactions,
+            SUM(CASE WHEN categories.type = "income"  THEN amount ELSE 0 END) as total_income,
+            SUM(CASE WHEN categories.type = "expense" THEN amount ELSE 0 END) as total_expenses,
+            SUM(CASE WHEN MONTH(date) = ? AND YEAR(date) = ? THEN amount ELSE 0 END) as this_month_total
+        ', [now()->month, now()->year])
             ->first();
 
         // ── Savings-specific stats ────────────────────────────────────────────
@@ -273,9 +329,9 @@ class AccountController extends Controller
                 ->whereNull('transactions.deleted_at')
                 ->join('categories', 'transactions.category_id', '=', 'categories.id')
                 ->selectRaw('
-                    SUM(CASE WHEN categories.name = "Interest" THEN transactions.amount ELSE 0 END) as total_interest,
-                    SUM(CASE WHEN categories.type = "expense"  THEN transactions.amount ELSE 0 END) as total_expenses
-                ')
+                SUM(CASE WHEN categories.name = "Interest" THEN transactions.amount ELSE 0 END) as total_interest,
+                SUM(CASE WHEN categories.type = "expense"  THEN transactions.amount ELSE 0 END) as total_expenses
+            ')
                 ->first();
 
             $savingsNetAllTime = ($savingsStats->total_interest ?? 0) - ($savingsStats->total_expenses ?? 0);
@@ -350,7 +406,6 @@ class AccountController extends Controller
         }
 
         // ── "Record Interest" button guard (day-based) ────────────────────────
-        // True = interest already recorded today → hide the button.
         $interestRecordedToday = false;
         if ($account->type === 'savings') {
             $interestRecordedToday = ! $this->interestService->canRecordToday($account);
@@ -383,7 +438,7 @@ class AccountController extends Controller
             'availableYears'        => $availableYears,
             'selectedYear'          => $selectedYear,
             'selectedPeriod'        => $selectedPeriod,
-            'interestRecordedToday' => $interestRecordedToday,   // ← renamed from interestRecordedLastMonth
+            'interestRecordedToday' => $interestRecordedToday,
         ]);
     }
 

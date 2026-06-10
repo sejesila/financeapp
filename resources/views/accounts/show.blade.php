@@ -572,19 +572,17 @@
                                         <td class="px-4 py-3">
                                             <div class="flex items-center gap-2">
                                                 <span>{{ $txn->category->icon ?? '💰' }}</span>
-                                                <span class="text-gray-900 dark:text-white font-medium">
-                    @if(!empty($search))
-                                                        <span class="sr-only">{{ $txn->description }}</span>
-                                                        {!! str_ireplace($search, '<mark class="bg-yellow-100 dark:bg-yellow-800 rounded px-0.5">' . e($search) . '</mark>', e($txn->description)) !!}
-                                                    @else
-                                                        {{ $txn->description }}
+                                                <div>
+            <span class="text-gray-900 dark:text-white font-medium">
+                {{ $txn->description }}
+            </span>
+                                                    {{-- Show breakdown of categories in the month --}}
+                                                    @if($account->type === 'savings' && ($txn->is_grouped ?? false) && !empty($txn->category_names))
+                                                        <p class="text-xs text-gray-400 mt-0.5">
+                                                            {{ $txn->category_names }}
+                                                        </p>
                                                     @endif
-                </span>
-                                                @if($account->type === 'savings' && !($txn->is_grouped ?? false) && !empty($txn->value_date) && \Carbon\Carbon::parse($txn->value_date)->isFuture())
-                                                    <span class="px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 rounded text-xs font-medium">
-                        Pending
-                    </span>
-                                                @endif
+                                                </div>
                                             </div>
                                         </td>
 
