@@ -416,12 +416,10 @@ class AccountController extends Controller
             'transactions' => $transactions,
             'topUps'       => $topUps,
             'transfers'    => $transfers,
-            // base stats
             'totalTransactions' => $stats->total_transactions ?? 0,
             'totalIncome'       => $stats->total_income ?? 0,
             'totalExpenses'     => $stats->total_expenses ?? 0,
             'thisMonthTotal'    => $stats->this_month_total ?? 0,
-            // ui state
             'search'            => $search,
             'activeTab'         => $activeTab,
             'txSort'            => $txSort,
@@ -430,7 +428,6 @@ class AccountController extends Controller
             'topDirection'      => $topDirection,
             'transferSort'      => $transferSort,
             'transferDirection' => $transferDirection,
-            // savings-only
             'savingsStats'          => $savingsStats,
             'savingsNetAllTime'     => $savingsNetAllTime,
             'interestByPeriod'      => $interestByPeriod,
