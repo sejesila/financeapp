@@ -305,12 +305,30 @@ class AccountController extends Controller
             ->whereNull('transactions.deleted_at')
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->selectRaw('
-            COUNT(*) as total_transactions,
-            SUM(CASE WHEN categories.type = "income"  THEN amount ELSE 0 END) as total_income,
-            SUM(CASE WHEN categories.type = "expense" THEN amount ELSE 0 END) as total_expenses,
-            SUM(CASE WHEN MONTH(date) = ? AND YEAR(date) = ? THEN amount ELSE 0 END) as this_month_total
-        ', [now()->month, now()->year])
+        COUNT(*) as total_transactions,
+        SUM(CASE WHEN categories.type = "income"  THEN amount ELSE 0 END) as total_income,
+        SUM(CASE WHEN categories.type = "expense" THEN amount ELSE 0 END) as total_expenses,
+        SUM(CASE WHEN MONTH(date) = ? AND YEAR(date) = ? THEN amount ELSE 0 END) as this_month_total
+    ', [now()->month, now()->year])
             ->first();
+
+// ── For Etica: recount transactions as aggregated monthly entries ─────
+        if ($account->type === 'savings' && strtolower($account->name) === 'etica') {
+            $incomeMonths = $account->transactions()
+                ->whereNull('transactions.deleted_at')
+                ->join('categories', 'transactions.category_id', '=', 'categories.id')
+                ->whereIn('categories.type', ['income', 'liability'])
+                ->selectRaw('COUNT(DISTINCT YEAR(transactions.date), MONTH(transactions.date)) as cnt')
+                ->value('cnt');
+
+            $expenseRows = $account->transactions()
+                ->whereNull('transactions.deleted_at')
+                ->join('categories', 'transactions.category_id', '=', 'categories.id')
+                ->where('categories.type', 'expense')
+                ->count();
+
+            $stats->total_transactions = $incomeMonths + $expenseRows;
+        }
 
         // ── Savings-specific stats ────────────────────────────────────────────
         $savingsStats      = null;
