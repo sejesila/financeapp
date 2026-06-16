@@ -830,7 +830,7 @@
         (function () {
             // Use account creation date as "from", today as "to"
             const ACCOUNT_CREATED = '{{ $account->created_at->toDateString() }}';
-            const today           = new Date().toISOString().slice(0, 10);
+            const today = new Date().toLocaleDateString('en-CA');
             const BASE_URL        = '{{ route('accounts.statement', $account) }}';
 
             // Trigger auto-load when the modal opens
