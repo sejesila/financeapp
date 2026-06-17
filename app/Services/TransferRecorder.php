@@ -370,6 +370,7 @@ class TransferRecorder
                 'category_id'    => $category->id,
                 'amount'         => $parsed['amount'],
                 'date'           => $parsed['date'],
+                // no value_date — this is a transaction row, not a transfer to savings
                 'description'    => $parsed['description'] . ' [' . $parsed['reference'] . ']',
                 'payment_method' => 'Mpesa',
             ]);
@@ -403,14 +404,19 @@ class TransferRecorder
         }
 
         DB::transaction(function () use ($user, $parsed, $mpesaAccount, $destinationAccount) {
+            $valueDate = ($destinationAccount->type === 'savings')
+                ? KenyanBusinessDays::nextBusinessDay(Carbon::parse($parsed['date']))->format('Y-m-d')
+                : null;
+
             Transfer::create([
                 'user_id'         => $user->id,
                 'from_account_id' => $mpesaAccount->id,
                 'to_account_id'   => $destinationAccount->id,
                 'amount'          => $parsed['amount'],
-                'date'            => now(),
+                'date'            => $parsed['date'],   // was: now()
+                'value_date'      => $valueDate,
                 'description'     => $parsed['description'] . ' [' . $parsed['reference'] . ']',
-                'mpesa_reference'  => $parsed['reference'],
+                'mpesa_reference' => $parsed['reference'],
             ]);
 
             if (!empty($parsed['fee']) && $parsed['fee'] > 0) {
