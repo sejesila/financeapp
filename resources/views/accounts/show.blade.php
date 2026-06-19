@@ -48,7 +48,7 @@
                             @elseif(strtolower($account->type) === 'airtel_money')
                                 <img src="{{ asset('images/airtel-money.png') }}" alt="Airtel Money" class="w-12 h-12 object-contain">
                             @elseif(str_contains(strtolower($account->name), 'etica'))
-                                    <img src="{{ asset('images/etica.webp') }}" alt="Etica" class="w-8 h-8 object-contain">
+                                <img src="{{ asset('images/etica.webp') }}" alt="Etica" class="w-8 h-8 object-contain">
                             @else
                                 <span class="font-bold text-2xl text-gray-700 dark:text-gray-300">{{ substr($account->name, 0, 1) }}</span>
                             @endif
@@ -103,7 +103,7 @@
                             </a>
                         @endif
                         @if($account->type === 'savings')
-                            <button onclick="document.getElementById('statementModal').showModal()"
+                            <button id="openStatementBtn"
                                     class="bg-indigo-700 text-white px-6 py-2.5 rounded-lg hover:bg-indigo-800 transition text-center font-medium shadow-md">
                                 📄 View Statement
                             </button>
@@ -238,12 +238,10 @@
                         <p class="text-sm text-gray-500 dark:text-gray-400 text-center py-6">No data for this period.</p>
                     @else
                         @php
-                            // Merge all period labels from both collections.
                             $allLabels   = $interestByPeriod->pluck('period_label')
                                 ->merge($expensesByPeriod->pluck('period_label'))
                                 ->unique()->values();
 
-                            // Key by period_label so Blade can look up a row by label.
                             $interestMap = $interestByPeriod->keyBy('period_label');
                             $expensesMap = $expensesByPeriod->keyBy('period_label');
                         @endphp
@@ -269,7 +267,6 @@
                                         $net       = $interest - $expenses;
                                         $grandInterest += $interest;
                                         $grandExpenses += $expenses;
-
                                     @endphp
                                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                                         <td class="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">{{ $label }}</td>
@@ -573,10 +570,9 @@
                                             <div class="flex items-center gap-2">
                                                 <span>{{ $txn->category->icon ?? '💰' }}</span>
                                                 <div>
-            <span class="text-gray-900 dark:text-white font-medium">
-                {{ $txn->description }}
-            </span>
-                                                    {{-- Show breakdown of categories in the month --}}
+                                                    <span class="text-gray-900 dark:text-white font-medium">
+                                                        {{ $txn->description }}
+                                                    </span>
                                                     @if($account->type === 'savings' && ($txn->is_grouped ?? false) && !empty($txn->category_names))
                                                         <p class="text-xs text-gray-400 mt-0.5">
                                                             {{ $txn->category_names }}
@@ -597,12 +593,12 @@
 
                                         {{-- Category --}}
                                         <td class="px-4 py-3 hidden sm:table-cell">
-            <span class="inline-flex rounded-full px-2 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-                {{ $txn->category->name ?? '—' }}
-            </span>
+                                            <span class="inline-flex rounded-full px-2 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                                                {{ $txn->category->name ?? '—' }}
+                                            </span>
                                         </td>
 
-                                        {{-- Reverse button — only for non-grouped, non-pending rows within the 30-minute window --}}
+                                        {{-- Reverse button --}}
                                         <td class="px-4 py-3 text-right whitespace-nowrap">
                                             @if(!($txn->is_grouped ?? false) && $txn->created_at->diffInMinutes(now()) <= 30)
                                                 <a href="{{ route('accounts.topup.reverse.form', ['account' => $account, 'transaction' => $txn]) }}"
@@ -689,7 +685,7 @@
                                     @endforeach
                                     <th class="px-4 py-3 text-left font-medium">Direction</th>
                                     <th class="px-4 py-3 text-left font-medium hidden sm:table-cell">Counterpart</th>
-                                        <th class="px-4 py-3"></th>
+                                    <th class="px-4 py-3"></th>
                                 </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
@@ -778,6 +774,7 @@
 
         </div>
     </div>
+
     {{-- ── Statement Modal ──────────────────────────────────────────────── --}}
     <dialog
         id="statementModal"
@@ -828,70 +825,82 @@
     {{-- ── Script ───────────────────────────────────────────────────────── --}}
     <script>
         (function () {
-            // Use account creation date as "from", today as "to"
-            const ACCOUNT_CREATED = '{{ $account->created_at->toDateString() }}';
-            const today = new Date().toLocaleDateString('en-CA');
-            const BASE_URL        = '{{ route('accounts.statement', $account) }}';
+            const BASE_URL = '{{ route('accounts.statement', $account) }}';
 
-            // Trigger auto-load when the modal opens
-            document.querySelector('[onclick*="statementModal"]')
-                ?.addEventListener('click', () => smLoad(ACCOUNT_CREATED, today));
+            // Open modal and load current month on button click
+            document.getElementById('openStatementBtn')
+                ?.addEventListener('click', function () {
+                    document.getElementById('statementModal').showModal();
+                    smLoad(null); // null = default to current month in controller
+                });
 
+            // ── Download PDF ──────────────────────────────────────────────
             window.smDownload = function () {
-                const from = document.getElementById('smDownloadBtn').dataset.from;
-                const to   = document.getElementById('smDownloadBtn').dataset.to;
-                const a    = document.createElement('a');
-                a.href     = `${BASE_URL}?from=${from}&to=${to}&download=1`;
-                a.download = `{{ $account->name }}_Statement_${from}_${to}.pdf`;
+                const month = document.getElementById('smDownloadBtn').dataset.month;
+                const a     = document.createElement('a');
+                a.href      = `${BASE_URL}?month=${month}&download=1`;
+                a.download  = `{{ $account->name }}_Statement_${month}.pdf`;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
             };
 
-            function smLoad(from, to) {
-                // Reset
-                document.getElementById('smLoading').style.display = '';
-                document.getElementById('smContent').style.display = 'none';
-                document.getElementById('smContent').innerHTML     = '';
+            // ── Load statement for a given month (YYYY-MM) ────────────────
+            window.smLoad = function (month) {
+                const qs = month ? `?month=${month}` : '';
+
+                // Reset state
+                document.getElementById('smLoading').style.display  = '';
+                document.getElementById('smContent').style.display  = 'none';
+                document.getElementById('smContent').innerHTML      = '';
                 document.getElementById('smDownloadBtn').style.display = 'none';
 
-                fetch(`${BASE_URL}?from=${from}&to=${to}`, {
+                fetch(`${BASE_URL}${qs}`, {
                     headers: { 'X-Requested-With': 'XMLHttpRequest' }
                 })
                     .then(r => r.text())
                     .then(html => {
-                        const doc   = new DOMParser().parseFromString(html, 'text/html');
-                        const table = doc.querySelector('table');
-                        const tableHTML = table
-                            ? table.outerHTML
+                        const doc = new DOMParser().parseFromString(html, 'text/html');
+
+                        // Pull metadata from hidden elements in the rendered statement view
+                        const acctName   = doc.querySelector('.sm-account-name')?.textContent?.trim()  ?? '{{ $account->name }}';
+                        const periodLabel = doc.querySelector('.sm-period-label')?.textContent?.trim() ?? '';
+                        const dataMonth  = doc.querySelector('[data-month]')?.dataset?.month           ?? '';
+
+                        // Grab the nav bar and table rendered inside statement.blade.php
+                        const navEl   = doc.querySelector('.sm-month-nav');
+                        const tableEl = doc.querySelector('table');
+
+                        const navHTML   = navEl   ? navEl.outerHTML   : '';
+                        const tableHTML = tableEl ? tableEl.outerHTML
                             : '<p style="color:#888;text-align:center;padding:32px">No transactions found.</p>';
 
-                        const fromFmt = new Date(from + 'T00:00:00')
-                            .toLocaleDateString('en-KE', { day:'numeric', month:'short', year:'numeric' });
-                        const toFmt   = new Date(to   + 'T00:00:00')
-                            .toLocaleDateString('en-KE', { day:'numeric', month:'short', year:'numeric' });
-
                         document.getElementById('smContent').innerHTML = `
-                <div class="sm-stmt-meta">
-                    <div class="sm-meta-item">
-                        <span class="sm-meta-label">Account</span>
-                        <span class="sm-meta-value">{{ $account->name }}</span>
-                    </div>
-                    <div class="sm-meta-item">
-                        <span class="sm-meta-label">Period</span>
-                        <span class="sm-meta-value">${fromFmt} – ${toFmt}</span>
-                    </div>
-                </div>
-                <div class="sm-table-wrap">${tableHTML}</div>
-            `;
+                        <div class="sm-stmt-meta">
+                            <div class="sm-meta-item">
+                                <span class="sm-meta-label">Account</span>
+                                <span class="sm-meta-value">${acctName}</span>
+                            </div>
+                            <div class="sm-meta-item">
+                                <span class="sm-meta-label">Period</span>
+                                <span class="sm-meta-value">${periodLabel}</span>
+                            </div>
+                        </div>
+                        ${navHTML}
+                        <div class="sm-table-wrap">${tableHTML}</div>
+                    `;
+
+                        // Wire up prev/next nav buttons injected from statement.blade.php
+                        document.querySelectorAll('#smContent [data-nav-month]').forEach(btn => {
+                            btn.addEventListener('click', () => smLoad(btn.dataset.navMonth));
+                        });
 
                         document.getElementById('smLoading').style.display = 'none';
                         document.getElementById('smContent').style.display = '';
 
-                        const btn = document.getElementById('smDownloadBtn');
-                        btn.dataset.from = from;
-                        btn.dataset.to   = to;
-                        btn.style.display = '';
+                        const dlBtn       = document.getElementById('smDownloadBtn');
+                        dlBtn.dataset.month = dataMonth;
+                        dlBtn.style.display = '';
                     })
                     .catch(() => {
                         document.getElementById('smLoading').style.display = 'none';
@@ -899,7 +908,8 @@
                             '<p style="color:#c00;text-align:center;padding:32px">Could not load statement. Please try again.</p>';
                         document.getElementById('smContent').style.display = '';
                     });
-            }
+            };
+
         })();
     </script>
 
@@ -1010,6 +1020,41 @@
             font-size:12.5px; font-weight:600; color:#0d2b5e; font-family:Arial,sans-serif;
         }
 
+        /* Month navigation bar injected from statement.blade.php */
+        #smContent .sm-month-nav {
+            display: flex !important;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 18px;
+            border-bottom: 1px solid #edf0f5;
+            background: #f7f9fb;
+        }
+
+        #smContent .sm-month-nav button {
+            background: #fff;
+            border: 1px solid #c8d3e6;
+            border-radius: 6px;
+            padding: 5px 12px;
+            font-size: 12px;
+            font-family: Arial, sans-serif;
+            font-weight: 600;
+            cursor: pointer;
+            color: #0d2b5e;
+            transition: background .15s, border-color .15s;
+        }
+
+        #smContent .sm-month-nav button:hover {
+            background: #e8edf5;
+            border-color: #0d2b5e;
+        }
+
+        #smContent .sm-month-nav span:not([data-nav-month]) {
+            font-size: 13px;
+            font-weight: 700;
+            color: #0d2b5e;
+            font-family: Arial, sans-serif;
+        }
+
         /* Injected table */
         .sm-table-wrap { overflow-x:auto; }
 
@@ -1074,6 +1119,10 @@
             .sm-table-wrap .amount-inflow    { color:#6ee7b7; }
             .sm-table-wrap .amount-withdrawal{ color:#fca5a5; }
             .sm-table-wrap .amount-interest  { color:#93c5fd; }
+            #smContent .sm-month-nav         { background:#1a2237; border-color:#2d3748; }
+            #smContent .sm-month-nav button  { background:#1e2535; border-color:#2d3748; color:#93c5fd; }
+            #smContent .sm-month-nav button:hover { background:#263050; border-color:#93c5fd; }
+            #smContent .sm-month-nav span    { color:#93c5fd; }
         }
     </style>
 </x-app-layout>

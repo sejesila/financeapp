@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ $account->name }} – Statement {{ $from->format('M d') }}–{{ $to->format('M d, Y') }}</title>
+    <title>{{ $account->name }} – Statement {{ $from->format('M Y') }}</title>
 
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -111,15 +111,12 @@
             text-align: left;
         }
 
-        /* Numeric columns right-aligned (3rd col onwards, skipping Narration) */
         thead th:nth-child(n+3) { text-align: right; }
 
         tbody tr { border-bottom: 1px solid #dde3ec; page-break-inside: avoid; }
         tbody tr:last-child { border-bottom: none; }
 
         tbody td { padding: 7px 10px; vertical-align: top; }
-
-        /* Same rule for body cells */
         tbody td:nth-child(n+3) { text-align: right; }
 
         .narration-cell { max-width: 200px; font-size: 10pt; color: #333; }
@@ -198,6 +195,42 @@
 <body>
 <div class="page">
 
+    {{-- ── Hidden metadata read by the modal JS ───────────────────────── --}}
+    <span class="sm-account-name" style="display:none">{{ $account->name }}</span>
+    <span class="sm-period-label" style="display:none">{{ $selectedLabel ?? $from->format('F Y') }}</span>
+    <span data-month="{{ $selectedMonth ?? $from->format('Y-m') }}" style="display:none"></span>
+
+    {{-- ── Month navigation bar (screen only, hidden when printing) ────── --}}
+    @if(isset($selectedMonth))
+        <div class="sm-month-nav print-bar" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+            @if($hasPrev ?? false)
+                <button data-nav-month="{{ $prevMonth }}"
+                        style="background:#fff; border:1px solid #c8d3e6; border-radius:6px; padding:6px 14px;
+                               font-size:11pt; font-family:Arial,sans-serif; cursor:pointer; color:#0d2b5e;
+                               font-weight:600;">
+                    ← {{ \Carbon\Carbon::parse($prevMonth . '-01')->format('M Y') }}
+                </button>
+            @else
+                <span></span>
+            @endif
+
+            <span style="font-size:13pt; font-weight:700; color:#0d2b5e; font-family:Arial,sans-serif;">
+                {{ $selectedLabel }}
+            </span>
+
+            @if($hasNext ?? false)
+                <button data-nav-month="{{ $nextMonth }}"
+                        style="background:#fff; border:1px solid #c8d3e6; border-radius:6px; padding:6px 14px;
+                               font-size:11pt; font-family:Arial,sans-serif; cursor:pointer; color:#0d2b5e;
+                               font-weight:600;">
+                    {{ \Carbon\Carbon::parse($nextMonth . '-01')->format('M Y') }} →
+                </button>
+            @else
+                <span></span>
+            @endif
+        </div>
+    @endif
+
     {{-- ── Print button (screen only) ────────────────────────────────── --}}
     <div class="print-bar">
         <button class="print-btn" onclick="window.print()">🖨 Print / Save PDF</button>
@@ -248,7 +281,7 @@
         <tbody>
         <tr class="opening-row">
             <td>{{ $from->format('M d, Y') }}</td>
-            <td class="narration-cell">Opening Balance</td>
+            <td class="narration-cell">Balance B/F</td>
             <td></td><td></td><td></td>
             <td class="amount-balance">{{ number_format($openingBalance, 2) }}</td>
         </tr>
@@ -289,7 +322,7 @@
 
         <tr class="totals-row">
             <td>{{ $to->format('M d, Y') }}</td>
-            <td>Total (KES)</td>
+            <td>Closing Balance (KES)</td>
             <td class="amount-inflow">
                 {{ $totalInflow > 0 ? number_format($totalInflow, 2) : '' }}
             </td>
