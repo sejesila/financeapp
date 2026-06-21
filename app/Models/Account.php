@@ -134,10 +134,11 @@ class Account extends Model
                 ELSE 0
             END) as loan_disbursements,
 
-            SUM(CASE
+           SUM(CASE
                 WHEN categories.type = 'liability'
                 AND categories.name = 'Client Funds'
                 AND transactions.amount > 0
+                AND (transactions.value_date IS NULL OR transactions.value_date <= {$lastInterestDateSql})
                 THEN transactions.amount
                 ELSE 0
             END) as client_funds_received,

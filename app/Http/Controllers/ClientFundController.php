@@ -7,6 +7,8 @@ use App\Models\Category;
 use App\Models\ClientFund;
 use App\Models\ClientFundTransaction;
 use App\Models\Transaction;
+use App\Services\KenyanBusinessDays;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -133,6 +135,12 @@ class ClientFundController extends Controller
                 'notes' => $request->notes,
             ]);
 
+            // For Etica savings accounts, the fund is only effective the next business day
+            $isEtica = $account->type === 'savings' && strtolower($account->name) === 'etica';
+            $valueDate = $isEtica
+                ? KenyanBusinessDays::nextBusinessDay(Carbon::parse($request->received_date))->format('Y-m-d')
+                : null;
+
             // Create liability transaction (this increases account balance)
             $liabilityTransaction = Transaction::create([
                 'user_id' => Auth::id(),
@@ -140,6 +148,7 @@ class ClientFundController extends Controller
                 'category_id' => $liabilityCategory->id,
                 'amount' => $request->amount_received,
                 'date' => $request->received_date,
+                'value_date' => $valueDate,
                 'period_date' => $request->received_date,
                 'description' => "Client fund received from {$request->client_name} for {$request->purpose}",
                 'payment_method' => 'Client Fund',
