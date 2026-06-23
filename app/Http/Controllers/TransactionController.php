@@ -105,9 +105,15 @@ class TransactionController extends Controller
         ));
     }
 
-    public function create()
+    public function create(Request $request)
     {
-        return view('transactions.create', $this->formData());
+        $data = $this->formData();
+
+        $data['selectedAccount'] = $request->account_id
+            ? $data['accounts']->find($request->account_id)
+            : null;
+
+        return view('transactions.create', $data);
     }
 
     public function store(StoreTransactionRequest $request)

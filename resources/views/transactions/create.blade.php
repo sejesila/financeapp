@@ -28,6 +28,16 @@
             </div>
         @endif
 
+        @php
+            // Priority: 1) old() after validation failure, 2) ?account_id= query param, 3) mpesa fallback
+            $mpesaAccount = $accounts->where('type', 'mpesa')->first();
+            $defaultAccountId = old('account_id')
+                ?: (request('account_id') && $accounts->contains('id', (int) request('account_id'))
+                    ? (int) request('account_id')
+                    : ($mpesaAccount?->id));
+            $defaultAccount = $accounts->firstWhere('id', $defaultAccountId);
+        @endphp
+
         <form action="{{ route('transactions.store') }}" method="POST" class="space-y-4 sm:space-y-5">
             @csrf
 
@@ -36,8 +46,8 @@
                 <div class="mb-4 sm:mb-5">
                     <label class="block text-sm sm:text-base font-semibold mb-1 dark:text-gray-200">Date</label>
                     <input type="datetime-local" name="date" value="{{ old('date', now()->format('Y-m-d\TH:i')) }}"
-                        class="w-full text-sm sm:text-base border dark:border-gray-600 p-2 sm:p-2.5 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
-                        required
+                           class="w-full text-sm sm:text-base border dark:border-gray-600 p-2 sm:p-2.5 rounded focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
+                           required
                     >
                 </div>
 
@@ -140,10 +150,6 @@
                         required
                     >
                         <option value="">-- Select Account --</option>
-                        @php
-                            $mpesaAccount = $accounts->where('type', 'mpesa')->first();
-                            $defaultAccountId = old('account_id') ?: ($mpesaAccount ? $mpesaAccount->id : null);
-                        @endphp
                         @foreach($accounts as $account)
                             <option value="{{ $account->id }}" data-type="{{ $account->type }}"
                                 {{ $defaultAccountId == $account->id ? 'selected' : '' }}>
@@ -193,8 +199,9 @@
         function transactionForm() {
             return {
                 totalAmount: {{ old('amount') ?: 'null' }},
-                accountId: '{{ old('account_id', $mpesaAccount->id ?? '') }}',
-                accountType: '',
+                // FIX: use $defaultAccountId resolved in PHP (respects ?account_id= param)
+                accountId: '{{ $defaultAccountId ?? '' }}',
+                accountType: '{{ $defaultAccount?->type ?? '' }}',
                 mobileMoneyType: '{{ old('mobile_money_type') }}',
                 showTransactionTypeSelector: false,
                 defaultMpesaType: '{{ $defaultMpesaType ?? 'send_money' }}',
