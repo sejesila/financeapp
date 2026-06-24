@@ -14,7 +14,6 @@ use App\Http\Controllers\{AccountController,
     MpesaSmsController,
     ProfileController,
     ReportsController,
-    RollingFundController,
     StatementController,
     TransactionController};
 use App\Http\Controllers\Auth\{AuthenticatedSessionController,
@@ -175,19 +174,6 @@ Route::middleware('auth')->group(function () {
         Route::delete('{clientFund}/profit/{transaction}', [ClientFundController::class, 'deleteProfit'])->name('profit.delete');
     });
 
-    // ======================================================================
-    // Rolling Funds (Odds & Ends)
-    // ======================================================================
-
-    Route::prefix('rolling-funds')->name('rolling-funds.')->group(function () {
-        Route::get('/', [RollingFundController::class, 'index'])->name('index');
-        Route::get('/create', [RollingFundController::class, 'create'])->name('create');
-        Route::post('/', [RollingFundController::class, 'store'])->name('store');
-        Route::post('/limits', [RollingFundController::class, 'saveLimits'])->name('save-limits');
-        Route::get('/{rollingFund}', [RollingFundController::class, 'show'])->name('show');
-        Route::post('/{rollingFund}/record-outcome', [RollingFundController::class, 'recordOutcome'])->name('record-outcome');
-        Route::delete('/{rollingFund}', [RollingFundController::class, 'destroy'])->name('destroy');
-    });
     // ======================================================================
 // Cafeteria
 // ======================================================================
