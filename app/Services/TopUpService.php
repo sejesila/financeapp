@@ -24,6 +24,9 @@ class TopUpService
 
     private const EXCLUDED_PARENTS = ['Income', 'Loans'];
 
+    // Income categories allowed for bank account top-ups.
+    private const BANK_ALLOWED_INCOME = ['Salary', 'Side Income'];
+
     // ── Category resolution ───────────────────────────────────────────────────
 
     /**
@@ -46,7 +49,10 @@ class TopUpService
             ->whereNotNull('parent_id');
 
         $categories = match ($accountType) {
-            'bank'         => $query->where('type', 'income')->where('name', 'Salary')->orderBy('name')->get(),
+            'bank'         => $query->where('type', 'income')
+                ->whereIn('name', self::BANK_ALLOWED_INCOME)
+                ->orderBy('name')
+                ->get(),
             'savings'      => $query->where('type', 'income')->orderBy('name')->get(),
             'airtel_money' => $query->where('type', 'income')->where('name', '!=', 'Salary')->orderBy('name')->get(),
             'mpesa'        => $query->where(function ($q) {
@@ -64,9 +70,6 @@ class TopUpService
 
     /**
      * Validate that the chosen category is allowed for this account and user.
-     * Throws ValidationException (rendered as redirect-with-errors by Laravel)
-     * or returns a session-error string for cases the controller handles via
-     * redirect()->back()->with('error', ...).
      *
      * Returns null on success, or an error string that the controller should
      * pass to session('error').
@@ -93,9 +96,13 @@ class TopUpService
             }
         }
 
-        // Bank accounts: income must be Salary only
-        if ($account->type === 'bank' && $category->type === 'income' && $category->name !== 'Salary') {
-            return 'Only Salary income is allowed for bank accounts.';
+        // Bank accounts: only allow explicitly permitted income categories
+        if ($account->type === 'bank'
+            && $category->type === 'income'
+            && !in_array($category->name, self::BANK_ALLOWED_INCOME)
+        ) {
+            $allowed = implode(' or ', self::BANK_ALLOWED_INCOME);
+            return "Only {$allowed} income is allowed for bank accounts.";
         }
 
         return null; // all good
@@ -103,11 +110,6 @@ class TopUpService
 
     // ── Sacco Dividends helpers ───────────────────────────────────────────────
 
-    /**
-     * Resolves Sacco Dividends visibility:
-     * true  = within the 10 Apr – 10 May window AND not yet used this year.
-     * false = outside the window, or already used.
-     */
     private function resolveSaccoDividends(): bool
     {
         return $this->inSaccoWindow() && !$this->saccoAlreadyUsed();
