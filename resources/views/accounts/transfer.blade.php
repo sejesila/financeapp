@@ -297,8 +297,8 @@
                         this.transactionFee = this.getWithdrawalFee(parseFloat(this.amount), fromAccount.type);
                         this.showFee        = this.transactionFee > 0;
                     }
-                    // M-Pesa/Airtel → Bank = PayBill fee
-                    else if (isMobileMoney && toAccount.type === 'bank') {
+                    // M-Pesa/Airtel → Bank or Savings = PayBill fee
+                    else if (isMobileMoney && (toAccount.type === 'bank' || toAccount.type === 'savings')) {
                         this.feeType        = 'paybill';
                         this.transactionFee = this.getPayBillFee(parseFloat(this.amount), fromAccount.type);
                         this.showFee        = this.transactionFee > 0;
@@ -405,9 +405,9 @@
                             option.disabled = !allowed.includes(optionType);
                             option.hidden   = !allowed.includes(optionType);
                         }
-                        // Savings source: allow mpesa, airtel_money, bank
+                        // Savings source: allow mpesa, airtel_money, bank, cash
                         else if (fromAccount && fromAccount.type === 'savings') {
-                            const allowed = ['mpesa', 'airtel_money', 'bank'];
+                            const allowed = ['mpesa', 'airtel_money', 'bank', 'cash'];
                             option.disabled = !allowed.includes(optionType);
                             option.hidden   = !allowed.includes(optionType);
                         }

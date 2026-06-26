@@ -29,7 +29,8 @@ class TransferFeeCalculator
             return new TransferFee($fee, 'withdrawal', $desc);
         }
 
-        if ($isMobileMoney && $to->type === 'bank') {
+        // ↓ Add 'savings' alongside 'bank' as a PayBill destination
+        if ($isMobileMoney && in_array($to->type, ['bank', 'savings'])) {
             $fee  = $this->payBillFee($amount, $from->type);
             $desc = $this->feeDescription($from, $to, 'paybill');
             return new TransferFee($fee, 'paybill', $desc);
