@@ -404,7 +404,10 @@ class TransferRecorder
         }
 
         DB::transaction(function () use ($user, $parsed, $mpesaAccount, $destinationAccount) {
-            $valueDate = ($destinationAccount->type === 'savings')
+            $isInterestGated = $destinationAccount->type === 'savings'
+                && stripos($destinationAccount->name, 'etica') !== false;
+
+            $valueDate = $isInterestGated
                 ? KenyanBusinessDays::nextBusinessDay(Carbon::parse($parsed['date']))->format('Y-m-d')
                 : null;
 

@@ -65,7 +65,10 @@ readonly class TransferService
 
         DB::transaction(function () use ($from, $to, $amount, $date, $description, $fee) {
             // Calculate value_date for savings destination accounts
-            $valueDate = ($to->type === 'savings')
+            $isInterestGated = $to->type === 'savings'
+                && stripos($to->name, 'etica') !== false;
+
+            $valueDate = $isInterestGated
                 ? KenyanBusinessDays::nextBusinessDay(Carbon::parse($date))->format('Y-m-d')
                 : null;
 
