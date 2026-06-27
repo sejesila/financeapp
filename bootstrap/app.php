@@ -29,7 +29,6 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Session\TokenMismatchException $e,
             \Illuminate\Http\Request $request
         ) {
-            // Regenerate a fresh token before redirecting to login
             $request->session()->regenerateToken();
 
             if ($request->routeIs('login') || $request->is('login')) {

@@ -22,9 +22,7 @@ class CheckInactivity
 
             if ($lastActivity && (time() - $lastActivity) > $inactivityLimit) {
                 Auth::logout();
-                $request->session()->invalidate();
-                $request->session()->start();          // ← starts a fresh session immediately
-                $request->session()->regenerateToken(); // ← fresh token in the new session
+                $request->session()->regenerateToken();
 
                 if ($request->expectsJson()) {
                     return response()->json(['message' => 'Session expired'], 419);
@@ -34,7 +32,10 @@ class CheckInactivity
                     ->with('message', 'You have been logged out due to inactivity.');
             }
 
-            session(['last_activity_time' => time()]);
+            // Don't count csrf-token or ping fetches as user activity
+            if (!$request->routeIs('csrf.refresh') && !$request->routeIs('session.ping')) {
+                session(['last_activity_time' => time()]);
+            }
         }
 
         return $next($request);

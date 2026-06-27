@@ -295,7 +295,10 @@ Route::get('/session-expired', function () {
 |--------------------------------------------------------------------------
 */
 Route::get('/csrf-token', function () {
-    session()->regenerateToken();
+    // Only regenerate if there's an active session — don't create one
+    if (session()->isStarted()) {
+        session()->regenerateToken();
+    }
     return response()->json(['token' => csrf_token()]);
 })->middleware('web')->name('csrf.refresh');
 /*
