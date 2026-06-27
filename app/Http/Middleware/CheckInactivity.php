@@ -17,13 +17,14 @@ class CheckInactivity
     public function handle(Request $request, Closure $next): Response
     {
         if (Auth::check()) {
-            $inactivityLimit = config('session.lifetime') * 60; // Convert to seconds
-            $lastActivity = session('last_activity_time');
+            $inactivityLimit = config('session.lifetime') * 60;
+            $lastActivity    = session('last_activity_time');
 
-            // Check if user has been inactive
             if ($lastActivity && (time() - $lastActivity) > $inactivityLimit) {
                 Auth::logout();
-                $request->session()->invalidate();
+
+                // Don't invalidate — just clear auth and regenerate the token
+                // so the login form the user sees next has a valid token
                 $request->session()->regenerateToken();
 
                 if ($request->expectsJson()) {
@@ -34,7 +35,6 @@ class CheckInactivity
                     ->with('message', 'You have been logged out due to inactivity.');
             }
 
-            // Update last activity time on every request
             session(['last_activity_time' => time()]);
         }
 

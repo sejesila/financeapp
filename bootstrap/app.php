@@ -28,6 +28,14 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Session\TokenMismatchException $e,
             \Illuminate\Http\Request $request
         ) {
+            // If the 419 happens on the login form submission itself,
+            // redirect back to login so a fresh token is issued
+            if ($request->routeIs('login') || $request->is('login')) {
+                return redirect()->route('login')
+                    ->withInput($request->except('password'))
+                    ->with('info', 'Your session expired. Please try logging in again.');
+            }
+
             return redirect()->route('login')
                 ->with('info', 'Your session expired. Please log in again.');
         });
