@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ClientFund;
+use App\Models\Transfer;
 use App\Models\User;
 use App\Models\Transaction;
 use App\Models\Account;
@@ -75,6 +76,7 @@ class ReportDataService
             : null;
         $report['period_type'] = 'annual';
         $report['year']        = $year;
+        $report['salary_savings_rate'] = $this->getSalarySavingsRate($user, $startDate, $endDate);
 
         return $report;
     }
@@ -108,6 +110,8 @@ class ReportDataService
         $report['budgets_under'] = $budgetPerf->where('percentage', '<=', 100)->count();
         $report['budgets_over']  = $budgetPerf->where('percentage', '>', 100)->count();
         $report['budgets_total'] = $budgetPerf->count();
+
+        $report['salary_savings_rate'] = $this->getSalarySavingsRate($user, $startDate, $endDate);
 
         return $report;
     }
@@ -499,5 +503,53 @@ class ReportDataService
         }
 
         return $insights;
+    }
+    public function getSalarySavingsRate(User $user, Carbon $startDate, Carbon $endDate): array
+    {
+        $salaryTransactions = Transaction::where('user_id', $user->id)
+            ->whereBetween(DB::raw('COALESCE(period_date, date)'), [
+                $startDate->toDateString(),
+                $endDate->toDateString(),
+            ])
+            ->whereHas('category', fn($q) => $q->where('name', 'like', '%salary%'))
+            ->with(['category', 'account'])
+            ->orderBy('date')
+            ->get();
+
+        if ($salaryTransactions->isEmpty()) {
+            return [];
+        }
+
+        $savingsAccountIds = Account::where('user_id', $user->id)
+            ->where('type', 'savings')
+            ->where('is_active', true)
+            ->pluck('id');
+
+        $results = [];
+
+        foreach ($salaryTransactions as $salary) {
+            $salaryDate = Carbon::parse($salary->date);
+            $windowEnd  = $salaryDate->copy()->addHours(48);
+
+            $transferredToSavings = Transfer::withoutGlobalScopes()   // ← key fix
+            ->where('user_id', $user->id)
+                ->whereIn('to_account_id', $savingsAccountIds)
+                ->whereBetween('date', [
+                    $salaryDate->toDateTimeString(),
+                    $windowEnd->toDateTimeString(),
+                ])
+                ->sum('amount');
+
+            $results[] = [
+                'salary_date'        => $salaryDate->format('M d, Y'),
+                'salary_amount'      => (float) $salary->amount,
+                'saved_amount'       => (float) $transferredToSavings,
+                'savings_percentage' => $salary->amount > 0
+                    ? round(($transferredToSavings / $salary->amount) * 100, 1)
+                    : 0,
+            ];
+        }
+
+        return $results;
     }
 }

@@ -380,6 +380,60 @@
         @endif
     </div>
 @endif
+{{-- Salary → Savings Rate --}}
+@php
+    $salarySavings = $data['salary_savings_rate'] ?? [];
+@endphp
+@if(!empty($salarySavings))
+    <div class="section">
+        <div class="section-title">Salary Saved to Savings (within 48 hours)</div>
+        <table>
+            <thead>
+            <tr>
+                <th style="width: 25%;">Salary Date</th>
+                <th style="text-align: right; width: 25%;">Salary Received</th>
+                <th style="text-align: right; width: 25%;">Moved to Savings</th>
+                <th style="text-align: right; width: 25%;">% Saved</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach($salarySavings as $entry)
+                <tr>
+                    <td>{{ $entry['salary_date'] }}</td>
+                    <td style="text-align: right;">{{ $currency }} {{ number_format($entry['salary_amount']) }}</td>
+                    <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($entry['saved_amount']) }}</td>
+                    <td style="text-align: right; font-weight: bold;
+                        color: {{ $entry['savings_percentage'] >= 20 ? '#059669' : ($entry['savings_percentage'] >= 10 ? '#D97706' : '#DC2626') }};">
+                        {{ $entry['savings_percentage'] }}%
+                    </td>
+                </tr>
+            @endforeach
+            @if(count($salarySavings) > 1)
+                @php $avgPct = round(collect($salarySavings)->avg('savings_percentage'), 1); @endphp
+                <tr class="total-row">
+                    <td colspan="3">Average Saved</td>
+                    <td style="text-align: right; color: {{ $avgPct >= 20 ? '#059669' : '#D97706' }};">{{ $avgPct }}%</td>
+                </tr>
+            @endif
+            </tbody>
+        </table>
+        @php $first = $salarySavings[0]; @endphp
+        <div class="insight-box">
+            <h4>&#128176; Salary Savings Discipline</h4>
+            @if($first['saved_amount'] > 0)
+                <p>You moved <strong>{{ $currency }} {{ number_format($first['saved_amount']) }}</strong>
+                    (<strong>{{ $first['savings_percentage'] }}%</strong> of your salary) to savings
+                    within 48 hours of receiving it. {{ $first['savings_percentage'] >= 20
+                       ? 'Excellent habit — paying yourself first is the foundation of wealth building.'
+                       : 'Consider increasing this to at least 20% of your salary for stronger long-term growth.' }}
+                </p>
+            @else
+                <p>No transfers to savings were recorded within 48 hours of your salary this month.
+                    Consider automating a savings transfer immediately after salary arrives.</p>
+            @endif
+        </div>
+    </div>
+@endif
 
 <!-- Key Insights -->
 @if(!empty($data['insights']))

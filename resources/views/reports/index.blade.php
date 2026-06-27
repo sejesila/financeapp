@@ -89,6 +89,48 @@
                 :color="$netCashFlow >= 0 ? 'blue' : 'orange'"
                 subtitle="{{ $netCashFlow >= 0 ? 'Surplus' : 'Deficit' }}" />
         </div>
+        {{-- Salary → Savings Rate --}}
+        @if(!empty($salarySavingsRate))
+            <div class="rounded-lg border bg-white p-4 md:p-6 shadow-sm">
+                <h3 class="text-base md:text-lg font-semibold mb-1">💰 Salary Saved to Savings</h3>
+                <p class="text-xs text-gray-500 mb-4">
+                    Transfers to savings accounts within 48 hours of receiving salary
+                </p>
+
+                <div class="space-y-3">
+                    @foreach($salarySavingsRate as $entry)
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between
+                            p-3 bg-gray-50 rounded gap-2">
+                            <div class="min-w-0">
+                                <p class="text-sm font-medium">{{ $entry['salary_date'] }}</p>
+                                <p class="text-xs text-gray-500">
+                                    Salary: KES {{ number_format($entry['salary_amount'], 0) }}
+                                </p>
+                            </div>
+                            <div class="sm:text-right">
+                                <p class="text-sm font-semibold
+                            {{ $entry['savings_percentage'] >= 20 ? 'text-green-600' : 'text-amber-600' }}">
+                                    {{ $entry['savings_percentage'] }}% saved
+                                </p>
+                                <p class="text-xs text-gray-500">
+                                    KES {{ number_format($entry['saved_amount'], 0) }} moved
+                                </p>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+
+                @php
+                    $avgSaved = collect($salarySavingsRate)->avg('savings_percentage');
+                @endphp
+                @if(count($salarySavingsRate) > 1)
+                    <div class="mt-4 pt-3 border-t text-sm text-gray-600">
+                        Average saved: <span class="font-semibold">{{ round($avgSaved, 1) }}%</span>
+                        across {{ count($salarySavingsRate) }} salary payment(s)
+                    </div>
+                @endif
+            </div>
+        @endif
 
         {{-- Charts --}}
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">

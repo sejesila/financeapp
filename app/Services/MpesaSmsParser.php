@@ -126,7 +126,7 @@ class MpesaSmsParser
 
         // ATM withdrawal
         if (preg_match(
-            '/Dear\s+\w+,\s+you\s+withdrew\s+KES\s*([\d,]+\.?\d*)\s+on\s+([\d-]+)\s+([\d:]+)\s+at\s+(.+?)\s+using/si',
+            '/Dear\s+\w+,\s+you\s+withdrew\s*KES\s*([\d,]+\.?\d*)\s+on\s+([\d-]+)\s+([\d:]+)\s+at\s+(.+?)\s+using/si',
             $sms, $m
         )) {
             return [

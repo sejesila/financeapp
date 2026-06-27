@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Account;
 use App\Models\MobileMoneyTypeUsage;
 use App\Models\Transaction;
+use App\Services\ReportDataService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -108,6 +109,10 @@ class ReportsController extends Controller
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
+        $reportDataService = app(ReportDataService::class);
+        $salarySavingsRate = $reportDataService->getSalarySavingsRate(
+            auth()->user(), $startDate, $endDate
+        );
 
         return view('reports.index', compact(
             'filter',
@@ -122,7 +127,8 @@ class ReportsController extends Controller
             'previousExpenses',
             'expenseChange',
             'transactionTypeStats',
-            'accounts'
+            'accounts',
+            'salarySavingsRate'
         ));
     }
 

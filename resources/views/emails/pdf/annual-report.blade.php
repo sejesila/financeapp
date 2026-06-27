@@ -275,6 +275,60 @@
         </p>
     </div>
 @endif
+{{-- Salary → Savings Rate --}}
+@php
+    $salarySavings = $data['salary_savings_rate'] ?? [];
+@endphp
+@if(!empty($salarySavings))
+    <div class="section">
+        <div class="section-title">Salary Saved to Savings (within 48 hours of receipt)</div>
+        <table>
+            <thead>
+            <tr>
+                <th style="width: 25%;">Salary Date</th>
+                <th style="text-align: right; width: 25%;">Salary Received</th>
+                <th style="text-align: right; width: 25%;">Moved to Savings</th>
+                <th style="text-align: right; width: 25%;">% Saved</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach($salarySavings as $entry)
+                <tr>
+                    <td>{{ $entry['salary_date'] }}</td>
+                    <td style="text-align: right;">{{ $currency }} {{ number_format($entry['salary_amount']) }}</td>
+                    <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($entry['saved_amount']) }}</td>
+                    <td style="text-align: right; font-weight: bold;
+                        color: {{ $entry['savings_percentage'] >= 20 ? '#059669' : ($entry['savings_percentage'] >= 10 ? '#D97706' : '#DC2626') }};">
+                        {{ $entry['savings_percentage'] }}%
+                    </td>
+                </tr>
+            @endforeach
+            @php
+                $avgPct      = round(collect($salarySavings)->avg('savings_percentage'), 1);
+                $totalSalary = collect($salarySavings)->sum('salary_amount');
+                $totalSaved  = collect($salarySavings)->sum('saved_amount');
+                $overallPct  = $totalSalary > 0 ? round(($totalSaved / $totalSalary) * 100, 1) : 0;
+            @endphp
+            <tr class="total-row">
+                <td>Annual Total</td>
+                <td style="text-align: right;">{{ $currency }} {{ number_format($totalSalary) }}</td>
+                <td style="text-align: right; color: #059669;">{{ $currency }} {{ number_format($totalSaved) }}</td>
+                <td style="text-align: right; color: {{ $overallPct >= 20 ? '#059669' : '#D97706' }};">{{ $overallPct }}%</td>
+            </tr>
+            </tbody>
+        </table>
+        <div class="insight-box">
+            <h4>&#128176; Annual Salary Savings Discipline</h4>
+            <p>Across {{ count($salarySavings) }} salary payment{{ count($salarySavings) > 1 ? 's' : '' }} in {{ $year }},
+                you moved a total of <strong>{{ $currency }} {{ number_format($totalSaved) }}</strong>
+                to savings within 48 hours of receipt — an average of <strong>{{ $avgPct }}%</strong> per month.
+                {{ $avgPct >= 20
+                    ? 'Outstanding consistency. Paying yourself first this reliably is a hallmark of strong financial discipline.'
+                    : 'Aim to consistently move 20%+ of each salary to savings immediately upon receipt.' }}
+            </p>
+        </div>
+    </div>
+@endif
 
 <!-- Month-by-Month Breakdown -->
 {{-- monthly_breakdown is a plain array built in generateAnnualReport() via a loop over 12 months --}}
