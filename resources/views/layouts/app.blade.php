@@ -340,36 +340,41 @@
             link.addEventListener('click', () => mobileMenu.classList.add('hidden'));
         });
     }
-
     // Session Timeout Management
     document.addEventListener('DOMContentLoaded', function () {
-        const sessionLifetime = 120 * 60 * 1000;
-        const warningTime     = 2 * 60 * 1000;
-        const pingInterval    = 10 * 60 * 1000;
-        let timeoutWarning, sessionTimeout, countdownInterval, pingTimer;
-        let lastActivity = Date.now();
+        const SESSION_MS  = {{ (int) config('session.lifetime') * 60 * 1000 }};
+        const WARNING_MS  = 30 * 1000; // show warning 30s before expiry
+        const PING_MS     = Math.floor(SESSION_MS * 0.6); // ping at 60% of lifetime
+
+        let lastActivity  = Date.now();
+        let warningTimer, logoutTimer, countdownInterval, pingTimer;
 
         function getCsrfToken() {
             return document.querySelector('meta[name="csrf-token"]')?.content || '';
         }
 
-        function resetTimer() {
+        function resetTimers() {
             lastActivity = Date.now();
-            clearTimeout(timeoutWarning);
-            clearTimeout(sessionTimeout);
+            clearTimeout(warningTimer);
+            clearTimeout(logoutTimer);
             clearInterval(countdownInterval);
-            timeoutWarning = setTimeout(showWarning, sessionLifetime - warningTime);
-            sessionTimeout = setTimeout(logout, sessionLifetime);
+            hideWarning();
+
+            warningTimer = setTimeout(showWarning, SESSION_MS - WARNING_MS);
+            logoutTimer  = setTimeout(forceLogout, SESSION_MS);
         }
 
         function showWarning() {
             document.getElementById('timeoutWarning')?.classList.remove('hidden');
-            let secondsLeft = 120;
+            let secondsLeft = Math.floor(WARNING_MS / 1000);
             updateCountdown(secondsLeft);
-            countdownInterval = setInterval(() => {
+            countdownInterval = setInterval(function () {
                 secondsLeft--;
                 updateCountdown(secondsLeft);
-                if (secondsLeft <= 0) { clearInterval(countdownInterval); logout(); }
+                if (secondsLeft <= 0) {
+                    clearInterval(countdownInterval);
+                    forceLogout();
+                }
             }, 1000);
         }
 
@@ -378,7 +383,7 @@
             if (el) {
                 const m = Math.floor(seconds / 60);
                 const s = seconds % 60;
-                el.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+                el.textContent = m + ':' + String(s).padStart(2, '0');
             }
         }
 
@@ -387,58 +392,73 @@
             document.getElementById('timeoutWarning')?.classList.add('hidden');
         }
 
-        function logout() {
-            clearTimeout(timeoutWarning);
-            clearTimeout(sessionTimeout);
+        function forceLogout() {
+            clearTimeout(warningTimer);
+            clearTimeout(logoutTimer);
             clearInterval(countdownInterval);
             clearInterval(pingTimer);
-            document.getElementById('logoutForm')?.submit();
+            // Redirect to login directly — don't submit logout form
+            // because the session may already be dead
+            window.location.href = '{{ route("login") }}';
         }
 
-        function pingServer(userInitiated = false) {
-            const csrfToken = getCsrfToken();
-            if (!csrfToken) { if (userInitiated) resetTimer(); return; }
+        function pingServer() {
+            const token = getCsrfToken();
+            if (!token) return;
             fetch('/ping', {
                 method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': csrfToken,
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Accept': 'application/json'
-                },
                 credentials: 'same-origin',
+                headers: {
+                    'X-CSRF-TOKEN': token,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
                 body: JSON.stringify({})
-            }).then(response => {
-                if (response.status === 401 || response.status === 419) logout();
-                else if (response.ok && userInitiated) resetTimer();
-            }).catch(err => console.error('Session ping failed:', err));
+            }).then(function (r) {
+                if (r.status === 401 || r.status === 419) {
+                    forceLogout();
+                }
+            }).catch(function () {
+                // Network error — don't force logout, let the timer handle it
+            });
         }
 
-        document.getElementById('stayLoggedIn')?.addEventListener('click', () => { hideWarning(); pingServer(true); });
-        document.getElementById('logoutNow')?.addEventListener('click', logout);
+        // Stay logged in button
+        document.getElementById('stayLoggedIn')?.addEventListener('click', function () {
+            hideWarning();
+            pingServer();
+            resetTimers();
+        });
 
-        ['mousedown', 'keypress', 'scroll', 'touchstart', 'click'].forEach(event => {
-            document.addEventListener(event, () => {
-                if (Date.now() - lastActivity > 10000) resetTimer();
+        // Logout now button
+        document.getElementById('logoutNow')?.addEventListener('click', function () {
+            document.getElementById('logoutForm')?.submit();
+        });
+
+        // Reset timers on any user activity
+        ['mousedown', 'keypress', 'scroll', 'touchstart', 'click'].forEach(function (evt) {
+            document.addEventListener(evt, function () {
+                if (Date.now() - lastActivity > 5000) {
+                    resetTimers();
+                }
             }, { passive: true });
         });
 
-        pingTimer = setInterval(() => pingServer(false), pingInterval);
-        resetTimer();
+        // Ping periodically while user is active
+        pingTimer = setInterval(pingServer, PING_MS);
 
-        const originalFetch = window.fetch;
-        window.fetch = function(...args) {
-            return originalFetch.apply(this, args).then(response => {
-                if (response.status === 419) {
-                    if (confirm('Your session has expired. Please log in again.')) {
-                        window.location.href = '{{ route("login") }}';
-                    } else {
-                        logout();
-                    }
-                }
-                return response;
-            }).catch(error => Promise.reject(error));
+        // Intercept fetch 419s globally
+        const _fetch = window.fetch;
+        window.fetch = function () {
+            return _fetch.apply(this, arguments).then(function (r) {
+                if (r.status === 419) forceLogout();
+                return r;
+            });
         };
+
+        // Start
+        resetTimers();
     });
 </script>
 
