@@ -291,6 +291,15 @@ Route::get('/session-expired', function () {
 })->name('session.expired');
 /*
 |--------------------------------------------------------------------------
+| CSRF Token Refresh (no auth required — used by login page keep-alive)
+|--------------------------------------------------------------------------
+*/
+Route::get('/csrf-token', function () {
+    session()->regenerateToken();
+    return response()->json(['token' => csrf_token()]);
+})->middleware('web')->name('csrf.refresh');
+/*
+|--------------------------------------------------------------------------
 | Mpesa SMS Webhook (from Android/Tasker — no session auth)
 |--------------------------------------------------------------------------
 */

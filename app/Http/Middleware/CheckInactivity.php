@@ -22,10 +22,9 @@ class CheckInactivity
 
             if ($lastActivity && (time() - $lastActivity) > $inactivityLimit) {
                 Auth::logout();
-
-                // Don't invalidate — just clear auth and regenerate the token
-                // so the login form the user sees next has a valid token
-                $request->session()->regenerateToken();
+                $request->session()->invalidate();
+                $request->session()->start();          // ← starts a fresh session immediately
+                $request->session()->regenerateToken(); // ← fresh token in the new session
 
                 if ($request->expectsJson()) {
                     return response()->json(['message' => 'Session expired'], 419);

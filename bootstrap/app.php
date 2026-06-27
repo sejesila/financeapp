@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->validateCsrfTokens(except: [
             'webhook/mpesa-sms',
+            'csrf-token',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
@@ -28,8 +29,9 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Session\TokenMismatchException $e,
             \Illuminate\Http\Request $request
         ) {
-            // If the 419 happens on the login form submission itself,
-            // redirect back to login so a fresh token is issued
+            // Regenerate a fresh token before redirecting to login
+            $request->session()->regenerateToken();
+
             if ($request->routeIs('login') || $request->is('login')) {
                 return redirect()->route('login')
                     ->withInput($request->except('password'))

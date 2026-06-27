@@ -175,12 +175,42 @@
         .status-message {
             background: rgba(16, 185, 129, 0.15);
             border: 1px solid rgba(16, 185, 129, 0.3);
-            color: #a7f3d0;
+            color: #065f46;
             padding: 1rem;
             border-radius: 12px;
             margin-bottom: 1.5rem;
             font-size: 0.9rem;
             animation: slideInDown 0.6s ease;
+        }
+
+        /* Session / info banner */
+        .info-message {
+            background: rgba(37, 99, 235, 0.08);
+            border: 1px solid rgba(37, 99, 235, 0.2);
+            color: #1e40af;
+            padding: 1rem;
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+            animation: slideInDown 0.6s ease;
+        }
+
+        /* Token-refresh notice — subtle, sits just above the form */
+        .token-notice {
+            display: none;
+            background: rgba(245, 158, 11, 0.08);
+            border: 1px solid rgba(245, 158, 11, 0.25);
+            color: #92400e;
+            padding: 0.65rem 1rem;
+            border-radius: 10px;
+            margin-bottom: 1.25rem;
+            font-size: 0.82rem;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .token-notice.visible {
+            display: flex;
         }
 
         /* Form Styling */
@@ -231,7 +261,7 @@
 
         /* Error Messages */
         .error-message {
-            color: #fca5a5;
+            color: #dc2626;
             font-size: 0.8rem;
             margin-top: 0.4rem;
             display: flex;
@@ -451,6 +481,14 @@
 
     <!-- Login Card -->
     <div class="card">
+
+        <!-- Session expired / info message -->
+        @if (session('info'))
+            <div class="info-message">
+                {{ session('info') }}
+            </div>
+        @endif
+
         <!-- Status Message -->
         @if (session('status'))
             <div class="status-message">
@@ -458,7 +496,12 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ route('login') }}">
+        {{-- Shown by JS when a silent token refresh happens --}}
+        <div class="token-notice" id="tokenNotice">
+            🔒 Session refreshed — you're good to sign in.
+        </div>
+
+        <form method="POST" action="{{ route('login') }}" id="loginForm">
             @csrf
 
             <!-- Email Address -->
@@ -533,5 +576,66 @@
         </div>
     </div>
 </div>
+
+<script>
+    (function () {
+        // How often to check whether the session is about to expire (ms)
+        var CHECK_INTERVAL_MS = 60 * 1000; // every 60 seconds
+
+        // Refresh the token when this much time has passed since page load (ms).
+        // Set to 80 % of SESSION_LIFETIME so we refresh well before expiry.
+        var REFRESH_AFTER_MS  = {{ (int) config('session.lifetime') * 60 * 1000 * 0.8 }};
+
+        var loadedAt  = Date.now();
+        var refreshed = false;
+
+        function updateToken(token) {
+            // Update the hidden _token field inside the form
+            var field = document.querySelector('#loginForm input[name="_token"]');
+            if (field) field.value = token;
+
+            // Update the meta tag so any JS that reads it is also current
+            var meta = document.querySelector('meta[name="csrf-token"]');
+            if (meta) meta.setAttribute('content', token);
+        }
+
+        function silentRefresh() {
+            fetch('/csrf-token', {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' }
+            })
+                .then(function (r) {
+                    if (!r.ok) throw new Error('Network response not ok');
+                    return r.json();
+                })
+                .then(function (data) {
+                    if (data.token) {
+                        updateToken(data.token);
+                        refreshed  = true;
+                        loadedAt   = Date.now(); // reset the clock
+
+                        // Show the subtle notice so the user knows the page is still live
+                        var notice = document.getElementById('tokenNotice');
+                        if (notice) notice.classList.add('visible');
+                    }
+                })
+                .catch(function () {
+                    // Fetch failed (server offline, network gone, etc.) — do a hard reload
+                    // so the user gets a fresh page rather than a stale token on submit.
+                    window.location.reload();
+                });
+        }
+
+        function tick() {
+            var elapsed = Date.now() - loadedAt;
+            if (elapsed >= REFRESH_AFTER_MS) {
+                silentRefresh();
+            }
+        }
+
+        setInterval(tick, CHECK_INTERVAL_MS);
+    })();
+</script>
 </body>
 </html>
