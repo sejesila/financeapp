@@ -60,17 +60,17 @@ Route::middleware('auth')->group(function () {
     // Session Keep-Alive (prevents timeout during active use)
         // Session Keep-Alive (prevents timeout during active use)
         // This is called periodically by JavaScript to keep the session alive
-        Route::post('/ping', function () {
-            if (auth()->check()) {
-                session(['last_activity_time' => time()]);
-                return response()->json([
-                    'status' => 'ok',
-                    'user' => auth()->user()->only(['id', 'name', 'email']),
-                    'message' => 'Session refreshed'
-                ]);
-            }
-            return response()->json(['status' => 'unauthorized', 'message' => 'Not authenticated'], 401);
-        })->name('session.ping');
+//        Route::post('/ping', function () {
+//            if (auth()->check()) {
+//                session(['last_activity_time' => time()]);
+//                return response()->json([
+//                    'status' => 'ok',
+//                    'user' => auth()->user()->only(['id', 'name', 'email']),
+//                    'message' => 'Session refreshed'
+//                ]);
+//            }
+//            return response()->json(['status' => 'unauthorized', 'message' => 'Not authenticated'], 401);
+//        })->name('session.ping');
 
 
         // ======================================================================

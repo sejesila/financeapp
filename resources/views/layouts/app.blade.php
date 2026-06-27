@@ -340,17 +340,33 @@
             link.addEventListener('click', () => mobileMenu.classList.add('hidden'));
         });
     }
-    // Session Timeout Management
     document.addEventListener('DOMContentLoaded', function () {
-        const SESSION_MS  = {{ (int) config('session.lifetime') * 60 * 1000 }};
-        const WARNING_MS  = 30 * 1000; // show warning 30s before expiry
-        const PING_MS     = Math.floor(SESSION_MS * 0.6); // ping at 60% of lifetime
+        const SESSION_MS = {{ (int) config('session.lifetime') * 60 * 1000 }};
+        const WARNING_MS = 30 * 1000;
 
-        let lastActivity  = Date.now();
-        let warningTimer, logoutTimer, countdownInterval, pingTimer;
+        let lastActivity = Date.now();
+        let warningTimer, logoutTimer, countdownInterval;
 
         function getCsrfToken() {
             return document.querySelector('meta[name="csrf-token"]')?.content || '';
+        }
+
+        function pingServer() {
+            const token = getCsrfToken();
+            if (!token) return;
+            fetch('/ping', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'X-CSRF-TOKEN': token,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({})
+            }).then(function (r) {
+                if (r.status === 401 || r.status === 419) forceLogout();
+            }).catch(function () {});
         }
 
         function resetTimers() {
@@ -359,6 +375,10 @@
             clearTimeout(logoutTimer);
             clearInterval(countdownInterval);
             hideWarning();
+
+            // Only ping on real user activity — keeps Laravel session alive
+            // only while the user is actually doing something
+            pingServer();
 
             warningTimer = setTimeout(showWarning, SESSION_MS - WARNING_MS);
             logoutTimer  = setTimeout(forceLogout, SESSION_MS);
@@ -396,47 +416,18 @@
             clearTimeout(warningTimer);
             clearTimeout(logoutTimer);
             clearInterval(countdownInterval);
-            clearInterval(pingTimer);
-            // Redirect to login directly — don't submit logout form
-            // because the session may already be dead
             window.location.href = '{{ route("login") }}';
         }
 
-        function pingServer() {
-            const token = getCsrfToken();
-            if (!token) return;
-            fetch('/ping', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    'X-CSRF-TOKEN': token,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-                body: JSON.stringify({})
-            }).then(function (r) {
-                if (r.status === 401 || r.status === 419) {
-                    forceLogout();
-                }
-            }).catch(function () {
-                // Network error — don't force logout, let the timer handle it
-            });
-        }
-
-        // Stay logged in button
         document.getElementById('stayLoggedIn')?.addEventListener('click', function () {
             hideWarning();
-            pingServer();
             resetTimers();
         });
 
-        // Logout now button
         document.getElementById('logoutNow')?.addEventListener('click', function () {
             document.getElementById('logoutForm')?.submit();
         });
 
-        // Reset timers on any user activity
         ['mousedown', 'keypress', 'scroll', 'touchstart', 'click'].forEach(function (evt) {
             document.addEventListener(evt, function () {
                 if (Date.now() - lastActivity > 5000) {
@@ -445,10 +436,6 @@
             }, { passive: true });
         });
 
-        // Ping periodically while user is active
-        pingTimer = setInterval(pingServer, PING_MS);
-
-        // Intercept fetch 419s globally
         const _fetch = window.fetch;
         window.fetch = function () {
             return _fetch.apply(this, arguments).then(function (r) {
@@ -457,7 +444,6 @@
             });
         };
 
-        // Start
         resetTimers();
     });
 </script>
