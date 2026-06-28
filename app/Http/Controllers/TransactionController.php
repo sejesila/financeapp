@@ -310,6 +310,8 @@ class TransactionController extends Controller
 
     private function getCategoriesForForm(): array
     {
+        $allowedChildren = ['Loan Repayment']; // exceptions that bypass parent exclusion
+
         $allCategories = Category::where('user_id', Auth::id())
             ->whereNotNull('parent_id')
             ->where('is_active', true)
@@ -318,7 +320,10 @@ class TransactionController extends Controller
             ->orderBy('usage_count', 'desc')
             ->orderBy('name')
             ->get()
-            ->filter(fn($c) => $c->parent && !in_array($c->parent->name, self::EXCLUDED_CATEGORIES));
+            ->filter(fn($c) => $c->parent && (
+                    !in_array($c->parent->name, self::EXCLUDED_CATEGORIES)
+                    || in_array($c->name, $allowedChildren)
+                ));
 
         $parentCategories = Category::where('user_id', Auth::id())
             ->whereNull('parent_id')
@@ -327,7 +332,17 @@ class TransactionController extends Controller
             ->get()
             ->keyBy('id');
 
-        $categoryGroups = $parentCategories->map(fn($parent) => [
+        // For allowed children whose parent is excluded, inject a synthetic parent group
+        $injectedParents = collect();
+        foreach ($allCategories as $child) {
+            if ($child->parent && in_array($child->parent->name, self::EXCLUDED_CATEGORIES)) {
+                $injectedParents->put($child->parent_id, $child->parent);
+            }
+        }
+
+        $allParents = $parentCategories->union($injectedParents);
+
+        $categoryGroups = $allParents->map(fn($parent) => [
             'id'       => $parent->id,
             'name'     => $parent->name,
             'icon'     => $parent->icon,
