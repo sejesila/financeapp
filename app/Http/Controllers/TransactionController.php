@@ -24,7 +24,7 @@ class TransactionController extends Controller
     use AuthorizesRequests;
 
     private const EXCLUDED_CATEGORIES = [
-        'Income', 'Loans', 'Loan Receipt', 'Loan Repayment', 'Excise Duty',
+        'Income', 'Loans', 'Loan Receipt', 'Excise Duty',
         'Loan Fees Refund', 'Facility Fee Refund', 'Transaction Fees',
         'Balance Adjustment', 'Rolling Funds',
     ];
