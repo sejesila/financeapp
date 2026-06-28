@@ -20,14 +20,15 @@ class CheckInactivity
             $inactivityLimit = config('session.lifetime') * 60;
             $lastActivity    = session('last_activity_time');
 
+            // CheckInactivity.php — remove the regenerateToken() call here
             if ($lastActivity && (time() - $lastActivity) > $inactivityLimit) {
                 Auth::logout();
-                $request->session()->regenerateToken();
+                $request->session()->invalidate(); // this already clears everything
+                // ❌ Remove: $request->session()->regenerateToken();
 
                 if ($request->expectsJson()) {
                     return response()->json(['message' => 'Session expired'], 419);
                 }
-
                 return redirect()->route('login')
                     ->with('message', 'You have been logged out due to inactivity.');
             }
