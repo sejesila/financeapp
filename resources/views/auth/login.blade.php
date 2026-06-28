@@ -195,23 +195,9 @@
             animation: slideInDown 0.6s ease;
         }
 
-        /* Token-refresh notice — subtle, sits just above the form */
-        .token-notice {
-            display: none;
-            background: rgba(245, 158, 11, 0.08);
-            border: 1px solid rgba(245, 158, 11, 0.25);
-            color: #92400e;
-            padding: 0.65rem 1rem;
-            border-radius: 10px;
-            margin-bottom: 1.25rem;
-            font-size: 0.82rem;
-            align-items: center;
-            gap: 0.5rem;
-        }
 
-        .token-notice.visible {
-            display: flex;
-        }
+
+
 
         /* Form Styling */
         .form-group {
@@ -496,11 +482,6 @@
             </div>
         @endif
 
-        {{-- Shown by JS when a silent token refresh happens --}}
-        <div class="token-notice" id="tokenNotice">
-            🔒 Session refreshed — you're good to sign in.
-        </div>
-
         <form method="POST" action="{{ route('login') }}" id="loginForm">
             @csrf
 
@@ -615,9 +596,7 @@
                         refreshed  = true;
                         loadedAt   = Date.now(); // reset the clock
 
-                        // Show the subtle notice so the user knows the page is still live
-                        var notice = document.getElementById('tokenNotice');
-                        if (notice) notice.classList.add('visible');
+
                     }
                 })
                 .catch(function () {
