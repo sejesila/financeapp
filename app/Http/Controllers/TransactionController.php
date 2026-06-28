@@ -310,13 +310,14 @@ class TransactionController extends Controller
 
     private function getCategoriesForForm(): array
     {
+
         $allowedChildren = ['Loan Repayment']; // exceptions that bypass parent exclusion
 
         $allCategories = Category::where('user_id', Auth::id())
             ->whereNotNull('parent_id')
             ->where('is_active', true)
             ->whereNotIn('name', self::EXCLUDED_CATEGORIES)
-            ->with(['parent' => fn($q) => $q->whereNotIn('name', self::EXCLUDED_CATEGORIES)])
+            ->with('parent')  // ← no constraint here
             ->orderBy('usage_count', 'desc')
             ->orderBy('name')
             ->get()
