@@ -127,6 +127,8 @@ Route::middleware('auth')->group(function () {
     // ======================================================================
 
     Route::get('/budgets/{year?}', [BudgetController::class, 'index'])->name('budgets.index');
+    Route::get('/budgets/{year?}', [BudgetController::class, 'index'])->name('budgets.index');
+    Route::post('/budgets/save-cell', [BudgetController::class, 'saveCell'])->name('budgets.save-cell');
 
     // ======================================================================
     // Loans Management

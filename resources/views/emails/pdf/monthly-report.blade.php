@@ -237,7 +237,7 @@
                     <div class="budget-amounts">
                         Spent: {{ $currency }} {{ number_format($budget['spent']) }}
                         of {{ $currency }} {{ number_format($budget['budgeted']) }}
-                        ({{ $budget['is_new'] ? 'new category' : $budget['months_used'] . '-mo avg' }})
+                        ({{ $budget['has_budget'] ? 'set budget' : ($budget['is_new'] ? 'new category' : $budget['months_used'] . '-mo avg') }})
                         &bull; {{ $budget['remaining'] >= 0
         ? 'Remaining: ' . $currency . ' ' . number_format($budget['remaining'])
         : 'Over by: ' . $currency . ' ' . number_format(abs($budget['remaining'])) }}

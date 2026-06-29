@@ -37,7 +37,7 @@ class BudgetController extends Controller
             ->orderBy('name')
             ->get();
 
-        // Load budgets for the year (auto-generated from transactions)
+        // Load budgets for the year
         $budgets = Budget::where('user_id', Auth::id())
             ->where('year', $year)
             ->get()
@@ -45,21 +45,17 @@ class BudgetController extends Controller
                 return $b->category_id . '-' . $b->month;
             });
 
-        // ✅ FIXED: Compute actual totals excluding client fund transactions
-        // Key insight: Client fund expenses are pass-through (not YOUR expenses)
-        // But client fund profits (income) should be counted (that's YOUR money)
+        // Compute actual totals excluding client fund transactions
         $actualsQuery = Transaction::query()
             ->selectRaw('category_id, MONTH(COALESCE(period_date, date)) as month, SUM(amount) as total')
             ->where('user_id', Auth::id())
             ->whereYear(DB::raw('COALESCE(period_date, date)'), $year)
             ->where(function($q) {
-                // Include regular transactions (not related to client funds)
                 $q->where(function($q2) {
                     $q2->where('payment_method', '!=', 'Client Fund')
                         ->where('payment_method', '!=', 'Client Commission')
                         ->orWhereNull('payment_method');
                 })
-                    // OR include client fund profit income (payment_method = 'Client Commission' AND type = 'income')
                     ->orWhereExists(function($query) {
                         $query->select(DB::raw(1))
                             ->from('categories')
@@ -74,7 +70,7 @@ class BudgetController extends Controller
                         'Loan Disbursement',
                         'Loan Receipt',
                         'Balance Adjustment',
-                        'Client Funds'  // ✅ Exclude liability category
+                        'Client Funds',
                     ]);
             })
             ->groupBy('category_id', DB::raw('MONTH(COALESCE(period_date, date))'))
@@ -86,7 +82,7 @@ class BudgetController extends Controller
             $actuals[$row->category_id][$row->month] = (float)$row->total;
         }
 
-        // Calculate yearly totals for income categories and filter out those with no transactions
+        // Calculate yearly totals for income categories
         $incomeCategories = $incomeCategories->map(function ($category) use ($actuals, $budgets) {
             $yearlyTotal = 0;
             $yearlyBudget = 0;
@@ -102,12 +98,10 @@ class BudgetController extends Controller
                 : 0;
             return $category;
         })
-            ->filter(function ($category) {
-                return $category->yearly_total > 0; // Only show categories with transactions
-            })
+            ->filter(fn($c) => $c->yearly_total > 0)
             ->sortByDesc('yearly_total');
 
-        // Calculate yearly totals for expense categories and filter out those with no transactions
+        // Calculate yearly totals for expense categories
         $expenseCategories = $expenseCategories->map(function ($category) use ($actuals, $budgets) {
             $yearlyTotal = 0;
             $yearlyBudget = 0;
@@ -123,15 +117,13 @@ class BudgetController extends Controller
                 : 0;
             return $category;
         })
-            ->filter(function ($category) {
-                return $category->yearly_total > 0; // Only show categories with transactions
-            })
+            ->filter(fn($c) => $c->yearly_total > 0)
             ->sortByDesc('yearly_total');
 
         // Get loan statistics for the year
         $loanStats = $this->getLoanStats($year);
 
-        // Get savings withdrawals by month for context
+        // Get savings withdrawals by month
         $savingsWithdrawals = DB::table('transfers')
             ->join('accounts as from_acc', 'transfers.from_account_id', '=', 'from_acc.id')
             ->join('accounts as to_acc', 'transfers.to_account_id', '=', 'to_acc.id')
@@ -166,30 +158,66 @@ class BudgetController extends Controller
     }
 
     /**
-     * Get loan statistics for display in budget
+     * Save (create or update) a single budget cell value.
+     * Called via AJAX from the inline budget input.
+     *
+     * POST /budgets/save-cell
+     * Body: { category_id, year, month, amount }
+     */
+    public function saveCell(Request $request)
+    {
+        $validated = $request->validate([
+            'category_id' => 'required|integer|exists:categories,id',
+            'year'        => 'required|integer|min:2000|max:2100',
+            'month'       => 'required|integer|min:1|max:12',
+            'amount'      => 'required|numeric|min:0',
+        ]);
+
+        // Ensure the category belongs to the authenticated user
+        $category = Category::where('id', $validated['category_id'])
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
+
+        $budget = Budget::updateOrCreate(
+            [
+                'user_id'     => Auth::id(),
+                'category_id' => $validated['category_id'],
+                'year'        => $validated['year'],
+                'month'       => $validated['month'],
+            ],
+            [
+                'amount' => $validated['amount'],
+            ]
+        );
+
+        return response()->json([
+            'success' => true,
+            'budget'  => $budget,
+        ]);
+    }
+
+    /**
+     * Get loan statistics for display in budget.
      */
     private function getLoanStats($year)
     {
-        // Loans disbursed this year (principal amount)
         $loansDisbursed = Loan::where('user_id', Auth::id())
             ->whereYear('disbursed_date', $year)
             ->sum('principal_amount');
 
-        // Loan repayments made this year
         $loanPayments = DB::table('loan_payments')
             ->join('loans', 'loan_payments.loan_id', '=', 'loans.id')
             ->where('loans.user_id', Auth::id())
             ->whereYear('loan_payments.payment_date', $year)
             ->sum('loan_payments.amount');
 
-        // Active loan balance
         $activeLoanBalance = Loan::where('user_id', Auth::id())
             ->where('status', 'active')
             ->sum('balance');
 
         return [
-            'disbursed' => $loansDisbursed,
-            'payments' => $loanPayments,
+            'disbursed'      => $loansDisbursed,
+            'payments'       => $loanPayments,
             'active_balance' => $activeLoanBalance,
         ];
     }

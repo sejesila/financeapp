@@ -74,6 +74,27 @@
         .trend-value   { font-size: 16px; font-weight: bold; margin-top: 4px; }
         .trend-subtext { font-size: 9px; color: #6B7280; margin-top: 2px; }
 
+        /* Budget performance styles */
+        .budget-item { background: #FAFAFA; padding: 12px; margin-bottom: 10px; border-left: 4px solid; border-radius: 4px; page-break-inside: avoid; }
+        .budget-item.good    { border-color: #10B981; }
+        .budget-item.warning { border-color: #F59E0B; }
+        .budget-item.danger  { border-color: #EF4444; }
+        .budget-header { display: flex; justify-content: space-between; margin-bottom: 6px; }
+        .budget-name { font-weight: 700; font-size: 11px; color: #1F2937; }
+        .budget-percent { font-weight: bold; font-size: 11px; }
+        .budget-bar { height: 6px; background: #E5E7EB; border-radius: 3px; overflow: hidden; margin: 6px 0; }
+        .budget-fill { height: 100%; border-radius: 3px; }
+        .budget-fill.good    { background: #10B981; }
+        .budget-fill.warning { background: #F59E0B; }
+        .budget-fill.danger  { background: #EF4444; }
+        .budget-amounts { font-size: 9px; color: #6B7280; }
+        .budget-grid { display: flex; flex-wrap: wrap; gap: 10px; page-break-inside: avoid; }
+        .budget-grid .budget-item { flex: 1 1 calc(50% - 5px); min-width: 0; margin-bottom: 0; page-break-inside: avoid; }
+
+        /* Month drill-down section */
+        .month-drill { margin-top: 16px; page-break-inside: avoid; }
+        .month-drill-title { font-size: 11px; font-weight: bold; color: #1F2937; margin-bottom: 8px; padding: 6px 10px; background: #F3F4F6; border-left: 3px solid #6366F1; border-radius: 3px; }
+
         .footer { margin-top: 30px; padding-top: 15px; border-top: 2px solid #E5E7EB; text-align: center; font-size: 9px; color: #6B7280; page-break-before: avoid; }
         .footer .confidential { color: #DC2626; font-weight: bold; margin-bottom: 8px; }
     </style>
@@ -87,30 +108,38 @@
     |--------------------------------------------------------------------------
     | Data comes from ReportDataService::generateAnnualReport()
     |
-    | $data['year']                    — int  (prior full year)
-    | $data['start_date']              — pre-formatted string e.g. "Jan 01, 2024"
-    | $data['end_date']                — pre-formatted string e.g. "Dec 31, 2024"
-    | $data['income']                  — float
-    | $data['expenses']                — float
-    | $data['net_flow']                — float
-    | $data['savings_rate']            — float  percentage
-    | $data['net_worth']               — float  (total_balance - total_loans - total_client_funds)
-    | $data['total_loans']             — float  (active loans balance)
-    | $data['total_balance']           — float  (sum of active account balances)
-    | $data['transaction_count']       — int
-    | $data['profitable_months']       — int    (months with net_flow > 0)
-    | $data['prior_period_income']     — float  (prior year income)
-    | $data['income_trend']            — float|null  percentage change vs prior year
-    | $data['monthly_breakdown']       — array[] {month, month_short, income, expenses, net_flow, savings_rate, transaction_count}
-    | $data['best_month']              — array|null  {month, net_flow, ...}  (highest net_flow month)
-    | $data['worst_month']             — array|null  {month, net_flow, ...}  (lowest net_flow month)
-    | $data['loans_paid_in_period']    — array  {count, total, items[]}   (repayment transactions during year)
-    | $data['loans_repaid_in_period']  — array  {count, total, principal_total, items[]}  (fully cleared loans)
-    | $data['accounts']                — Collection<Account>
-    | $data['top_categories']          — Collection  {category, amount, count}
-    | $data['largest_transactions']    — Collection<Transaction>
-    | $data['active_loans']            — Collection<Loan>
-    | $data['insights']                — array[]  {icon, title, value, description}
+    | $data['year']                       — int  (prior full year)
+    | $data['start_date']                 — pre-formatted string e.g. "Jan 01, 2024"
+    | $data['end_date']                   — pre-formatted string e.g. "Dec 31, 2024"
+    | $data['income']                     — float
+    | $data['expenses']                   — float
+    | $data['net_flow']                   — float
+    | $data['savings_rate']               — float  percentage
+    | $data['net_worth']                  — float  (total_balance - total_loans - total_client_funds)
+    | $data['total_loans']                — float  (active loans balance)
+    | $data['total_balance']              — float  (sum of active account balances)
+    | $data['transaction_count']          — int
+    | $data['profitable_months']          — int    (months with net_flow > 0)
+    | $data['prior_period_income']        — float  (prior year income)
+    | $data['income_trend']               — float|null  percentage change vs prior year
+    | $data['monthly_breakdown']          — array[] {
+    |       month, month_short, income, expenses, net_flow, savings_rate,
+    |       transaction_count, budgeted_expenses, budgeted_income,
+    |       budget_variance, cats_over_budget, cats_under_budget,
+    |       category_performance[]
+    |   }
+    | $data['best_month']                 — array|null  {month, net_flow, ...}
+    | $data['worst_month']                — array|null  {month, net_flow, ...}
+    | $data['loans_paid_in_period']       — array  {count, total, items[]}
+    | $data['loans_repaid_in_period']     — array  {count, total, principal_total, items[]}
+    | $data['accounts']                   — Collection<Account>
+    | $data['top_categories']             — Collection  {category, amount, count}
+    | $data['largest_transactions']       — Collection<Transaction>
+    | $data['active_loans']               — Collection<Loan>
+    | $data['insights']                   — array[]  {icon, title, value, description}
+    | $data['annual_budgeted_expenses']   — float
+    | $data['annual_budget_variance']     — float  (positive = under budget)
+    | $data['months_over_budget']         — int
     |--------------------------------------------------------------------------
     */
     $currency        = 'KES';
@@ -130,13 +159,16 @@
     $bestMonth       = $data['best_month']      ?? null;
     $worstMonth      = $data['worst_month']     ?? null;
 
+    $annualBudgetedExpenses = $data['annual_budgeted_expenses'] ?? 0;
+    $annualBudgetVariance   = $data['annual_budget_variance']   ?? 0;
+    $monthsOverBudget       = $data['months_over_budget']       ?? 0;
+
     /*
      * loans_paid_in_period  — transactions where category = 'Loan Repayment'
      * loans_repaid_in_period — Loan records with status='paid' and repaid_date in period
-     * These are two distinct datasets; the trend-box uses loans_paid_in_period.
      */
     $loansPaid    = $data['loans_paid_in_period']   ?? ['count' => 0, 'total' => 0, 'items' => []];
-    $loansCleared = $data['loans_repaid_in_period']  ?? ['count' => 0, 'total' => 0, 'principal_total' => 0, 'items' => []];
+    $loansCleared = $data['loans_repaid_in_period'] ?? ['count' => 0, 'total' => 0, 'principal_total' => 0, 'items' => []];
 
     $avgMonthlySpend = $expenses > 0 ? $expenses / 12 : 0;
     $avgMonthlySave  = $netFlow / 12;
@@ -185,7 +217,6 @@
 <div class="stats-grid">
     <div class="stat-cell">
         <div class="stat-label">Transactions</div>
-        {{-- transaction_count is the full untruncated count (service truncates ->transactions to 50 but counts all) --}}
         <div class="stat-value">{{ $txCount }}</div>
     </div>
     <div class="stat-cell">
@@ -225,7 +256,6 @@
         <div class="trend-subtext">months with positive cash flow</div>
     </div>
     <div class="trend-cell">
-        {{-- loans_paid_in_period = repayment transactions (count & total from getLoanPaymentsInPeriod) --}}
         <div class="trend-label">Loan Repayments</div>
         @if($loansPaid['count'] > 0)
             <div class="trend-value" style="color: #059669;">{{ $currency }} {{ number_format($loansPaid['total']) }}</div>
@@ -234,6 +264,18 @@
             <div class="trend-value" style="color: #9CA3AF;">None recorded</div>
         @endif
     </div>
+    @if($annualBudgetedExpenses > 0)
+        <div class="trend-cell">
+            <div class="trend-label">Annual Budget</div>
+            <div class="trend-value" style="color: {{ $annualBudgetVariance >= 0 ? '#059669' : '#DC2626' }};">
+                {{ $annualBudgetVariance >= 0 ? 'Under' : 'Over' }}
+            </div>
+            <div class="trend-subtext">
+                by {{ $currency }} {{ number_format(abs($annualBudgetVariance)) }}
+                ({{ $monthsOverBudget }} {{ $monthsOverBudget === 1 ? 'month' : 'months' }} over)
+            </div>
+        </div>
+    @endif
 </div>
 
 <!-- Financial Health Alert -->
@@ -258,14 +300,12 @@
 <div class="insight-box">
     <h4>Annual Performance Overview</h4>
     <p>Throughout {{ $year }}, you had positive cash flow in <strong>{{ $profitMonths }} of 12 months</strong>, with an average monthly savings of {{ $currency }} {{ number_format($avgMonthlySave) }}.
-        {{-- best_month and worst_month are the first() items from sortByDesc/sortBy on net_flow --}}
         @if($bestMonth) Your best month was <strong>{{ $bestMonth['month'] }}</strong> (net: {{ $currency }} {{ number_format($bestMonth['net_flow']) }}). @endif
         @if($worstMonth) Your toughest month was <strong>{{ $worstMonth['month'] }}</strong> (net: {{ $currency }} {{ number_format($worstMonth['net_flow']) }}). @endif
     </p>
 </div>
 
 <!-- Loans Fully Cleared During Year -->
-{{-- loans_repaid_in_period = Loan records where status='paid' AND repaid_date falls within the year --}}
 @if($loansCleared['count'] > 0)
     <div class="insight-box" style="border-left-color: #10B981; background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);">
         <h4 style="color: #065F46;">&#10003; Loans Fully Cleared in {{ $year }}</h4>
@@ -275,6 +315,7 @@
         </p>
     </div>
 @endif
+
 {{-- Salary → Savings Rate --}}
 @php
     $salarySavings = $data['salary_savings_rate'] ?? [];
@@ -330,8 +371,7 @@
     </div>
 @endif
 
-<!-- Month-by-Month Breakdown -->
-{{-- monthly_breakdown is a plain array built in generateAnnualReport() via a loop over 12 months --}}
+<!-- Month-by-Month Breakdown with Budget vs Actual -->
 @if(!empty($monthlyBreakdown))
     <div class="section">
         <div class="section-title">Month-by-Month Breakdown</div>
@@ -341,19 +381,38 @@
                 <th>Month</th>
                 <th style="text-align: right;">Income</th>
                 <th style="text-align: right;">Expenses</th>
+                <th style="text-align: right;">Budgeted</th>
+                <th style="text-align: right;">Variance</th>
                 <th style="text-align: right;">Net Flow</th>
-                <th style="text-align: right;">Savings Rate</th>
+                <th style="text-align: right;">Rate</th>
                 <th style="text-align: center;">Txns</th>
             </tr>
             </thead>
             <tbody>
             @foreach($monthlyBreakdown as $i => $month)
-                @php $rowNet = $month['net_flow']; @endphp
+                @php
+                    $rowNet    = $month['net_flow'];
+                    $variance  = $month['budget_variance'] ?? 0;
+                    $hasBudget = ($month['budgeted_expenses'] ?? 0) > 0;
+                @endphp
                 <tr @if($i % 2 === 0) style="background: #F9FAFB;" @endif>
-                    {{-- month_short is pre-formatted as 'M' (e.g. "Jan", "Feb") --}}
                     <td style="font-weight: 600;">{{ $month['month_short'] }}</td>
                     <td style="text-align: right; color: #059669;">{{ number_format($month['income']) }}</td>
                     <td style="text-align: right; color: #DC2626;">{{ number_format($month['expenses']) }}</td>
+                    <td style="text-align: right; color: #6366F1;">
+                        {{ $hasBudget ? number_format($month['budgeted_expenses']) : '—' }}
+                    </td>
+                    <td style="text-align: right; font-weight: bold;
+                        color: {{ !$hasBudget ? '#9CA3AF' : ($variance >= 0 ? '#059669' : '#DC2626') }};">
+                        @if($hasBudget)
+                            {{ $variance >= 0 ? '-' : '+' }}{{ number_format(abs($variance)) }}
+                            <span style="font-size: 8px; font-weight: normal; display: block;">
+                                {{ $variance >= 0 ? 'under' : 'over' }}
+                            </span>
+                        @else
+                            —
+                        @endif
+                    </td>
                     <td style="text-align: right; font-weight: bold; color: {{ $rowNet >= 0 ? '#059669' : '#DC2626' }};">
                         {{ $rowNet >= 0 ? '+' : '' }}{{ number_format($rowNet) }}
                     </td>
@@ -367,6 +426,20 @@
                 <td>Full Year</td>
                 <td style="text-align: right; color: #059669;">{{ number_format($income) }}</td>
                 <td style="text-align: right; color: #DC2626;">{{ number_format($expenses) }}</td>
+                <td style="text-align: right; color: #6366F1;">
+                    {{ $annualBudgetedExpenses > 0 ? number_format($annualBudgetedExpenses) : '—' }}
+                </td>
+                <td style="text-align: right; font-weight: bold;
+                    color: {{ $annualBudgetedExpenses == 0 ? '#9CA3AF' : ($annualBudgetVariance >= 0 ? '#059669' : '#DC2626') }};">
+                    @if($annualBudgetedExpenses > 0)
+                        {{ $annualBudgetVariance >= 0 ? '-' : '+' }}{{ number_format(abs($annualBudgetVariance)) }}
+                        <span style="font-size: 8px; font-weight: normal; display: block;">
+                            {{ $annualBudgetVariance >= 0 ? 'under' : 'over' }}
+                        </span>
+                    @else
+                        —
+                    @endif
+                </td>
                 <td style="text-align: right; color: {{ $netFlow >= 0 ? '#059669' : '#DC2626' }};">
                     {{ $netFlow >= 0 ? '+' : '' }}{{ number_format($netFlow) }}
                 </td>
@@ -375,11 +448,84 @@
             </tr>
             </tbody>
         </table>
+
+        {{-- Annual budget summary insight --}}
+        @if($annualBudgetedExpenses > 0)
+            <div class="insight-box">
+                <h4>Annual Budget Performance</h4>
+                <p>
+                    Against a total annual expense budget of
+                    <strong>{{ $currency }} {{ number_format($annualBudgetedExpenses) }}</strong>,
+                    you actually spent
+                    <strong>{{ $currency }} {{ number_format($expenses) }}</strong> —
+                    @if($annualBudgetVariance >= 0)
+                        <strong style="color: #059669;">{{ $currency }} {{ number_format($annualBudgetVariance) }} under budget</strong>.
+                        Great discipline across the year!
+                    @else
+                        <strong style="color: #DC2626;">{{ $currency }} {{ number_format(abs($annualBudgetVariance)) }} over budget</strong>
+                        across {{ $monthsOverBudget }} {{ $monthsOverBudget === 1 ? 'month' : 'months' }}.
+                        Review overspend months below to find patterns.
+                    @endif
+                </p>
+            </div>
+        @endif
+
+        {{-- Per-month category drill-down --}}
+        @foreach($monthlyBreakdown as $month)
+            @if(!empty($month['category_performance']))
+                <div class="month-drill">
+                    <div class="month-drill-title">
+                        {{ $month['month_short'] }} — Category Budget vs Actual
+                        @if(($month['budgeted_expenses'] ?? 0) > 0)
+                            &nbsp;&bull;&nbsp;
+                            Budgeted: {{ $currency }} {{ number_format($month['budgeted_expenses']) }}
+                            &nbsp;&bull;&nbsp;
+                            Actual: {{ $currency }} {{ number_format($month['expenses']) }}
+                            &nbsp;&bull;&nbsp;
+                            @php $mv = $month['budget_variance'] ?? 0; @endphp
+                            <span style="color: {{ $mv >= 0 ? '#059669' : '#DC2626' }};">
+                                {{ $mv >= 0 ? 'Under' : 'Over' }} by {{ $currency }} {{ number_format(abs($mv)) }}
+                            </span>
+                        @endif
+                    </div>
+                    <div class="budget-grid">
+                        @foreach($month['category_performance'] as $budget)
+                            @php
+                                $pct         = min($budget['percentage'], 100);
+                                $statusClass = $budget['percentage'] >= 100 ? 'danger'
+                                    : ($budget['percentage'] >= 80 ? 'warning' : 'good');
+                                $pctColor    = $budget['percentage'] >= 100 ? '#DC2626'
+                                    : ($budget['percentage'] >= 80 ? '#D97706' : '#059669');
+                            @endphp
+                            <div class="budget-item {{ $statusClass }}">
+                                <div class="budget-header">
+                                    <div class="budget-name">{{ $budget['category'] }}</div>
+                                    <div class="budget-percent" style="color: {{ $pctColor }};">
+                                        {{ number_format($budget['percentage'], 1) }}%
+                                    </div>
+                                </div>
+                                <div class="budget-bar">
+                                    <div class="budget-fill {{ $statusClass }}" style="width: {{ $pct }}%;"></div>
+                                </div>
+                                <div class="budget-amounts">
+                                    Spent: {{ $currency }} {{ number_format($budget['spent']) }}
+                                    of {{ $currency }} {{ number_format($budget['budgeted']) }}
+                                    ({{ $budget['has_budget'] ? 'set budget' : ($budget['is_new'] ? 'new category' : $budget['months_used'] . '-mo avg') }})
+                                    &bull;
+                                    {{ $budget['remaining'] >= 0
+                                        ? 'Remaining: ' . $currency . ' ' . number_format($budget['remaining'])
+                                        : 'Over by: ' . $currency . ' ' . number_format(abs($budget['remaining'])) }}
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+        @endforeach
     </div>
 @endif
 
 <!-- Account Balances -->
-{{-- $data['accounts'] is a Collection<Account> — active accounts only (is_active = true) --}}
 @if($data['accounts']->isNotEmpty())
     <div class="section">
         <div class="section-title">Year-End Account Overview</div>
@@ -417,7 +563,6 @@
 @endif
 
 <!-- Top Spending Categories -->
-{{-- $data['top_categories'] is a Collection of arrays: {category, amount, count} — top 5 by amount --}}
 @if($data['top_categories']->isNotEmpty())
     <div class="section">
         <div class="section-title">Annual Spending Breakdown by Category</div>
@@ -448,10 +593,6 @@
 @endif
 
 <!-- Largest Transactions -->
-{{--
-    $data['largest_transactions'] is a Collection<Transaction> (top 5 expenses, sorted by amount desc)
-    Uses COALESCE(period_date, date) in the query, so prefer period_date when set.
---}}
 @if($data['largest_transactions']->isNotEmpty())
     <div class="section">
         <div class="section-title">Largest Individual Expenses</div>
@@ -479,7 +620,6 @@
 @endif
 
 <!-- Active Loans -->
-{{-- $data['active_loans'] = Loan::where('status','active') — only currently outstanding loans --}}
 @if($data['active_loans']->isNotEmpty())
     <div class="section">
         <div class="section-title">Active Loans</div>
@@ -514,18 +654,12 @@
 @endif
 
 <!-- Key Insights — two-column grid -->
-{{--
-    $data['insights'] is a plain array from generateInsights():
-    {icon (emoji), title, value, description}
-    The annual blade uses insight-card style (title + value on separate lines) for better layout.
---}}
 @if(!empty($data['insights']))
     <div class="section">
         <div class="section-title">Key Insights</div>
         <div class="insights-grid">
             @foreach($data['insights'] as $insight)
                 <div class="insight-card">
-                    {{-- icon is an emoji string present in all insight arrays from the service --}}
                     <h4>{{ $insight['icon'] }} {{ $insight['title'] }}</h4>
                     <div class="insight-value">{{ $insight['value'] }}</div>
                     <p>{{ $insight['description'] }}</p>
@@ -540,6 +674,15 @@
     <div class="insight-box">
         <h4>{{ $year }} Year in Review</h4>
         <p>Over the course of {{ $year }}, you recorded <strong>{{ $txCount }} transactions</strong> across <strong>{{ $data['accounts']->count() }} accounts</strong>. Your total income was <strong>{{ $currency }} {{ number_format($income) }}</strong> against total expenses of <strong>{{ $currency }} {{ number_format($expenses) }}</strong>, yielding an annual savings rate of <strong>{{ number_format($savingsRate, 1) }}%</strong>. Your year-end net worth stands at <strong>{{ $currency }} {{ number_format($netWorth) }}</strong>.</p>
+        @if($annualBudgetedExpenses > 0)
+            <p style="margin-top: 6px;">On the budget front, you set expense targets totalling <strong>{{ $currency }} {{ number_format($annualBudgetedExpenses) }}</strong> for the year and
+                @if($annualBudgetVariance >= 0)
+                    came in <strong style="color: #059669;">{{ $currency }} {{ number_format($annualBudgetVariance) }} under budget</strong> — a strong result.
+                @else
+                    finished <strong style="color: #DC2626;">{{ $currency }} {{ number_format(abs($annualBudgetVariance)) }} over budget</strong> across {{ $monthsOverBudget }} {{ $monthsOverBudget === 1 ? 'month' : 'months' }}.
+                @endif
+            </p>
+        @endif
         <p style="margin-top: 6px;">Use this report to set intentional financial targets for {{ $year + 1 }}. Small, consistent improvements in your savings rate compound significantly over time.</p>
     </div>
 </div>
@@ -548,7 +691,6 @@
 <div class="footer">
     <p class="confidential">CONFIDENTIAL FINANCIAL DOCUMENT</p>
     <p>Generated on {{ now()->format('F j, Y') }}</p>
-    {{-- Report ID hashes user->id and the year integer, matching the service's data keys --}}
     <p>Report ID: ANN-{{ $year }}-{{ strtoupper(substr(md5($user->id . $year), 0, 8)) }}</p>
     <p style="margin-top: 8px;">© {{ now()->year }} Financial Report System. All rights reserved.</p>
     <p style="margin-top: 5px; font-size: 8px; color: #9CA3AF;">This document contains highly confidential financial information. Store securely and do not share with unauthorized parties.</p>

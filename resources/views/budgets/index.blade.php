@@ -11,62 +11,67 @@
                 </p>
             </div>
 
-            {{-- Year Selector --}}
-            <div class="relative" x-data="{ open: false, selectedYear: {{ $year }} }">
-                <button
-                    @click="open = !open"
-                    @click.outside="open = false"
-                    class="flex items-center gap-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 sm:px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
-                >
-                    <span class="font-medium">{{ $year }}</span>
-                    <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                </button>
+            <div class="flex items-center gap-3">
+                {{-- Year Selector --}}
+                <div class="relative" x-data="{ open: false, selectedYear: {{ $year }} }">
+                    <button
+                        @click="open = !open"
+                        @click.outside="open = false"
+                        class="flex items-center gap-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 sm:px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+                    >
+                        <span class="font-medium">{{ $year }}</span>
+                        <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
 
-                <div
-                    x-show="open"
-                    x-transition
-                    class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 overflow-hidden"
-                    style="display: none;"
-                >
-                    {{-- Recent Years --}}
-                    <div class="border-b border-gray-200 dark:border-gray-700">
-                        @php
-                            $currentYear = date('Y');
-                            $recentYears = range($currentYear, max($minYear, $currentYear - 3));
-                        @endphp
-                        @foreach($recentYears as $y)
-                            <a
-                                href="{{ url('budgets/' . $y) }}"
-                                class="block px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition {{ $y == $year ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-gray-700 dark:text-gray-300' }}"
+                    <div
+                        x-show="open"
+                        x-transition
+                        class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 overflow-hidden"
+                        style="display: none;"
+                    >
+                        {{-- Recent Years --}}
+                        <div class="border-b border-gray-200 dark:border-gray-700">
+                            @php
+                                $currentYear = date('Y');
+                                $recentYears = range($currentYear, max($minYear, $currentYear - 3));
+                            @endphp
+                            @foreach($recentYears as $y)
+                                <a
+                                    href="{{ url('budgets/' . $y) }}"
+                                    class="block px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition {{ $y == $year ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-gray-700 dark:text-gray-300' }}"
+                                >
+                                    {{ $y }}
+                                    @if($y == $currentYear)
+                                        <span class="text-xs text-gray-500 dark:text-gray-400">(Current)</span>
+                                    @endif
+                                </a>
+                            @endforeach
+                        </div>
+
+                        {{-- All Years Option --}}
+                        @if($maxYear - $minYear > 3)
+                            <button
+                                @click="$dispatch('open-all-years-modal')"
+                                class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center justify-between"
                             >
-                                {{ $y }}
-                                @if($y == $currentYear)
-                                    <span class="text-xs text-gray-500 dark:text-gray-400">(Current)</span>
-                                @endif
-                            </a>
-                        @endforeach
+                                <span>All Years</span>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </button>
+                        @endif
                     </div>
-
-                    {{-- All Years Option --}}
-                    @if($maxYear - $minYear > 3)
-                        <button
-                            @click="$dispatch('open-all-years-modal')"
-                            class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center justify-between"
-                        >
-                            <span>All Years</span>
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                            </svg>
-                        </button>
-                    @endif
                 </div>
             </div>
         </div>
     </x-slot>
 
-    <div class="mx-auto max-w-7xl py-4 sm:py-10 space-y-6 sm:space-y-10 px-4 sm:px-6 lg:px-8">
+    <div
+        x-data="budgetPage()"
+        class="mx-auto max-w-7xl py-4 sm:py-10 space-y-6 sm:space-y-10 px-4 sm:px-6 lg:px-8"
+    >
 
         {{-- Flash --}}
         @if(session('success'))
@@ -77,13 +82,26 @@
 
         {{-- Mobile: Card-based view --}}
         <div class="lg:hidden space-y-6" x-data="{ selectedMonth: {{ $currentMonth }} }">
-            <div>
-                <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">
-                    Monthly Budget Details
-                </h3>
-                <p class="text-xs text-gray-500 mb-4">
-                    Auto-generated from transactions
-                </p>
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                        Monthly Budget Details
+                    </h3>
+                    <p class="text-xs text-gray-500">
+                        Auto-generated from transactions
+                    </p>
+                </div>
+                {{-- Budget comparison toggle (mobile) --}}
+                <button
+                    @click="showBudget = !showBudget"
+                    :class="showBudget ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600'"
+                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition"
+                >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                    vs Budget
+                </button>
             </div>
 
             {{-- Month Selector for Mobile --}}
@@ -120,17 +138,33 @@
                                     {{ number_format($monthIncome, 0) }}
                                 </span>
                             </div>
-                            <div class="space-y-2">
+                            <div class="space-y-3">
                                 @foreach($incomeCategories as $category)
                                     @php
                                         $actualAmount = $actuals[$category->id][$m] ?? 0;
+                                        $budgetKey = $category->id . '-' . $m;
+                                        $budgetAmount = $budgets->get($budgetKey)->amount ?? 0;
+                                        $variance = $actualAmount - $budgetAmount;
                                     @endphp
-                                    @if($actualAmount > 0)
-                                        <div class="flex items-center justify-between text-sm">
-                                            <span class="text-gray-700 dark:text-gray-300">{{ $category->name }}</span>
-                                            <span class="font-medium text-green-600 dark:text-green-400">
-                                                {{ number_format($actualAmount, 0) }}
-                                            </span>
+                                    @if($actualAmount > 0 || $budgetAmount > 0)
+                                        <div class="text-sm">
+                                            <div class="flex items-center justify-between">
+                                                <span class="text-gray-700 dark:text-gray-300">{{ $category->name }}</span>
+                                                <span class="font-medium text-green-600 dark:text-green-400">
+                                                    {{ number_format($actualAmount, 0) }}
+                                                </span>
+                                            </div>
+                                            <div x-show="showBudget" class="mt-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                                                <span>Budget</span>
+                                                <div class="flex items-center gap-2">
+                                                    <span>{{ number_format($budgetAmount, 0) }}</span>
+                                                    @if($budgetAmount > 0)
+                                                        <span class="{{ $variance >= 0 ? 'text-green-600' : 'text-red-500' }} font-medium">
+                                                            {{ $variance >= 0 ? '+' : '' }}{{ number_format($variance, 0) }}
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                            </div>
                                         </div>
                                     @endif
                                 @endforeach
@@ -154,17 +188,34 @@
                                     {{ number_format($monthExpense, 0) }}
                                 </span>
                             </div>
-                            <div class="space-y-2">
+                            <div class="space-y-3">
                                 @foreach($expenseCategories as $category)
                                     @php
                                         $actualAmount = $actuals[$category->id][$m] ?? 0;
+                                        $budgetKey = $category->id . '-' . $m;
+                                        $budgetAmount = $budgets->get($budgetKey)->amount ?? 0;
+                                        $variance = $actualAmount - $budgetAmount;
                                     @endphp
-                                    @if($actualAmount > 0)
-                                        <div class="flex items-center justify-between text-sm">
-                                            <span class="text-gray-700 dark:text-gray-300">{{ $category->name }}</span>
-                                            <span class="font-medium text-red-600 dark:text-red-400">
-                                                {{ number_format($actualAmount, 0) }}
-                                            </span>
+                                    @if($actualAmount > 0 || $budgetAmount > 0)
+                                        <div class="text-sm">
+                                            <div class="flex items-center justify-between">
+                                                <span class="text-gray-700 dark:text-gray-300">{{ $category->name }}</span>
+                                                <span class="font-medium text-red-600 dark:text-red-400">
+                                                    {{ number_format($actualAmount, 0) }}
+                                                </span>
+                                            </div>
+                                            <div x-show="showBudget" class="mt-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                                                <span>Budget</span>
+                                                <div class="flex items-center gap-2">
+                                                    <span>{{ number_format($budgetAmount, 0) }}</span>
+                                                    @if($budgetAmount > 0)
+                                                        {{-- For expenses: positive variance = over budget = bad = red --}}
+                                                        <span class="{{ $variance <= 0 ? 'text-green-600' : 'text-red-500' }} font-medium">
+                                                            {{ $variance >= 0 ? '+' : '' }}{{ number_format($variance, 0) }}
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                            </div>
                                         </div>
                                     @endif
                                 @endforeach
@@ -264,6 +315,44 @@
                         Budgets are automatically generated from your transactions
                     </p>
                 </div>
+
+                {{-- Budget comparison toggle (desktop) --}}
+                <div class="flex items-center gap-3">
+                    <span class="text-sm text-gray-500 dark:text-gray-400">Show budget comparison</span>
+                    <button
+                        @click="showBudget = !showBudget"
+                        :class="showBudget ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'"
+                        class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                        role="switch"
+                        :aria-checked="showBudget"
+                    >
+                        <span
+                            :class="showBudget ? 'translate-x-5' : 'translate-x-0'"
+                            class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                        ></span>
+                    </button>
+                </div>
+            </div>
+
+            {{-- Legend (shown when budget mode on) --}}
+            <div x-show="showBudget" x-transition class="flex items-center gap-5 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 rounded-lg px-4 py-2">
+                <span class="font-semibold text-gray-600 dark:text-gray-300">Each cell:</span>
+                <span class="flex items-center gap-1.5">
+                    <span class="inline-block w-3 h-3 rounded-sm bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600"></span>
+                    Actual
+                </span>
+                <span class="flex items-center gap-1.5">
+                    <span class="inline-block w-3 h-3 rounded-sm bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700"></span>
+                    Budget (click to edit)
+                </span>
+                <span class="flex items-center gap-1.5">
+                    <span class="inline-block w-2 h-2 rounded-full bg-green-500"></span>
+                    Under budget
+                </span>
+                <span class="flex items-center gap-1.5">
+                    <span class="inline-block w-2 h-2 rounded-full bg-red-500"></span>
+                    Over budget
+                </span>
             </div>
 
             <div class="overflow-x-auto rounded-lg border bg-white dark:bg-gray-800 shadow-sm">
@@ -272,7 +361,7 @@
                     <tr>
                         <th class="px-3 py-2 text-left w-44 font-semibold text-gray-700 dark:text-gray-300">Category</th>
                         @for($m = 1; $m <= 12; $m++)
-                            <th class="px-2 py-2 text-center font-semibold text-gray-700 dark:text-gray-300">
+                            <th class="px-2 py-2 text-center font-semibold text-gray-700 dark:text-gray-300 {{ ($year == date('Y') && $m == $currentMonth) ? 'bg-blue-100 dark:bg-blue-900/30' : '' }}">
                                 {{ \Carbon\Carbon::create()->month($m)->format('M') }}
                             </th>
                         @endfor
@@ -289,27 +378,68 @@
                     </tr>
 
                     @foreach($incomeCategories as $category)
-                        <tr class="border-b hover:bg-gray-50 dark:hover:bg-gray-700">
-                            <td class="px-3 py-2 font-medium text-gray-700 dark:text-gray-300">
+                        <tr class="border-b hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                            <td class="px-3 py-1.5 font-medium text-gray-700 dark:text-gray-300">
                                 {{ $category->name }}
                             </td>
                             @for($m = 1; $m <= 12; $m++)
                                 @php
                                     $actualAmount = $actuals[$category->id][$m] ?? 0;
+                                    $budgetKey = $category->id . '-' . $m;
+                                    $budgetAmount = $budgets->get($budgetKey)->amount ?? 0;
+                                    $variance = $actualAmount - $budgetAmount;
                                     $isCurrent = ($year == date('Y') && $m == $currentMonth);
                                 @endphp
-                                <td class="px-2 py-2 text-center {{ $isCurrent ? 'bg-blue-50 dark:bg-blue-900/20' : '' }}">
-                                    @if($actualAmount > 0)
-                                        <span class="text-green-600 dark:text-green-400 font-medium">
-                                            {{ number_format($actualAmount, 0) }}
-                                        </span>
-                                    @else
-                                        <span class="text-gray-400">—</span>
-                                    @endif
+                                <td class="px-1 py-1 text-center {{ $isCurrent ? 'bg-blue-50 dark:bg-blue-900/10' : '' }}">
+                                    {{-- Simple view (no budget) --}}
+                                    <div x-show="!showBudget" class="py-1">
+                                        @if($actualAmount > 0)
+                                            <span class="text-green-600 dark:text-green-400 font-medium">
+                                                {{ number_format($actualAmount, 0) }}
+                                            </span>
+                                        @else
+                                            <span class="text-gray-400">—</span>
+                                        @endif
+                                    </div>
+
+                                    {{-- Budget comparison view --}}
+                                    <div x-show="showBudget" class="budget-cell space-y-0.5">
+                                        {{-- Actual --}}
+                                        <div class="text-xs font-semibold {{ $actualAmount > 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-400' }}">
+                                            {{ $actualAmount > 0 ? number_format($actualAmount, 0) : '—' }}
+                                        </div>
+                                        {{-- Budget (editable) --}}
+                                        <div class="relative group">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="1"
+                                                value="{{ $budgetAmount > 0 ? round($budgetAmount) : '' }}"
+                                                placeholder="—"
+                                                data-category="{{ $category->id }}"
+                                                data-year="{{ $year }}"
+                                                data-month="{{ $m }}"
+                                                data-type="income"
+                                                @change="saveBudgetCell($event)"
+                                                class="budget-input w-full text-center text-xs rounded border border-transparent bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-300 focus:outline-none placeholder-gray-300 dark:placeholder-gray-600 px-1 py-0.5"
+                                            />
+                                        </div>
+                                        {{-- Variance --}}
+                                        @if($budgetAmount > 0)
+                                            <div class="text-xs font-medium {{ $variance >= 0 ? 'text-green-600' : 'text-red-500' }}">
+                                                {{ $variance >= 0 ? '+' : '' }}{{ number_format($variance, 0) }}
+                                            </div>
+                                        @else
+                                            <div class="text-xs text-gray-300">·</div>
+                                        @endif
+                                    </div>
                                 </td>
                             @endfor
-                            <td class="px-3 py-2 text-center font-bold bg-indigo-100 dark:bg-indigo-900 text-gray-800 dark:text-gray-200">
-                                {{ number_format($category->yearly_total, 0) }}
+                            <td class="px-3 py-1.5 text-center font-bold bg-indigo-50 dark:bg-indigo-900/30 text-gray-800 dark:text-gray-200">
+                                <div>{{ number_format($category->yearly_total, 0) }}</div>
+                                <div x-show="showBudget && {{ $category->yearly_budget > 0 ? 'true' : 'false' }}" class="text-xs font-normal text-indigo-500 dark:text-indigo-400">
+                                    / {{ number_format($category->yearly_budget, 0) }}
+                                </div>
                             </td>
                         </tr>
                     @endforeach
@@ -320,16 +450,26 @@
                         @for($m = 1; $m <= 12; $m++)
                             @php
                                 $monthTotal = 0;
+                                $monthBudgetTotal = 0;
                                 foreach($incomeCategories as $cat) {
                                     $monthTotal += $actuals[$cat->id][$m] ?? 0;
+                                    $key = $cat->id . '-' . $m;
+                                    $monthBudgetTotal += $budgets->get($key)->amount ?? 0;
                                 }
+                                $monthNetVariance = $monthTotal - $monthBudgetTotal;
                             @endphp
                             <td class="px-2 py-2 text-center">
-                                {{ $monthTotal > 0 ? number_format($monthTotal, 0) : '—' }}
+                                <div>{{ $monthTotal > 0 ? number_format($monthTotal, 0) : '—' }}</div>
+                                <div x-show="showBudget && {{ $monthBudgetTotal > 0 ? 'true' : 'false' }}" class="text-xs font-normal {{ $monthNetVariance >= 0 ? 'text-green-700 dark:text-green-300' : 'text-red-600' }}">
+                                    {{ $monthNetVariance >= 0 ? '+' : '' }}{{ number_format($monthNetVariance, 0) }}
+                                </div>
                             </td>
                         @endfor
                         <td class="px-3 py-2 text-center bg-indigo-200 dark:bg-indigo-800">
                             {{ number_format($incomeCategories->sum('yearly_total'), 0) }}
+                            <div x-show="showBudget && {{ $incomeCategories->sum('yearly_budget') > 0 ? 'true' : 'false' }}" class="text-xs font-normal text-indigo-700 dark:text-indigo-300">
+                                / {{ number_format($incomeCategories->sum('yearly_budget'), 0) }}
+                            </div>
                         </td>
                     </tr>
 
@@ -339,27 +479,68 @@
                     </tr>
 
                     @foreach($expenseCategories as $category)
-                        <tr class="border-b hover:bg-gray-50 dark:hover:bg-gray-700">
-                            <td class="px-3 py-2 font-medium text-gray-700 dark:text-gray-300">
+                        <tr class="border-b hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                            <td class="px-3 py-1.5 font-medium text-gray-700 dark:text-gray-300">
                                 {{ $category->name }}
                             </td>
                             @for($m = 1; $m <= 12; $m++)
                                 @php
                                     $actualAmount = $actuals[$category->id][$m] ?? 0;
+                                    $budgetKey = $category->id . '-' . $m;
+                                    $budgetAmount = $budgets->get($budgetKey)->amount ?? 0;
+                                    $variance = $actualAmount - $budgetAmount; // positive = over budget (bad for expenses)
                                     $isCurrent = ($year == date('Y') && $m == $currentMonth);
                                 @endphp
-                                <td class="px-2 py-2 text-center {{ $isCurrent ? 'bg-blue-50 dark:bg-blue-900/20' : '' }}">
-                                    @if($actualAmount > 0)
-                                        <span class="text-red-600 dark:text-red-400 font-medium">
-                                            {{ number_format($actualAmount, 0) }}
-                                        </span>
-                                    @else
-                                        <span class="text-gray-400">—</span>
-                                    @endif
+                                <td class="px-1 py-1 text-center {{ $isCurrent ? 'bg-blue-50 dark:bg-blue-900/10' : '' }}">
+                                    {{-- Simple view --}}
+                                    <div x-show="!showBudget" class="py-1">
+                                        @if($actualAmount > 0)
+                                            <span class="text-red-600 dark:text-red-400 font-medium">
+                                                {{ number_format($actualAmount, 0) }}
+                                            </span>
+                                        @else
+                                            <span class="text-gray-400">—</span>
+                                        @endif
+                                    </div>
+
+                                    {{-- Budget comparison view --}}
+                                    <div x-show="showBudget" class="budget-cell space-y-0.5">
+                                        {{-- Actual --}}
+                                        <div class="text-xs font-semibold {{ $actualAmount > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-400' }}">
+                                            {{ $actualAmount > 0 ? number_format($actualAmount, 0) : '—' }}
+                                        </div>
+                                        {{-- Budget (editable) --}}
+                                        <div>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="1"
+                                                value="{{ $budgetAmount > 0 ? round($budgetAmount) : '' }}"
+                                                placeholder="—"
+                                                data-category="{{ $category->id }}"
+                                                data-year="{{ $year }}"
+                                                data-month="{{ $m }}"
+                                                data-type="expense"
+                                                @change="saveBudgetCell($event)"
+                                                class="budget-input w-full text-center text-xs rounded border border-transparent bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-300 focus:outline-none placeholder-gray-300 dark:placeholder-gray-600 px-1 py-0.5"
+                                            />
+                                        </div>
+                                        {{-- Variance: for expenses, positive = over = red --}}
+                                        @if($budgetAmount > 0)
+                                            <div class="text-xs font-medium {{ $variance <= 0 ? 'text-green-600' : 'text-red-500' }}">
+                                                {{ $variance >= 0 ? '+' : '' }}{{ number_format($variance, 0) }}
+                                            </div>
+                                        @else
+                                            <div class="text-xs text-gray-300">·</div>
+                                        @endif
+                                    </div>
                                 </td>
                             @endfor
-                            <td class="px-3 py-2 text-center font-bold bg-indigo-100 dark:bg-indigo-900 text-gray-800 dark:text-gray-200">
-                                {{ number_format($category->yearly_total, 0) }}
+                            <td class="px-3 py-1.5 text-center font-bold bg-indigo-50 dark:bg-indigo-900/30 text-gray-800 dark:text-gray-200">
+                                <div>{{ number_format($category->yearly_total, 0) }}</div>
+                                <div x-show="showBudget && {{ $category->yearly_budget > 0 ? 'true' : 'false' }}" class="text-xs font-normal text-indigo-500 dark:text-indigo-400">
+                                    / {{ number_format($category->yearly_budget, 0) }}
+                                </div>
                             </td>
                         </tr>
                     @endforeach
@@ -370,16 +551,26 @@
                         @for($m = 1; $m <= 12; $m++)
                             @php
                                 $monthTotal = 0;
+                                $monthBudgetTotal = 0;
                                 foreach($expenseCategories as $cat) {
                                     $monthTotal += $actuals[$cat->id][$m] ?? 0;
+                                    $key = $cat->id . '-' . $m;
+                                    $monthBudgetTotal += $budgets->get($key)->amount ?? 0;
                                 }
+                                $monthNetVariance = $monthTotal - $monthBudgetTotal; // positive = over budget (bad)
                             @endphp
                             <td class="px-2 py-2 text-center">
-                                {{ $monthTotal > 0 ? number_format($monthTotal, 0) : '—' }}
+                                <div>{{ $monthTotal > 0 ? number_format($monthTotal, 0) : '—' }}</div>
+                                <div x-show="showBudget && {{ $monthBudgetTotal > 0 ? 'true' : 'false' }}" class="text-xs font-normal {{ $monthNetVariance <= 0 ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300' }}">
+                                    {{ $monthNetVariance >= 0 ? '+' : '' }}{{ number_format($monthNetVariance, 0) }}
+                                </div>
                             </td>
                         @endfor
                         <td class="px-3 py-2 text-center bg-indigo-200 dark:bg-indigo-800">
                             {{ number_format($expenseCategories->sum('yearly_total'), 0) }}
+                            <div x-show="showBudget && {{ $expenseCategories->sum('yearly_budget') > 0 ? 'true' : 'false' }}" class="text-xs font-normal text-indigo-700 dark:text-indigo-300">
+                                / {{ number_format($expenseCategories->sum('yearly_budget'), 0) }}
+                            </div>
                         </td>
                     </tr>
 
@@ -389,22 +580,33 @@
                         @for($m = 1; $m <= 12; $m++)
                             @php
                                 $monthIncome = 0;
+                                $monthIncomeBudget = 0;
                                 foreach($incomeCategories as $cat) {
                                     $monthIncome += $actuals[$cat->id][$m] ?? 0;
+                                    $key = $cat->id . '-' . $m;
+                                    $monthIncomeBudget += $budgets->get($key)->amount ?? 0;
                                 }
 
                                 $monthExpense = 0;
+                                $monthExpenseBudget = 0;
                                 foreach($expenseCategories as $cat) {
                                     $monthExpense += $actuals[$cat->id][$m] ?? 0;
+                                    $key = $cat->id . '-' . $m;
+                                    $monthExpenseBudget += $budgets->get($key)->amount ?? 0;
                                 }
 
                                 $netAmount = $monthIncome - $monthExpense;
+                                $netBudget = $monthIncomeBudget - $monthExpenseBudget;
+                                $netVariance = $netAmount - $netBudget;
                             @endphp
                             <td class="px-2 py-2 text-center">
                                 @if($netAmount != 0)
-                                    <span class="{{ $netAmount < 0 ? 'text-red-600' : 'text-green-600' }}">
+                                    <div class="{{ $netAmount < 0 ? 'text-red-600' : 'text-green-600' }}">
                                         {{ number_format($netAmount, 0) }}
-                                    </span>
+                                    </div>
+                                    <div x-show="showBudget && {{ $netBudget != 0 ? 'true' : 'false' }}" class="text-xs font-normal {{ $netVariance >= 0 ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300' }}">
+                                        {{ $netVariance >= 0 ? '+' : '' }}{{ number_format($netVariance, 0) }}
+                                    </div>
                                 @else
                                     <span class="text-gray-400">—</span>
                                 @endif
@@ -413,10 +615,15 @@
                         <td class="px-3 py-2 text-center bg-indigo-200 dark:bg-indigo-800">
                             @php
                                 $yearlyNet = $incomeCategories->sum('yearly_total') - $expenseCategories->sum('yearly_total');
+                                $yearlyNetBudget = $incomeCategories->sum('yearly_budget') - $expenseCategories->sum('yearly_budget');
+                                $yearlyNetVariance = $yearlyNet - $yearlyNetBudget;
                             @endphp
-                            <span class="{{ $yearlyNet < 0 ? 'text-red-600' : 'text-green-600' }}">
+                            <div class="{{ $yearlyNet < 0 ? 'text-red-600' : 'text-green-600' }}">
                                 {{ number_format($yearlyNet, 0) }}
-                            </span>
+                            </div>
+                            <div x-show="showBudget && {{ $yearlyNetBudget != 0 ? 'true' : 'false' }}" class="text-xs font-normal {{ $yearlyNetVariance >= 0 ? 'text-green-700' : 'text-red-700' }}">
+                                {{ $yearlyNetVariance >= 0 ? '+' : '' }}{{ number_format($yearlyNetVariance, 0) }}
+                            </div>
                         </td>
                     </tr>
 
@@ -443,7 +650,6 @@
                                     @endif
                                 </td>
                             @endfor
-
                         </tr>
                     @endif
                     </tbody>
@@ -500,7 +706,6 @@
         style="display: none;"
     >
         <div class="flex items-center justify-center min-h-screen px-4">
-            {{-- Backdrop --}}
             <div
                 x-show="open"
                 x-transition:enter="ease-out duration-300"
@@ -513,7 +718,6 @@
                 class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
             ></div>
 
-            {{-- Modal Content --}}
             <div
                 x-show="open"
                 x-transition:enter="ease-out duration-300"
@@ -554,16 +758,88 @@
         </div>
     </div>
 
+    {{-- Save notification toast --}}
+    <div
+        x-data
+        @budget-saved.window="
+            $el.classList.remove('opacity-0', 'translate-y-2');
+            $el.classList.add('opacity-100', 'translate-y-0');
+            setTimeout(() => {
+                $el.classList.remove('opacity-100', 'translate-y-0');
+                $el.classList.add('opacity-0', 'translate-y-2');
+            }, 2000)
+        "
+        class="fixed bottom-6 right-6 z-50 bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-lg opacity-0 translate-y-2 transition-all duration-300 pointer-events-none"
+    >
+        Budget saved ✓
+    </div>
+
     <style>
-        /* Hide scrollbar for month selector on mobile */
-        .scrollbar-hide::-webkit-scrollbar {
-            display: none;
-        }
-        .scrollbar-hide {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .budget-cell { min-width: 60px; }
+
+        /* Hide number input spinners */
+        .budget-input::-webkit-outer-spin-button,
+        .budget-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .budget-input[type=number] { -moz-appearance: textfield; }
+
+        /* Subtle pulse on saving */
+        .budget-input.saving { animation: pulse 0.6s ease-in-out; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
     </style>
+
+    <script>
+        function budgetPage() {
+            return {
+                showBudget: false,
+
+                async saveBudgetCell(event) {
+                    const input = event.target;
+                    const amount = parseFloat(input.value) || 0;
+
+                    input.classList.add('saving');
+
+                    try {
+                        const response = await fetch('{{ route("budgets.save-cell") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'Accept': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                category_id: input.dataset.category,
+                                year:        input.dataset.year,
+                                month:       input.dataset.month,
+                                amount:      amount,
+                            }),
+                        });
+
+                        const data = await response.json();
+
+                        if (data.success) {
+                            window.dispatchEvent(new CustomEvent('budget-saved'));
+                            // Update input to the saved value (in case server rounded it)
+                            if (data.budget && data.budget.amount) {
+                                input.value = Math.round(data.budget.amount);
+                            }
+                        } else {
+                            console.error('Budget save failed', data);
+                        }
+                    } catch (err) {
+                        console.error('Budget save error', err);
+                    } finally {
+                        input.classList.remove('saving');
+                    }
+                },
+            };
+        }
+    </script>
 
     <x-floating-action-button :quickAccount="$accounts->first()" />
 </x-app-layout>

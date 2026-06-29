@@ -28,6 +28,13 @@ class ReportDataService
 
         $report = $this->generateReport($user, $startDate, $endDate, 'annual');
 
+        // Load ALL budget records for the year in one query
+        $allBudgets = Budget::where('user_id', $user->id)
+            ->where('year', $year)
+            ->get()
+            ->groupBy('month')  // keyed by month number
+            ->map(fn($group) => $group->keyBy('category_id'));
+
         $monthlyBreakdown = [];
         for ($month = 1; $month <= 12; $month++) {
             $mStart = Carbon::create($year, $month, 1)->startOfDay();
@@ -39,14 +46,84 @@ class ReportDataService
             $mExpenses = $monthTransactions->filter(fn($t) => $t->category->type === 'expense')->sum('amount');
             $mNet      = $mIncome - $mExpenses;
 
+            // Stored budgets for this month, keyed by category_id
+            $monthBudgets = $allBudgets->get($month, collect());
+
+            // Actual spend per category
+            $actualByCat = $monthTransactions
+                ->filter(fn($t) => $t->category->type === 'expense')
+                ->groupBy('category_id')
+                ->map(fn($group) => [
+                    'name'  => $group->first()->category->name,
+                    'spent' => $group->sum('amount'),
+                ]);
+
+            // Rolling baselines for fallback
+            $baselines = $this->buildRollingBaselines($user, $mStart, lookbackMonths: 3);
+
+            $allCatIds = $actualByCat->keys()
+                ->merge($monthBudgets->keys())
+                ->unique();
+
+            $categoryPerformance = [];
+            $totalBudgeted       = 0;
+            $totalSpent          = 0;
+            $catsOver            = 0;
+            $catsUnder           = 0;
+
+            foreach ($allCatIds as $catId) {
+                $spent = $actualByCat[$catId]['spent'] ?? 0;
+                if ($spent === 0) continue;
+
+                $catName   = $actualByCat[$catId]['name']
+                    ?? $baselines[$catId]['name']
+                    ?? 'Unknown';
+                $hasBudget = $monthBudgets->has($catId);
+                $budgeted  = $hasBudget
+                    ? (float) $monthBudgets[$catId]->amount
+                    : ($baselines[$catId]['baseline'] ?? $spent);
+
+                $remaining  = $budgeted - $spent;
+                $percentage = $budgeted > 0 ? ($spent / $budgeted) * 100 : 100;
+
+                $categoryPerformance[] = [
+                    'category'    => $catName,
+                    'budgeted'    => round($budgeted, 2),
+                    'spent'       => round($spent, 2),
+                    'remaining'   => round($remaining, 2),
+                    'percentage'  => round($percentage, 1),
+                    'has_budget'  => $hasBudget,
+                    'months_used' => $baselines[$catId]['months_used'] ?? 0,
+                    'is_new'      => ($baselines[$catId]['months_used'] ?? 0) === 0,
+                ];
+
+                $totalBudgeted += $budgeted;
+                $totalSpent    += $spent;
+                $percentage >= 100 ? $catsOver++ : $catsUnder++;
+            }
+
+            usort($categoryPerformance, fn($a, $b) => $b['percentage'] <=> $a['percentage']);
+
+            // Income budgets for the month
+            $mIncomeBudgeted = $monthBudgets
+                ->filter(fn($b) => optional($b->category)->type === 'income')
+                ->sum('amount');
+
             $monthlyBreakdown[] = [
-                'month'             => $mStart->format('F Y'),
-                'month_short'       => $mStart->format('M'),
-                'income'            => $mIncome,
-                'expenses'          => $mExpenses,
-                'net_flow'          => $mNet,
-                'savings_rate'      => $mIncome > 0 ? ($mNet / $mIncome) * 100 : 0,
-                'transaction_count' => $monthTransactions->count(),
+                'month'               => $mStart->format('F Y'),
+                'month_short'         => $mStart->format('M'),
+                'income'              => $mIncome,
+                'expenses'            => $mExpenses,
+                'net_flow'            => $mNet,
+                'savings_rate'        => $mIncome > 0 ? ($mNet / $mIncome) * 100 : 0,
+                'transaction_count'   => $monthTransactions->count(),
+                // Budget fields
+                'budgeted_expenses'   => round($totalBudgeted, 2),
+                'budgeted_income'     => round($mIncomeBudgeted, 2),
+                'budget_variance'     => round($totalBudgeted - $totalSpent, 2), // positive = under budget
+                'cats_over_budget'    => $catsOver,
+                'cats_under_budget'   => $catsUnder,
+                'category_performance' => $categoryPerformance,
             ];
         }
 
@@ -54,6 +131,12 @@ class ReportDataService
         $bestMonth    = $collection->sortByDesc('net_flow')->first();
         $worstMonth   = $collection->sortBy('net_flow')->first();
         $profitMonths = $collection->where('net_flow', '>', 0)->count();
+
+        // Annual budget summary across all months
+        $annualBudgetedExpenses = $collection->sum('budgeted_expenses');
+        $annualActualExpenses   = $collection->sum('expenses');
+        $annualBudgetVariance   = $annualBudgetedExpenses - $annualActualExpenses;
+        $monthsOverBudget       = $collection->where('cats_over_budget', '>', 0)->count();
 
         $loansPaidInYear       = $this->getLoanPaymentsInPeriod($user, $startDate, $endDate);
         $loansRepaidDuringYear = $this->getLoansRepaidInPeriod($user, $startDate, $endDate);
@@ -64,19 +147,22 @@ class ReportDataService
             ->filter(fn($t) => $t->category->type === 'income')
             ->sum('amount');
 
-        $report['monthly_breakdown']      = $monthlyBreakdown;
-        $report['best_month']             = $bestMonth;
-        $report['worst_month']            = $worstMonth;
-        $report['profitable_months']      = $profitMonths;
-        $report['loans_paid_in_period']   = $loansPaidInYear;
-        $report['loans_repaid_in_period'] = $loansRepaidDuringYear;
-        $report['prior_period_income']    = $priorYearIncome;
-        $report['income_trend']           = $priorYearIncome > 0
+        $report['monthly_breakdown']          = $monthlyBreakdown;
+        $report['best_month']                 = $bestMonth;
+        $report['worst_month']                = $worstMonth;
+        $report['profitable_months']          = $profitMonths;
+        $report['loans_paid_in_period']       = $loansPaidInYear;
+        $report['loans_repaid_in_period']     = $loansRepaidDuringYear;
+        $report['prior_period_income']        = $priorYearIncome;
+        $report['income_trend']               = $priorYearIncome > 0
             ? (($report['income'] - $priorYearIncome) / $priorYearIncome) * 100
             : null;
-        $report['period_type'] = 'annual';
-        $report['year']        = $year;
-        $report['salary_savings_rate'] = $this->getSalarySavingsRate($user, $startDate, $endDate);
+        $report['period_type']                = 'annual';
+        $report['year']                       = $year;
+        $report['salary_savings_rate']        = $this->getSalarySavingsRate($user, $startDate, $endDate);
+        $report['annual_budgeted_expenses']   = $annualBudgetedExpenses;
+        $report['annual_budget_variance']     = $annualBudgetVariance;
+        $report['months_over_budget']         = $monthsOverBudget;
 
         return $report;
     }
@@ -295,9 +381,18 @@ class ReportDataService
         $budgetPerformance = [];
 
         if ($type === 'monthly') {
+            // Replace buildRollingBaselines() with stored Budget records
+            $reportMonth = $startDate->month;
+            $reportYear  = $startDate->year;
+
+            $storedBudgets = Budget::where('user_id', $user->id)
+                ->where('year', $reportYear)
+                ->where('month', $reportMonth)
+                ->get()
+                ->keyBy('category_id');
+
             $baselines = $this->buildRollingBaselines($user, $startDate, lookbackMonths: 3);
 
-            // Group actual spend for the period by category
             $actualByCat = $transactions
                 ->filter(fn($t) => $t->category->type === 'expense')
                 ->groupBy('category_id')
@@ -306,40 +401,40 @@ class ReportDataService
                     'spent' => $group->sum('amount'),
                 ]);
 
-            // Union of all categories: those with a baseline AND those that are
-            // brand-new this month (no prior history yet).
             $allCategoryIds = $actualByCat->keys()
-                ->merge(collect($baselines)->keys())
+                ->merge($storedBudgets->keys())
                 ->unique();
 
             foreach ($allCategoryIds as $catId) {
-                $spent    = $actualByCat[$catId]['spent']   ?? 0;
-                if ($spent === 0) {
-                    continue;
-                }
-                $catName  = $actualByCat[$catId]['name']
+                $spent = $actualByCat[$catId]['spent'] ?? 0;
+                if ($spent === 0) continue;
+
+                $catName = $actualByCat[$catId]['name']
+                    ?? $storedBudgets[$catId]?->category?->name
                     ?? $baselines[$catId]['name']
                     ?? 'Unknown';
 
-                // If no prior history exists yet, treat last month's spend as
-                // a provisional baseline (100 % — neutral, not alarming).
-                $baseline    = $baselines[$catId]['baseline'] ?? $spent;
+                // Use stored budget if set, otherwise fall back to rolling average
+                $hasBudget   = isset($storedBudgets[$catId]);
+                $baseline    = $hasBudget
+                    ? (float) $storedBudgets[$catId]->amount
+                    : ($baselines[$catId]['baseline'] ?? $spent);
                 $monthsUsed  = $baselines[$catId]['months_used'] ?? 0;
                 $remaining   = $baseline - $spent;
                 $percentage  = $baseline > 0 ? ($spent / $baseline) * 100 : ($spent > 0 ? 100 : 0);
 
                 $budgetPerformance[] = [
                     'category'    => $catName,
-                    'budgeted'    => round($baseline, 2),   // the rolling average
+                    'budgeted'    => round($baseline, 2),
                     'spent'       => round($spent, 2),
                     'remaining'   => round($remaining, 2),
                     'percentage'  => round($percentage, 1),
-                    'months_used' => $monthsUsed,           // exposed for template use
-                    'is_new'      => $monthsUsed === 0,     // flag for "no prior data"
+                    'months_used' => $monthsUsed,
+                    'is_new'      => $monthsUsed === 0,
+                    'has_budget'  => $hasBudget,   // lets the template distinguish the two cases
                 ];
             }
 
-            // Sort: most over-budget first, then by percentage descending
             usort($budgetPerformance, fn($a, $b) => $b['percentage'] <=> $a['percentage']);
         }
 
