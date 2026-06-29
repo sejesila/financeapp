@@ -512,6 +512,14 @@ class ReportDataService
             + $outgoingAfter
             - $transfersInAfter
             + $transfersOutAfter;
+        Log::info('Savings reconstruction', [
+            'currentSavingsTotal' => $currentSavingsTotal,
+            'incomingAfter'       => $incomingAfter,
+            'outgoingAfter'       => $outgoingAfter,
+            'transfersInAfter'    => $transfersInAfter,
+            'transfersOutAfter'   => $transfersOutAfter,
+            'balanceAsAt'         => $balanceAsAt,
+        ]);
 
         return max(0, $balanceAsAt);
     }
