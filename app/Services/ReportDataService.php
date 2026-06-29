@@ -299,8 +299,10 @@ class ReportDataService
      */
     private function generateReport(User $user, Carbon $startDate, Carbon $endDate, string $type): array
     {
-        $accounts     = Account::where('user_id', $user->id)->where('is_active', true)->get();
-        $totalBalance = $accounts->sum('current_balance');
+        // AFTER
+        $accounts        = Account::where('user_id', $user->id)->where('is_active', true)->get();
+        $totalBalance    = $accounts->sum('current_balance');
+        $savingsBalance  = $accounts->where('type', 'savings')->sum('current_balance');
 
         $transactions = $this->getFilteredTransactions($user, $startDate, $endDate)
             ->sortBy(fn($t) => $t->date)
@@ -447,9 +449,10 @@ class ReportDataService
             'user'               => $user,
             'accounts'           => $accounts,
             'total_balance'      => $totalBalance,
+            'savings_balance'    => $savingsBalance,
             'total_loans'        => $totalLoanBalance,
             'total_client_funds' => $totalClientFunds,
-            'net_worth'          => $totalBalance - $totalLoanBalance - $totalClientFunds,
+            'net_worth' => $savingsBalance,   // Your money = just what's in savings accounts
             'transactions'       => match ($type) {
                 'annual'  => $transactions->take(50),
                 'monthly' => $transactions->take(30),

@@ -159,9 +159,11 @@
     $bestMonth       = $data['best_month']      ?? null;
     $worstMonth      = $data['worst_month']     ?? null;
 
+
     $annualBudgetedExpenses = $data['annual_budgeted_expenses'] ?? 0;
     $annualBudgetVariance   = $data['annual_budget_variance']   ?? 0;
     $monthsOverBudget       = $data['months_over_budget']       ?? 0;
+    $savingsBalance = $data['savings_balance'] ?? 0;
 
     /*
      * loans_paid_in_period  — transactions where category = 'Loan Repayment'
@@ -187,8 +189,9 @@
     <h3>Year-End Net Worth</h3>
     <div class="amount">{{ $currency }} {{ number_format($netWorth) }}</div>
     <div class="breakdown">
-        Assets: {{ $currency }} {{ number_format($netWorth) }}
-        &bull; Liabilities: {{ $currency }} {{ number_format($totalLoans) }}
+        {{-- AFTER --}}
+        Savings Accounts: {{ $currency }} {{ number_format($savingsBalance) }}
+        &bull; Active Loans: {{ $currency }} {{ number_format($totalLoans) }}
     </div>
 </div>
 

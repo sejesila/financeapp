@@ -106,6 +106,7 @@
     $budgetsUnder = $data['budgets_under']      ?? 0;
     $budgetsTotal = $data['budgets_total']      ?? 0;
     $txCount      = $data['transaction_count']  ?? 0;
+    $savingsBalance = $data['savings_balance'] ?? 0;
 
     $startDate = \Carbon\Carbon::parse($data['start_date']);
     $endDate   = \Carbon\Carbon::parse($data['end_date']);
@@ -129,9 +130,11 @@
 <div class="net-worth-banner">
     <h3>Your Net Worth</h3>
     <div class="amount">{{ $currency }} {{ number_format($netWorth) }}</div>
+    {{-- AFTER --}}
+    @php $savingsBalance = $data['savings_balance'] ?? 0; @endphp
     <div class="breakdown">
-        Assets: {{ $currency }} {{ number_format($netWorth) }}
-        &bull; Liabilities: {{ $currency }} {{ number_format($totalLoans) }}
+        Savings Accounts: {{ $currency }} {{ number_format($savingsBalance) }}
+        &bull; Active Loans: {{ $currency }} {{ number_format($totalLoans) }}
     </div>
 </div>
 
