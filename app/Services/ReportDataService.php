@@ -421,6 +421,13 @@ class ReportDataService
         }
 
         $insights = $this->generateInsights($user, $transactions, $startDate, $endDate, $type);
+        Log::info('Net Worth Debug', [
+            'savingsBalance'    => $savingsBalance,
+            'totalClientFunds'  => $totalClientFunds,
+            'totalLoanBalance'  => $totalLoanBalance,
+            'ownedSavings'      => $ownedSavings,
+            'netWorth'          => $netWorth,
+        ]);
 
         return [
             'period_type'          => $type,
