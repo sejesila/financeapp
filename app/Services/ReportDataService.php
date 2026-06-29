@@ -10,6 +10,7 @@ use App\Models\Account;
 use App\Models\Loan;
 use App\Models\Budget;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
