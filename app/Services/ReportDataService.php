@@ -317,6 +317,7 @@ class ReportDataService
 
         $totalClientFunds = ClientFund::where('user_id', $user->id)
             ->whereNotIn('status', ['completed', 'cancelled'])
+            ->whereDate('created_at', '<=', $endDate)
             ->sum('balance');
 
 // Historical savings balance — what was actually in savings at period end, not today
