@@ -321,8 +321,8 @@ class ReportDataService
 
 // Historical savings balance — what was actually in savings at period end, not today
         $savingsBalance = $this->getSavingsBalanceAsAt($user, $endDate);
-        // What's actually yours = savings minus what belongs to clients, minus loan obligations
-        $netWorth = max(0, ($savingsBalance - $totalClientFunds) - $totalLoanBalance);
+        $ownedSavings = max(0, $savingsBalance - $totalClientFunds);
+        $netWorth     = max(0, $ownedSavings - $totalLoanBalance);
 
         // --- Transactions ---
         $transactions = $this->getFilteredTransactions($user, $startDate, $endDate)
