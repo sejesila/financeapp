@@ -302,7 +302,7 @@ class ReportDataService
         // AFTER
         $accounts        = Account::where('user_id', $user->id)->where('is_active', true)->get();
         $totalBalance    = $accounts->sum('current_balance');
-        $savingsBalance  = $accounts->where('type', 'savings')->sum('current_balance');
+        $savingsBalance = $accounts->where('type', 'savings')->sum('current_balance') - $totalClientFunds;
 
         $transactions = $this->getFilteredTransactions($user, $startDate, $endDate)
             ->sortBy(fn($t) => $t->date)
@@ -452,7 +452,7 @@ class ReportDataService
             'savings_balance'    => $savingsBalance,
             'total_loans'        => $totalLoanBalance,
             'total_client_funds' => $totalClientFunds,
-            'net_worth' => $savingsBalance,   // Your money = just what's in savings accounts
+            'net_worth' => $savingsBalance,
             'transactions'       => match ($type) {
                 'annual'  => $transactions->take(50),
                 'monthly' => $transactions->take(30),
