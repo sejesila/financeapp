@@ -298,7 +298,6 @@ class ReportDataService
      */
     private function generateReport(User $user, Carbon $startDate, Carbon $endDate, string $type): array
     {
-        // --- Accounts & balances (all computed upfront so nothing is used before defined) ---
         $accounts         = Account::where('user_id', $user->id)->where('is_active', true)->get();
         $totalBalance     = $accounts->sum('current_balance');
 
@@ -309,8 +308,9 @@ class ReportDataService
             ->whereNotIn('status', ['completed', 'cancelled'])
             ->sum('balance');
 
-        $savingsBalance   = $accounts->where('type', 'savings')->sum('current_balance');
-        $netWorth         = max(0, $savingsBalance - $totalClientFunds);
+// Historical savings balance — what was actually in savings at period end, not today
+        $savingsBalance = $this->getSavingsBalanceAsAt($user, $endDate);
+        $netWorth       = max(0, $savingsBalance - $totalClientFunds);
 
         // --- Transactions ---
         $transactions = $this->getFilteredTransactions($user, $startDate, $endDate)
@@ -466,6 +466,62 @@ class ReportDataService
             'budget_performance'   => $budgetPerformance,
             'insights'             => $insights,
         ];
+    }
+    /**
+     * Calculate what a savings account's balance was at a specific point in time
+     * by taking current_balance and reversing transactions that occurred after $asAtDate.
+     */
+    private function getSavingsBalanceAsAt(User $user, Carbon $asAtDate): float
+    {
+        $savingsAccounts = Account::where('user_id', $user->id)
+            ->where('type', 'savings')
+            ->where('is_active', true)
+            ->get();
+
+        if ($savingsAccounts->isEmpty()) {
+            return 0.0;
+        }
+
+        $savingsAccountIds = $savingsAccounts->pluck('id');
+        $currentSavingsTotal = $savingsAccounts->sum('current_balance');
+
+        // Transactions INTO savings accounts after the period end (these increased the balance,
+        // so we subtract them to go back in time)
+        $incomingAfter = Transaction::where('user_id', $user->id)
+            ->whereIn('account_id', $savingsAccountIds)
+            ->whereHas('category', fn($q) => $q->where('type', 'income'))
+            ->where(DB::raw('COALESCE(period_date, date)'), '>', $asAtDate->toDateString())
+            ->sum('amount');
+
+        // Transactions OUT OF savings accounts after the period end (these decreased the balance,
+        // so we add them back to go back in time)
+        $outgoingAfter = Transaction::where('user_id', $user->id)
+            ->whereIn('account_id', $savingsAccountIds)
+            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
+            ->where(DB::raw('COALESCE(period_date, date)'), '>', $asAtDate->toDateString())
+            ->sum('amount');
+
+        // Transfers INTO savings accounts after period end (subtract to reverse)
+        $transfersInAfter = Transfer::withoutGlobalScopes()
+            ->where('user_id', $user->id)
+            ->whereIn('to_account_id', $savingsAccountIds)
+            ->where('date', '>', $asAtDate->toDateString())
+            ->sum('amount');
+
+        // Transfers OUT OF savings accounts after period end (add back to reverse)
+        $transfersOutAfter = Transfer::withoutGlobalScopes()
+            ->where('user_id', $user->id)
+            ->whereIn('from_account_id', $savingsAccountIds)
+            ->where('date', '>', $asAtDate->toDateString())
+            ->sum('amount');
+
+        $balanceAsAt = $currentSavingsTotal
+            - $incomingAfter
+            + $outgoingAfter
+            - $transfersInAfter
+            + $transfersOutAfter;
+
+        return max(0, $balanceAsAt);
     }
 
     /**
