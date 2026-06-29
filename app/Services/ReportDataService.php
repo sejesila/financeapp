@@ -293,17 +293,26 @@ class ReportDataService
 
         return $baselines;
     }
-
     /**
      * Core report generation logic
      */
     private function generateReport(User $user, Carbon $startDate, Carbon $endDate, string $type): array
     {
-        // AFTER
-        $accounts        = Account::where('user_id', $user->id)->where('is_active', true)->get();
-        $totalBalance    = $accounts->sum('current_balance');
-        $savingsBalance = $accounts->where('type', 'savings')->sum('current_balance') - $totalClientFunds;
+        // --- Accounts & balances (all computed upfront so nothing is used before defined) ---
+        $accounts         = Account::where('user_id', $user->id)->where('is_active', true)->get();
+        $totalBalance     = $accounts->sum('current_balance');
 
+        $activeLoans      = Loan::where('user_id', $user->id)->where('status', 'active')->with('account')->get();
+        $totalLoanBalance = $activeLoans->sum('balance');
+
+        $totalClientFunds = ClientFund::where('user_id', $user->id)
+            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->sum('balance');
+
+        $savingsBalance   = $accounts->where('type', 'savings')->sum('current_balance');
+        $netWorth         = max(0, $savingsBalance - $totalClientFunds);
+
+        // --- Transactions ---
         $transactions = $this->getFilteredTransactions($user, $startDate, $endDate)
             ->sortBy(fn($t) => $t->date)
             ->reverse()
@@ -368,22 +377,10 @@ class ReportDataService
                 'amount' => $item->total,
             ]);
 
-        $activeLoans      = Loan::where('user_id', $user->id)->where('status', 'active')->with('account')->get();
-        $totalLoanBalance = $activeLoans->sum('balance');
-        $totalClientFunds = ClientFund::where('user_id', $user->id)
-            ->whereNotIn('status', ['completed', 'cancelled'])
-            ->sum('balance');
-
-        // -------------------------------------------------------------------------
-        // Budget Performance — uses rolling 3-month average as the baseline target
-        // instead of stored Budget records.  This means every expense category that
-        // had spend in the period is automatically benchmarked against its own
-        // historical average, so the percentage is always a meaningful signal.
-        // -------------------------------------------------------------------------
+        // --- Budget Performance (monthly only) ---
         $budgetPerformance = [];
 
         if ($type === 'monthly') {
-            // Replace buildRollingBaselines() with stored Budget records
             $reportMonth = $startDate->month;
             $reportYear  = $startDate->year;
 
@@ -416,14 +413,13 @@ class ReportDataService
                     ?? $baselines[$catId]['name']
                     ?? 'Unknown';
 
-                // Use stored budget if set, otherwise fall back to rolling average
-                $hasBudget   = isset($storedBudgets[$catId]);
-                $baseline    = $hasBudget
+                $hasBudget  = isset($storedBudgets[$catId]);
+                $baseline   = $hasBudget
                     ? (float) $storedBudgets[$catId]->amount
                     : ($baselines[$catId]['baseline'] ?? $spent);
-                $monthsUsed  = $baselines[$catId]['months_used'] ?? 0;
-                $remaining   = $baseline - $spent;
-                $percentage  = $baseline > 0 ? ($spent / $baseline) * 100 : ($spent > 0 ? 100 : 0);
+                $monthsUsed = $baselines[$catId]['months_used'] ?? 0;
+                $remaining  = $baseline - $spent;
+                $percentage = $baseline > 0 ? ($spent / $baseline) * 100 : ($spent > 0 ? 100 : 0);
 
                 $budgetPerformance[] = [
                     'category'    => $catName,
@@ -433,7 +429,7 @@ class ReportDataService
                     'percentage'  => round($percentage, 1),
                     'months_used' => $monthsUsed,
                     'is_new'      => $monthsUsed === 0,
-                    'has_budget'  => $hasBudget,   // lets the template distinguish the two cases
+                    'has_budget'  => $hasBudget,
                 ];
             }
 
@@ -443,17 +439,17 @@ class ReportDataService
         $insights = $this->generateInsights($user, $transactions, $startDate, $endDate, $type);
 
         return [
-            'period_type'        => $type,
-            'start_date'         => $startDate->format('M d, Y'),
-            'end_date'           => $endDate->format('M d, Y'),
-            'user'               => $user,
-            'accounts'           => $accounts,
-            'total_balance'      => $totalBalance,
-            'savings_balance'    => $savingsBalance,
-            'total_loans'        => $totalLoanBalance,
-            'total_client_funds' => $totalClientFunds,
-            'net_worth' => $savingsBalance,
-            'transactions'       => match ($type) {
+            'period_type'          => $type,
+            'start_date'           => $startDate->format('M d, Y'),
+            'end_date'             => $endDate->format('M d, Y'),
+            'user'                 => $user,
+            'accounts'             => $accounts,
+            'total_balance'        => $totalBalance,
+            'savings_balance'      => $savingsBalance,
+            'total_loans'          => $totalLoanBalance,
+            'total_client_funds'   => $totalClientFunds,
+            'net_worth'            => $netWorth,
+            'transactions'         => match ($type) {
                 'annual'  => $transactions->take(50),
                 'monthly' => $transactions->take(30),
                 default   => $transactions->take(25),
