@@ -32,8 +32,13 @@ class ReportDataService
         $allBudgets = Budget::where('user_id', $user->id)
             ->where('year', $year)
             ->get()
-            ->groupBy('month')  // keyed by month number
+            ->groupBy('month')
             ->map(fn($group) => $group->keyBy('category_id'));
+
+        // Load all lookback transactions once (3 months before Jan 1) — fixes N+1
+        $lookbackStart = Carbon::create($year, 1, 1)->startOfDay()->subMonths(3)->startOfMonth();
+        $lookbackEnd   = Carbon::create($year, 1, 1)->startOfDay()->subDay()->endOfDay();
+        $lookbackTx    = $this->getFilteredTransactions($user, $lookbackStart, $lookbackEnd);
 
         $monthlyBreakdown = [];
         for ($month = 1; $month <= 12; $month++) {
@@ -58,8 +63,8 @@ class ReportDataService
                     'spent' => $group->sum('amount'),
                 ]);
 
-            // Rolling baselines for fallback
-            $baselines = $this->buildRollingBaselines($user, $mStart, lookbackMonths: 3);
+            // Use pre-loaded lookback transactions instead of re-querying
+            $baselines = $this->buildRollingBaselines($user, $mStart, lookbackMonths: 3, preloadedTx: $lookbackTx);
 
             $allCatIds = $actualByCat->keys()
                 ->merge($monthBudgets->keys())
@@ -110,19 +115,18 @@ class ReportDataService
                 ->sum('amount');
 
             $monthlyBreakdown[] = [
-                'month'               => $mStart->format('F Y'),
-                'month_short'         => $mStart->format('M'),
-                'income'              => $mIncome,
-                'expenses'            => $mExpenses,
-                'net_flow'            => $mNet,
-                'savings_rate'        => $mIncome > 0 ? ($mNet / $mIncome) * 100 : 0,
-                'transaction_count'   => $monthTransactions->count(),
-                // Budget fields
-                'budgeted_expenses'   => round($totalBudgeted, 2),
-                'budgeted_income'     => round($mIncomeBudgeted, 2),
-                'budget_variance'     => round($totalBudgeted - $totalSpent, 2), // positive = under budget
-                'cats_over_budget'    => $catsOver,
-                'cats_under_budget'   => $catsUnder,
+                'month'                => $mStart->format('F Y'),
+                'month_short'          => $mStart->format('M'),
+                'income'               => $mIncome,
+                'expenses'             => $mExpenses,
+                'net_flow'             => $mNet,
+                'savings_rate'         => $mIncome > 0 ? ($mNet / $mIncome) * 100 : 0,
+                'transaction_count'    => $monthTransactions->count(),
+                'budgeted_expenses'    => round($totalBudgeted, 2),
+                'budgeted_income'      => round($mIncomeBudgeted, 2),
+                'budget_variance'      => round($totalBudgeted - $totalSpent, 2),
+                'cats_over_budget'     => $catsOver,
+                'cats_under_budget'    => $catsUnder,
                 'category_performance' => $categoryPerformance,
             ];
         }
@@ -147,22 +151,22 @@ class ReportDataService
             ->filter(fn($t) => $t->category->type === 'income')
             ->sum('amount');
 
-        $report['monthly_breakdown']          = $monthlyBreakdown;
-        $report['best_month']                 = $bestMonth;
-        $report['worst_month']                = $worstMonth;
-        $report['profitable_months']          = $profitMonths;
-        $report['loans_paid_in_period']       = $loansPaidInYear;
-        $report['loans_repaid_in_period']     = $loansRepaidDuringYear;
-        $report['prior_period_income']        = $priorYearIncome;
-        $report['income_trend']               = $priorYearIncome > 0
+        $report['monthly_breakdown']        = $monthlyBreakdown;
+        $report['best_month']               = $bestMonth;
+        $report['worst_month']              = $worstMonth;
+        $report['profitable_months']        = $profitMonths;
+        $report['loans_paid_in_period']     = $loansPaidInYear;
+        $report['loans_repaid_in_period']   = $loansRepaidDuringYear;
+        $report['prior_period_income']      = $priorYearIncome;
+        $report['income_trend']             = $priorYearIncome > 0
             ? (($report['income'] - $priorYearIncome) / $priorYearIncome) * 100
             : null;
-        $report['period_type']                = 'annual';
-        $report['year']                       = $year;
-        $report['salary_savings_rate']        = $this->getSalarySavingsRate($user, $startDate, $endDate);
-        $report['annual_budgeted_expenses']   = $annualBudgetedExpenses;
-        $report['annual_budget_variance']     = $annualBudgetVariance;
-        $report['months_over_budget']         = $monthsOverBudget;
+        $report['period_type']              = 'annual';
+        $report['year']                     = $year;
+        $report['salary_savings_rate']      = $this->getSalarySavingsRate($user, $startDate, $endDate);
+        $report['annual_budgeted_expenses'] = $annualBudgetedExpenses;
+        $report['annual_budget_variance']   = $annualBudgetVariance;
+        $report['months_over_budget']       = $monthsOverBudget;
 
         return $report;
     }
@@ -258,7 +262,7 @@ class ReportDataService
      * Returns an array keyed by category_id:
      *   [ category_id => ['name' => string, 'baseline' => float, 'months_used' => int] ]
      */
-    private function buildRollingBaselines(User $user, Carbon $startDate, int $lookbackMonths = 3): array
+    private function buildRollingBaselines(User $user, Carbon $startDate, int $lookbackMonths = 3, ?Collection $preloadedTx = null): array
     {
         $baselines = [];
 
@@ -266,8 +270,15 @@ class ReportDataService
             $mStart = $startDate->copy()->subMonths($i)->startOfMonth();
             $mEnd   = $mStart->copy()->endOfMonth();
 
-            $monthTx = $this->getFilteredTransactions($user, $mStart, $mEnd)
-                ->filter(fn($t) => $t->category->type === 'expense');
+            if ($preloadedTx !== null) {
+                $monthTx = $preloadedTx->filter(function ($t) use ($mStart, $mEnd) {
+                    $date = Carbon::parse($t->period_date ?? $t->date);
+                    return $date->between($mStart, $mEnd) && $t->category->type === 'expense';
+                });
+            } else {
+                $monthTx = $this->getFilteredTransactions($user, $mStart, $mEnd)
+                    ->filter(fn($t) => $t->category->type === 'expense');
+            }
 
             foreach ($monthTx->groupBy('category_id') as $catId => $group) {
                 if (!isset($baselines[$catId])) {
@@ -282,7 +293,6 @@ class ReportDataService
             }
         }
 
-        // Convert running totals to averages
         foreach ($baselines as $catId => &$data) {
             $data['baseline'] = $data['months_used'] > 0
                 ? $data['total'] / $data['months_used']
@@ -340,43 +350,15 @@ class ReportDataService
             ->take(5)
             ->values();
 
-        $dailySpending = Transaction::where('user_id', $user->id)
-            ->whereBetween(DB::raw('COALESCE(period_date, date)'), [
-                $startDate->toDateString(),
-                $endDate->toDateString(),
+        $dailySpending = $transactions
+            ->filter(fn($t) => $t->category->type === 'expense')
+            ->groupBy(fn($t) => Carbon::parse($t->period_date ?? $t->date)->format('Y-m-d'))
+            ->map(fn($group, $date) => [
+                'date'   => Carbon::parse($date)->format('M d'),
+                'amount' => $group->sum('amount'),
             ])
-            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
-            ->where(function ($q) {
-                $q->where(function ($q2) {
-                    $q2->where('payment_method', '!=', 'Client Fund')
-                        ->where('payment_method', '!=', 'Client Commission')
-                        ->orWhereNull('payment_method');
-                })
-                    ->orWhereExists(function ($query) {
-                        $query->select(DB::raw(1))
-                            ->from('categories')
-                            ->whereColumn('categories.id', 'transactions.category_id')
-                            ->where('categories.type', 'income')
-                            ->where('transactions.payment_method', 'Client Commission');
-                    });
-            })
-            ->whereHas('category', function ($q) {
-                $q->whereNotIn('name', [
-                    'Loan Disbursement',
-                    'Loan Receipt',
-                    'Balance Adjustment',
-                    'Client Funds',
-                ]);
-            })
-            ->select(DB::raw('DATE(COALESCE(period_date, date)) as date'), DB::raw('SUM(amount) as total'))
-            ->groupBy(DB::raw('DATE(COALESCE(period_date, date))'))
-            ->orderBy('date')
-            ->get()
-            ->map(fn($item) => [
-                'date'   => Carbon::parse($item->date)->format('M d'),
-                'amount' => $item->total,
-            ]);
-
+            ->sortKeys()
+            ->values();
         // --- Budget Performance (monthly only) ---
         $budgetPerformance = [];
 
@@ -530,7 +512,10 @@ class ReportDataService
     private function getLoanPaymentsInPeriod(User $user, Carbon $startDate, Carbon $endDate): array
     {
         $payments = Transaction::where('user_id', $user->id)
-            ->whereBetween(DB::raw('COALESCE(period_date, date)'), [$startDate, $endDate])
+            ->whereBetween(DB::raw('COALESCE(period_date, date)'), [
+                $startDate->toDateString(),
+                $endDate->toDateString(),
+            ])
             ->whereHas('category', fn($q) => $q->where('name', 'Loan Repayment'))
             ->with(['category', 'account'])
             ->get();
@@ -635,7 +620,7 @@ class ReportDataService
             $insights[] = [
                 'icon'        => '💸',
                 'title'       => 'Biggest Expense',
-                'value'       => 'KES ' . $biggestExpense->amount,
+                'value'       => 'KES ' . number_format($biggestExpense->amount, 0),
                 'description' => $biggestExpense->description . ' (' . $biggestExpense->category->name . ')',
             ];
         }
