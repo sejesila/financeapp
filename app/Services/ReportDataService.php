@@ -11,7 +11,6 @@ use App\Models\Loan;
 use App\Models\Budget;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class ReportDataService
@@ -223,7 +222,7 @@ class ReportDataService
     {
         return Transaction::query()
             ->where('user_id', $user->id)
-            ->whereBetween(DB::raw('COALESCE(period_date, date)'), [
+            ->whereBetween('date', [
                 $startDate->toDateString(),
                 $endDate->toDateString(),
             ])
@@ -273,7 +272,7 @@ class ReportDataService
 
             if ($preloadedTx !== null) {
                 $monthTx = $preloadedTx->filter(function ($t) use ($mStart, $mEnd) {
-                    $date = Carbon::parse($t->period_date ?? $t->date);
+                    $date = Carbon::parse($t->date);
                     return $date->between($mStart, $mEnd) && $t->category->type === 'expense';
                 });
             } else {
@@ -304,6 +303,7 @@ class ReportDataService
 
         return $baselines;
     }
+
     /**
      * Core report generation logic
      */
@@ -311,7 +311,7 @@ class ReportDataService
     {
         $accounts = Account::where('user_id', $user->id)->where('is_active', true)->get();
 
-// Reconstruct each account's balance as of $endDate, not today
+        // Reconstruct each account's balance as of $endDate, not today
         $accountsAsAt = $accounts->map(function ($account) use ($endDate) {
             $account->balance_as_at = $this->getAccountBalanceAsAt($account, $endDate);
             return $account;
@@ -332,7 +332,7 @@ class ReportDataService
             ->whereNotIn('status', ['cancelled'])
             ->sum('balance');
 
-// Historical savings balance — what was actually in savings at period end, not today
+        // Historical savings balance — what was actually in savings at period end, not today
         $savingsBalance = $this->getSavingsBalanceAsAt($user, $endDate);
         $ownedSavings = max(0, $savingsBalance - $totalClientFunds);
         $netWorth     = max(0, $ownedSavings - $totalLoanBalance);
@@ -367,13 +367,14 @@ class ReportDataService
 
         $dailySpending = $transactions
             ->filter(fn($t) => $t->category->type === 'expense')
-            ->groupBy(fn($t) => Carbon::parse($t->period_date ?? $t->date)->format('Y-m-d'))
+            ->groupBy(fn($t) => Carbon::parse($t->date)->format('Y-m-d'))
             ->map(fn($group, $date) => [
                 'date'   => Carbon::parse($date)->format('M d'),
                 'amount' => $group->sum('amount'),
             ])
             ->sortKeys()
             ->values();
+
         // --- Budget Performance (monthly only) ---
         $budgetPerformance = [];
 
@@ -471,10 +472,7 @@ class ReportDataService
             'insights'             => $insights,
         ];
     }
-    /**
-     * Calculate what a savings account's balance was at a specific point in time
-     * by taking current_balance and reversing transactions that occurred after $asAtDate.
-     */
+
     /**
      * Calculate what a savings account's balance was at a specific point in time
      * by taking current_balance and reversing transactions that occurred after $asAtDate.
@@ -496,7 +494,7 @@ class ReportDataService
         // Pull all transactions on these accounts after asAtDate in one query
         $txAfter = Transaction::where('user_id', $user->id)
             ->whereIn('account_id', $savingsAccountIds)
-            ->where(DB::raw('COALESCE(period_date, date)'), '>', $asAtDate->toDateString())
+            ->where('date', '>', $asAtDate->toDateString())
             ->with('category')
             ->get();
 
@@ -532,6 +530,7 @@ class ReportDataService
 
         return max(0, $balanceAsAt);
     }
+
     /**
      * Calculate what a single account's balance was at a specific point in time
      * by taking current_balance and reversing transactions/transfers that
@@ -543,7 +542,7 @@ class ReportDataService
 
         $txAfter = Transaction::where('user_id', $account->user_id)
             ->where('account_id', $account->id)
-            ->where(DB::raw('COALESCE(period_date, date)'), '>', $asAtDate->toDateString())
+            ->where('date', '>', $asAtDate->toDateString())
             ->with('category')
             ->get();
 
@@ -582,7 +581,7 @@ class ReportDataService
     private function getLoanPaymentsInPeriod(User $user, Carbon $startDate, Carbon $endDate): array
     {
         $payments = Transaction::where('user_id', $user->id)
-            ->whereBetween(DB::raw('COALESCE(period_date, date)'), [
+            ->whereBetween('date', [
                 $startDate->toDateString(),
                 $endDate->toDateString(),
             ])
@@ -709,10 +708,11 @@ class ReportDataService
 
         return $insights;
     }
+
     public function getSalarySavingsRate(User $user, Carbon $startDate, Carbon $endDate): array
     {
         $salaryTransactions = Transaction::where('user_id', $user->id)
-            ->whereBetween(DB::raw('COALESCE(period_date, date)'), [
+            ->whereBetween('date', [
                 $startDate->toDateString(),
                 $endDate->toDateString(),
             ])
@@ -736,8 +736,8 @@ class ReportDataService
             $salaryDate = Carbon::parse($salary->date);
             $windowEnd  = $salaryDate->copy()->addHours(48);
 
-            $transferredToSavings = Transfer::withoutGlobalScopes()   // ← key fix
-            ->where('user_id', $user->id)
+            $transferredToSavings = Transfer::withoutGlobalScopes()
+                ->where('user_id', $user->id)
                 ->whereIn('to_account_id', $savingsAccountIds)
                 ->whereBetween('date', [
                     $salaryDate->toDateTimeString(),
