@@ -283,7 +283,7 @@ class MpesaSmsParser
                 'date'            => self::parseDate($m[5], $m[6]),
                 'balance'         => self::parseAmount($m[7]),
                 'fee'             => self::parseAmount($m[8]),
-                'description'     => 'Paybill - ' . $recipient,
+                'description'     => 'Paybill - ' . $recipient . ' (Acc: ' . $accountNo . ')',
             ];
         }
 
