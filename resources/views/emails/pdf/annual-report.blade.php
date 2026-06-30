@@ -511,7 +511,7 @@
                         @endif
                     </div>
                     <div class="budget-grid">
-                        @foreach($month['category_performance']->chunk(2) ?? collect($month['category_performance'])->chunk(2) as $pair)
+                        @foreach(collect($month['category_performance'])->chunk(2) as $pair)
                             <div class="budget-row">
                                 @foreach($pair as $budget)
                                     @php
