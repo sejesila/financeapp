@@ -247,9 +247,13 @@ class StatementDataService
                     'narration'    => 'Interest earned – '
                         . Carbon::parse($last['sort_date'])->format('F Y')
                         . ' (consolidated)',
-                    // running_balance is already correct from $last — no recalculation needed
                 ]);
             })
+            // groupBy() keeps each group at the position of its FIRST occurrence,
+            // which for interest rows is often earlier in the month than the
+            // consolidated row's display date (the last posting). Re-sort by date
+            // so the row appears where it belongs instead of near the top.
+            ->sortBy([['sort_date', 'asc'], ['sort_id', 'asc']])
             ->values()
             ->all();
 

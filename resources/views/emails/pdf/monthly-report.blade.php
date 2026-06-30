@@ -8,19 +8,19 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, sans-serif; font-size: 11px; line-height: 1.5; color: #333; background: white; }
 
-        .watermark { position: fixed; top: 280px; left: 40px; transform: rotate(-45deg); font-size: 80px; color: rgba(139, 92, 246, 0.08); z-index: 0; font-weight: bold; pointer-events: none; }
+        .watermark { position: absolute; top: 280px; left: 40px; transform: rotate(-45deg); font-size: 80px; color: rgba(139, 92, 246, 0.06); z-index: 0; font-weight: bold; pointer-events: none; }
 
-        .header { text-align: center; padding: 20px 0; margin-bottom: 20px; background: linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%); color: white; border-radius: 8px; page-break-after: avoid; }
+        .header { text-align: center; padding: 20px 0; margin-bottom: 20px; background: #6366F1; color: white; border-radius: 8px; page-break-after: avoid; }
         .header h1 { font-size: 24px; letter-spacing: 1px; font-weight: bold; }
         .header .period { font-size: 12px; margin-top: 5px; opacity: 0.95; }
         .header .user-info { font-size: 12px; margin-top: 8px; font-weight: 600; }
 
-        .net-worth-banner { background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%); color: white; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; page-break-inside: avoid; page-break-after: avoid; }
+        .net-worth-banner { background: #6366F1; color: white; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; page-break-after: avoid; }
         .net-worth-banner h3 { margin: 0 0 10px 0; font-size: 11px; opacity: 0.95; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; }
         .net-worth-banner .amount { font-size: 28px; font-weight: bold; margin-bottom: 8px; }
         .net-worth-banner .breakdown { font-size: 10px; opacity: 0.9; margin-top: 8px; }
 
-        .summary-grid { display: flex; gap: 10px; margin: 20px 0; page-break-inside: avoid; page-break-after: avoid; }
+        .summary-grid { display: flex; gap: 10px; margin: 20px 0; page-break-after: avoid; }
         .summary-cell { flex: 1; padding: 18px; background: #FFFFFF; border: 2px solid #E5E7EB; border-radius: 8px; text-align: center; }
         .summary-cell.income  { border-left: 5px solid #10B981; }
         .summary-cell.expense { border-left: 5px solid #EF4444; }
@@ -28,7 +28,7 @@
         .summary-cell h3 { margin: 0 0 10px 0; font-size: 10px; color: #6B7280; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
         .summary-cell .amount { font-size: 20px; font-weight: bold; line-height: 1.2; }
 
-        .stats-grid { display: flex; margin: 20px 0; background: #F9FAFB; padding: 12px; border-radius: 8px; page-break-inside: avoid; page-break-after: avoid; }
+        .stats-grid { display: flex; margin: 20px 0; background: #F9FAFB; padding: 12px; border-radius: 8px; page-break-after: avoid; }
         .stat-cell { flex: 1; text-align: center; padding: 10px 5px; }
         .stat-label { font-size: 8px; color: #6B7280; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
         .stat-value { font-size: 14px; font-weight: bold; color: #1F2937; margin-top: 4px; }
@@ -36,7 +36,7 @@
         .section { margin: 20px 0; page-break-inside: avoid; }
         .section-title { font-size: 13px; font-weight: bold; color: #1F2937; margin-bottom: 12px; padding: 8px 12px; background: #F9FAFB; border-left: 4px solid #8B5CF6; border-radius: 4px; page-break-after: avoid; }
 
-        .budget-item { background: #FAFAFA; padding: 12px; margin-bottom: 10px; border-left: 4px solid; border-radius: 4px; page-break-inside: avoid; }
+        .budget-item { background: #FAFAFA; padding: 12px; border-left: 4px solid; border-radius: 4px; }
         .budget-item.good    { border-color: #10B981; }
         .budget-item.warning { border-color: #F59E0B; }
         .budget-item.danger  { border-color: #EF4444; }
@@ -50,25 +50,30 @@
         .budget-fill.danger  { background: #EF4444; }
         .budget-amounts { font-size: 9px; color: #6B7280; }
 
-        .budget-grid { display: flex; flex-wrap: wrap; gap: 10px; page-break-inside: avoid; }
-        .budget-grid .budget-item { flex: 1 1 calc(50% - 5px); min-width: 0; margin-bottom: 0; page-break-inside: avoid; }
+        /* Budget grid rendered as a CSS table instead of flex-wrap for cheaper layout */
+        .budget-grid { display: table; width: 100%; border-collapse: separate; border-spacing: 0 10px; table-layout: fixed; }
+        .budget-grid .budget-row { display: table-row; }
+        .budget-grid .budget-cell { display: table-cell; width: 50%; padding-right: 10px; vertical-align: top; }
+        .budget-grid .budget-cell:last-child { padding-right: 0; }
 
-        .insights-grid { display: flex; flex-wrap: wrap; gap: 10px; page-break-inside: avoid; }
-        .insights-grid .insight-box { flex: 1 1 calc(50% - 5px); min-width: 0; margin: 0; page-break-inside: avoid; }
+        .insights-grid { display: table; width: 100%; border-collapse: separate; border-spacing: 0 10px; table-layout: fixed; }
+        .insights-grid .insight-row { display: table-row; }
+        .insights-grid .insight-cell { display: table-cell; width: 50%; padding-right: 10px; vertical-align: top; }
+        .insights-grid .insight-cell:last-child { padding-right: 0; }
 
-        table { width: 100%; border-collapse: collapse; margin: 12px 0; background: white; page-break-inside: avoid; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; background: white; }
         table th { background: #F3F4F6; padding: 10px 8px; text-align: left; font-size: 9px; color: #4B5563; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; border-bottom: 2px solid #E5E7EB; }
         table td { padding: 9px 8px; border-bottom: 1px solid #F3F4F6; font-size: 10px; }
         table tr.total-row { background: #F9FAFB; font-weight: bold; border-top: 2px solid #8B5CF6; }
 
-        .alert { padding: 12px; border-radius: 6px; margin: 12px 0; border-left: 4px solid; page-break-inside: avoid; }
+        .alert { padding: 12px; border-radius: 6px; margin: 12px 0; border-left: 4px solid; }
         .alert.warning { background: #FEF3C7; border-color: #F59E0B; color: #92400E; }
         .alert.info    { background: #DBEAFE; border-color: #3B82F6; color: #1E40AF; }
         .alert.success { background: #D1FAE5; border-color: #10B981; color: #065F46; }
         .alert-title { font-weight: bold; font-size: 10px; margin-bottom: 4px; }
         .alert-text  { font-size: 9px; line-height: 1.4; }
 
-        .insight-box { background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%); padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #6366F1; page-break-inside: avoid; }
+        .insight-box { background: #EEF2FF; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #6366F1; }
         .insight-box h4 { margin: 0 0 8px 0; font-size: 11px; color: #4338CA; font-weight: bold; }
         .insight-box p  { margin: 4px 0; font-size: 10px; color: #4B5563; line-height: 1.5; }
 
@@ -78,7 +83,7 @@
         .badge.warning { background: #FEF3C7; color: #92400E; }
         .badge.neutral { background: #F3F4F6; color: #4B5563; }
 
-        .trend-box { display: flex; margin: 0 0 16px 0; background: #F9FAFB; border-radius: 8px; padding: 12px; page-break-inside: avoid; }
+        .trend-box { display: flex; margin: 0 0 16px 0; background: #F9FAFB; border-radius: 8px; padding: 12px; page-break-after: avoid; }
         .trend-cell { flex: 1; text-align: center; padding: 8px; border-right: 1px solid #E5E7EB; }
         .trend-cell:last-child { border-right: none; }
         .trend-label   { font-size: 8px; color: #6B7280; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px; }
@@ -112,6 +117,9 @@
     $endDate   = \Carbon\Carbon::parse($data['end_date']);
     $days      = $startDate->diffInDays($endDate) + 1;
     $dailyAvg  = $days > 0 ? $expenses / $days : 0;
+
+    // Cap budget items shown to keep DOM size (and render time) down
+    $budgetPerformance = collect($data['budget_performance'] ?? [])->take(10);
 @endphp
 
 <div class="watermark">CONFIDENTIAL</div>
@@ -130,8 +138,6 @@
 <div class="net-worth-banner">
     <h3>Your Net Worth</h3>
     <div class="amount">{{ $currency }} {{ number_format($netWorth) }}</div>
-    {{-- AFTER --}}
-    @php $savingsBalance = $data['savings_balance'] ?? 0; @endphp
     <div class="breakdown">
         Savings Accounts: {{ $currency }} {{ number_format($savingsBalance) }}
         &bull; Active Loans: {{ $currency }} {{ number_format($totalLoans) }}
@@ -219,32 +225,41 @@
 @endif
 
 <!-- Budget Performance -->
-@if(!empty($data['budget_performance']))
+@if($budgetPerformance->isNotEmpty())
     <div class="section">
         <div class="section-title">Budget Performance Analysis</div>
         <div class="budget-grid">
-            @foreach($data['budget_performance'] as $budget)
-                @php
-                    $pct         = min($budget['percentage'], 100);
-                    $statusClass = $budget['percentage'] >= 100 ? 'danger' : ($budget['percentage'] >= 80 ? 'warning' : 'good');
-                    $pctColor    = $budget['percentage'] >= 100 ? '#DC2626' : ($budget['percentage'] >= 80 ? '#D97706' : '#059669');
-                @endphp
-                <div class="budget-item {{ $statusClass }}">
-                    <div class="budget-header">
-                        <div class="budget-name">{{ $budget['category'] }}</div>
-                        <div class="budget-percent" style="color: {{ $pctColor }};">{{ number_format($budget['percentage'], 1) }}%</div>
-                    </div>
-                    <div class="budget-bar">
-                        <div class="budget-fill {{ $statusClass }}" style="width: {{ $pct }}%;"></div>
-                    </div>
-                    <div class="budget-amounts">
-                        Spent: {{ $currency }} {{ number_format($budget['spent']) }}
-                        of {{ $currency }} {{ number_format($budget['budgeted']) }}
-                        ({{ $budget['has_budget'] ? 'set budget' : ($budget['is_new'] ? 'new category' : $budget['months_used'] . '-mo avg') }})
-                        &bull; {{ $budget['remaining'] >= 0
-        ? 'Remaining: ' . $currency . ' ' . number_format($budget['remaining'])
-        : 'Over by: ' . $currency . ' ' . number_format(abs($budget['remaining'])) }}
-                    </div>
+            @foreach($budgetPerformance->chunk(2) as $pair)
+                <div class="budget-row">
+                    @foreach($pair as $budget)
+                        @php
+                            $pct         = min($budget['percentage'], 100);
+                            $statusClass = $budget['percentage'] >= 100 ? 'danger' : ($budget['percentage'] >= 80 ? 'warning' : 'good');
+                            $pctColor    = $budget['percentage'] >= 100 ? '#DC2626' : ($budget['percentage'] >= 80 ? '#D97706' : '#059669');
+                        @endphp
+                        <div class="budget-cell">
+                            <div class="budget-item {{ $statusClass }}">
+                                <div class="budget-header">
+                                    <div class="budget-name">{{ $budget['category'] }}</div>
+                                    <div class="budget-percent" style="color: {{ $pctColor }};">{{ number_format($budget['percentage'], 1) }}%</div>
+                                </div>
+                                <div class="budget-bar">
+                                    <div class="budget-fill {{ $statusClass }}" style="width: {{ $pct }}%;"></div>
+                                </div>
+                                <div class="budget-amounts">
+                                    Spent: {{ $currency }} {{ number_format($budget['spent']) }}
+                                    of {{ $currency }} {{ number_format($budget['budgeted']) }}
+                                    ({{ $budget['has_budget'] ? 'set budget' : ($budget['is_new'] ? 'new category' : $budget['months_used'] . '-mo avg') }})
+                                    &bull; {{ $budget['remaining'] >= 0
+                ? 'Remaining: ' . $currency . ' ' . number_format($budget['remaining'])
+                : 'Over by: ' . $currency . ' ' . number_format(abs($budget['remaining'])) }}
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                    @if($pair->count() === 1)
+                        <div class="budget-cell"></div>
+                    @endif
                 </div>
             @endforeach
         </div>
@@ -388,7 +403,7 @@
             </div>
         @endif
         @if($loansCleared['count'] > 0)
-            <div class="insight-box" style="border-left-color: #10B981; background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);">
+            <div class="insight-box" style="border-left-color: #10B981; background: #ECFDF5;">
                 <h4 style="color: #065F46;">&#10003; Loans Fully Cleared</h4>
                 <p>Congratulations! You fully repaid <strong>{{ $loansCleared['count'] }} loan{{ $loansCleared['count'] > 1 ? 's' : '' }}</strong> this month with a combined principal of <strong>{{ $currency }} {{ number_format($loansCleared['principal_total']) }}</strong>.</p>
             </div>
@@ -455,10 +470,19 @@
     <div class="section">
         <div class="section-title">Key Insights</div>
         <div class="insights-grid">
-            @foreach($data['insights'] as $insight)
-                <div class="insight-box">
-                    <h4>{{ $insight['icon'] }} {{ $insight['title'] }} &mdash; {{ $insight['value'] }}</h4>
-                    <p>{{ $insight['description'] }}</p>
+            @foreach(collect($data['insights'])->chunk(2) as $pair)
+                <div class="insight-row">
+                    @foreach($pair as $insight)
+                        <div class="insight-cell">
+                            <div class="insight-box" style="margin: 0;">
+                                <h4>{{ $insight['icon'] }} {{ $insight['title'] }} &mdash; {{ $insight['value'] }}</h4>
+                                <p>{{ $insight['description'] }}</p>
+                            </div>
+                        </div>
+                    @endforeach
+                    @if($pair->count() === 1)
+                        <div class="insight-cell"></div>
+                    @endif
                 </div>
             @endforeach
         </div>
