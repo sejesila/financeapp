@@ -261,6 +261,18 @@
 
 <!-- Account Balances -->
 @if($data['accounts']->isNotEmpty())
+    @php
+        // Substitute the net-worth-adjusted figure for Etica's raw balance everywhere it's used
+        $adjustedAccounts = $data['accounts']->where('current_balance', '!=', 0)->map(function ($account) use ($netWorth) {
+            $isEtica = strtolower($account->name) === 'etica';
+            return (object) [
+                'id'              => $account->id,
+                'name'            => $account->name,
+                'display_balance' => $isEtica ? $netWorth : $account->current_balance,
+            ];
+        });
+        $adjustedTotal = $adjustedAccounts->sum('display_balance');
+    @endphp
     <div class="section">
         <div class="section-title">Account Overview</div>
         <table>
@@ -273,22 +285,22 @@
             </tr>
             </thead>
             <tbody>
-            @foreach($data['accounts'] as $account)
+            @foreach($adjustedAccounts as $account)
                 @php
-                    $pct         = $totalBal > 0 ? ($account->current_balance / $totalBal) * 100 : 0;
-                    $healthClass = $account->current_balance > 0 ? 'success' : ($account->current_balance < 0 ? 'danger' : 'neutral');
-                    $healthLabel = $account->current_balance > 0 ? 'Healthy' : ($account->current_balance < 0 ? 'Negative' : 'Zero');
+                    $pct         = $adjustedTotal > 0 ? ($account->display_balance / $adjustedTotal) * 100 : 0;
+                    $healthClass = $account->display_balance > 0 ? 'success' : ($account->display_balance < 0 ? 'danger' : 'neutral');
+                    $healthLabel = $account->display_balance > 0 ? 'Healthy' : ($account->display_balance < 0 ? 'Negative' : 'Zero');
                 @endphp
                 <tr>
                     <td style="font-weight: 600;">{{ $account->name }}</td>
                     <td style="text-align: center;"><span class="badge {{ $healthClass }}">{{ $healthLabel }}</span></td>
-                    <td style="text-align: right; font-weight: bold;">{{ $currency }} {{ number_format($account->current_balance) }}</td>
+                    <td style="text-align: right; font-weight: bold;">{{ $currency }} {{ number_format($account->display_balance) }}</td>
                     <td style="text-align: right; color: #6B7280;">{{ number_format($pct, 1) }}%</td>
                 </tr>
             @endforeach
             <tr class="total-row">
                 <td colspan="2">Total Assets</td>
-                <td style="text-align: right; color: #10B981;">{{ $currency }} {{ number_format($totalBal) }}</td>
+                <td style="text-align: right; color: #10B981;">{{ $currency }} {{ number_format($adjustedTotal) }}</td>
                 <td style="text-align: right; color: #6B7280;">100%</td>
             </tr>
             </tbody>
