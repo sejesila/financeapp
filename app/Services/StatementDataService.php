@@ -168,6 +168,7 @@ class StatementDataService
                     'pending'        => $isPending,
                     'pending_amount' => $isPending ? $t->amount : null,
                     'source'         => 'transfer_in',
+                    'interest_group' => null,
                 ];
             });
     }
@@ -194,6 +195,7 @@ class StatementDataService
                     'pending'        => false,
                     'pending_amount' => null,
                     'source'         => 'transfer_out',
+                    'interest_group' => null,
                 ];
             });
     }
