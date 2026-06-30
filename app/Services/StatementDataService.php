@@ -62,23 +62,22 @@ class StatementDataService
             ->whereNull('transactions.deleted_at')
             ->where('transactions.date', '<=', $atDate)
             ->selectRaw("
-                SUM(CASE
-                    WHEN categories.type IN ('income', 'liability')
-                     AND NOT (
-                            categories.type = 'income'
-                            AND categories.name NOT IN ('Interest')
-                            AND transactions.value_date IS NOT NULL
-                            AND transactions.value_date > ?
-                         )
-                    THEN transactions.amount
-                    ELSE 0
-                END) -
-                SUM(CASE
-                    WHEN categories.type = 'expense'
-                    THEN transactions.amount
-                    ELSE 0
-                END) AS net
-            ", [$atDate])
+            SUM(CASE
+                WHEN categories.type IN ('income', 'liability')
+                 AND NOT (
+                        categories.name NOT IN ('Interest')
+                        AND transactions.value_date IS NOT NULL
+                        AND transactions.value_date > ?
+                     )
+                THEN transactions.amount
+                ELSE 0
+            END) -
+            SUM(CASE
+                WHEN categories.type = 'expense'
+                THEN transactions.amount
+                ELSE 0
+            END) AS net
+        ", [$atDate])
             ->value('net');
 
         $transfersInNet = Transfer::where('to_account_id', $account->id)
@@ -122,41 +121,22 @@ class StatementDataService
                     && Carbon::parse($txn->value_date)->isFuture();
 
                 return [
-                    'sort_date'      => $txn->date,
-                    'sort_id'        => $txn->id,
-                    'date'           => Carbon::parse($txn->date)->format('M d, Y'),
-                    'narration'      => $txn->description
+                    'sort_date'        => $txn->date,
+                    'sort_id'          => $txn->id,
+                    'date'             => Carbon::parse($txn->date)->format('M d, Y'),
+                    'narration'        => $txn->description
                         . ($isPending
                             ? ' (pending – eff. ' . Carbon::parse($txn->value_date)->format('M d') . ')'
                             : ''),
-                    'inflow'         => ($isIncome && ! $isPending) ? $txn->amount : null,
-                    'withdrawal'     => $isExpense                  ? $txn->amount : null,
-                    'net_interest'   => $isInterest                 ? $txn->amount : null,
-                    'pending'        => $isPending,
-                    'pending_amount' => $isPending ? $txn->amount : null,
-                    'source'         => 'txn',
+                    'inflow'           => ($isIncome && ! $isPending) ? $txn->amount : null,
+                    'withdrawal'       => $isExpense                  ? $txn->amount : null,
+                    'net_interest'     => $isInterest                 ? $txn->amount : null,
+                    'pending'          => $isPending,
+                    'pending_amount'   => $isPending ? $txn->amount : null,
+                    'source'           => 'txn',
+                    // Group key used only for display consolidation, applied AFTER running balance is built
+                    'interest_group'   => $isInterest ? substr($txn->date, 0, 7) : null,
                 ];
-            })
-            ->groupBy(function ($item) {
-                // Consolidate multiple interest postings in the same month into one row.
-                return $item['net_interest'] !== null
-                    ? 'interest_' . substr($item['sort_date'], 0, 7)  // e.g. interest_2026-05
-                    : 'txn_' . $item['sort_id'];
-            })
-            ->map(function ($group) {
-                if ($group->count() === 1) {
-                    return $group->first();
-                }
-
-                // Multiple interest rows for the same month → consolidate into the last one.
-                $last = $group->sortBy('sort_date')->last();
-
-                return array_merge($last, [
-                    'net_interest' => $group->sum('net_interest'),
-                    'narration'    => 'Interest earned – '
-                        . Carbon::parse($last['sort_date'])->format('F Y')
-                        . ' (consolidated)',
-                ]);
             })
             ->values();
     }
@@ -224,8 +204,9 @@ class StatementDataService
         $totalInflow     = 0;
         $totalWithdrawal = 0;
         $totalInterest   = 0;
-        $rows            = [];
+        $rawRows         = [];
 
+        // Step 1: compute true running balance per individual transaction
         foreach ($merged as $item) {
             if ($item['inflow'] !== null) {
                 $runningBalance += $item['inflow'];
@@ -240,8 +221,35 @@ class StatementDataService
                 $totalInterest  += $item['net_interest'];
             }
 
-            $rows[] = array_merge($item, ['running_balance' => $runningBalance]);
+            $rawRows[] = array_merge($item, ['running_balance' => $runningBalance]);
         }
+
+        // Step 2: consolidate interest rows for display only, after balances are correct.
+        // Each group's displayed row uses the LAST individual row's running_balance
+        // (which is already correct) and the SUMMED amount for that month.
+        $rows = collect($rawRows)
+            ->groupBy(function ($item) {
+                return $item['interest_group'] !== null
+                    ? 'interest_' . $item['interest_group']
+                    : 'txn_' . $item['sort_id'];
+            })
+            ->map(function ($group) {
+                if ($group->count() === 1) {
+                    return $group->first();
+                }
+
+                $last = $group->sortBy('sort_date')->last();
+
+                return array_merge($last, [
+                    'net_interest' => $group->sum('net_interest'),
+                    'narration'    => 'Interest earned – '
+                        . Carbon::parse($last['sort_date'])->format('F Y')
+                        . ' (consolidated)',
+                    // running_balance is already correct from $last — no recalculation needed
+                ]);
+            })
+            ->values()
+            ->all();
 
         return [
             'rows'            => $rows,
