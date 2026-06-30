@@ -468,6 +468,10 @@ class ReportDataService
      * Calculate what a savings account's balance was at a specific point in time
      * by taking current_balance and reversing transactions that occurred after $asAtDate.
      */
+    /**
+     * Calculate what a savings account's balance was at a specific point in time
+     * by taking current_balance and reversing transactions that occurred after $asAtDate.
+     */
     private function getSavingsBalanceAsAt(User $user, Carbon $asAtDate): float
     {
         $savingsAccounts = Account::where('user_id', $user->id)
@@ -482,20 +486,21 @@ class ReportDataService
         $savingsAccountIds = $savingsAccounts->pluck('id');
         $currentSavingsTotal = $savingsAccounts->sum('current_balance');
 
-        // Transactions INTO savings accounts after the period end (these increased the balance,
-        // so we subtract them to go back in time)
-        $incomingAfter = Transaction::where('user_id', $user->id)
+        // Pull all transactions on these accounts after asAtDate in one query
+        $txAfter = Transaction::where('user_id', $user->id)
             ->whereIn('account_id', $savingsAccountIds)
-            ->whereHas('category', fn($q) => $q->where('type', 'income'))
             ->where(DB::raw('COALESCE(period_date, date)'), '>', $asAtDate->toDateString())
+            ->with('category')
+            ->get();
+
+        // Income transactions AND "Client Funds" liability transactions both increase
+        // the account balance, so both must be reversed the same way.
+        $incomingAfter = $txAfter
+            ->filter(fn($t) => $t->category->type === 'income' || $t->category->name === 'Client Funds')
             ->sum('amount');
 
-        // Transactions OUT OF savings accounts after the period end (these decreased the balance,
-        // so we add them back to go back in time)
-        $outgoingAfter = Transaction::where('user_id', $user->id)
-            ->whereIn('account_id', $savingsAccountIds)
-            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
-            ->where(DB::raw('COALESCE(period_date, date)'), '>', $asAtDate->toDateString())
+        $outgoingAfter = $txAfter
+            ->filter(fn($t) => $t->category->type === 'expense')
             ->sum('amount');
 
         // Transfers INTO savings accounts after period end (subtract to reverse)
@@ -517,14 +522,6 @@ class ReportDataService
             + $outgoingAfter
             - $transfersInAfter
             + $transfersOutAfter;
-        Log::info('Savings reconstruction', [
-            'currentSavingsTotal' => $currentSavingsTotal,
-            'incomingAfter'       => $incomingAfter,
-            'outgoingAfter'       => $outgoingAfter,
-            'transfersInAfter'    => $transfersInAfter,
-            'transfersOutAfter'   => $transfersOutAfter,
-            'balanceAsAt'         => $balanceAsAt,
-        ]);
 
         return max(0, $balanceAsAt);
     }
