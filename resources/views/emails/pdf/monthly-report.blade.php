@@ -20,16 +20,20 @@
         .net-worth-banner .amount { font-size: 28px; font-weight: bold; margin-bottom: 8px; }
         .net-worth-banner .breakdown { font-size: 10px; opacity: 0.9; margin-top: 8px; }
 
-        .summary-grid { display: flex; gap: 10px; margin: 20px 0; page-break-after: avoid; }
-        .summary-cell { flex: 1; padding: 18px; background: #FFFFFF; border: 2px solid #E5E7EB; border-radius: 8px; text-align: center; }
+        /* ── Summary cards: table layout instead of flex (cheaper for the PDF renderer) ── */
+        .summary-grid { display: table; width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 10px 0; margin: 20px 0 20px -10px; width: calc(100% + 10px); page-break-after: avoid; }
+        .summary-grid .summary-row { display: table-row; }
+        .summary-cell { display: table-cell; padding: 18px; background: #FFFFFF; border: 2px solid #E5E7EB; border-radius: 8px; text-align: center; vertical-align: top; }
         .summary-cell.income  { border-left: 5px solid #10B981; }
         .summary-cell.expense { border-left: 5px solid #EF4444; }
         .summary-cell.savings { border-left: 5px solid #8B5CF6; }
         .summary-cell h3 { margin: 0 0 10px 0; font-size: 10px; color: #6B7280; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
         .summary-cell .amount { font-size: 20px; font-weight: bold; line-height: 1.2; }
 
-        .stats-grid { display: flex; margin: 20px 0; background: #F9FAFB; padding: 12px; border-radius: 8px; page-break-after: avoid; }
-        .stat-cell { flex: 1; text-align: center; padding: 10px 5px; }
+        /* ── Stat cells: table layout instead of flex ── */
+        .stats-grid { display: table; width: 100%; table-layout: fixed; margin: 20px 0; background: #F9FAFB; padding: 12px; border-radius: 8px; page-break-after: avoid; }
+        .stats-grid .stats-row { display: table-row; }
+        .stat-cell { display: table-cell; text-align: center; padding: 10px 5px; vertical-align: top; }
         .stat-label { font-size: 8px; color: #6B7280; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
         .stat-value { font-size: 14px; font-weight: bold; color: #1F2937; margin-top: 4px; }
 
@@ -83,8 +87,10 @@
         .badge.warning { background: #FEF3C7; color: #92400E; }
         .badge.neutral { background: #F3F4F6; color: #4B5563; }
 
-        .trend-box { display: flex; margin: 0 0 16px 0; background: #F9FAFB; border-radius: 8px; padding: 12px; page-break-after: avoid; }
-        .trend-cell { flex: 1; text-align: center; padding: 8px; border-right: 1px solid #E5E7EB; }
+        /* ── Trend cells: table layout instead of flex ── */
+        .trend-box { display: table; width: 100%; margin: 0 0 16px 0; background: #F9FAFB; border-radius: 8px; padding: 12px; table-layout: fixed; page-break-after: avoid; }
+        .trend-box .trend-row { display: table-row; }
+        .trend-cell { display: table-cell; text-align: center; padding: 8px; border-right: 1px solid #E5E7EB; vertical-align: top; }
         .trend-cell:last-child { border-right: none; }
         .trend-label   { font-size: 8px; color: #6B7280; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px; }
         .trend-value   { font-size: 16px; font-weight: bold; margin-top: 4px; }
@@ -146,63 +152,69 @@
 
 <!-- Summary Cards -->
 <div class="summary-grid">
-    <div class="summary-cell income">
-        <h3>Total Income</h3>
-        <div class="amount" style="color: #10B981;">{{ $currency }} {{ number_format($income) }}</div>
-    </div>
-    <div class="summary-cell expense">
-        <h3>Total Expenses</h3>
-        <div class="amount" style="color: #EF4444;">{{ $currency }} {{ number_format($expenses) }}</div>
-    </div>
-    <div class="summary-cell savings">
-        <h3>Net Cash Flow</h3>
-        <div class="amount" style="color: {{ $netFlow >= 0 ? '#10B981' : '#EF4444' }};">
-            {{ $netFlow >= 0 ? '+' : '' }}{{ $currency }} {{ number_format($netFlow) }}
+    <div class="summary-row">
+        <div class="summary-cell income">
+            <h3>Total Income</h3>
+            <div class="amount" style="color: #10B981;">{{ $currency }} {{ number_format($income) }}</div>
+        </div>
+        <div class="summary-cell expense">
+            <h3>Total Expenses</h3>
+            <div class="amount" style="color: #EF4444;">{{ $currency }} {{ number_format($expenses) }}</div>
+        </div>
+        <div class="summary-cell savings">
+            <h3>Net Cash Flow</h3>
+            <div class="amount" style="color: {{ $netFlow >= 0 ? '#10B981' : '#EF4444' }};">
+                {{ $netFlow >= 0 ? '+' : '' }}{{ $currency }} {{ number_format($netFlow) }}
+            </div>
         </div>
     </div>
 </div>
 
 <!-- Monthly Stats -->
 <div class="stats-grid">
-    <div class="stat-cell">
-        <div class="stat-label">Transactions</div>
-        <div class="stat-value">{{ $txCount }}</div>
-    </div>
-    <div class="stat-cell">
-        <div class="stat-label">Surplus Rate</div>
-        <div class="stat-value" style="color: {{ $savingsRate >= 20 ? '#10B981' : ($savingsRate >= 10 ? '#F59E0B' : '#EF4444') }};">
-            {{ number_format($savingsRate, 1) }}%
+    <div class="stats-row">
+        <div class="stat-cell">
+            <div class="stat-label">Transactions</div>
+            <div class="stat-value">{{ $txCount }}</div>
         </div>
-    </div>
-    <div class="stat-cell">
-        <div class="stat-label">Daily Avg Spending</div>
-        <div class="stat-value">{{ $currency }} {{ number_format($dailyAvg) }}</div>
-    </div>
-    <div class="stat-cell">
-        <div class="stat-label">Accounts</div>
-        <div class="stat-value">{{ $data['accounts']->count() }}</div>
+        <div class="stat-cell">
+            <div class="stat-label">Surplus Rate</div>
+            <div class="stat-value" style="color: {{ $savingsRate >= 20 ? '#10B981' : ($savingsRate >= 10 ? '#F59E0B' : '#EF4444') }};">
+                {{ number_format($savingsRate, 1) }}%
+            </div>
+        </div>
+        <div class="stat-cell">
+            <div class="stat-label">Daily Avg Spending</div>
+            <div class="stat-value">{{ $currency }} {{ number_format($dailyAvg) }}</div>
+        </div>
+        <div class="stat-cell">
+            <div class="stat-label">Accounts</div>
+            <div class="stat-value">{{ $data['accounts']->count() }}</div>
+        </div>
     </div>
 </div>
 
 <!-- Trend Box -->
 <div class="trend-box">
-    <div class="trend-cell">
-        <div class="trend-label">Income vs Last Month</div>
-        @if($incomeTrend !== null)
-            <div class="trend-value" style="color: {{ $incomeTrend >= 0 ? '#059669' : '#DC2626' }};">
-                {{ $incomeTrend >= 0 ? '+' : '' }}{{ number_format($incomeTrend, 1) }}%
-            </div>
-            <div class="trend-subtext">Prior month: {{ $currency }} {{ number_format($priorIncome) }}</div>
-        @else
-            <div class="trend-value" style="color: #9CA3AF;">No prior data</div>
-        @endif
-    </div>
-    <div class="trend-cell">
-        <div class="trend-label">Budget Adherence</div>
-        <div class="trend-value" style="color: {{ $budgetsOver === 0 ? '#059669' : '#F59E0B' }};">
-            {{ $budgetsUnder }}/{{ $budgetsTotal }} on track
+    <div class="trend-row">
+        <div class="trend-cell">
+            <div class="trend-label">Income vs Last Month</div>
+            @if($incomeTrend !== null)
+                <div class="trend-value" style="color: {{ $incomeTrend >= 0 ? '#059669' : '#DC2626' }};">
+                    {{ $incomeTrend >= 0 ? '+' : '' }}{{ number_format($incomeTrend, 1) }}%
+                </div>
+                <div class="trend-subtext">Prior month: {{ $currency }} {{ number_format($priorIncome) }}</div>
+            @else
+                <div class="trend-value" style="color: #9CA3AF;">No prior data</div>
+            @endif
         </div>
-        <div class="trend-subtext">{{ $budgetsOver }} {{ $budgetsOver === 1 ? 'category' : 'categories' }} over budget</div>
+        <div class="trend-cell">
+            <div class="trend-label">Budget Adherence</div>
+            <div class="trend-value" style="color: {{ $budgetsOver === 0 ? '#059669' : '#F59E0B' }};">
+                {{ $budgetsUnder }}/{{ $budgetsTotal }} on track
+            </div>
+            <div class="trend-subtext">{{ $budgetsOver }} {{ $budgetsOver === 1 ? 'category' : 'categories' }} over budget</div>
+        </div>
     </div>
 </div>
 
