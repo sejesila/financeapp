@@ -316,8 +316,13 @@ class ReportDataService
         $totalLoanBalance = $activeLoans->sum('balance');
 
         $totalClientFunds = ClientFund::where('user_id', $user->id)
-            ->whereNotIn('status', ['completed', 'cancelled'])
-            ->whereDate('created_at', '<=', $endDate)
+            ->where('received_date', '<=', $endDate)
+            ->where(function ($q) use ($endDate) {
+                $q->whereNull('completed_date')
+                    ->orWhere('completed_date', '>', $endDate)
+                    ->orWhereIn('status', ['pending', 'partial']); // safety net for inconsistent data
+            })
+            ->whereNotIn('status', ['cancelled'])
             ->sum('balance');
 
 // Historical savings balance — what was actually in savings at period end, not today
