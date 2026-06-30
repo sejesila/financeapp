@@ -447,7 +447,7 @@ class ReportDataService
             'start_date'           => $startDate->format('M d, Y'),
             'end_date'             => $endDate->format('M d, Y'),
             'user'                 => $user,
-            'accounts'             => $accounts,
+            'accounts'             => $accountsAsAt,
             'total_balance'        => $totalBalance,
             'savings_balance'      => $savingsBalance,
             'total_loans'          => $totalLoanBalance,
