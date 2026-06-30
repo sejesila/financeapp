@@ -493,10 +493,22 @@ class ReportDataService
         $savingsAccountIds = $savingsAccounts->pluck('id');
         $currentSavingsTotal = $savingsAccounts->sum('current_balance');
 
-        // Pull all transactions on these accounts after asAtDate in one query
+        // Pull all transactions on these accounts after asAtDate in one query.
+        // Use the actual transaction date (not period_date) — balance reconstruction
+        // must reflect real cash movement, not budget-attribution month.
+        // Also exclude the same non-cash-flow categories that getFilteredTransactions()
+        // excludes, so this stays consistent with the rest of the report.
         $txAfter = Transaction::where('user_id', $user->id)
             ->whereIn('account_id', $savingsAccountIds)
-            ->where(DB::raw('COALESCE(period_date, date)'), '>', $asAtDate->toDateString())
+            ->where('date', '>', $asAtDate->toDateString())
+            ->whereHas('category', function ($q) {
+                $q->whereNotIn('name', [
+                    'Loan Disbursement',
+                    'Loan Receipt',
+                    'Balance Adjustment',
+                    'Client Funds',
+                ]);
+            })
             ->with('category')
             ->get();
 
@@ -543,7 +555,15 @@ class ReportDataService
 
         $txAfter = Transaction::where('user_id', $account->user_id)
             ->where('account_id', $account->id)
-            ->where(DB::raw('COALESCE(period_date, date)'), '>', $asAtDate->toDateString())
+            ->where('date', '>', $asAtDate->toDateString())   // actual date, not period_date
+            ->whereHas('category', function ($q) {
+                $q->whereNotIn('name', [
+                    'Loan Disbursement',
+                    'Loan Receipt',
+                    'Balance Adjustment',
+                    'Client Funds',
+                ]);
+            })
             ->with('category')
             ->get();
 
@@ -567,13 +587,7 @@ class ReportDataService
             ->where('date', '>', $asAtDate->toDateString())
             ->sum('amount');
 
-        $balanceAsAt = $currentBalance
-            - $incomingAfter
-            + $outgoingAfter
-            - $transfersInAfter
-            + $transfersOutAfter;
-
-        return $balanceAsAt; // no max(0,...) here — non-savings accounts can legitimately be negative
+        return $currentBalance - $incomingAfter + $outgoingAfter - $transfersInAfter + $transfersOutAfter;
     }
 
     /**
