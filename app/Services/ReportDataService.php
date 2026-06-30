@@ -309,8 +309,15 @@ class ReportDataService
      */
     private function generateReport(User $user, Carbon $startDate, Carbon $endDate, string $type): array
     {
-        $accounts         = Account::where('user_id', $user->id)->where('is_active', true)->get();
-        $totalBalance     = $accounts->sum('current_balance');
+        $accounts = Account::where('user_id', $user->id)->where('is_active', true)->get();
+
+// Reconstruct each account's balance as of $endDate, not today
+        $accountsAsAt = $accounts->map(function ($account) use ($endDate) {
+            $account->balance_as_at = $this->getAccountBalanceAsAt($account, $endDate);
+            return $account;
+        });
+
+        $totalBalance = $accountsAsAt->sum('balance_as_at');
 
         $activeLoans      = Loan::where('user_id', $user->id)->where('status', 'active')->with('account')->get();
         $totalLoanBalance = $activeLoans->sum('balance');
@@ -524,6 +531,49 @@ class ReportDataService
             + $transfersOutAfter;
 
         return max(0, $balanceAsAt);
+    }
+    /**
+     * Calculate what a single account's balance was at a specific point in time
+     * by taking current_balance and reversing transactions/transfers that
+     * occurred after $asAtDate.
+     */
+    private function getAccountBalanceAsAt(Account $account, Carbon $asAtDate): float
+    {
+        $currentBalance = (float) $account->current_balance;
+
+        $txAfter = Transaction::where('user_id', $account->user_id)
+            ->where('account_id', $account->id)
+            ->where(DB::raw('COALESCE(period_date, date)'), '>', $asAtDate->toDateString())
+            ->with('category')
+            ->get();
+
+        $incomingAfter = $txAfter
+            ->filter(fn($t) => $t->category->type === 'income' || $t->category->name === 'Client Funds')
+            ->sum('amount');
+
+        $outgoingAfter = $txAfter
+            ->filter(fn($t) => $t->category->type === 'expense')
+            ->sum('amount');
+
+        $transfersInAfter = Transfer::withoutGlobalScopes()
+            ->where('user_id', $account->user_id)
+            ->where('to_account_id', $account->id)
+            ->where('date', '>', $asAtDate->toDateString())
+            ->sum('amount');
+
+        $transfersOutAfter = Transfer::withoutGlobalScopes()
+            ->where('user_id', $account->user_id)
+            ->where('from_account_id', $account->id)
+            ->where('date', '>', $asAtDate->toDateString())
+            ->sum('amount');
+
+        $balanceAsAt = $currentBalance
+            - $incomingAfter
+            + $outgoingAfter
+            - $transfersInAfter
+            + $transfersOutAfter;
+
+        return $balanceAsAt; // no max(0,...) here — non-savings accounts can legitimately be negative
     }
 
     /**

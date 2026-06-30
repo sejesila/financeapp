@@ -268,7 +268,7 @@
             return (object) [
                 'id'              => $account->id,
                 'name'            => $account->name,
-                'display_balance' => $isEtica ? $netWorth : $account->current_balance,
+                'display_balance' => $isEtica ? $netWorth : $account->balance_as_at,
             ];
         });
         $adjustedTotal = $adjustedAccounts->sum('display_balance');

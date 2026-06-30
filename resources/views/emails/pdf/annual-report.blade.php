@@ -544,14 +544,14 @@
                 <tbody>
                 @foreach($data['accounts'] as $account)
                     @php
-                        $pct         = $totalBal > 0 ? ($account->current_balance / $totalBal) * 100 : 0;
-                        $healthClass = $account->current_balance > 0 ? 'success' : ($account->current_balance < 0 ? 'danger' : 'neutral');
-                        $healthLabel = $account->current_balance > 0 ? 'Healthy' : ($account->current_balance < 0 ? 'Negative' : 'Zero');
+                        $pct         = $totalBal > 0 ? ($account->balance_as_at / $totalBal) * 100 : 0;
+                        $healthClass = $account->balance_as_at > 0 ? 'success' : ($account->balance_as_at < 0 ? 'danger' : 'neutral');
+                        $healthLabel = $account->balance_as_at > 0 ? 'Healthy' : ($account->balance_as_at < 0 ? 'Negative' : 'Zero');
                     @endphp
                     <tr>
                         <td style="font-weight: 600;">{{ $account->name }}</td>
                         <td style="text-align: center;"><span class="badge {{ $healthClass }}">{{ $healthLabel }}</span></td>
-                        <td style="text-align: right; font-weight: bold;">{{ $currency }} {{ number_format($account->current_balance) }}</td>
+                        <td style="text-align: right; font-weight: bold;">{{ $currency }} {{ number_format($account->balance_as_at) }}</td>
                         <td style="text-align: right; color: #6B7280;">{{ number_format($pct, 1) }}%</td>
                     </tr>
                 @endforeach
