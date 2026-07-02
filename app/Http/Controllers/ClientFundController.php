@@ -233,7 +233,6 @@ class ClientFundController extends Controller
 
         DB::beginTransaction();
         try {
-            // ✅ Deduct from the account the money actually left from
             $expenseTransaction = Transaction::create([
                 'user_id'        => Auth::id(),
                 'account_id'     => $expenseAccount->id,
@@ -259,7 +258,6 @@ class ClientFundController extends Controller
 
             DB::commit();
 
-            // Update the account that was actually charged
             $expenseAccount->updateBalance();
 
             return back()->with('success', 'Expense recorded successfully! Account balance updated.');
@@ -478,7 +476,6 @@ class ClientFundController extends Controller
 
         DB::beginTransaction();
         try {
-            // Find the underlying money transaction and its account BEFORE deleting anything
             $expenseTransaction = Transaction::find($transaction->transaction_id);
             $account = $expenseTransaction
                 ? Account::find($expenseTransaction->account_id)

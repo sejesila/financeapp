@@ -107,7 +107,10 @@ class StatementDataService
         return $account->transactions()
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->whereNull('transactions.deleted_at')
-            ->whereBetween('transactions.date', [$from->toDateString(), $to->toDateString()])
+            ->whereRaw('DATE(transactions.date) BETWEEN ? AND ?', [
+                $from->toDateString(),
+                $to->toDateString(),
+            ])
             ->select('transactions.*', 'categories.type as cat_type', 'categories.name as cat_name')
             ->orderBy('transactions.date')
             ->orderBy('transactions.id')
