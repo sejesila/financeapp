@@ -264,6 +264,20 @@
                         Available: KES {{ number_format($clientFund->balance, 0, '.', ',') }}
                     </p>
                 </div>
+                <div class="mb-3 sm:mb-4">
+                    <label class="block text-xs sm:text-sm font-medium mb-1 sm:mb-2">Pay From</label>
+                    <select
+                        name="account_id"
+                        class="w-full border rounded px-3 py-2 text-sm sm:text-base dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+                        required
+                    >
+                        @foreach($expenseAccounts as $account)
+                            <option value="{{ $account->id }}" {{ $account->id === $clientFund->account_id ? 'selected' : '' }}>
+                                {{ $account->name }} ({{ ucfirst($account->type) }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
 
                 <div class="mb-3 sm:mb-4">
                     <label class="block text-xs sm:text-sm font-medium mb-1 sm:mb-2">Category</label>

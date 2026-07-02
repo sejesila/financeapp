@@ -197,7 +197,13 @@ class ClientFundController extends Controller
 
         $clientFund->load(['account', 'transactions']);
 
-        return view('client-funds.show', compact('clientFund'));
+        $expenseAccounts = Account::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->whereIn('type', ['mpesa', 'bank'])
+            ->orderBy('name')
+            ->get();
+
+        return view('client-funds.show', compact('clientFund', 'expenseAccounts'));
     }
 
     public function recordExpense(Request $request, ClientFund $clientFund)
@@ -207,44 +213,54 @@ class ClientFundController extends Controller
         }
 
         $request->validate([
-            'amount' => 'required|numeric|min:0.01|max:' . $clientFund->balance,
+            'account_id'  => 'required|exists:accounts,id',
+            'amount'      => 'required|numeric|min:0.01|max:' . $clientFund->balance,
             'description' => 'required|string',
-            'date' => 'required|date',
+            'date'        => 'required|date',
             'category_id' => 'required|exists:categories,id',
         ]);
 
+        $expenseAccount = Account::where('id', $request->account_id)
+            ->where('user_id', Auth::id())
+            ->whereIn('type', ['mpesa', 'bank'])
+            ->first();
+
+        if (!$expenseAccount) {
+            return back()
+                ->withInput()
+                ->withErrors(['account_id' => 'Please select a valid M-Pesa or Bank account to pay from.']);
+        }
+
         DB::beginTransaction();
         try {
-            // ✅ Create the ACTUAL EXPENSE transaction (deducts from account)
+            // ✅ Deduct from the account the money actually left from
             $expenseTransaction = Transaction::create([
-                'user_id' => Auth::id(),
-                'account_id' => $clientFund->account_id,
-                'category_id' => $request->category_id,
-                'amount' => $request->amount,
-                'date' => $request->date,
-                'period_date' => $request->date,
-                'description' => "{$request->description} (Client: {$clientFund->client_name})",
+                'user_id'        => Auth::id(),
+                'account_id'     => $expenseAccount->id,
+                'category_id'    => $request->category_id,
+                'amount'         => $request->amount,
+                'date'           => $request->date,
+                'period_date'    => $request->date,
+                'description'    => "{$request->description} (Client: {$clientFund->client_name})",
                 'payment_method' => 'Client Fund',
             ]);
 
-            // Record expense in client fund tracking
             ClientFundTransaction::create([
                 'client_fund_id' => $clientFund->id,
                 'transaction_id' => $expenseTransaction->id,
-                'type' => 'expense',
-                'amount' => $request->amount,
-                'date' => $request->date,
-                'description' => $request->description,
+                'type'           => 'expense',
+                'amount'         => $request->amount,
+                'date'           => $request->date,
+                'description'    => $request->description,
             ]);
 
-            // Update client fund
             $clientFund->amount_spent += $request->amount;
             $clientFund->updateBalance();
 
-            // Update account balance
-            $clientFund->account->updateBalance();
-
             DB::commit();
+
+            // Update the account that was actually charged
+            $expenseAccount->updateBalance();
 
             return back()->with('success', 'Expense recorded successfully! Account balance updated.');
 
@@ -462,19 +478,26 @@ class ClientFundController extends Controller
 
         DB::beginTransaction();
         try {
-            // Add the amount back to account balance
-            $account = $clientFund->account;
-            $clientFund->account->updateBalance();
-           // $account->save();
+            // Find the underlying money transaction and its account BEFORE deleting anything
+            $expenseTransaction = Transaction::find($transaction->transaction_id);
+            $account = $expenseTransaction
+                ? Account::find($expenseTransaction->account_id)
+                : $clientFund->account;
 
-            // Update client fund
+            if ($expenseTransaction) {
+                $expenseTransaction->delete();
+            }
+
             $clientFund->amount_spent -= $transaction->amount;
             $clientFund->updateBalance();
 
-            // Delete the transaction
             $transaction->delete();
 
             DB::commit();
+
+            if ($account) {
+                $account->updateBalance();
+            }
 
             return back()->with('success', 'Expense deleted successfully!');
 
