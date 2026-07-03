@@ -7,6 +7,7 @@ use App\Models\MobileMoneyTypeUsage;
 use App\Models\Transaction;
 use App\Services\ReportDataService;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -47,11 +48,13 @@ class ReportsController extends Controller
         }
 
         // 1. Spending by Category
-        $spendingByCategory = Transaction::query()
-            ->join('categories', 'transactions.category_id', '=', 'categories.id')
-            ->select('categories.name', 'categories.type', DB::raw('SUM(transactions.amount) as total'))
-            ->whereBetween('transactions.date', [$startDate, $endDate])
-            ->where('transactions.user_id', auth()->id())
+        $spendingByCategory = $this->excludeClientFunds(
+            Transaction::query()
+                ->join('categories', 'transactions.category_id', '=', 'categories.id')
+                ->select('categories.name', 'categories.type', DB::raw('SUM(transactions.amount) as total'))
+                ->whereBetween('transactions.date', [$startDate, $endDate])
+                ->where('transactions.user_id', auth()->id())
+        )
             ->groupBy('categories.id', 'categories.name', 'categories.type')
             ->orderByDesc('total')
             ->get();
@@ -89,12 +92,13 @@ class ReportsController extends Controller
         $previousExpenses = 0;
 
         if ($previousStartDate) {
-            $previousExpenses = Transaction::query()
-                ->join('categories', 'transactions.category_id', '=', 'categories.id')
-                ->where('categories.type', 'expense')
-                ->whereBetween('transactions.date', [$previousStartDate, $previousEndDate])
-                ->where('transactions.user_id', auth()->id())
-                ->sum('transactions.amount');
+            $previousExpenses = $this->excludeClientFunds(
+                Transaction::query()
+                    ->join('categories', 'transactions.category_id', '=', 'categories.id')
+                    ->where('categories.type', 'expense')
+                    ->whereBetween('transactions.date', [$previousStartDate, $previousEndDate])
+                    ->where('transactions.user_id', auth()->id())
+            )->sum('transactions.amount');
         }
 
         $expenseChange = $previousExpenses > 0
@@ -204,5 +208,21 @@ class ReportsController extends Controller
             'pochi_la_biashara' => 'Pochi La Biashara',
             default => ucwords(str_replace('_', ' ', $type)),
         };
+    }
+
+    /**
+     * Exclude transactions that represent client-fund pass-through money
+     * (i.e. not the user's own income/spending) from a query.
+     *
+     * Mirrors the exclusion applied in BudgetController and DashboardController
+     * so report totals stay consistent with the budgets, dashboard, and
+     * transactions summary views.
+     */
+    private function excludeClientFunds(Builder $query): Builder
+    {
+        return $query->where(function ($q) {
+            $q->whereNull('transactions.payment_method')
+                ->orWhereNotIn('transactions.payment_method', ['Client Fund', 'Client Commission']);
+        });
     }
 }
