@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Budget;
 use App\Models\Loan;
 use App\Models\Transaction;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -59,64 +60,73 @@ class DashboardController extends Controller
 
         // ============ QUICK STATS ============
 
-        $totalToday = Transaction::where('user_id', $userId)
-            ->whereDate('date', today())
-            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
-            ->sum('amount');
+        $totalToday = $this->excludeClientFunds(
+            Transaction::where('user_id', $userId)
+                ->whereDate('date', today())
+                ->whereHas('category', fn($q) => $q->where('type', 'expense'))
+        )->sum('amount');
 
-        $totalThisWeek = Transaction::where('user_id', $userId)
-            ->whereBetween('date', [now()->startOfWeek(), now()->endOfWeek()])
-            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
-            ->sum('amount');
+        $totalThisWeek = $this->excludeClientFunds(
+            Transaction::where('user_id', $userId)
+                ->whereBetween('date', [now()->startOfWeek(), now()->endOfWeek()])
+                ->whereHas('category', fn($q) => $q->where('type', 'expense'))
+        )->sum('amount');
 
-        $totalThisMonth = Transaction::where('user_id', $userId)
-            ->whereMonth('date', $currentMonth)
-            ->whereYear('date', $currentYear)
-            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
-            ->sum('amount');
+        $totalThisMonth = $this->excludeClientFunds(
+            Transaction::where('user_id', $userId)
+                ->whereMonth('date', $currentMonth)
+                ->whereYear('date', $currentYear)
+                ->whereHas('category', fn($q) => $q->where('type', 'expense'))
+        )->sum('amount');
 
-        $monthlyIncome = Transaction::where('user_id', $userId)
-            ->whereMonth('date', $currentMonth)
-            ->whereYear('date', $currentYear)
-            ->whereHas('category', fn($q) => $q
-                ->where('type', 'income')
-                ->whereNotIn('name', ['Loan Disbursement', 'Balance Adjustment'])
-            )
-            ->sum('amount');
+        $monthlyIncome = $this->excludeClientFunds(
+            Transaction::where('user_id', $userId)
+                ->whereMonth('date', $currentMonth)
+                ->whereYear('date', $currentYear)
+                ->whereHas('category', fn($q) => $q
+                    ->where('type', 'income')
+                    ->whereNotIn('name', ['Loan Disbursement', 'Balance Adjustment'])
+                )
+        )->sum('amount');
 
         $remainingThisMonth = $monthlyIncome - $totalThisMonth;
 
         // ============ MONTHLY & YEARLY OVERVIEW ============
 
-        $monthlyExpenses = Transaction::where('user_id', $userId)
-            ->whereYear('date', $currentYear)
-            ->whereMonth('date', $currentMonth)
-            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
-            ->sum('amount');
+        $monthlyExpenses = $this->excludeClientFunds(
+            Transaction::where('user_id', $userId)
+                ->whereYear('date', $currentYear)
+                ->whereMonth('date', $currentMonth)
+                ->whereHas('category', fn($q) => $q->where('type', 'expense'))
+        )->sum('amount');
 
         $monthlyNet = $monthlyIncome - $monthlyExpenses;
 
-        $yearlyIncome = Transaction::where('user_id', $userId)
-            ->whereYear('date', $currentYear)
-            ->whereHas('category', fn($q) => $q
-                ->where('type', 'income')
-                ->whereNotIn('name', ['Loan Disbursement', 'Balance Adjustment'])
-            )
-            ->sum('amount');
+        $yearlyIncome = $this->excludeClientFunds(
+            Transaction::where('user_id', $userId)
+                ->whereYear('date', $currentYear)
+                ->whereHas('category', fn($q) => $q
+                    ->where('type', 'income')
+                    ->whereNotIn('name', ['Loan Disbursement', 'Balance Adjustment'])
+                )
+        )->sum('amount');
 
-        $yearlyExpenses = Transaction::where('user_id', $userId)
-            ->whereYear('date', $currentYear)
-            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
-            ->sum('amount');
+        $yearlyExpenses = $this->excludeClientFunds(
+            Transaction::where('user_id', $userId)
+                ->whereYear('date', $currentYear)
+                ->whereHas('category', fn($q) => $q->where('type', 'expense'))
+        )->sum('amount');
 
         $yearlyNet = $yearlyIncome - $yearlyExpenses;
 
         // ============ SPENDING ANALYSIS ============
 
-        $topExpenses = Transaction::where('user_id', $userId)
-            ->whereYear('date', $currentYear)
-            ->whereMonth('date', $currentMonth)
-            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
+        $topExpenses = $this->excludeClientFunds(
+            Transaction::where('user_id', $userId)
+                ->whereYear('date', $currentYear)
+                ->whereMonth('date', $currentMonth)
+                ->whereHas('category', fn($q) => $q->where('type', 'expense'))
+        )
             ->with('category')
             ->get()
             ->groupBy('category_id')
@@ -128,22 +138,25 @@ class DashboardController extends Controller
             ->sortByDesc('total')
             ->take(5);
 
-        $dailySpending = Transaction::where('user_id', $userId)
-            ->select(DB::raw('DATE(date) as date'), DB::raw('SUM(amount) as total'))
-            ->whereMonth('date', $currentMonth)
-            ->whereYear('date', $currentYear)
-            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
+        $dailySpending = $this->excludeClientFunds(
+            Transaction::where('user_id', $userId)
+                ->select(DB::raw('DATE(date) as date'), DB::raw('SUM(amount) as total'))
+                ->whereMonth('date', $currentMonth)
+                ->whereYear('date', $currentYear)
+                ->whereHas('category', fn($q) => $q->where('type', 'expense'))
+        )
             ->groupBy(DB::raw('DATE(date)'))
             ->orderBy('date')
             ->get();
 
         // ============ MONTH COMPARISON ============
 
-        $lastMonthTotal = Transaction::where('user_id', $userId)
-            ->whereMonth('date', now()->subMonth()->month)
-            ->whereYear('date', now()->subMonth()->year)
-            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
-            ->sum('amount');
+        $lastMonthTotal = $this->excludeClientFunds(
+            Transaction::where('user_id', $userId)
+                ->whereMonth('date', now()->subMonth()->month)
+                ->whereYear('date', now()->subMonth()->year)
+                ->whereHas('category', fn($q) => $q->where('type', 'expense'))
+        )->sum('amount');
 
         $monthlyComparison        = $totalThisMonth - $lastMonthTotal;
         $monthlyComparisonPercent = $lastMonthTotal > 0
@@ -195,5 +208,20 @@ class DashboardController extends Controller
             'recentTransactions',
             'budgets',
         ));
+    }
+
+    /**
+     * Exclude transactions that represent client-fund pass-through money
+     * (i.e. not the user's own income/spending) from a query.
+     *
+     * Mirrors the exclusion applied in BudgetController so dashboard totals
+     * stay consistent with the budgets and transactions summary views.
+     */
+    private function excludeClientFunds(Builder $query): Builder
+    {
+        return $query->where(function ($q) {
+            $q->whereNull('payment_method')
+                ->orWhereNotIn('payment_method', ['Client Fund', 'Client Commission']);
+        });
     }
 }
