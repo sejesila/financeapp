@@ -78,16 +78,16 @@
             {{-- Month Selector --}}
             <div class="mb-6 sm:mb-8 flex items-center justify-between">
                 <div class="flex items-center space-x-3">
-                    <a href="{{ route('cafeteria.index', ['month' => now()->subMonth()->format('Y-m')]) }}"
+                    <a href="{{ route('cafeteria.index', ['month' => $monthDate->copy()->subMonth()->format('Y-m')]) }}"
                        class="p-2 hover:bg-white dark:hover:bg-gray-700 rounded-lg transition-colors">
                         <svg class="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                         </svg>
                     </a>
                     <span class="text-lg font-semibold text-gray-900 dark:text-white min-w-40">
-                        {{ $monthDate->format('F Y') }}
-                    </span>
-                    <a href="{{ route('cafeteria.index', ['month' => now()->addMonth()->format('Y-m')]) }}"
+    {{ $monthDate->format('F Y') }}
+</span>
+                    <a href="{{ route('cafeteria.index', ['month' => $monthDate->copy()->addMonth()->format('Y-m')]) }}"
                        class="p-2 hover:bg-white dark:hover:bg-gray-700 rounded-lg transition-colors">
                         <svg class="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
