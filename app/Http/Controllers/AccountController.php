@@ -15,6 +15,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
@@ -924,7 +925,13 @@ class AccountController extends Controller
         $fromAccount = Account::withoutGlobalScopes()->findOrFail($transfer->from_account_id);
         $toAccount   = Account::withoutGlobalScopes()->findOrFail($transfer->to_account_id);
 
-        $transfer->delete();
+        $feeTransaction = Transaction::where('transfer_id', $transfer->id)->first();
+        $feeAmount      = $feeTransaction?->amount ?? 0;
+
+        DB::transaction(function () use ($transfer, $feeTransaction) {
+            $feeTransaction?->delete();
+            $transfer->delete();
+        });
 
         $fromAccount->updateBalance();
         $toAccount->updateBalance();
@@ -932,7 +939,12 @@ class AccountController extends Controller
         $this->clearAccountCache($fromAccount->id);
         $this->clearAccountCache($toAccount->id);
 
+        $message = 'Transfer of KES ' . number_format($transfer->amount, 0, '.', ',') . ' has been reversed.';
+        if ($feeAmount > 0) {
+            $message .= ' Fee of KES ' . number_format($feeAmount, 2, '.', ',') . ' was also reversed.';
+        }
+
         return redirect()->route('accounts.show', ['account' => $account, 'tab' => 'transfers'])
-            ->with('success', 'Transfer of KES ' . number_format($transfer->amount, 0, '.', ',') . ' has been reversed.');
+            ->with('success', $message);
     }
 }

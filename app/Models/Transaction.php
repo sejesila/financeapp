@@ -24,6 +24,7 @@ class Transaction extends Model
         'fee_for_transaction_id',
         'is_transaction_fee',
         'value_date',
+        'transfer_id',
     ];
 
     protected $casts = [

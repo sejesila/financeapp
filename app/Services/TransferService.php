@@ -27,19 +27,21 @@ readonly class TransferService
 {
     public function __construct(
         private TransferFeeCalculator $feeCalculator,
-    ) {}
+    )
+    {
+    }
 
     // ── Public entry point ────────────────────────────────────────────────────
 
     /**
      * Execute a transfer.
      *
-     * @param  Account      $from
-     * @param  Account      $to
-     * @param  float        $amount
-     * @param  string       $date
-     * @param  string|null  $description
-     * @param  float|null   $manualFee      User-supplied fee override (null = use calculator)
+     * @param Account $from
+     * @param Account $to
+     * @param float $amount
+     * @param string $date
+     * @param string|null $description
+     * @param float|null $manualFee User-supplied fee override (null = use calculator)
      * @return TransferFee  The fee that was charged (amount may be 0).
      *
      * @throws ValidationException
@@ -51,7 +53,8 @@ readonly class TransferService
         string  $date,
         ?string $description = null,
         ?float  $manualFee = null,
-    ): TransferFee {
+    ): TransferFee
+    {
         $this->enforceTransferRules($from, $to, $amount);
 
         $fee = $this->feeCalculator->calculate($from, $to, $amount);
@@ -64,7 +67,6 @@ readonly class TransferService
         $this->enforceBalanceCheck($from, $amount, $fee);
 
         DB::transaction(function () use ($from, $to, $amount, $date, $description, $fee) {
-            // Calculate value_date for savings destination accounts
             $isInterestGated = $to->type === 'savings'
                 && stripos($to->name, 'etica') !== false;
 
@@ -72,18 +74,18 @@ readonly class TransferService
                 ? KenyanBusinessDays::nextBusinessDay(Carbon::parse($date))->format('Y-m-d')
                 : null;
 
-            Transfer::create([
+            $transfer = Transfer::create([
                 'from_account_id' => $from->id,
-                'to_account_id'   => $to->id,
-                'amount'          => $amount,
-                'date'            => $date,
-                'value_date'      => $valueDate,
-                'description'     => $description,
-                'user_id'         => Auth::id(),
+                'to_account_id' => $to->id,
+                'amount' => $amount,
+                'date' => $date,
+                'value_date' => $valueDate,
+                'description' => $description,
+                'user_id' => Auth::id(),
             ]);
 
             if ($fee->isCharged()) {
-                $this->recordFeeTransaction($from, $to, $date, $fee, $description);
+                $this->recordFeeTransaction($from, $to, $date, $fee, $description, $transfer);
             }
 
             $from->updateBalance();
@@ -158,28 +160,31 @@ readonly class TransferService
         string      $date,
         TransferFee $fee,
         ?string     $userDescription,
-    ): void {
+        Transfer    $transfer,
+    ): void
+    {
         $feeCategory = Category::firstOrCreate(
             ['user_id' => Auth::id(), 'name' => 'Transaction Fees', 'parent_id' => null],
             ['type' => 'expense', 'icon' => '💸', 'is_active' => true],
         );
 
         Transaction::create([
-            'user_id'            => Auth::id(),
-            'date'               => $date,
-            'description'        => $userDescription
+            'user_id' => Auth::id(),
+            'date' => $date,
+            'description' => $userDescription
                 ? "{$from->name} to {$to->name} fee: {$userDescription}"
                 : "{$from->name} to {$to->name} fee",
-            'amount'             => $fee->amount,
-            'category_id'        => $feeCategory->id,
-            'account_id'         => $from->id,
-            'payment_method'     => match ($from->type) {
-                'mpesa'        => 'Mpesa',
+            'amount' => $fee->amount,
+            'category_id' => $feeCategory->id,
+            'account_id' => $from->id,
+            'payment_method' => match ($from->type) {
+                'mpesa' => 'Mpesa',
                 'airtel_money' => 'Airtel Money',
-                'bank'         => 'Bank',
-                default        => 'Cash',
+                'bank' => 'Bank',
+                default => 'Cash',
             },
             'is_transaction_fee' => true,
+            'transfer_id' => $transfer->id,
         ]);
     }
 }
