@@ -36,17 +36,17 @@ class TransactionController extends Controller
 
     public function index(Request $request)
     {
-        $filter     = $request->get('filter', 'all');
-        $search     = $request->get('search');
-        $categoryId = $request->get('category_id');
-        $accountId  = $request->get('account_id');
-        $startDate  = $request->get('start_date');
-        $endDate    = $request->get('end_date');
+        $filter     = $request->query('filter', 'today');
+        $search     = $request->query('search');
+        $categoryId = $request->query('category_id');
+        $accountId  = $request->query('account_id');
+        $startDate  = $request->query('start_date');
+        $endDate    = $request->query('end_date');
         $showFees   = $request->boolean('show_fees');
 
         $allowedSorts  = ['date', 'description', 'amount', 'account', 'category'];
-        $sortColumn    = in_array($request->get('sort'), $allowedSorts) ? $request->get('sort') : 'date';
-        $sortDirection = $request->get('direction') === 'asc' ? 'asc' : 'desc';
+        $sortColumn    = in_array($request->query('sort'), $allowedSorts) ? $request->query('sort') : 'date';
+        $sortDirection = $request->query('direction') === 'asc' ? 'asc' : 'desc';
 
         $minYear = Transaction::selectRaw('YEAR(MIN(date)) as min_year')->value('min_year') ?? date('Y');
         $maxYear = date('Y');

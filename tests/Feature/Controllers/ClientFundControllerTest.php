@@ -277,6 +277,7 @@ describe('recordExpense', function () {
 
         $this->actingAs($user)
             ->post("/client-funds/{$fund->id}/expense", [
+                'account_id'  => $account->id,
                 'amount'      => 1000,
                 'description' => 'Bought supplies',
                 'date'        => '2024-06-05',
@@ -297,6 +298,7 @@ describe('recordExpense', function () {
 
         $this->actingAs($user)
             ->post("/client-funds/{$fund->id}/expense", [
+                'account_id'  => $account->id,
                 'amount'      => 500,
                 'description' => 'Stationery',
                 'date'        => '2024-06-05',
@@ -326,6 +328,7 @@ describe('recordExpense', function () {
 
         $this->actingAs($user)
             ->post("/client-funds/{$fund->id}/expense", [
+                'account_id'  => $account->id,
                 'amount'      => 200,
                 'description' => 'Bought gear',
                 'date'        => '2024-06-05',
@@ -362,6 +365,7 @@ describe('recordExpense', function () {
 
         $this->actingAs($user)
             ->post("/client-funds/{$fund->id}/expense", [
+                'account_id'  => $account->id,
                 'amount'      => 1000,
                 'description' => 'Full spend',
                 'date'        => '2024-06-05',
@@ -378,7 +382,7 @@ describe('recordExpense', function () {
 
         $this->actingAs($user)
             ->post("/client-funds/{$fund->id}/expense", [])
-            ->assertSessionHasErrors(['amount', 'description', 'date', 'category_id']);
+            ->assertSessionHasErrors(['account_id', 'amount', 'description', 'date', 'category_id']);
     });
 
     it('prevents a different user from recording an expense', function () {
