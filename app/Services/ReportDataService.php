@@ -17,6 +17,7 @@ class ReportDataService
 {
     private const MIN_SALARY_AMOUNT_FOR_SAVINGS_RATE = 40000;
     private const SALARY_TO_SAVINGS_WINDOW_HOURS = 72;
+    private const SAVINGS_REVERSAL_WINDOW_DAYS = 7;
     /**
      * Generate annual report for the prior full year
      */
@@ -714,11 +715,6 @@ class ReportDataService
                 $endDate->toDateString(),
             ])
             ->whereHas('category', fn($q) => $q->where('name', 'like', '%salary%'))
-            // Ignore small transactions sitting in a "salary"-named category
-            // (corrections, refunds, misclassified entries). Without this
-            // filter, a stray small entry can "steal" a nearby transfer meant
-            // for the real salary payment and produce a nonsensical percentage
-            // (e.g. 8947% on a KES 420 "salary").
             ->where('amount', '>=', self::MIN_SALARY_AMOUNT_FOR_SAVINGS_RATE)
             ->with(['category', 'account'])
             ->orderBy('date')
@@ -748,12 +744,30 @@ class ReportDataService
                 ])
                 ->sum('amount');
 
+            // Net out any money pulled back OUT of savings within a wider window
+            // (7 days from the salary date) — a same-week reversal means the
+            // salary was never really "saved".
+            $reversalWindowEnd = $salaryDate->copy()->addDays(self::SAVINGS_REVERSAL_WINDOW_DAYS);
+
+            $transferredFromSavings = Transfer::withoutGlobalScopes()
+                ->where('user_id', $user->id)
+                ->whereIn('from_account_id', $savingsAccountIds)
+                ->whereBetween('date', [
+                    $salaryDate->toDateTimeString(),
+                    $reversalWindowEnd->toDateTimeString(),
+                ])
+                ->sum('amount');
+
+            $netSaved = max(0, $transferredToSavings - $transferredFromSavings);
+
             $results[] = [
                 'salary_date'        => $salaryDate->format('M d, Y'),
                 'salary_amount'      => (float) $salary->amount,
-                'saved_amount'       => (float) $transferredToSavings,
+                'saved_amount'       => (float) $netSaved,
+                'gross_saved_amount' => (float) $transferredToSavings,
+                'reversed_amount'    => (float) $transferredFromSavings,
                 'savings_percentage' => $salary->amount > 0
-                    ? round(($transferredToSavings / $salary->amount) * 100, 1)
+                    ? round(($netSaved / $salary->amount) * 100, 1)
                     : 0,
             ];
         }

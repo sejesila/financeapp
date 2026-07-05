@@ -1,336 +1,472 @@
 <x-app-layout>
     <x-slot name="header">
-        <div>
-            <h2 class="text-lg md:text-xl font-semibold text-gray-800 dark:text-gray-200">
-                Reports
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="font-semibold text-lg sm:text-xl text-gray-800 dark:text-gray-200 leading-tight">
+                {{ __('Transfer Money') }}
             </h2>
-            <p class="text-xs md:text-sm text-gray-500">
-                Analyze your spending patterns and trends
-            </p>
+            <a href="{{ route('accounts.index') }}" class="text-indigo-600 hover:text-indigo-800">
+                ← Back to Accounts
+            </a>
         </div>
     </x-slot>
 
-    <div class="mx-auto mt-4 md:mt-8 max-w-7xl space-y-6 md:space-y-8 px-4 md:px-0">
-
-        {{-- Filters --}}
-        <div class="rounded-lg border bg-white p-4 md:p-5 shadow-sm">
-            <form method="GET"
-                  action="{{ route('reports.index') }}"
-                  class="flex flex-col md:flex-row md:flex-wrap items-start md:items-end gap-4">
-
-                <div class="w-full md:w-auto">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">
-                        Time Period
-                    </label>
-                    <select name="filter"
-                            onchange="toggleCustomDates(this.value)"
-                            class="w-full md:w-auto rounded-md border border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500 px-3 py-2">
-                        @foreach([
-                            'this_month' => 'This Month',
-                            'last_month' => 'Last Month',
-                            'this_year'  => 'This Year',
-                            'last_year'  => 'Last Year',
-                            'custom'     => 'Custom Range',
-                        ] as $value => $label)
-                            <option value="{{ $value }}" @selected($filter === $value)>
-                                {{ $label }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div id="customDates"
-                     class="w-full flex flex-col md:flex-row gap-4 {{ $filter === 'custom' ? '' : 'hidden' }}">
-                    <div class="flex-1 md:flex-initial">
-                        <label class="block text-sm font-medium mb-1">Start</label>
-                        <input type="date"
-                               name="start_date"
-                               value="{{ request('start_date') }}"
-                               class="w-full rounded-md border border-gray-300 text-sm px-3 py-2">
-                    </div>
-
-                    <div class="flex-1 md:flex-initial">
-                        <label class="block text-sm font-medium mb-1">End</label>
-                        <input type="date"
-                               name="end_date"
-                               value="{{ request('end_date') }}"
-                               class="w-full rounded-md border border-gray-300 text-sm px-3 py-2">
-                    </div>
-                </div>
-
-                <button type="submit"
-                        class="w-full md:w-auto rounded-md bg-indigo-600 px-6 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition">
-                    Apply
-                </button>
-            </form>
-        </div>
-
-        {{-- Summary Cards --}}
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-            <x-report-card
-                title="Total Income"
-                :value="$totalIncome"
-                color="green" />
-
-            <x-report-card
-                title="Total Expenses"
-                :value="$totalExpenses"
-                color="red">
-                @if($previousExpenses > 0)
-                    <p class="text-xs mt-1 {{ $expenseChange > 0 ? 'text-red-500' : 'text-green-500' }}">
-                        {{ $expenseChange > 0 ? '↑' : '↓' }} {{ abs($expenseChange) }}% vs previous
-                    </p>
-                @endif
-            </x-report-card>
-
-            <x-report-card
-                title="Net Cash Flow"
-                :value="$netCashFlow"
-                :color="$netCashFlow >= 0 ? 'blue' : 'orange'"
-                subtitle="{{ $netCashFlow >= 0 ? 'Surplus' : 'Deficit' }}" />
-        </div>
-        {{-- Salary → Savings Rate --}}
-        @if(!empty($salarySavingsRate))
-            <div class="rounded-lg border bg-white p-4 md:p-6 shadow-sm">
-                <h3 class="text-base md:text-lg font-semibold mb-1">💰 Salary Saved to Savings</h3>
-                <p class="text-xs text-gray-500 mb-4">
-                    Transfers to savings accounts within 48 hours of receiving salary
-                </p>
-
-                <div class="space-y-3">
-                    @foreach($salarySavingsRate as $entry)
-                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between
-                            p-3 bg-gray-50 rounded gap-2">
-                            <div class="min-w-0">
-                                <p class="text-sm font-medium">{{ $entry['salary_date'] }}</p>
-                                <p class="text-xs text-gray-500">
-                                    Salary: KES {{ number_format($entry['salary_amount'], 0) }}
-                                </p>
-                            </div>
-                            <div class="sm:text-right">
-                                <p class="text-sm font-semibold
-                            {{ $entry['savings_percentage'] >= 20 ? 'text-green-600' : 'text-amber-600' }}">
-                                    {{ $entry['savings_percentage'] }}% saved
-                                </p>
-                                <p class="text-xs text-gray-500">
-                                    KES {{ number_format($entry['saved_amount'], 0) }} moved
-                                </p>
-                            </div>
-                        </div>
+    <div class="max-w-2xl mx-auto">
+        @if($errors->any())
+            <div class="bg-red-100 text-red-700 p-4 rounded mb-6">
+                <ul class="list-disc list-inside">
+                    @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
                     @endforeach
-                </div>
-
-                @php
-                    $avgSaved = collect($salarySavingsRate)->avg('savings_percentage');
-                @endphp
-                @if(count($salarySavingsRate) > 1)
-                    <div class="mt-4 pt-3 border-t text-sm text-gray-600">
-                        Average saved: <span class="font-semibold">{{ round($avgSaved, 1) }}%</span>
-                        across {{ count($salarySavingsRate) }} salary payment(s)
-                    </div>
-                @endif
+                </ul>
             </div>
         @endif
 
-        {{-- Charts --}}
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+        <div x-data="transferForm()">
+            <form method="POST" action="{{ route('accounts.transferPost') }}" class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+                @csrf
 
-            {{-- Spending by Category --}}
-            <div class="rounded-lg border bg-white p-4 md:p-6 shadow-sm">
-                <h3 class="text-base md:text-lg font-semibold mb-4">
-                    Spending by Category
-                </h3>
+                {{-- Hidden input so the manual fee is submitted with the form --}}
+                <input type="hidden" name="transaction_fee" :value="transactionFee">
 
-                <div class="h-64 md:h-72">
-                    <canvas id="categoryPieChart"></canvas>
-                </div>
-
-                <div class="mt-4 space-y-2 text-xs md:text-sm">
-                    @forelse($topCategories as $category)
-                        <div class="flex justify-between items-center">
-                            <span class="truncate">{{ $category->name }}</span>
-                            <span class="font-medium text-right ml-2">
-                                {{ number_format($category->total) }}
-                                ({{ $totalExpenses > 0 ? round(($category->total / $totalExpenses) * 100, 1) : 0 }}%)
-                            </span>
-                        </div>
-                    @empty
-                        <p class="text-gray-500 text-center">
-                            No expense data available
-                        </p>
-                    @endforelse
-                </div>
-            </div>
-
-            {{-- Income vs Expenses --}}
-            <div class="rounded-lg border bg-white p-4 md:p-6 shadow-sm">
-                <h3 class="text-base md:text-lg font-semibold mb-4">
-                    Income vs Expenses
-                </h3>
-
-                <div class="h-64 md:h-72">
-                    <canvas id="incomeExpenseChart"></canvas>
-                </div>
-            </div>
-        </div>
-
-        {{-- Mobile Money Transaction Type Stats --}}
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-            {{-- M-Pesa Stats --}}
-            @if($transactionTypeStats['mpesa']['period']->isNotEmpty())
-                <div class="rounded-lg border bg-white p-4 md:p-6 shadow-sm">
-                    <h3 class="text-base md:text-lg font-semibold mb-4">
-                        📱 M-Pesa Transaction Types
-                    </h3>
-
-                    <div class="space-y-2 md:space-y-3">
-                        @foreach($transactionTypeStats['mpesa']['period'] as $stat)
-                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded gap-2">
-                                <div class="min-w-0">
-                                    <p class="font-medium text-xs md:text-sm capitalize truncate">
-                                        {{ str_replace('_', ' ', $stat->type) }}
-                                    </p>
-                                    <p class="text-xs text-gray-500 dark:text-gray-400">
-                                        {{ $stat->count }} transaction{{ $stat->count !== 1 ? 's' : '' }}
-                                    </p>
-                                </div>
-                                <div class="sm:text-right">
-                                    <p class="font-semibold text-xs md:text-sm">
-                                        KSh {{ number_format($stat->total, 0) }}
-                                    </p>
-                                    <p class="text-xs text-gray-500 dark:text-gray-400">
-                                        {{ round(($stat->count / $transactionTypeStats['mpesa']['period']->sum('count')) * 100, 1) }}%
-                                    </p>
-                                </div>
-                            </div>
+                <!-- From Account -->
+                <div class="mb-4">
+                    <label for="from_account_id" class="block text-gray-700 dark:text-gray-200 font-semibold mb-2">From Account</label>
+                    <select
+                        name="from_account_id"
+                        id="from_account_id"
+                        x-model="fromAccountId"
+                        @change="calculateFee(); updateDestinationOptions();"
+                        required
+                        class="w-full border border-gray-300 dark:border-gray-600 rounded px-4 py-2 dark:bg-gray-700 dark:text-gray-200"
+                    >
+                        <option value="">Select source account</option>
+                        @foreach($sourceAccounts as $account)
+                            <option
+                                value="{{ $account->id }}"
+                                data-type="{{ $account->type }}"
+                                data-name="{{ $account->name }}"
+                                {{ old('from_account_id') == $account->id ? 'selected' : '' }}
+                            >
+                                @if($account->type == 'cash') 💵
+                                @elseif($account->type == 'mpesa') 📱
+                                @elseif($account->type == 'airtel_money') 📲
+                                @elseif($account->type == 'bank') 🏦
+                                @elseif($account->type == 'savings') 💰
+                                @endif
+                                {{ $account->name }}
+                                @if($account->type !== 'savings')
+                                    ({{ number_format($account->current_balance, 0, '.', ',') }})
+                                @endif
+                            </option>
                         @endforeach
+                    </select>
+                    @error('from_account_id')
+                    <p class="text-red-500 text-sm mt-2">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <!-- To Account -->
+                <div class="mb-4">
+                    <label for="to_account_id" class="block text-gray-700 dark:text-gray-200 font-semibold mb-2">To Account</label>
+                    <select
+                        name="to_account_id"
+                        id="to_account_id"
+                        x-model="toAccountId"
+                        @change="calculateFee()"
+                        required
+                        class="w-full border border-gray-300 dark:border-gray-600 rounded px-4 py-2 dark:bg-gray-700 dark:text-gray-200"
+                    >
+                        <option value="">Select destination account</option>
+                        @foreach($destinationAccounts as $account)
+                            <option
+                                value="{{ $account->id }}"
+                                data-type="{{ $account->type }}"
+                                data-name="{{ $account->name }}"
+                                {{ old('to_account_id') == $account->id ? 'selected' : '' }}
+                            >
+                                @if($account->type == 'cash') 💵
+                                @elseif($account->type == 'mpesa') 📱
+                                @elseif($account->type == 'airtel_money') 📲
+                                @elseif($account->type == 'bank') 🏦
+                                @elseif($account->type == 'savings') 💰
+                                @endif
+                                {{ $account->name }}
+                                @if($account->type !== 'savings')
+                                    ({{ number_format($account->current_balance, 0, '.', ',') }})
+                                @endif
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('to_account_id')
+                    <p class="text-red-500 text-sm mt-2">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <!-- Amount -->
+                <div class="mb-4">
+                    <label for="amount" class="block text-gray-700 dark:text-gray-200 font-semibold mb-2">Amount</label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        name="amount"
+                        id="amount"
+                        x-model.number="amount"
+                        @input="calculateFee()"
+                        placeholder="Enter amount to transfer"
+                        class="w-full border border-gray-300 dark:border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
+                        required
+                    >
+                    @error('amount')
+                    <p class="text-red-500 text-sm mt-2">{{ $message }}</p>
+                    @enderror
+
+                    <!-- Minimum withdrawal warning -->
+                    <p x-show="feeType === 'withdrawal' && amount > 0 && amount < 50" class="text-red-500 text-sm mt-2">
+                        ⚠️ Minimum M-Pesa withdrawal amount is KES 50
+                    </p>
+                </div>
+                <!-- Personal vs Client Fund -->
+                <div x-show="fromAccountType === 'savings'" x-transition class="mb-4">
+                    <label class="block text-gray-700 dark:text-gray-200 font-semibold mb-2">
+                        Whose money is this?
+                    </label>
+                    <div class="flex gap-3">
+                        <label class="flex-1 flex items-center gap-2 border rounded px-3 py-2 cursor-pointer"
+                               :class="!isClientFund ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-gray-300 dark:border-gray-600'">
+                            <input type="radio" name="is_client_fund_radio" value="0" x-model.number="isClientFund" class="hidden">
+                            <span class="text-sm">💼 My Money</span>
+                        </label>
+                        <label class="flex-1 flex items-center gap-2 border rounded px-3 py-2 cursor-pointer"
+                               :class="isClientFund ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'border-gray-300 dark:border-gray-600'">
+                            <input type="radio" name="is_client_fund_radio" value="1" x-model.number="isClientFund" class="hidden">
+                            <span class="text-sm">👤 Client Fund</span>
+                        </label>
+                    </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Client fund withdrawals won't count against your personal "Savings Used" in Budgets.
+                    </p>
+                </div>
+
+                <input type="hidden" name="is_client_fund" :value="isClientFund ? '1' : '0'">
+
+                <!-- Editable Transaction Fee -->
+                <div x-show="showFee" x-transition class="mb-4">
+                    <label class="block font-semibold mb-2"
+                           :class="{
+                            'text-orange-700 dark:text-orange-300': feeType === 'atm',
+                            'text-yellow-700 dark:text-yellow-300': feeType === 'withdrawal',
+                            'text-blue-700 dark:text-blue-300': feeType === 'paybill',
+                            'text-purple-700 dark:text-purple-300': feeType === 'savings'
+                        }">
+                        <span x-text="
+                            feeType === 'atm'        ? '🏧 ATM Withdrawal Fee' :
+                            feeType === 'savings'    ? '💰 Savings Withdrawal Fee' :
+                            feeType === 'withdrawal' ? '📱 ' + (fromAccountType === 'mpesa' ? 'M-Pesa' : 'Airtel Money') + ' Withdrawal Fee' :
+                                                       '📱 ' + (fromAccountType === 'mpesa' ? 'M-Pesa' : 'Airtel Money') + ' PayBill Fee'
+                        "></span>
+                        <span class="text-xs font-normal text-gray-500 dark:text-gray-400 ml-1">(auto-calculated, editable)</span>
+                    </label>
+
+                    <div class="flex items-center gap-2">
+                        <span class="text-gray-600 dark:text-gray-300 font-medium">KES</span>
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            x-model.number="transactionFee"
+                            @input="feeManuallyEdited = true"
+                            class="w-40 border border-gray-300 dark:border-gray-600 rounded px-3 py-2 focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
+                        >
+                        <button
+                            type="button"
+                            x-show="feeManuallyEdited"
+                            @click="feeManuallyEdited = false; calculateFee()"
+                            class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                        >
+                            ↺ Reset to calculated
+                        </button>
                     </div>
 
-                    @if($transactionTypeStats['mpesa']['frequency']->isNotEmpty())
-                        <div class="mt-3 md:mt-4 pt-3 md:pt-4 border-t">
-                            <p class="text-xs font-semibold text-gray-600 dark:text-gray-300 mb-2">
-                                ALL-TIME PREFERENCE
-                            </p>
-                            <div class="space-y-1 md:space-y-2">
-                                @foreach($transactionTypeStats['mpesa']['frequency'] as $freq)
-                                    <div class="flex justify-between items-center text-xs gap-2">
-                                        <span class="capitalize truncate">{{ str_replace('_', ' ', $freq->transaction_type) }}</span>
-                                        <span class="font-medium whitespace-nowrap">{{ $freq->usage_count }} uses</span>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endif
+                    <p x-show="feeType === 'atm' && !feeManuallyEdited"
+                       class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Default: KES 33.00 flat + 15% excise duty = KES 37.95
+                    </p>
+                    <p x-show="feeType === 'savings' && !feeManuallyEdited"
+                       class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Enter the withdrawal fee charged by your savings provider.
+                    </p>
                 </div>
-            @endif
 
-            {{-- Airtel Money Stats --}}
-            @if($transactionTypeStats['airtel_money']['period']->isNotEmpty())
-                <div class="rounded-lg border bg-white p-4 md:p-6 shadow-sm">
-                    <h3 class="text-base md:text-lg font-semibold mb-4">
-                        📲 Airtel Money Transaction Types
-                    </h3>
-
-                    <div class="space-y-2 md:space-y-3">
-                        @foreach($transactionTypeStats['airtel_money']['period'] as $stat)
-                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded gap-2">
-                                <div class="min-w-0">
-                                    <p class="font-medium text-xs md:text-sm capitalize truncate">
-                                        {{ str_replace('_', ' ', $stat->type) }}
-                                    </p>
-                                    <p class="text-xs text-gray-500 dark:text-gray-400">
-                                        {{ $stat->count }} transaction{{ $stat->count !== 1 ? 's' : '' }}
-                                    </p>
-                                </div>
-                                <div class="sm:text-right">
-                                    <p class="font-semibold text-xs md:text-sm">
-                                        KSh {{ number_format($stat->total, 0) }}
-                                    </p>
-                                    <p class="text-xs text-gray-500 dark:text-gray-400">
-                                        {{ round(($stat->count / $transactionTypeStats['airtel_money']['period']->sum('count')) * 100, 1) }}%
-                                    </p>
-                                </div>
-                            </div>
-                        @endforeach
+                <!-- Total Deduction -->
+                <div
+                    x-show="showFee && transactionFee > 0"
+                    x-transition
+                    class="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded p-3 mb-4"
+                >
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-indigo-800 dark:text-indigo-200">
+                            Total Deduction from <span x-text="fromAccountName"></span>:
+                        </span>
+                        <span class="text-lg font-bold text-indigo-800 dark:text-indigo-200"
+                              x-text="'KES ' + totalDeduction.toLocaleString()"></span>
                     </div>
-
-                    @if($transactionTypeStats['airtel_money']['frequency']->isNotEmpty())
-                        <div class="mt-3 md:mt-4 pt-3 md:pt-4 border-t">
-                            <p class="text-xs font-semibold text-gray-600 dark:text-gray-300 mb-2">
-                                ALL-TIME PREFERENCE
-                            </p>
-                            <div class="space-y-1 md:space-y-2">
-                                @foreach($transactionTypeStats['airtel_money']['frequency'] as $freq)
-                                    <div class="flex justify-between items-center text-xs gap-2">
-                                        <span class="capitalize truncate">{{ str_replace('_', ' ', $freq->transaction_type) }}</span>
-                                        <span class="font-medium whitespace-nowrap">{{ $freq->usage_count }} uses</span>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endif
+                    <p class="text-xs text-indigo-600 dark:text-indigo-300 mt-1">
+                        Transfer: KES <span x-text="parseFloat(amount || 0).toLocaleString()"></span>
+                        + Fee: KES <span x-text="parseFloat(transactionFee || 0).toFixed(2)"></span>
+                    </p>
                 </div>
-            @endif
+
+                <!-- Date -->
+                <div class="mb-4">
+                    <label for="date" class="block text-gray-700 dark:text-gray-200 font-semibold mb-2">Date</label>
+                    <input type="datetime-local" name="date" id="date" x-model="date"
+                           class="w-full border border-gray-300 dark:border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
+                           required
+                    >
+                    @error('date')
+                    <p class="text-red-500 text-sm mt-2">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <!-- Description -->
+                <div class="mb-6">
+                    <label for="description" class="block text-gray-700 dark:text-gray-200 font-semibold mb-2">Description (Optional)</label>
+                    <input
+                        type="text"
+                        name="description"
+                        id="description"
+                        x-model="description"
+                        placeholder="e.g., Transfer to savings"
+                        class="w-full border border-gray-300 dark:border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200"
+                    >
+                    @error('description')
+                    <p class="text-red-500 text-sm mt-2">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div class="flex items-center justify-between">
+                    <a href="{{ route('accounts.index') }}" class="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">Cancel</a>
+                    <button type="submit" class="bg-purple-600 text-white px-6 py-2 rounded hover:bg-purple-700 focus:outline-none">
+                        Transfer Money
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
-    {{-- Scripts --}}
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-
     <script>
-        function toggleCustomDates(value) {
-            document.getElementById('customDates')
-                .classList.toggle('hidden', value !== 'custom');
-        }
+        function transferForm() {
+            return {
+                fromAccountId: '{{ old('from_account_id') }}',
+                toAccountId: '{{ old('to_account_id') }}',
+                amount: {{ old('amount') ?: 'null' }},
+                date: '{{ old('date', now()->format('Y-m-d\TH:i')) }}',
+                description: '{{ old('description') }}',
+                transactionFee: {{ old('transaction_fee', 0) }},
+                showFee: false,
+                feeType: null,
+                fromAccountType: '',
+                fromAccountName: '',
+                toAccountType: '',
+                feeManuallyEdited: false,
 
-        new Chart(document.getElementById('categoryPieChart'), {
-            type: 'pie',
-            data: {
-                labels: @json($expensesByCategory->pluck('name')),
-                datasets: [{
-                    data: @json($expensesByCategory->pluck('total')),
-                    backgroundColor: [
-                        '#3B82F6','#EF4444','#10B981','#F59E0B','#8B5CF6',
-                        '#EC4899','#14B8A6','#F97316','#6366F1','#84CC16'
-                    ]
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                    legend: {
-                        position: window.innerWidth < 768 ? 'bottom' : 'right',
-                        labels: { font: { size: window.innerWidth < 768 ? 10 : 12 } }
+                // FIX: this was previously undeclared, so x-model="isClientFund"
+                // on the radio inputs had nothing to bind to and clicking did nothing.
+                // Uses a number (not string) so "0" doesn't evaluate as truthy in JS.
+                isClientFund: {{ old('is_client_fund', 0) }},
+
+                ATM_FEE: 33 + (33 * 0.15),
+
+                get totalDeduction() {
+                    return parseFloat(this.amount || 0) + parseFloat(this.transactionFee || 0);
+                },
+
+                getAccount(id) {
+                    if (!id) return null;
+                    const select = document.querySelector(`option[value="${id}"]`);
+                    if (!select) return null;
+                    return {
+                        type: select.dataset.type,
+                        name: select.dataset.name || select.textContent.split('(')[0].trim()
+                    };
+                },
+
+                calculateFee() {
+                    if (this.feeManuallyEdited) return;
+
+                    const fromAccount = this.getAccount(this.fromAccountId);
+                    const toAccount   = this.getAccount(this.toAccountId);
+
+                    if (!fromAccount || !toAccount || !this.amount || this.amount <= 0) {
+                        this.showFee = false;
+                        this.transactionFee = 0;
+                        this.feeType = null;
+                        return;
                     }
+
+                    this.fromAccountType = fromAccount.type;
+                    this.fromAccountName = fromAccount.name;
+                    this.toAccountType   = toAccount.type;
+
+                    // Savings → anywhere: show fee field at 0 for manual entry
+                    if (fromAccount.type === 'savings') {
+                        this.feeType        = 'savings';
+                        this.transactionFee = 0;
+                        this.showFee        = true;
+                        return;
+                    }
+
+                    const mobileMoneyTypes = ['mpesa', 'airtel_money'];
+                    const isMobileMoney    = mobileMoneyTypes.includes(fromAccount.type);
+
+                    // M-Pesa/Airtel → Cash = Withdrawal fee
+                    if (isMobileMoney && toAccount.type === 'cash') {
+                        this.feeType        = 'withdrawal';
+                        this.transactionFee = this.getWithdrawalFee(parseFloat(this.amount), fromAccount.type);
+                        this.showFee        = this.transactionFee > 0;
+                    }
+                    // M-Pesa/Airtel → Bank or Savings = PayBill fee
+                    else if (isMobileMoney && (toAccount.type === 'bank' || toAccount.type === 'savings')) {
+                        this.feeType        = 'paybill';
+                        this.transactionFee = this.getPayBillFee(parseFloat(this.amount), fromAccount.type);
+                        this.showFee        = this.transactionFee > 0;
+                    }
+                    // Bank → Cash = ATM fee
+                    else if (fromAccount.type === 'bank' && toAccount.type === 'cash') {
+                        this.feeType        = 'atm';
+                        this.transactionFee = this.ATM_FEE;
+                        this.showFee        = true;
+                    }
+                    // Bank → Savings = no fee
+                    else if (fromAccount.type === 'bank' && toAccount.type === 'savings') {
+                        this.feeType        = null;
+                        this.transactionFee = 0;
+                        this.showFee        = false;
+                    }
+                    // All other transfers = no fee
+                    else {
+                        this.feeType        = null;
+                        this.transactionFee = 0;
+                        this.showFee        = false;
+                    }
+                },
+
+                getWithdrawalFee(amount, accountType) {
+                    if (!amount || amount < 50) return 0;
+
+                    const tiers = [
+                        { min: 50,    max: 100,    cost: 11  },
+                        { min: 101,   max: 500,    cost: 29  },
+                        { min: 501,   max: 1000,   cost: 29  },
+                        { min: 1001,  max: 1500,   cost: 29  },
+                        { min: 1501,  max: 2500,   cost: 29  },
+                        { min: 2501,  max: 3500,   cost: 52  },
+                        { min: 3501,  max: 5000,   cost: 69  },
+                        { min: 5001,  max: 7500,   cost: 87  },
+                        { min: 7501,  max: 10000,  cost: 115 },
+                        { min: 10001, max: 15000,  cost: 167 },
+                        { min: 15001, max: 20000,  cost: 185 },
+                        { min: 20001, max: 35000,  cost: 197 },
+                        { min: 35001, max: 50000,  cost: 278 },
+                        { min: 50001, max: 250000, cost: 309 },
+                    ];
+
+                    for (let tier of tiers) {
+                        if (amount >= tier.min && amount <= tier.max) return tier.cost;
+                    }
+                    return amount > 250000 ? 309 : 0;
+                },
+
+                getPayBillFee(amount, accountType) {
+                    if (!amount || amount <= 0) return 0;
+
+                    if (accountType === 'airtel_money') return 0;
+
+                    const tiers = [
+                        { min: 1,     max: 49,     cost: 0   },
+                        { min: 50,    max: 100,    cost: 0   },
+                        { min: 101,   max: 500,    cost: 5   },
+                        { min: 501,   max: 1000,   cost: 10  },
+                        { min: 1001,  max: 1500,   cost: 15  },
+                        { min: 1501,  max: 2500,   cost: 20  },
+                        { min: 2501,  max: 3500,   cost: 25  },
+                        { min: 3501,  max: 5000,   cost: 34  },
+                        { min: 5001,  max: 7500,   cost: 42  },
+                        { min: 7501,  max: 10000,  cost: 48  },
+                        { min: 10001, max: 15000,  cost: 57  },
+                        { min: 15001, max: 20000,  cost: 62  },
+                        { min: 20001, max: 25000,  cost: 67  },
+                        { min: 25001, max: 30000,  cost: 72  },
+                        { min: 30001, max: 35000,  cost: 83  },
+                        { min: 35001, max: 40000,  cost: 99  },
+                        { min: 40001, max: 45000,  cost: 103 },
+                        { min: 45001, max: 50000,  cost: 108 },
+                        { min: 50001, max: 250000, cost: 108 },
+                    ];
+
+                    for (let tier of tiers) {
+                        if (amount >= tier.min && amount <= tier.max) return tier.cost;
+                    }
+                    return amount > 250000 ? 108 : 0;
+                },
+
+                updateDestinationOptions() {
+                    const fromAccount = this.getAccount(this.fromAccountId);
+                    const toSelect    = document.getElementById('to_account_id');
+                    if (!toSelect) return;
+
+                    Array.from(toSelect.options).forEach(option => {
+                        if (!option.value) return;
+
+                        const optionType = option.dataset.type;
+
+                        // Disable same account
+                        if (option.value === this.fromAccountId) {
+                            option.disabled = true;
+                            option.hidden   = true;
+                            return;
+                        }
+
+                        // Bank source: allow mpesa, airtel_money, cash, savings
+                        if (fromAccount && fromAccount.type === 'bank') {
+                            const allowed = ['mpesa', 'airtel_money', 'cash', 'savings'];
+                            option.disabled = !allowed.includes(optionType);
+                            option.hidden   = !allowed.includes(optionType);
+                        }
+                        // Savings source: allow mpesa, airtel_money, bank, cash
+                        else if (fromAccount && fromAccount.type === 'savings') {
+                            const allowed = ['mpesa', 'airtel_money', 'bank', 'cash'];
+                            option.disabled = !allowed.includes(optionType);
+                            option.hidden   = !allowed.includes(optionType);
+                        }
+                        else {
+                            option.disabled = false;
+                            option.hidden   = false;
+                        }
+                    });
+
+                    // Auto-select M-Pesa if source is bank and no destination selected
+                    if (fromAccount && fromAccount.type === 'bank' && !this.toAccountId) {
+                        const mpesaOption = Array.from(toSelect.options).find(opt =>
+                            opt.dataset.type === 'mpesa' && opt.value !== this.fromAccountId
+                        );
+                        if (mpesaOption) this.toAccountId = mpesaOption.value;
+                    }
+
+                    // Clear selection if currently selected account is now disabled
+                    const currentOption = toSelect.querySelector(`option[value="${this.toAccountId}"]`);
+                    if (currentOption && (currentOption.disabled || currentOption.hidden)) {
+                        this.toAccountId = '';
+                    }
+                },
+
+                init() {
+                    this.$nextTick(() => {
+                        this.updateDestinationOptions();
+                        this.calculateFee();
+                    });
                 }
             }
-        });
-
-        new Chart(document.getElementById('incomeExpenseChart'), {
-            type: 'bar',
-            data: {
-                labels: ['Income', 'Expenses', 'Net'],
-                datasets: [{
-                    data: [
-                        {{ $totalIncome }},
-                        {{ $totalExpenses }},
-                        {{ abs($netCashFlow) }}
-                    ],
-                    backgroundColor: [
-                        '#10B981',
-                        '#EF4444',
-                        '{{ $netCashFlow >= 0 ? "#3B82F6" : "#F59E0B" }}'
-                    ]
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: { legend: { display: false } },
-                scales: { y: { beginAtZero: true } }
-            }
-        });
+        }
     </script>
-    <x-floating-action-button :quickAccount="$accounts->first()" />
 </x-app-layout>
