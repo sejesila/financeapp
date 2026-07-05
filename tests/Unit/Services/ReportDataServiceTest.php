@@ -4,6 +4,8 @@ namespace Tests\Unit\Services;
 
 use App\Models\Account;
 use App\Models\Category;
+use App\Models\ClientFund;
+use App\Models\ClientFundTransaction;
 use App\Models\Loan;
 use App\Models\Transaction;
 use App\Models\User;
@@ -532,6 +534,206 @@ class ReportDataServiceTest extends TestCase
         $report = $this->service->generateMonthlyReport($this->user);
 
         $this->assertEquals(70000, $report['net_worth']);
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // CLIENT FUNDS "AS-AT" TESTS
+    //
+    // Regression coverage for getClientFundsBalanceAsAt(). A ClientFund's
+    // `balance` column is a CURRENT value: it gets reduced the moment an
+    // expense or profit is recorded against it (see ClientFund::updateBalance()),
+    // and that reduction is timestamped via a ClientFundTransaction row, not
+    // via the fund's own received_date. If a report simply summed the live
+    // `balance` column, a reduction recorded AFTER the report's period end
+    // would retroactively make a "closed" period's report change — money
+    // that was genuinely still outstanding as of $endDate would look
+    // resolved, because the resolution happened a few days into the next
+    // period. These tests confirm the as-at reconstruction reverses that
+    // out, the same way getAccountBalanceAsAt() already does for accounts.
+    // ────────────────────────────────────────────────────────────────────────
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_reconstructs_client_fund_balance_as_at_period_end_reversing_a_later_reduction()
+    {
+        // Fund received in June — still fully outstanding as of June 30.
+        $clientFund = ClientFund::create([
+            'user_id'         => $this->user->id,
+            'client_name'     => 'Acme Corp',
+            'type'            => 'no_profit',
+            'amount_received' => 10000,
+            'amount_spent'    => 0,
+            'profit_amount'   => 0,
+            'balance'         => 10000,
+            'status'          => 'pending',
+            'account_id'      => $this->account->id,
+            'purpose'         => 'Supplies',
+            'received_date'   => Carbon::create(2026, 6, 15),
+        ]);
+
+        // On July 2nd — AFTER the June period has already closed — a 3,000
+        // expense is recorded against the fund. This mirrors the exact bug
+        // scenario: the fund's `balance` column now reflects the reduction,
+        // even though the report in question is for June.
+        $expenseTransaction = Transaction::factory()
+            ->for($this->user)
+            ->for($this->account)
+            ->for($this->createCategory($this->user, 'Client Payment', 'expense'))
+            ->create([
+                'type'           => 'expense',
+                'amount'         => 3000,
+                'payment_method' => 'Client Fund',
+                'date'           => Carbon::create(2026, 7, 2),
+            ]);
+
+        ClientFundTransaction::create([
+            'client_fund_id' => $clientFund->id,
+            'transaction_id' => $expenseTransaction->id,
+            'type'           => 'expense',
+            'amount'         => 3000,
+            'date'           => Carbon::create(2026, 7, 2),
+            'description'    => 'Post-period expense',
+        ]);
+
+        $clientFund->amount_spent = 3000;
+        $clientFund->balance = 7000;
+        $clientFund->status = 'partial';
+        $clientFund->save();
+
+        $juneStart = Carbon::create(2026, 6, 1);
+        $juneEnd   = Carbon::create(2026, 6, 30);
+
+        $report = $this->service->generateCustomReport($this->user, $juneStart, $juneEnd);
+
+        // The June report must still show the full 10,000 as outstanding —
+        // the July 2nd reduction is added back, not leaked backward into a
+        // period that has already closed.
+        $this->assertEquals(10000, $report['total_client_funds']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_does_not_double_count_a_reduction_recorded_within_the_period()
+    {
+        // Same fund, but this time the 3,000 expense is recorded WITHIN
+        // June (not after it) — the current balance of 7,000 is already
+        // correct as of June 30 and should NOT be adjusted further.
+        $clientFund = ClientFund::create([
+            'user_id'         => $this->user->id,
+            'client_name'     => 'Acme Corp',
+            'type'            => 'no_profit',
+            'amount_received' => 10000,
+            'amount_spent'    => 3000,
+            'profit_amount'   => 0,
+            'balance'         => 7000,
+            'status'          => 'partial',
+            'account_id'      => $this->account->id,
+            'purpose'         => 'Supplies',
+            'received_date'   => Carbon::create(2026, 6, 5),
+        ]);
+
+        $expenseTransaction = Transaction::factory()
+            ->for($this->user)
+            ->for($this->account)
+            ->for($this->createCategory($this->user, 'Client Payment', 'expense'))
+            ->create([
+                'type'           => 'expense',
+                'amount'         => 3000,
+                'payment_method' => 'Client Fund',
+                'date'           => Carbon::create(2026, 6, 20),
+            ]);
+
+        ClientFundTransaction::create([
+            'client_fund_id' => $clientFund->id,
+            'transaction_id' => $expenseTransaction->id,
+            'type'           => 'expense',
+            'amount'         => 3000,
+            'date'           => Carbon::create(2026, 6, 20),
+            'description'    => 'In-period expense',
+        ]);
+
+        $juneStart = Carbon::create(2026, 6, 1);
+        $juneEnd   = Carbon::create(2026, 6, 30);
+
+        $report = $this->service->generateCustomReport($this->user, $juneStart, $juneEnd);
+
+        // The reduction already happened before period end, so the
+        // current balance (7,000) is the correct as-at-June-30 figure.
+        $this->assertEquals(7000, $report['total_client_funds']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_excludes_cancelled_client_funds_from_balance_as_at()
+    {
+        ClientFund::create([
+            'user_id'         => $this->user->id,
+            'client_name'     => 'Cancelled Client',
+            'type'            => 'no_profit',
+            'amount_received' => 15000,
+            'amount_spent'    => 0,
+            'profit_amount'   => 0,
+            'balance'         => 15000,
+            'status'          => 'cancelled',
+            'account_id'      => $this->account->id,
+            'purpose'         => 'Test',
+            'received_date'   => $this->reportStart->copy()->addDays(2),
+        ]);
+
+        $report = $this->service->generateMonthlyReport($this->user);
+
+        $this->assertEquals(0, $report['total_client_funds']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_excludes_client_funds_received_after_the_period_end()
+    {
+        $startDate = now()->startOfMonth();
+        $endDate = now()->endOfMonth();
+
+        ClientFund::create([
+            'user_id'         => $this->user->id,
+            'client_name'     => 'Future Client',
+            'type'            => 'no_profit',
+            'amount_received' => 8000,
+            'amount_spent'    => 0,
+            'profit_amount'   => 0,
+            'balance'         => 8000,
+            'status'          => 'pending',
+            'account_id'      => $this->account->id,
+            'purpose'         => 'Test',
+            'received_date'   => now()->addMonth()->startOfMonth(),
+        ]);
+
+        $report = $this->service->generateCustomReport($this->user, $startDate, $endDate);
+
+        $this->assertEquals(0, $report['total_client_funds']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_nets_outstanding_client_funds_against_savings_for_net_worth()
+    {
+        $savingsAccount = Account::factory()
+            ->for($this->user)
+            ->create(['type' => 'savings', 'current_balance' => 50000]);
+
+        ClientFund::create([
+            'user_id'         => $this->user->id,
+            'client_name'     => 'Beta Ltd',
+            'type'            => 'no_profit',
+            'amount_received' => 20000,
+            'amount_spent'    => 0,
+            'profit_amount'   => 0,
+            'balance'         => 20000,
+            'status'          => 'pending',
+            'account_id'      => $savingsAccount->id,
+            'purpose'         => 'Escrow',
+            'received_date'   => $this->reportStart->copy()->addDays(3),
+        ]);
+
+        $report = $this->service->generateMonthlyReport($this->user);
+
+        $this->assertEquals(20000, $report['total_client_funds']);
+        // 50,000 savings - 20,000 owed to client = 30,000 owned savings.
+        // No active loans, so net worth equals owned savings.
+        $this->assertEquals(30000, $report['net_worth']);
     }
 
     // ────────────────────────────────────────────────────────────────────────
