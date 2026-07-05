@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\Log;
 
 class ReportDataService
 {
+    private const MIN_SALARY_AMOUNT_FOR_SAVINGS_RATE = 40000;
+    private const SALARY_TO_SAVINGS_WINDOW_HOURS = 72;
     /**
      * Generate annual report for the prior full year
      */
@@ -702,6 +704,8 @@ class ReportDataService
         return $insights;
     }
 
+
+
     public function getSalarySavingsRate(User $user, Carbon $startDate, Carbon $endDate): array
     {
         $salaryTransactions = Transaction::where('user_id', $user->id)
@@ -710,6 +714,12 @@ class ReportDataService
                 $endDate->toDateString(),
             ])
             ->whereHas('category', fn($q) => $q->where('name', 'like', '%salary%'))
+            // Ignore small transactions sitting in a "salary"-named category
+            // (corrections, refunds, misclassified entries). Without this
+            // filter, a stray small entry can "steal" a nearby transfer meant
+            // for the real salary payment and produce a nonsensical percentage
+            // (e.g. 8947% on a KES 420 "salary").
+            ->where('amount', '>=', self::MIN_SALARY_AMOUNT_FOR_SAVINGS_RATE)
             ->with(['category', 'account'])
             ->orderBy('date')
             ->get();
@@ -727,7 +737,7 @@ class ReportDataService
 
         foreach ($salaryTransactions as $salary) {
             $salaryDate = Carbon::parse($salary->date);
-            $windowEnd  = $salaryDate->copy()->addHours(48);
+            $windowEnd  = $salaryDate->copy()->addHours(self::SALARY_TO_SAVINGS_WINDOW_HOURS);
 
             $transferredToSavings = Transfer::withoutGlobalScopes()
                 ->where('user_id', $user->id)
