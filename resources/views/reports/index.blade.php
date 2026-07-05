@@ -16,31 +16,73 @@
         <div class="rounded-lg border bg-white p-4 md:p-5 shadow-sm">
             <form method="GET"
                   action="{{ route('reports.index') }}"
+                  x-data="{
+                      open: false,
+                      filter: '{{ $filter }}',
+                      labels: {
+                          this_month: 'This Month',
+                          last_month: 'Last Month',
+                          this_year:  'This Year',
+                          last_year:  'Last Year',
+                          custom:     'Custom Range',
+                      },
+                      select(value) {
+                          this.filter = value;
+                          this.open = false;
+                          toggleCustomDates(value);
+                          const isMobile = window.innerWidth < 768;
+                          if (value !== 'custom' && !isMobile) {
+                              // Desktop: preset picks navigate immediately, no Apply needed
+                              window.location = '{{ route('reports.index') }}?filter=' + value;
+                          }
+                          // Mobile (or custom range): leave Apply visible so the
+                          // user can confirm before the page reloads.
+                      }
+                  }"
                   class="flex flex-col md:flex-row md:flex-wrap items-start md:items-end gap-4">
 
                 <div class="w-full md:w-auto">
                     <label class="block text-sm font-medium text-gray-700 mb-1">
                         Time Period
                     </label>
-                    <select name="filter"
-                            onchange="toggleCustomDates(this.value)"
-                            class="w-full md:w-auto rounded-md border border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500 px-3 py-2">
-                        @foreach([
-                            'this_month' => 'This Month',
-                            'last_month' => 'Last Month',
-                            'this_year'  => 'This Year',
-                            'last_year'  => 'Last Year',
-                            'custom'     => 'Custom Range',
-                        ] as $value => $label)
-                            <option value="{{ $value }}" @selected($filter === $value)>
-                                {{ $label }}
-                            </option>
-                        @endforeach
-                    </select>
+
+                    <div
+                        @mouseenter="open = true"
+                        @mouseleave="open = false"
+                        @click.outside="open = false"
+                        class="relative w-full md:w-56"
+                    >
+                        <button type="button"
+                                @click="open = !open"
+                                class="w-full md:w-auto rounded-md border border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500 px-3 py-2 text-left flex justify-between items-center gap-2 bg-white">
+                            <span x-text="labels[filter]"></span>
+                            <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+
+                        <ul x-show="open"
+                            x-transition
+                            x-cloak
+                            class="absolute z-20 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg text-sm overflow-hidden">
+                            <template x-for="(label, value) in labels" :key="value">
+                                <li @click="select(value)"
+                                    :class="{ 'bg-indigo-50': filter === value }"
+                                    class="px-3 py-2 cursor-pointer hover:bg-indigo-100"
+                                    x-text="label">
+                                </li>
+                            </template>
+                        </ul>
+
+                        {{-- Hidden input keeps 'filter' in the form submission --}}
+                        <input type="hidden" name="filter" :value="filter">
+                    </div>
                 </div>
 
                 <div id="customDates"
-                     class="w-full flex flex-col md:flex-row gap-4 {{ $filter === 'custom' ? '' : 'hidden' }}">
+                     x-show="filter === 'custom'"
+                     x-cloak
+                     class="w-full flex flex-col md:flex-row gap-4">
                     <div class="flex-1 md:flex-initial">
                         <label class="block text-sm font-medium mb-1">Start</label>
                         <input type="date"
@@ -58,7 +100,18 @@
                     </div>
                 </div>
 
+                {{--
+                    Apply button only needed when:
+                    - Custom range is selected (dates need manual confirmation), or
+                    - We're on a mobile viewport (select() skips auto-navigate there
+                      as a safety net against accidental taps).
+                    On desktop, picking a preset in the dropdown navigates immediately.
+                --}}
                 <button type="submit"
+                        x-show="filter === 'custom' || isMobileWidth"
+                        x-data="{ isMobileWidth: window.innerWidth < 768 }"
+                        x-init="window.addEventListener('resize', () => isMobileWidth = window.innerWidth < 768)"
+                        x-cloak
                         class="w-full md:w-auto rounded-md bg-indigo-600 px-6 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition">
                     Apply
                 </button>
@@ -275,12 +328,18 @@
     </div>
 
     {{-- Scripts --}}
+    {{-- Alpine.js is already loaded in the app layout (x-app-layout) — don't load it again here. --}}
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
     <script>
+        // Kept for compatibility — no longer wired to a native <select> onchange,
+        // but still called from Alpine's select() so the #customDates block
+        // (and this function, if referenced elsewhere) keeps working.
         function toggleCustomDates(value) {
-            document.getElementById('customDates')
-                .classList.toggle('hidden', value !== 'custom');
+            const el = document.getElementById('customDates');
+            if (el) {
+                el.classList.toggle('hidden', value !== 'custom');
+            }
         }
 
         new Chart(document.getElementById('categoryPieChart'), {
