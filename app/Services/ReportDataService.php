@@ -735,9 +735,12 @@ class ReportDataService
             $salaryDate = Carbon::parse($salary->date);
             $windowEnd  = $salaryDate->copy()->addHours(self::SALARY_TO_SAVINGS_WINDOW_HOURS);
 
+            // Client-fund transfers are excluded — that money was never the
+            // user's own salary savings, so it shouldn't count as "saved".
             $transferredToSavings = Transfer::withoutGlobalScopes()
                 ->where('user_id', $user->id)
                 ->whereIn('to_account_id', $savingsAccountIds)
+                ->where('is_client_fund', false)
                 ->whereBetween('date', [
                     $salaryDate->toDateTimeString(),
                     $windowEnd->toDateTimeString(),
@@ -745,13 +748,16 @@ class ReportDataService
                 ->sum('amount');
 
             // Net out any money pulled back OUT of savings within a wider window
-            // (7 days from the salary date) — a same-week reversal means the
-            // salary was never really "saved".
+            // (8 days from the salary date) — a same-week reversal means the
+            // salary was never really "saved". Client-fund withdrawals are
+            // excluded too — pulling a client's money back out isn't the user
+            // reversing their own savings decision.
             $reversalWindowEnd = $salaryDate->copy()->addDays(self::SAVINGS_REVERSAL_WINDOW_DAYS);
 
             $transferredFromSavings = Transfer::withoutGlobalScopes()
                 ->where('user_id', $user->id)
                 ->whereIn('from_account_id', $savingsAccountIds)
+                ->where('is_client_fund', false)
                 ->whereBetween('date', [
                     $salaryDate->toDateTimeString(),
                     $reversalWindowEnd->toDateTimeString(),
