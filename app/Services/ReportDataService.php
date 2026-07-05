@@ -17,7 +17,7 @@ class ReportDataService
 {
     private const MIN_SALARY_AMOUNT_FOR_SAVINGS_RATE = 40000;
     private const SALARY_TO_SAVINGS_WINDOW_HOURS = 72;
-    private const SAVINGS_REVERSAL_WINDOW_DAYS = 7;
+    private const SAVINGS_REVERSAL_WINDOW_DAYS = 8;
     /**
      * Generate annual report for the prior full year
      */
