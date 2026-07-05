@@ -37,9 +37,13 @@ class ClientFundController extends Controller
         $clientFunds = $query->paginate(15)->withQueryString();
 
         // ── Summary cards (reflects filter if active) ─────────────────
+        // ── Summary cards (reflects filter if active) ─────────────────
         $summaryQuery = ClientFund::where('user_id', Auth::id());
         if ($clientFilter) {
             $summaryQuery->where('client_name', $clientFilter);
+        }
+        if (!$showCompleted) {
+            $summaryQuery->where('status', '!=', 'completed');
         }
         $allClientFunds = $summaryQuery->get();
 
