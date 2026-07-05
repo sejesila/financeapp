@@ -7,12 +7,18 @@ use App\Models\Budget;
 use App\Models\Category;
 use App\Models\Loan;
 use App\Models\Transaction;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class BudgetController extends Controller
 {
+    /** Hop must complete within this many hours to be treated as a
+     *  savings→savings transfer routed through an intermediate account,
+     *  rather than a genuine withdrawal for spending. */
+    private const SAVINGS_HOP_WINDOW_HOURS = 24;
+
     public function index(Request $request, $year = null)
     {
         $year = $year ?? date('Y');
@@ -123,19 +129,10 @@ class BudgetController extends Controller
         // Get loan statistics for the year
         $loanStats = $this->getLoanStats($year);
 
-        // Get savings withdrawals by month
-        $savingsWithdrawals = DB::table('transfers')
-            ->join('accounts as from_acc', 'transfers.from_account_id', '=', 'from_acc.id')
-            ->join('accounts as to_acc', 'transfers.to_account_id', '=', 'to_acc.id')
-            ->where('transfers.user_id', Auth::id())
-            ->whereYear('transfers.date', $year)
-            ->where('from_acc.type', 'savings')
-            ->where('to_acc.type', '!=', 'savings')
-            ->where('transfers.is_client_fund', false) // exclude client fund withdrawals
-            ->selectRaw('MONTH(transfers.date) as month, SUM(transfers.amount) as total')
-            ->groupBy('month')
-            ->get()
-            ->keyBy('month');
+        // Get savings withdrawals by month, netted against any amount that
+        // was actually a savings→savings hop through an intermediate account
+        // (e.g. Sanlam → M-Pesa → Etica), not real spending.
+        $savingsWithdrawals = $this->calculateNetSavingsWithdrawals($year);
 
         // Get accounts for the FAB component
         $accounts = Account::where('user_id', Auth::id())
@@ -221,5 +218,116 @@ class BudgetController extends Controller
             'payments'       => $loanPayments,
             'active_balance' => $activeLoanBalance,
         ];
+    }
+
+    /**
+     * Calculate monthly "Savings Used" figures, netting out any transfer
+     * that was really a savings→savings move routed through an intermediate
+     * wallet — since Savings accounts can't transfer to each other directly
+     * (see TransferService::enforceTransferRules()), moving money between
+     * two savings accounts always looks like: Savings A → Wallet → Savings B.
+     *
+     * Without this netting, that single logical transfer would be counted
+     * as a full withdrawal from Savings A (spending), even though the money
+     * never left savings — it just changed which savings account holds it.
+     *
+     * Approach:
+     *   1. Collect every "savings → non-savings" transfer (a candidate
+     *      withdrawal) and every "non-savings → savings" transfer (a
+     *      candidate re-deposit) for the year.
+     *   2. For each withdrawal, look for re-deposits through the SAME
+     *      intermediate account within a 24-hour window and consume their
+     *      amounts against the withdrawal (oldest-deposit-first, partial
+     *      matches allowed).
+     *   3. Only the unmatched remainder of each withdrawal counts as real
+     *      "Savings Used" for that month.
+     *
+     * This also naturally covers "moved out and back into the SAME savings
+     * account" — the re-deposit doesn't have to target a different account.
+     */
+    private function calculateNetSavingsWithdrawals(int $year): \Illuminate\Support\Collection
+    {
+        $withdrawals = DB::table('transfers')
+            ->join('accounts as from_acc', 'transfers.from_account_id', '=', 'from_acc.id')
+            ->join('accounts as to_acc', 'transfers.to_account_id', '=', 'to_acc.id')
+            ->where('transfers.user_id', Auth::id())
+            ->whereYear('transfers.date', $year)
+            ->where('from_acc.type', 'savings')
+            ->where('to_acc.type', '!=', 'savings')
+            ->where('transfers.is_client_fund', false)
+            ->select(
+                'transfers.id',
+                'transfers.to_account_id as intermediate_account_id',
+                'transfers.amount',
+                'transfers.date'
+            )
+            ->orderBy('transfers.date')
+            ->get();
+
+        if ($withdrawals->isEmpty()) {
+            return collect();
+        }
+
+        $deposits = DB::table('transfers')
+            ->join('accounts as from_acc', 'transfers.from_account_id', '=', 'from_acc.id')
+            ->join('accounts as to_acc', 'transfers.to_account_id', '=', 'to_acc.id')
+            ->where('transfers.user_id', Auth::id())
+            ->whereYear('transfers.date', $year)
+            ->where('from_acc.type', '!=', 'savings')
+            ->where('to_acc.type', 'savings')
+            ->where('transfers.is_client_fund', false)
+            ->select(
+                'transfers.id',
+                'transfers.from_account_id as intermediate_account_id',
+                'transfers.amount',
+                'transfers.date'
+            )
+            ->orderBy('transfers.date')
+            ->get()
+            ->map(fn($d) => (object) [
+                'id'                      => $d->id,
+                'intermediate_account_id' => $d->intermediate_account_id,
+                'date'                    => Carbon::parse($d->date),
+                'remaining'               => (float) $d->amount,
+            ])
+            ->keyBy('id');
+
+        $netByMonth = [];
+
+        foreach ($withdrawals as $w) {
+            $withdrawalDate   = Carbon::parse($w->date);
+            $remainingToMatch = (float) $w->amount;
+
+            // Candidate re-deposits: same intermediate account, on/after the
+            // withdrawal, within the hop window, and not fully consumed yet.
+            $candidates = $deposits
+                ->filter(fn($d) =>
+                    $d->intermediate_account_id === $w->intermediate_account_id
+                    && $d->remaining > 0
+                    && $d->date->greaterThanOrEqualTo($withdrawalDate)
+                    && $withdrawalDate->diffInHours($d->date) <= self::SAVINGS_HOP_WINDOW_HOURS
+                )
+                ->sortBy('date');
+
+            foreach ($candidates as $d) {
+                if ($remainingToMatch <= 0) {
+                    break;
+                }
+
+                $matched = min($remainingToMatch, $d->remaining);
+                $remainingToMatch   -= $matched;
+                $deposits[$d->id]->remaining -= $matched;
+            }
+
+            $month = $withdrawalDate->month;
+            $netByMonth[$month] = ($netByMonth[$month] ?? 0) + $remainingToMatch;
+        }
+
+        return collect($netByMonth)
+            ->map(fn($total, $month) => (object) [
+                'month' => $month,
+                'total' => $total,
+            ])
+            ->keyBy('month');
     }
 }
