@@ -325,15 +325,9 @@ class ReportDataService
         $activeLoans      = Loan::where('user_id', $user->id)->where('status', 'active')->with('account')->get();
         $totalLoanBalance = $activeLoans->sum('balance');
 
-        $totalClientFunds = ClientFund::where('user_id', $user->id)
-            ->where('received_date', '<=', $endDate)
-            ->where(function ($q) use ($endDate) {
-                $q->whereNull('completed_date')
-                    ->orWhere('completed_date', '>', $endDate)
-                    ->orWhereIn('status', ['pending', 'partial']); // safety net for inconsistent data
-            })
-            ->whereNotIn('status', ['cancelled'])
-            ->sum('balance');
+        // Historical client funds balance — what was still outstanding as of $endDate,
+// not what's outstanding today.
+        $totalClientFunds = $this->getClientFundsBalanceAsAt($user, $endDate);
 
         // Historical savings balance — what was actually in savings at period end, not today
         $savingsBalance = $this->getSavingsBalanceAsAt($user, $endDate);
@@ -779,5 +773,29 @@ class ReportDataService
         }
 
         return $results;
+    }
+    /**
+     * Calculate what a user's outstanding client funds balance was at a specific
+     * point in time, by taking each fund's current balance and adding back any
+     * expense/profit reductions recorded after $asAtDate.
+     */
+    private function getClientFundsBalanceAsAt(User $user, Carbon $asAtDate): float
+    {
+        $clientFunds = ClientFund::where('user_id', $user->id)
+            ->where('received_date', '<=', $asAtDate)
+            ->whereNotIn('status', ['cancelled'])
+            ->with(['transactions' => function ($q) use ($asAtDate) {
+                $q->whereIn('type', ['expense', 'profit'])
+                    ->where('date', '>', $asAtDate);
+            }])
+            ->get();
+
+        return $clientFunds->sum(function ($fund) {
+            // Reverse out any balance reduction that happened after the period end
+            $reductionsAfter = $fund->transactions->sum('amount');
+            $balanceAsAt = (float) $fund->balance + (float) $reductionsAfter;
+
+            return max(0, $balanceAsAt);
+        });
     }
 }
