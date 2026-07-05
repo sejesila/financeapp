@@ -14,10 +14,14 @@ use Illuminate\Support\Facades\DB;
 
 class BudgetController extends Controller
 {
-    /** Hop must complete within this many hours to be treated as a
-     *  savings→savings transfer routed through an intermediate account,
-     *  rather than a genuine withdrawal for spending. */
-    private const SAVINGS_HOP_WINDOW_HOURS = 24;
+    /**
+     * A withdrawal from savings that gets re-deposited back into savings
+     * (through the same intermediate wallet) within this many days is
+     * treated as a reversal, not real spending — same 8-day window used
+     * for the salary→savings reversal check in ReportDataService, for
+     * consistency across the app.
+     */
+    private const SAVINGS_REVERSAL_WINDOW_DAYS = 8;
 
     public function index(Request $request, $year = null)
     {
@@ -131,7 +135,8 @@ class BudgetController extends Controller
 
         // Get savings withdrawals by month, netted against any amount that
         // was actually a savings→savings hop through an intermediate account
-        // (e.g. Sanlam → M-Pesa → Etica), not real spending.
+        // (e.g. Sanlam → M-Pesa → Etica), not real spending, and against
+        // any withdrawal reversed back into savings within the window.
         $savingsWithdrawals = $this->calculateNetSavingsWithdrawals($year);
 
         // Get accounts for the FAB component
@@ -227,23 +232,27 @@ class BudgetController extends Controller
      * (see TransferService::enforceTransferRules()), moving money between
      * two savings accounts always looks like: Savings A → Wallet → Savings B.
      *
-     * Without this netting, that single logical transfer would be counted
-     * as a full withdrawal from Savings A (spending), even though the money
-     * never left savings — it just changed which savings account holds it.
+     * Also nets out any withdrawal that was simply reversed — moved back
+     * into savings through the same intermediate account — within an
+     * 8-day window, even if that reversal isn't an immediate same-day hop.
+     * Without this, a withdrawal that gets undone a few days later would
+     * still be counted as spending, overstating "Savings Used".
      *
      * Approach:
      *   1. Collect every "savings → non-savings" transfer (a candidate
      *      withdrawal) and every "non-savings → savings" transfer (a
      *      candidate re-deposit) for the year.
      *   2. For each withdrawal, look for re-deposits through the SAME
-     *      intermediate account within a 24-hour window and consume their
-     *      amounts against the withdrawal (oldest-deposit-first, partial
-     *      matches allowed).
+     *      intermediate account within SAVINGS_REVERSAL_WINDOW_DAYS and
+     *      consume their amounts against the withdrawal (oldest-deposit-
+     *      first, partial matches allowed).
      *   3. Only the unmatched remainder of each withdrawal counts as real
      *      "Savings Used" for that month.
      *
-     * This also naturally covers "moved out and back into the SAME savings
-     * account" — the re-deposit doesn't have to target a different account.
+     * This covers both:
+     *   - Same-day hops (Savings A → Wallet → Savings B), and
+     *   - Slower reversals (withdraw, then change your mind and put it
+     *     back within the week), without needing separate logic for each.
      */
     private function calculateNetSavingsWithdrawals(int $year): \Illuminate\Support\Collection
     {
@@ -296,16 +305,17 @@ class BudgetController extends Controller
 
         foreach ($withdrawals as $w) {
             $withdrawalDate   = Carbon::parse($w->date);
+            $reversalWindowEnd = $withdrawalDate->copy()->addDays(self::SAVINGS_REVERSAL_WINDOW_DAYS);
             $remainingToMatch = (float) $w->amount;
 
             // Candidate re-deposits: same intermediate account, on/after the
-            // withdrawal, within the hop window, and not fully consumed yet.
+            // withdrawal, within the reversal window, and not fully consumed yet.
             $candidates = $deposits
                 ->filter(fn($d) =>
                     $d->intermediate_account_id === $w->intermediate_account_id
                     && $d->remaining > 0
                     && $d->date->greaterThanOrEqualTo($withdrawalDate)
-                    && $withdrawalDate->diffInHours($d->date) <= self::SAVINGS_HOP_WINDOW_HOURS
+                    && $d->date->lessThanOrEqualTo($reversalWindowEnd)
                 )
                 ->sortBy('date');
 
