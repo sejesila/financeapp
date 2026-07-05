@@ -643,13 +643,16 @@
                                 <td class="px-2 py-2 text-center text-sm">
                                     @if($savingsUsed > 0)
                                         <span class="text-purple-600 dark:text-purple-400 font-medium">
-                                            {{ number_format($savingsUsed, 0) }}
-                                        </span>
+                        {{ number_format($savingsUsed, 0) }}
+                    </span>
                                     @else
                                         <span class="text-gray-400">—</span>
                                     @endif
                                 </td>
                             @endfor
+                            <td class="px-3 py-2 text-center text-sm font-semibold bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300">
+                                {{ number_format($savingsWithdrawals->sum('total'), 0) }}
+                            </td>
                         </tr>
                     @endif
                     </tbody>
