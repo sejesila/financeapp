@@ -557,6 +557,7 @@ class AccountController extends Controller
             'date'            => 'required|date',
             'description'     => 'nullable|string',
             'transaction_fee' => 'nullable|numeric|min:0',
+            'is_client_fund'  => 'nullable|boolean',
         ]);
 
         $from = Account::withoutGlobalScopes()->findOrFail($request->from_account_id);
@@ -566,9 +567,6 @@ class AccountController extends Controller
             abort(403);
         }
 
-        // ── Etica savings interest gate ───────────────────────────────────────
-        // Before any money leaves an Etica savings account, today's interest
-        // must have been recorded. If it hasn't, redirect to the interest form.
         if ($this->interestService->requiresInterestBeforeWithdrawal($from)
             && ! $this->interestService->isInterestGateSatisfied($from)
         ) {
@@ -578,7 +576,6 @@ class AccountController extends Controller
                     "Please record today's interest for {$from->name} before making a transfer or withdrawal."
                 );
         }
-        // ─────────────────────────────────────────────────────────────────────
 
         try {
             $fee = $this->transferService->execute(
@@ -588,6 +585,7 @@ class AccountController extends Controller
                 $request->date,
                 $request->description,
                 $request->filled('transaction_fee') ? (float) $request->transaction_fee : null,
+                $request->boolean('is_client_fund'),
             );
         } catch (ValidationException $e) {
             return redirect()->back()->withInput()->withErrors($e->errors());

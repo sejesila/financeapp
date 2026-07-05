@@ -15,12 +15,14 @@ class Transfer extends Model
         'date',
         'description',
         'value_date',
-        'mpesa_reference'
+        'mpesa_reference',
+        'is_client_fund',
     ];
 
     protected $casts = [
-        'amount' => 'decimal:2',
-        'date' => 'datetime',
+        'amount'         => 'decimal:2',
+        'date'           => 'datetime',
+        'is_client_fund' => 'boolean',
     ];
 
     public function fromAccount()

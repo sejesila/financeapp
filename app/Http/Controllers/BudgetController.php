@@ -131,6 +131,7 @@ class BudgetController extends Controller
             ->whereYear('transfers.date', $year)
             ->where('from_acc.type', 'savings')
             ->where('to_acc.type', '!=', 'savings')
+            ->where('transfers.is_client_fund', false) // exclude client fund withdrawals
             ->selectRaw('MONTH(transfers.date) as month, SUM(transfers.amount) as total')
             ->groupBy('month')
             ->get()

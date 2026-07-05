@@ -125,6 +125,29 @@
                         ⚠️ Minimum M-Pesa withdrawal amount is KES 50
                     </p>
                 </div>
+                <!-- Personal vs Client Fund -->
+                <div x-show="fromAccountType === 'savings'" x-transition class="mb-4">
+                    <label class="block text-gray-700 dark:text-gray-200 font-semibold mb-2">
+                        Whose money is this?
+                    </label>
+                    <div class="flex gap-3">
+                        <label class="flex-1 flex items-center gap-2 border rounded px-3 py-2 cursor-pointer"
+                               :class="!isClientFund ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-gray-300 dark:border-gray-600'">
+                            <input type="radio" name="is_client_fund_radio" value="0" x-model.number="isClientFund" class="hidden">
+                            <span class="text-sm">💼 My Money</span>
+                        </label>
+                        <label class="flex-1 flex items-center gap-2 border rounded px-3 py-2 cursor-pointer"
+                               :class="isClientFund ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'border-gray-300 dark:border-gray-600'">
+                            <input type="radio" name="is_client_fund_radio" value="1" x-model.number="isClientFund" class="hidden">
+                            <span class="text-sm">👤 Client Fund</span>
+                        </label>
+                    </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Client fund withdrawals won't count against your personal "Savings Used" in Budgets.
+                    </p>
+                </div>
+
+                <input type="hidden" name="is_client_fund" :value="isClientFund ? '1' : '0'">
 
                 <!-- Editable Transaction Fee -->
                 <div x-show="showFee" x-transition class="mb-4">
@@ -246,6 +269,11 @@
                 fromAccountName: '',
                 toAccountType: '',
                 feeManuallyEdited: false,
+
+                // FIX: this was previously undeclared, so x-model="isClientFund"
+                // on the radio inputs had nothing to bind to and clicking did nothing.
+                // Uses a number (not string) so "0" doesn't evaluate as truthy in JS.
+                isClientFund: {{ old('is_client_fund', 0) }},
 
                 ATM_FEE: 33 + (33 * 0.15),
 

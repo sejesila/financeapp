@@ -53,20 +53,20 @@ readonly class TransferService
         string  $date,
         ?string $description = null,
         ?float  $manualFee = null,
+        bool    $isClientFund = false,
     ): TransferFee
     {
         $this->enforceTransferRules($from, $to, $amount);
 
         $fee = $this->feeCalculator->calculate($from, $to, $amount);
 
-        // Override calculated fee with user-supplied value if provided
         if ($manualFee !== null) {
             $fee = $fee->withAmount($manualFee);
         }
 
         $this->enforceBalanceCheck($from, $amount, $fee);
 
-        DB::transaction(function () use ($from, $to, $amount, $date, $description, $fee) {
+        DB::transaction(function () use ($from, $to, $amount, $date, $description, $fee, $isClientFund) {
             $isInterestGated = $to->type === 'savings'
                 && stripos($to->name, 'etica') !== false;
 
@@ -76,12 +76,13 @@ readonly class TransferService
 
             $transfer = Transfer::create([
                 'from_account_id' => $from->id,
-                'to_account_id' => $to->id,
-                'amount' => $amount,
-                'date' => $date,
-                'value_date' => $valueDate,
-                'description' => $description,
-                'user_id' => Auth::id(),
+                'to_account_id'   => $to->id,
+                'amount'          => $amount,
+                'date'            => $date,
+                'value_date'      => $valueDate,
+                'description'     => $description,
+                'user_id'         => Auth::id(),
+                'is_client_fund'  => $isClientFund,
             ]);
 
             if ($fee->isCharged()) {
