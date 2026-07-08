@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Account;
 use App\Models\Category;
 use App\Models\Loan;
+use App\Models\LoanPayment;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\ReportDataService;
@@ -117,11 +118,40 @@ class ReportDataServiceIntegrationTest extends TestCase
                 ->create(['type' => 'expense', 'amount' => 5000, 'date' => $startDate->copy()->addMonth($i)]);
         }
 
-        // Create loan payments
+        // Loan being paid down over the year. getLoanPaymentsInPeriod() now
+        // reads from LoanPayment (the authoritative record), not by matching
+        // a Transaction's category name — so each repayment below needs a
+        // real Loan behind it, not just a "Loan Repayment"-categorized
+        // transaction. balance is pinned to 0 (fully paid down, status left
+        // as 'active') specifically so it contributes nothing extra to
+        // total_loans / loans_repaid_in_period, keeping those assertions
+        // below unchanged from before this fix.
+        $repaymentLoan = Loan::factory()->for($this->user)->for($account)->create([
+            'status'           => 'active',
+            'principal_amount' => 60000,
+            'total_amount'     => 60000,
+            'balance'          => 0,
+            'amount_paid'      => 60000,
+        ]);
+
+        // Create loan payments — each backed by both a Transaction (so it
+        // still counts as ordinary expense spend in `expenses`) and a
+        // LoanPayment (so it's recognized as a real repayment).
         for ($i = 0; $i < 6; $i++) {
-            Transaction::factory()
+            $repaymentTransaction = Transaction::factory()
                 ->for($this->user)->for($account)->for($loanRepaymentCategory)
                 ->create(['type' => 'expense', 'amount' => 10000, 'date' => $startDate->copy()->addMonth($i)]);
+
+            LoanPayment::create([
+                'user_id'           => $this->user->id,
+                'loan_id'           => $repaymentLoan->id,
+                'account_id'        => $account->id,
+                'amount'            => 10000,
+                'principal_portion' => 10000,
+                'interest_portion'  => 0,
+                'payment_date'      => $startDate->copy()->addMonth($i),
+                'transaction_id'    => $repaymentTransaction->id,
+            ]);
         }
 
         // Create active loan
@@ -158,6 +188,8 @@ class ReportDataServiceIntegrationTest extends TestCase
         $expectedSavingsRate = (1055000 / 1355000) * 100;
         $this->assertEqualsWithDelta($expectedSavingsRate, $report['savings_rate'], 0.1);
 
+        // total_loans sums balance across ACTIVE loans only: 50000 (the
+        // standalone active loan) + 0 ($repaymentLoan, fully paid down).
         $this->assertEquals(50000, $report['total_loans']);
 
         // net_worth is derived from getSavingsBalanceAsAt(), which only sums
@@ -168,11 +200,14 @@ class ReportDataServiceIntegrationTest extends TestCase
         // 0, and net_worth clamps to 0 regardless of loans/client funds.
         $this->assertEquals(0, $report['net_worth']);
 
-        // Loans repaid during the year
+        // Loans repaid during the year — only the standalone 'paid' loan
+        // counts here; $repaymentLoan is left 'active' so it doesn't
+        // double up on this assertion.
         $this->assertEquals(1,      $report['loans_repaid_in_period']['count']);
         $this->assertEquals(110000, $report['loans_repaid_in_period']['total']);
 
-        // Loan repayment transactions
+        // Loan repayment transactions — now sourced from the 6 LoanPayment
+        // records tied to $repaymentLoan.
         $this->assertEquals(6,     $report['loans_paid_in_period']['count']);
         $this->assertEquals(60000, $report['loans_paid_in_period']['total']);
 

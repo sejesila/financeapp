@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\ClientFund;
 use App\Models\ClientFundTransaction;
 use App\Models\Loan;
+use App\Models\LoanPayment;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\ReportDataService;
@@ -238,10 +239,26 @@ class ReportDataServiceTest extends TestCase
     {
         $startDate = $this->reportStart;
 
+        // getLoanPaymentsInPeriod() now reads from LoanPayment (the
+        // authoritative record created by LoanController::recordPayment()),
+        // not by matching a Transaction's category name. A repayment must
+        // be backed by a real tracked Loan to show up here — a bare
+        // "Loan Repayment"-categorized transaction with no Loan behind it
+        // is exactly the false-positive bug this method was fixed to avoid.
+        $loan = Loan::factory()
+            ->for($this->user)
+            ->for($this->account)
+            ->create([
+                'status'           => 'active',
+                'principal_amount' => 20000,
+                'total_amount'     => 21000,
+                'balance'          => 16000,
+                'amount_paid'      => 5000,
+            ]);
+
         $loanRepaymentCategory = $this->createCategory($this->user, 'Loan Repayment', 'expense');
 
-        // Create loan repayment transaction
-        Transaction::factory()
+        $transaction = Transaction::factory()
             ->for($this->user)
             ->for($this->account)
             ->for($loanRepaymentCategory)
@@ -252,10 +269,51 @@ class ReportDataServiceTest extends TestCase
                 'date'        => $startDate->copy()->addDays(5),
             ]);
 
+        LoanPayment::create([
+            'user_id'           => $this->user->id,
+            'loan_id'           => $loan->id,
+            'account_id'        => $this->account->id,
+            'amount'            => 5000,
+            'principal_portion' => 5000,
+            'interest_portion'  => 0,
+            'payment_date'      => $startDate->copy()->addDays(5),
+            'transaction_id'    => $transaction->id,
+        ]);
+
         $report = $this->service->generateMonthlyReport($this->user);
 
         $this->assertEquals(1, $report['loans_paid_in_period']['count']);
         $this->assertEquals(5000, $report['loans_paid_in_period']['total']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_does_not_count_a_loan_repayment_category_transaction_with_no_linked_loan_payment()
+    {
+        // Regression test for the bug: a transaction merely categorized
+        // "Loan Repayment" must NOT surface in loans_paid_in_period unless
+        // it is backed by a real LoanPayment record tied to a tracked Loan.
+        $startDate = $this->reportStart;
+        $loanRepaymentCategory = $this->createCategory($this->user, 'Loan Repayment', 'expense');
+
+        Transaction::factory()
+            ->for($this->user)
+            ->for($this->account)
+            ->for($loanRepaymentCategory)
+            ->create([
+                'type'        => 'expense',
+                'amount'      => 3550,
+                'description' => 'Manual entry, not tied to any tracked loan',
+                'date'        => $startDate->copy()->addDays(5),
+            ]);
+
+        $report = $this->service->generateMonthlyReport($this->user);
+
+        $this->assertEquals(0, $report['loans_paid_in_period']['count']);
+        $this->assertEquals(0, $report['loans_paid_in_period']['total']);
+
+        // It should still show up as ordinary spend, though — the money
+        // did leave the account.
+        $this->assertEquals(3550, $report['expenses']);
     }
 
     // ────────────────────────────────────────────────────────────────────────
