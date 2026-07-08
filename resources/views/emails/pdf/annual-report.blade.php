@@ -10,65 +10,34 @@
 
         .watermark { position: fixed; top: 280px; left: 40px; transform: rotate(-45deg); font-size: 80px; color: rgba(99, 102, 241, 0.08); z-index: 0; font-weight: bold; pointer-events: none; }
 
-        /* Flat colors instead of linear-gradient() — cheaper to paint/repaint
-           under page-break-inside:avoid pagination checks */
-        .header { text-align: center; padding: 20px 0; margin-bottom: 20px; background: #4F46E5; color: white; border-radius: 8px; page-break-after: avoid; }
-        .header h1 { font-size: 24px; letter-spacing: 1px; font-weight: bold; }
-        .header .period { font-size: 12px; margin-top: 5px; opacity: 0.95; }
-        .header .user-info { font-size: 12px; margin-top: 8px; font-weight: 600; }
-        .header .year-badge { display: inline-block; background: rgba(255,255,255,0.2); padding: 2px 12px; border-radius: 12px; font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-top: 6px; }
+        .header { text-align: center; padding: 16px 0; margin-bottom: 14px; background: #4F46E5; color: white; border-radius: 8px; page-break-after: avoid; }
+        .header h1 { font-size: 20px; letter-spacing: 1px; font-weight: bold; }
+        .header .period { font-size: 11px; margin-top: 4px; opacity: 0.95; }
+        .header .user-info { font-size: 11px; margin-top: 6px; font-weight: 600; }
+        .header .year-badge { display: inline-block; background: rgba(255,255,255,0.2); padding: 2px 10px; border-radius: 12px; font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-top: 5px; }
 
-        .net-worth-banner { background: #4F46E5; color: white; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; page-break-after: avoid; }
-        .net-worth-banner h3 { margin: 0 0 10px 0; font-size: 11px; opacity: 0.95; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; }
-        .net-worth-banner .amount { font-size: 28px; font-weight: bold; margin-bottom: 8px; }
-        .net-worth-banner .breakdown { font-size: 10px; opacity: 0.9; margin-top: 8px; }
+        .net-worth-banner { background: #4F46E5; color: white; padding: 14px; text-align: center; margin: 14px 0; border-radius: 8px; page-break-after: avoid; }
+        .net-worth-banner h3 { margin: 0 0 6px 0; font-size: 10px; opacity: 0.95; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; }
+        .net-worth-banner .amount { font-size: 22px; font-weight: bold; margin-bottom: 4px; }
+        .net-worth-banner .breakdown { font-size: 9px; opacity: 0.9; margin-top: 4px; }
 
-        /* ── Summary cards: table layout instead of flex ── */
-        .summary-grid { display: table; width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 10px 0; margin: 20px 0 20px -10px; width: calc(100% + 10px); page-break-after: avoid; }
-        .summary-grid .summary-row { display: table-row; }
-        .summary-cell { display: table-cell; padding: 18px; background: #FFFFFF; border: 2px solid #E5E7EB; border-radius: 8px; text-align: center; vertical-align: top; }
-        .summary-cell.income  { border-left: 5px solid #10B981; }
-        .summary-cell.expense { border-left: 5px solid #EF4444; }
-        .summary-cell.savings { border-left: 5px solid #6366F1; }
-        .summary-cell h3 { margin: 0 0 10px 0; font-size: 10px; color: #6B7280; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
-        .summary-cell .amount { font-size: 20px; font-weight: bold; line-height: 1.2; }
-        .summary-cell .sub-label { font-size: 8px; color: #9CA3AF; margin-top: 4px; }
+        .section { margin: 14px 0; page-break-inside: avoid; }
+        .section-title { font-size: 12px; font-weight: bold; color: #1F2937; margin-bottom: 8px; padding: 6px 10px; background: #F9FAFB; border-left: 4px solid #6366F1; border-radius: 4px; page-break-after: avoid; }
 
-        /* ── Stat cells: table layout instead of flex ── */
-        .stats-grid { display: table; width: 100%; table-layout: fixed; margin: 20px 0; background: #F9FAFB; padding: 12px; border-radius: 8px; page-break-after: avoid; }
-        .stats-grid .stats-row { display: table-row; }
-        .stat-cell { display: table-cell; text-align: center; padding: 10px 5px; vertical-align: top; }
-        .stat-label { font-size: 8px; color: #6B7280; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
-        .stat-value { font-size: 14px; font-weight: bold; color: #1F2937; margin-top: 4px; }
-
-        .section { margin: 20px 0; page-break-inside: avoid; }
-        .section-title { font-size: 13px; font-weight: bold; color: #1F2937; margin-bottom: 12px; padding: 8px 12px; background: #F9FAFB; border-left: 4px solid #6366F1; border-radius: 4px; page-break-after: avoid; }
-
-        table { width: 100%; border-collapse: collapse; margin: 12px 0; background: white; page-break-inside: avoid; }
-        table th { background: #F3F4F6; padding: 10px 8px; text-align: left; font-size: 9px; color: #4B5563; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; border-bottom: 2px solid #E5E7EB; }
-        table td { padding: 9px 8px; border-bottom: 1px solid #F3F4F6; font-size: 10px; }
+        table { width: 100%; border-collapse: collapse; margin: 8px 0; background: white; page-break-inside: avoid; }
+        table th { background: #F3F4F6; padding: 7px 8px; text-align: left; font-size: 8px; color: #4B5563; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; border-bottom: 2px solid #E5E7EB; }
+        table td { padding: 6px 8px; border-bottom: 1px solid #F3F4F6; font-size: 10px; }
         table tr.total-row { background: #F9FAFB; font-weight: bold; border-top: 2px solid #6366F1; }
 
-        .alert { padding: 12px; border-radius: 6px; margin: 12px 0; border-left: 4px solid; page-break-inside: avoid; }
+        /* Dense label/value stat table — replaces card grids, stat grids, trend boxes */
+        .stat-table td { padding: 6px 10px; font-size: 10px; border-bottom: 1px solid #F3F4F6; }
+        .stat-table td.label { width: 25%; color: #6B7280; text-transform: uppercase; font-weight: 700; font-size: 8px; letter-spacing: 0.4px; }
+        .stat-table td.value { width: 25%; font-weight: bold; color: #1F2937; }
+
+        .alert { padding: 9px 12px; border-radius: 6px; margin: 10px 0; border-left: 4px solid; font-size: 10px; page-break-inside: avoid; }
         .alert.warning { background: #FEF3C7; border-color: #F59E0B; color: #92400E; }
         .alert.info    { background: #DBEAFE; border-color: #3B82F6; color: #1E40AF; }
         .alert.success { background: #D1FAE5; border-color: #10B981; color: #065F46; }
-        .alert-title { font-weight: bold; font-size: 10px; margin-bottom: 4px; }
-        .alert-text  { font-size: 9px; line-height: 1.4; }
-
-        .insight-box { background: #EEF2FF; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #6366F1; page-break-inside: avoid; }
-        .insight-box h4 { margin: 0 0 8px 0; font-size: 11px; color: #4338CA; font-weight: bold; }
-        .insight-box p  { margin: 4px 0; font-size: 10px; color: #4B5563; line-height: 1.5; }
-
-        /* ── Two-column insights grid: table layout instead of flex-wrap ── */
-        .insights-grid { display: table; width: 100%; border-collapse: separate; border-spacing: 0 10px; table-layout: fixed; }
-        .insights-grid .insight-row { display: table-row; }
-        .insights-grid .insight-cell { display: table-cell; width: 50%; padding-right: 10px; vertical-align: top; }
-        .insights-grid .insight-cell:last-child { padding-right: 0; }
-        .insight-card { background: #EEF2FF; padding: 12px 14px; border-radius: 8px; border-left: 4px solid #6366F1; page-break-inside: avoid; box-sizing: border-box; }
-        .insight-card h4 { margin: 0 0 4px 0; font-size: 10px; color: #4338CA; font-weight: bold; text-transform: uppercase; letter-spacing: 0.4px; }
-        .insight-card .insight-value { font-size: 14px; font-weight: bold; color: #1F2937; margin: 2px 0 4px 0; }
-        .insight-card p { margin: 0; font-size: 9px; color: #4B5563; line-height: 1.4; }
 
         .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
         .badge.success { background: #D1FAE5; color: #065F46; }
@@ -76,40 +45,12 @@
         .badge.warning { background: #FEF3C7; color: #92400E; }
         .badge.neutral { background: #F3F4F6; color: #4B5563; }
 
-        /* ── Trend cells: table layout instead of flex ── */
-        .trend-box { display: table; width: 100%; margin: 0 0 16px 0; background: #F9FAFB; border-radius: 8px; padding: 12px; table-layout: fixed; page-break-inside: avoid; }
-        .trend-box .trend-row { display: table-row; }
-        .trend-cell { display: table-cell; text-align: center; padding: 8px; border-right: 1px solid #E5E7EB; vertical-align: top; }
-        .trend-cell:last-child { border-right: none; }
-        .trend-label   { font-size: 8px; color: #6B7280; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px; }
-        .trend-value   { font-size: 16px; font-weight: bold; margin-top: 4px; }
-        .trend-subtext { font-size: 9px; color: #6B7280; margin-top: 2px; }
-
-        /* ── Budget performance: table layout instead of flex-wrap ── */
-        .budget-item { background: #FAFAFA; padding: 12px; margin-bottom: 10px; border-left: 4px solid; border-radius: 4px; page-break-inside: avoid; }
-        .budget-item.good    { border-color: #10B981; }
-        .budget-item.warning { border-color: #F59E0B; }
-        .budget-item.danger  { border-color: #EF4444; }
-        .budget-header { display: flex; justify-content: space-between; margin-bottom: 6px; }
-        .budget-name { font-weight: 700; font-size: 11px; color: #1F2937; }
-        .budget-percent { font-weight: bold; font-size: 11px; }
-        .budget-bar { height: 6px; background: #E5E7EB; border-radius: 3px; overflow: hidden; margin: 6px 0; }
-        .budget-fill { height: 100%; border-radius: 3px; }
-        .budget-fill.good    { background: #10B981; }
-        .budget-fill.warning { background: #F59E0B; }
-        .budget-fill.danger  { background: #EF4444; }
-        .budget-amounts { font-size: 9px; color: #6B7280; }
-        .budget-grid { display: table; width: 100%; border-collapse: separate; border-spacing: 0 10px; table-layout: fixed; }
-        .budget-grid .budget-row { display: table-row; }
-        .budget-grid .budget-cell { display: table-cell; width: 50%; padding-right: 10px; vertical-align: top; }
-        .budget-grid .budget-cell:last-child { padding-right: 0; }
-
         /* Month drill-down section */
-        .month-drill { margin-top: 16px; page-break-inside: avoid; }
-        .month-drill-title { font-size: 11px; font-weight: bold; color: #1F2937; margin-bottom: 8px; padding: 6px 10px; background: #F3F4F6; border-left: 3px solid #6366F1; border-radius: 3px; }
+        .month-drill { margin-top: 12px; page-break-inside: avoid; }
+        .month-drill-title { font-size: 10px; font-weight: bold; color: #1F2937; margin-bottom: 6px; padding: 5px 8px; background: #F3F4F6; border-left: 3px solid #6366F1; border-radius: 3px; }
 
-        .footer { margin-top: 30px; padding-top: 15px; border-top: 2px solid #E5E7EB; text-align: center; font-size: 9px; color: #6B7280; page-break-before: avoid; }
-        .footer .confidential { color: #DC2626; font-weight: bold; margin-bottom: 8px; }
+        .footer { margin-top: 22px; padding-top: 12px; border-top: 2px solid #E5E7EB; text-align: center; font-size: 9px; color: #6B7280; page-break-before: avoid; }
+        .footer .confidential { color: #DC2626; font-weight: bold; margin-bottom: 6px; }
     </style>
 </head>
 <body>
@@ -134,7 +75,6 @@
     $bestMonth       = $data['best_month']      ?? null;
     $worstMonth      = $data['worst_month']     ?? null;
 
-
     $annualBudgetedExpenses = $data['annual_budgeted_expenses'] ?? 0;
     $annualBudgetVariance   = $data['annual_budget_variance']   ?? 0;
     $monthsOverBudget       = $data['months_over_budget']       ?? 0;
@@ -152,7 +92,7 @@
 <div class="header">
     <h1>ANNUAL FINANCIAL REPORT</h1>
     <div class="year-badge">Financial Year {{ $year }}</div>
-    <p class="period" style="margin-top: 6px;">Jan 1, {{ $year }} &mdash; Dec 31, {{ $year }}</p>
+    <p class="period" style="margin-top: 5px;">Jan 1, {{ $year }} &mdash; Dec 31, {{ $year }}</p>
     <p class="user-info">{{ $user->name }}</p>
 </div>
 
@@ -166,134 +106,69 @@
     </div>
 </div>
 
-<!-- Summary Cards -->
-<div class="summary-grid">
-    <div class="summary-row">
-        <div class="summary-cell income">
-            <h3>Total Income</h3>
-            <div class="amount" style="color: #10B981;">{{ $currency }} {{ number_format($income) }}</div>
-            <div class="sub-label">Full Year {{ $year }}</div>
-        </div>
-        <div class="summary-cell expense">
-            <h3>Total Expenses</h3>
-            <div class="amount" style="color: #EF4444;">{{ $currency }} {{ number_format($expenses) }}</div>
-            <div class="sub-label">Full Year {{ $year }}</div>
-        </div>
-        <div class="summary-cell savings">
-            <h3>Net Savings</h3>
-            <div class="amount" style="color: {{ $netFlow >= 0 ? '#10B981' : '#EF4444' }};">
-                {{ $netFlow >= 0 ? '+' : '' }}{{ $currency }} {{ number_format($netFlow) }}
-            </div>
-            <div class="sub-label">Full Year {{ $year }}</div>
-        </div>
-    </div>
-</div>
-
-<!-- Annual Stats -->
-<div class="stats-grid">
-    <div class="stats-row">
-        <div class="stat-cell">
-            <div class="stat-label">Transactions</div>
-            <div class="stat-value">{{ $txCount }}</div>
-        </div>
-        <div class="stat-cell">
-            <div class="stat-label">Savings Rate</div>
-            <div class="stat-value" style="color: {{ $savingsRate >= 20 ? '#10B981' : ($savingsRate >= 10 ? '#F59E0B' : '#EF4444') }};">
-                {{ number_format($savingsRate, 1) }}%
-            </div>
-        </div>
-        <div class="stat-cell">
-            <div class="stat-label">Monthly Avg Spending</div>
-            <div class="stat-value">{{ $currency }} {{ number_format($avgMonthlySpend) }}</div>
-        </div>
-        <div class="stat-cell">
-            <div class="stat-label">Accounts</div>
-            <div class="stat-value">{{ $data['accounts']->count() }}</div>
-        </div>
-    </div>
-</div>
-
-<!-- Annual Performance Trend -->
-<div class="trend-box">
-    <div class="trend-row">
-        <div class="trend-cell">
-            <div class="trend-label">Income vs Prior Year</div>
-            @if($incomeTrend !== null)
-                <div class="trend-value" style="color: {{ $incomeTrend >= 0 ? '#059669' : '#DC2626' }};">
-                    {{ $incomeTrend >= 0 ? '+' : '' }}{{ number_format($incomeTrend, 1) }}%
-                </div>
-                <div class="trend-subtext">Prior year: {{ $currency }} {{ number_format($priorIncome) }}</div>
-            @else
-                <div class="trend-value" style="color: #9CA3AF;">No prior data</div>
-            @endif
-        </div>
-        <div class="trend-cell">
-            <div class="trend-label">Profitable Months</div>
-            <div class="trend-value" style="color: {{ $profitMonths >= 10 ? '#059669' : ($profitMonths >= 6 ? '#F59E0B' : '#DC2626') }};">
-                {{ $profitMonths }}/12
-            </div>
-            <div class="trend-subtext">months with positive cash flow</div>
-        </div>
-        <div class="trend-cell">
-            <div class="trend-label">Loan Repayments</div>
-            @if($loansPaid['count'] > 0)
-                <div class="trend-value" style="color: #059669;">{{ $currency }} {{ number_format($loansPaid['total']) }}</div>
-                <div class="trend-subtext">{{ $loansPaid['count'] }} repayment{{ $loansPaid['count'] > 1 ? 's' : '' }}</div>
-            @else
-                <div class="trend-value" style="color: #9CA3AF;">None recorded</div>
-            @endif
-        </div>
-        @if($annualBudgetedExpenses > 0)
-            <div class="trend-cell">
-                <div class="trend-label">Annual Budget</div>
-                <div class="trend-value" style="color: {{ $annualBudgetVariance >= 0 ? '#059669' : '#DC2626' }};">
-                    {{ $annualBudgetVariance >= 0 ? 'Under' : 'Over' }}
-                </div>
-                <div class="trend-subtext">
-                    by {{ $currency }} {{ number_format(abs($annualBudgetVariance)) }}
-                    ({{ $monthsOverBudget }} {{ $monthsOverBudget === 1 ? 'month' : 'months' }} over)
-                </div>
-            </div>
-        @endif
-    </div>
-</div>
+<!-- Key Metrics -->
+<table class="stat-table">
+    <tr>
+        <td class="label">Total Income</td>
+        <td class="value" style="color: #10B981;">{{ $currency }} {{ number_format($income) }}</td>
+        <td class="label">Total Expenses</td>
+        <td class="value" style="color: #EF4444;">{{ $currency }} {{ number_format($expenses) }}</td>
+    </tr>
+    <tr>
+        <td class="label">Net Savings</td>
+        <td class="value" style="color: {{ $netFlow >= 0 ? '#059669' : '#DC2626' }};">{{ $netFlow >= 0 ? '+' : '' }}{{ $currency }} {{ number_format($netFlow) }}</td>
+        <td class="label">Savings Rate</td>
+        <td class="value" style="color: {{ $savingsRate >= 20 ? '#059669' : ($savingsRate >= 10 ? '#D97706' : '#DC2626') }};">{{ number_format($savingsRate, 1) }}%</td>
+    </tr>
+    <tr>
+        <td class="label">Transactions</td>
+        <td class="value">{{ $txCount }}</td>
+        <td class="label">Monthly Avg Spending</td>
+        <td class="value">{{ $currency }} {{ number_format($avgMonthlySpend) }}</td>
+    </tr>
+    <tr>
+        <td class="label">Accounts</td>
+        <td class="value">{{ $data['accounts']->count() }}</td>
+        <td class="label">Income vs Prior Year</td>
+        <td class="value" style="color: {{ $incomeTrend === null ? '#9CA3AF' : ($incomeTrend >= 0 ? '#059669' : '#DC2626') }};">
+            {{ $incomeTrend !== null ? ($incomeTrend >= 0 ? '+' : '') . number_format($incomeTrend, 1) . '%' : 'No prior data' }}
+        </td>
+    </tr>
+    <tr>
+        <td class="label">Profitable Months</td>
+        <td class="value" style="color: {{ $profitMonths >= 10 ? '#059669' : ($profitMonths >= 6 ? '#D97706' : '#DC2626') }};">{{ $profitMonths }}/12</td>
+        <td class="label">Loan Repayments</td>
+        <td class="value" style="color: #059669;">{{ $loansPaid['count'] > 0 ? $currency . ' ' . number_format($loansPaid['total']) . ' (' . $loansPaid['count'] . ')' : 'None' }}</td>
+    </tr>
+    <tr>
+        <td class="label">Annual Budget</td>
+        <td class="value" style="color: {{ $annualBudgetedExpenses == 0 ? '#9CA3AF' : ($annualBudgetVariance >= 0 ? '#059669' : '#DC2626') }};">
+            {{ $annualBudgetedExpenses > 0 ? ($annualBudgetVariance >= 0 ? 'Under by ' : 'Over by ') . $currency . ' ' . number_format(abs($annualBudgetVariance)) . ' (' . $monthsOverBudget . ' mo over)' : 'Not set' }}
+        </td>
+        <td class="label">Loans Fully Cleared</td>
+        <td class="value" style="color: #059669;">{{ $loansCleared['count'] > 0 ? $loansCleared['count'] . ' (' . $currency . ' ' . number_format($loansCleared['principal_total']) . ' principal)' : 'None' }}</td>
+    </tr>
+    <tr>
+        <td class="label">Best Month</td>
+        <td class="value" style="color: #059669;">{{ $bestMonth ? $bestMonth['month'] . ' (+' . $currency . ' ' . number_format($bestMonth['net_flow']) . ')' : '—' }}</td>
+        <td class="label">Toughest Month</td>
+        <td class="value" style="color: #DC2626;">{{ $worstMonth ? $worstMonth['month'] . ' (' . $currency . ' ' . number_format($worstMonth['net_flow']) . ')' : '—' }}</td>
+    </tr>
+    <tr>
+        <td class="label">Investment Income</td>
+        <td class="value" style="color: #059669;">{{ $currency }} {{ number_format($investmentIncome['total']) }}</td>
+        <td class="label"></td>
+        <td class="value"></td>
+    </tr>
+</table>
 
 <!-- Financial Health Alert -->
 @if($savingsRate >= 20)
-    <div class="alert success">
-        <div class="alert-title">Excellent Annual Financial Health</div>
-        <div class="alert-text">You saved {{ number_format($savingsRate, 1) }}% of your total income in {{ $year }} ({{ $currency }} {{ number_format($netFlow) }}). Outstanding discipline — you're building serious long-term wealth.</div>
-    </div>
+    <div class="alert success"><strong>Excellent annual financial health</strong> &mdash; {{ number_format($savingsRate, 1) }}% savings rate in {{ $year }}.</div>
 @elseif($savingsRate >= 10)
-    <div class="alert info">
-        <div class="alert-title">Good Progress on Savings</div>
-        <div class="alert-text">You saved {{ number_format($savingsRate, 1) }}% of your income this year. Aim to push this above 20% for stronger long-term growth.</div>
-    </div>
+    <div class="alert info"><strong>Good progress on savings</strong> &mdash; {{ number_format($savingsRate, 1) }}% this year. Aim to push above 20%.</div>
 @else
-    <div class="alert warning">
-        <div class="alert-title">Low Savings Rate</div>
-        <div class="alert-text">Your savings rate of {{ number_format($savingsRate, 1) }}% is below the recommended 20%. Review your spending categories to find areas to reduce.</div>
-    </div>
-@endif
-
-<!-- Annual Performance Overview -->
-<div class="insight-box">
-    <h4>Annual Performance Overview</h4>
-    <p>Throughout {{ $year }}, you had positive cash flow in <strong>{{ $profitMonths }} of 12 months</strong>, with an average monthly savings of {{ $currency }} {{ number_format($avgMonthlySave) }}.
-        @if($bestMonth) Your best month was <strong>{{ $bestMonth['month'] }}</strong> (net: {{ $currency }} {{ number_format($bestMonth['net_flow']) }}). @endif
-        @if($worstMonth) Your toughest month was <strong>{{ $worstMonth['month'] }}</strong> (net: {{ $currency }} {{ number_format($worstMonth['net_flow']) }}). @endif
-    </p>
-</div>
-
-<!-- Loans Fully Cleared During Year -->
-@if($loansCleared['count'] > 0)
-    <div class="insight-box" style="border-left-color: #10B981; background: #ECFDF5;">
-        <h4 style="color: #065F46;">&#10003; Loans Fully Cleared in {{ $year }}</h4>
-        <p>You completely paid off <strong>{{ $loansCleared['count'] }} loan{{ $loansCleared['count'] > 1 ? 's' : '' }}</strong> during {{ $year }},
-            with a combined principal of <strong>{{ $currency }} {{ number_format($loansCleared['principal_total']) }}</strong>
-            (total repaid including interest: <strong>{{ $currency }} {{ number_format($loansCleared['total']) }}</strong>).
-        </p>
-    </div>
+    <div class="alert warning"><strong>Low savings rate</strong> &mdash; {{ number_format($savingsRate, 1) }}%, below the recommended 20%.</div>
 @endif
 
 {{-- Salary → Savings Rate --}}
@@ -325,7 +200,6 @@
                 </tr>
             @endforeach
             @php
-                $avgPct      = round(collect($salarySavings)->avg('savings_percentage'), 1);
                 $totalSalary = collect($salarySavings)->sum('salary_amount');
                 $totalSaved  = collect($salarySavings)->sum('saved_amount');
                 $overallPct  = $totalSalary > 0 ? round(($totalSaved / $totalSalary) * 100, 1) : 0;
@@ -338,20 +212,10 @@
             </tr>
             </tbody>
         </table>
-        <div class="insight-box">
-            <h4>&#128176; Annual Salary Savings Discipline</h4>
-            <p>Across {{ count($salarySavings) }} salary payment{{ count($salarySavings) > 1 ? 's' : '' }} in {{ $year }},
-                you moved a total of <strong>{{ $currency }} {{ number_format($totalSaved) }}</strong>
-                to savings within 48 hours of receipt — an average of <strong>{{ $avgPct }}%</strong> per month.
-                {{ $avgPct >= 20
-                    ? 'Outstanding consistency. Paying yourself first this reliably is a hallmark of strong financial discipline.'
-                    : 'Aim to consistently move 20%+ of each salary to savings immediately upon receipt.' }}
-            </p>
-        </div>
     </div>
 @endif
 
-<!-- Investment Income (Savings Interest) -->
+<!-- Investment Income -->
 @if($investmentIncome['total'] > 0)
     <div class="section">
         <div class="section-title">Investment Income (Savings Interest)</div>
@@ -370,15 +234,11 @@
                 </tr>
             @endforeach
             <tr class="total-row">
-                <td>Total Investment Income</td>
+                <td>Total</td>
                 <td style="text-align: right; color: #059669;">{{ $currency }} {{ number_format($investmentIncome['total']) }}</td>
             </tr>
             </tbody>
         </table>
-        <div class="insight-box">
-            <h4>&#128176; Annual Investment Income</h4>
-            <p>Your savings accounts earned a combined <strong>{{ $currency }} {{ number_format($investmentIncome['total']) }}</strong> in interest during {{ $year }}.</p>
-        </div>
     </div>
 @endif
 
@@ -417,9 +277,6 @@
                             color: {{ !$hasBudget ? '#9CA3AF' : ($variance >= 0 ? '#059669' : '#DC2626') }};">
                         @if($hasBudget)
                             {{ $variance >= 0 ? '-' : '+' }}{{ number_format(abs($variance)) }}
-                            <span style="font-size: 8px; font-weight: normal; display: block;">
-                                    {{ $variance >= 0 ? 'under' : 'over' }}
-                                </span>
                         @else
                             —
                         @endif
@@ -444,9 +301,6 @@
                         color: {{ $annualBudgetedExpenses == 0 ? '#9CA3AF' : ($annualBudgetVariance >= 0 ? '#059669' : '#DC2626') }};">
                     @if($annualBudgetedExpenses > 0)
                         {{ $annualBudgetVariance >= 0 ? '-' : '+' }}{{ number_format(abs($annualBudgetVariance)) }}
-                        <span style="font-size: 8px; font-weight: normal; display: block;">
-                                {{ $annualBudgetVariance >= 0 ? 'under' : 'over' }}
-                            </span>
                     @else
                         —
                     @endif
@@ -460,28 +314,7 @@
             </tbody>
         </table>
 
-        {{-- Annual budget summary insight --}}
-        @if($annualBudgetedExpenses > 0)
-            <div class="insight-box">
-                <h4>Annual Budget Performance</h4>
-                <p>
-                    Against a total annual expense budget of
-                    <strong>{{ $currency }} {{ number_format($annualBudgetedExpenses) }}</strong>,
-                    you actually spent
-                    <strong>{{ $currency }} {{ number_format($expenses) }}</strong> —
-                    @if($annualBudgetVariance >= 0)
-                        <strong style="color: #059669;">{{ $currency }} {{ number_format($annualBudgetVariance) }} under budget</strong>.
-                        Great discipline across the year!
-                    @else
-                        <strong style="color: #DC2626;">{{ $currency }} {{ number_format(abs($annualBudgetVariance)) }} over budget</strong>
-                        across {{ $monthsOverBudget }} {{ $monthsOverBudget === 1 ? 'month' : 'months' }}.
-                        Review overspend months below to find patterns.
-                    @endif
-                </p>
-            </div>
-        @endif
-
-        {{-- Per-month category drill-down --}}
+        {{-- Per-month category drill-down — dense table instead of card+bar grid --}}
         @foreach($monthlyBreakdown as $month)
             @if(!empty($month['category_performance']))
                 <div class="month-drill">
@@ -489,56 +322,41 @@
                         {{ $month['month_short'] }} — Category Budget vs Actual
                         @if(($month['budgeted_expenses'] ?? 0) > 0)
                             &nbsp;&bull;&nbsp;
-                            Budgeted: {{ $currency }} {{ number_format($month['budgeted_expenses']) }}
-                            &nbsp;&bull;&nbsp;
-                            Actual: {{ $currency }} {{ number_format($month['expenses']) }}
-                            &nbsp;&bull;&nbsp;
                             @php $mv = $month['budget_variance'] ?? 0; @endphp
                             <span style="color: {{ $mv >= 0 ? '#059669' : '#DC2626' }};">
-                                    {{ $mv >= 0 ? 'Under' : 'Over' }} by {{ $currency }} {{ number_format(abs($mv)) }}
-                                </span>
+                                {{ $mv >= 0 ? 'Under' : 'Over' }} by {{ $currency }} {{ number_format(abs($mv)) }}
+                            </span>
                         @endif
                     </div>
-                    <div class="budget-grid">
-                        @foreach(collect($month['category_performance'])->chunk(2) as $pair)
-                            <div class="budget-row">
-                                @foreach($pair as $budget)
-                                    @php
-                                        $pct         = min($budget['percentage'], 100);
-                                        $statusClass = $budget['percentage'] >= 100 ? 'danger'
-                                            : ($budget['percentage'] >= 80 ? 'warning' : 'good');
-                                        $pctColor    = $budget['percentage'] >= 100 ? '#DC2626'
-                                            : ($budget['percentage'] >= 80 ? '#D97706' : '#059669');
-                                    @endphp
-                                    <div class="budget-cell">
-                                        <div class="budget-item {{ $statusClass }}">
-                                            <div class="budget-header">
-                                                <div class="budget-name">{{ $budget['category'] }}</div>
-                                                <div class="budget-percent" style="color: {{ $pctColor }};">
-                                                    {{ number_format($budget['percentage'], 1) }}%
-                                                </div>
-                                            </div>
-                                            <div class="budget-bar">
-                                                <div class="budget-fill {{ $statusClass }}" style="width: {{ $pct }}%;"></div>
-                                            </div>
-                                            <div class="budget-amounts">
-                                                Spent: {{ $currency }} {{ number_format($budget['spent']) }}
-                                                of {{ $currency }} {{ number_format($budget['budgeted']) }}
-                                                ({{ $budget['has_budget'] ? 'set budget' : ($budget['is_new'] ? 'new category' : $budget['months_used'] . '-mo avg') }})
-                                                &bull;
-                                                {{ $budget['remaining'] >= 0
-                                                    ? 'Remaining: ' . $currency . ' ' . number_format($budget['remaining'])
-                                                    : 'Over by: ' . $currency . ' ' . number_format(abs($budget['remaining'])) }}
-                                            </div>
-                                        </div>
-                                    </div>
-                                @endforeach
-                                @if($pair->count() === 1)
-                                    <div class="budget-cell"></div>
-                                @endif
-                            </div>
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th style="text-align: right;">Budgeted</th>
+                            <th style="text-align: right;">Spent</th>
+                            <th style="text-align: right;">Remaining</th>
+                            <th style="text-align: right;">%</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @foreach($month['category_performance'] as $budget)
+                            @php
+                                $pctColor = $budget['percentage'] >= 100 ? '#DC2626' : ($budget['percentage'] >= 80 ? '#D97706' : '#059669');
+                            @endphp
+                            <tr>
+                                <td style="font-weight: 600;">{{ $budget['category'] }}
+                                    <span style="color:#9CA3AF; font-size:8px;">({{ $budget['has_budget'] ? 'set' : ($budget['is_new'] ? 'new' : $budget['months_used'] . 'mo avg') }})</span>
+                                </td>
+                                <td style="text-align: right;">{{ $currency }} {{ number_format($budget['budgeted']) }}</td>
+                                <td style="text-align: right;">{{ $currency }} {{ number_format($budget['spent']) }}</td>
+                                <td style="text-align: right; color: {{ $budget['remaining'] >= 0 ? '#059669' : '#DC2626' }};">
+                                    {{ $budget['remaining'] >= 0 ? '' : '-' }}{{ $currency }} {{ number_format(abs($budget['remaining'])) }}
+                                </td>
+                                <td style="text-align: right; font-weight: bold; color: {{ $pctColor }};">{{ number_format($budget['percentage'], 1) }}%</td>
+                            </tr>
                         @endforeach
-                    </div>
+                        </tbody>
+                    </table>
                 </div>
             @endif
         @endforeach
@@ -646,56 +464,13 @@
     </div>
 @endif
 
-<!-- Key Insights — two-column grid (table layout) -->
-@if(!empty($data['insights']))
-    <div class="section">
-        <div class="section-title">Key Insights</div>
-        <div class="insights-grid">
-            @foreach(collect($data['insights'])->chunk(2) as $pair)
-                <div class="insight-row">
-                    @foreach($pair as $insight)
-                        <div class="insight-cell">
-                            <div class="insight-card">
-                                <h4>{{ $insight['icon'] }} {{ $insight['title'] }}</h4>
-                                <div class="insight-value">{{ $insight['value'] }}</div>
-                                <p>{{ $insight['description'] }}</p>
-                            </div>
-                        </div>
-                    @endforeach
-                    @if($pair->count() === 1)
-                        <div class="insight-cell"></div>
-                    @endif
-                </div>
-            @endforeach
-        </div>
-    </div>
-@endif
-
-<!-- Year in Review -->
-<div class="section">
-    <div class="insight-box">
-        <h4>{{ $year }} Year in Review</h4>
-        <p>Over the course of {{ $year }}, you recorded <strong>{{ $txCount }} transactions</strong> across <strong>{{ $data['accounts']->count() }} accounts</strong>. Your total income was <strong>{{ $currency }} {{ number_format($income) }}</strong> against total expenses of <strong>{{ $currency }} {{ number_format($expenses) }}</strong>, yielding an annual savings rate of <strong>{{ number_format($savingsRate, 1) }}%</strong>. Your year-end net worth stands at <strong>{{ $currency }} {{ number_format($netWorth) }}</strong>.</p>
-        @if($annualBudgetedExpenses > 0)
-            <p style="margin-top: 6px;">On the budget front, you set expense targets totalling <strong>{{ $currency }} {{ number_format($annualBudgetedExpenses) }}</strong> for the year and
-                @if($annualBudgetVariance >= 0)
-                    came in <strong style="color: #059669;">{{ $currency }} {{ number_format($annualBudgetVariance) }} under budget</strong> — a strong result.
-                @else
-                    finished <strong style="color: #DC2626;">{{ $currency }} {{ number_format(abs($annualBudgetVariance)) }} over budget</strong> across {{ $monthsOverBudget }} {{ $monthsOverBudget === 1 ? 'month' : 'months' }}.
-                @endif
-            </p>
-        @endif
-        <p style="margin-top: 6px;">Use this report to set intentional financial targets for {{ $year + 1 }}. Small, consistent improvements in your savings rate compound significantly over time.</p>
-    </div>
-</div>
-
 <!-- Footer -->
 <div class="footer">
     <p class="confidential">CONFIDENTIAL FINANCIAL DOCUMENT</p>
     <p>Generated on {{ now()->format('F j, Y') }}</p>
     <p>Report ID: ANN-{{ $year }}-{{ strtoupper(substr(md5($user->id . $year), 0, 8)) }}</p>
-    <p style="margin-top: 8px;">© {{ now()->year }} Financial Report System. All rights reserved.</p>
-    <p style="margin-top: 5px; font-size: 8px; color: #9CA3AF;">This document contains highly confidential financial information. Store securely and do not share with unauthorized parties.</p>
+    <p style="margin-top: 6px;">© {{ now()->year }} Financial Report System. All rights reserved.</p>
+    <p style="margin-top: 4px; font-size: 8px; color: #9CA3AF;">This document contains highly confidential financial information. Store securely and do not share with unauthorized parties.</p>
 </div>
 
 </body>
