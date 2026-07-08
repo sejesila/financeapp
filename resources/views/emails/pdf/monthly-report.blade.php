@@ -118,6 +118,7 @@
     $budgetsTotal = $data['budgets_total']      ?? 0;
     $txCount      = $data['transaction_count']  ?? 0;
     $savingsBalance = $data['savings_balance'] ?? 0;
+    $investmentIncome = $data['investment_income'] ?? ['total' => 0, 'accounts' => []];
 
     $startDate = \Carbon\Carbon::parse($data['start_date']);
     $endDate   = \Carbon\Carbon::parse($data['end_date']);
@@ -335,6 +336,37 @@
     </div>
 @endif
 
+<!-- Investment Income (Savings Interest) -->
+@if($investmentIncome['total'] > 0)
+    <div class="section">
+        <div class="section-title">Investment Income (Savings Interest)</div>
+        <table>
+            <thead>
+            <tr>
+                <th>Savings Account</th>
+                <th style="text-align: right;">Interest Earned</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach($investmentIncome['accounts'] as $acct)
+                <tr>
+                    <td style="font-weight: 600;">{{ $acct['name'] }}</td>
+                    <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($acct['amount']) }}</td>
+                </tr>
+            @endforeach
+            <tr class="total-row">
+                <td>Total Investment Income</td>
+                <td style="text-align: right; color: #059669;">{{ $currency }} {{ number_format($investmentIncome['total']) }}</td>
+            </tr>
+            </tbody>
+        </table>
+        <div class="insight-box">
+            <h4>&#128176; Investment Income</h4>
+            <p>Your savings accounts earned <strong>{{ $currency }} {{ number_format($investmentIncome['total']) }}</strong> in interest this month.</p>
+        </div>
+    </div>
+@endif
+
 <!-- Top Spending Categories -->
 @if($data['top_categories']->isNotEmpty())
     <div class="section">
@@ -370,33 +402,6 @@
                 <p>Your dominant spending category was <strong>{{ $topCat['category'] }}</strong>, representing <strong>{{ number_format($topPct, 1) }}%</strong> of total expenses &mdash; {{ $currency }} {{ number_format($topCat['amount']) }} across {{ $topCat['count'] }} transactions.</p>
             </div>
         @endif
-    </div>
-@endif
-
-<!-- Largest Transactions -->
-@if($data['largest_transactions']->isNotEmpty())
-    <div class="section">
-        <div class="section-title">Largest Individual Expenses</div>
-        <table>
-            <thead>
-            <tr>
-                <th style="width: 15%;">Date</th>
-                <th style="width: 40%;">Description</th>
-                <th style="width: 25%;">Category</th>
-                <th style="text-align: right; width: 20%;">Amount</th>
-            </tr>
-            </thead>
-            <tbody>
-            @foreach($data['largest_transactions'] as $txn)
-                <tr>
-                    <td style="color: #6B7280;">{{ \Carbon\Carbon::parse($txn->period_date ?? $txn->date)->format('M j, Y') }}</td>
-                    <td style="font-weight: 500;">{{ $txn->description }}</td>
-                    <td style="color: #6B7280;">{{ $txn->category->name }}</td>
-                    <td style="text-align: right; font-weight: bold; color: #DC2626;">-{{ $currency }} {{ number_format($txn->amount) }}</td>
-                </tr>
-            @endforeach
-            </tbody>
-        </table>
     </div>
 @endif
 

@@ -433,6 +433,8 @@ class ReportDataService
 
         $insights = $this->generateInsights($user, $transactions, $startDate, $endDate, $type);
 
+        $investmentIncome = $this->getInvestmentIncome($user, $startDate, $endDate);
+
         return [
             'period_type'          => $type,
             'start_date'           => $startDate->format('M d, Y'),
@@ -460,6 +462,55 @@ class ReportDataService
             'active_loans'         => $activeLoans,
             'budget_performance'   => $budgetPerformance,
             'insights'             => $insights,
+            'investment_income'    => $investmentIncome,
+        ];
+    }
+
+    /**
+     * Calculate interest earned on savings/investment accounts during the period,
+     * broken down per account. Interest is identified by category name 'Interest',
+     * matching the convention used in StatementDataService::computeBalanceAt().
+     *
+     * Returns:
+     *   [
+     *       'total'    => float,
+     *       'accounts' => [ ['name' => string, 'amount' => float], ... ]  // only accounts with amount > 0
+     *   ]
+     */
+    private function getInvestmentIncome(User $user, Carbon $startDate, Carbon $endDate): array
+    {
+        $savingsAccounts = Account::where('user_id', $user->id)
+            ->where('type', 'savings')
+            ->where('is_active', true)
+            ->get();
+
+        if ($savingsAccounts->isEmpty()) {
+            return ['total' => 0.0, 'accounts' => []];
+        }
+
+        $interestByAccount = Transaction::whereIn('account_id', $savingsAccounts->pluck('id'))
+            ->whereBetween('date', [
+                $startDate->toDateString(),
+                $endDate->toDateString(),
+            ])
+            ->whereHas('category', fn($q) => $q->where('name', 'Interest'))
+            ->selectRaw('account_id, SUM(amount) as total')
+            ->groupBy('account_id')
+            ->pluck('total', 'account_id');
+
+        $accounts = $savingsAccounts
+            ->map(fn($account) => [
+                'name'   => $account->name,
+                'amount' => (float) ($interestByAccount[$account->id] ?? 0),
+            ])
+            ->filter(fn($a) => $a['amount'] > 0)
+            ->sortByDesc('amount')
+            ->values()
+            ->all();
+
+        return [
+            'total'    => (float) $interestByAccount->sum(),
+            'accounts' => $accounts,
         ];
     }
 
