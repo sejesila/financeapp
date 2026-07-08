@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Transaction;
 use App\Models\Account;
 use App\Models\Loan;
+use App\Models\LoanPayment;
 use App\Models\Budget;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -621,22 +622,29 @@ class ReportDataService
      */
     private function getLoanPaymentsInPeriod(User $user, Carbon $startDate, Carbon $endDate): array
     {
-        $payments = Transaction::where('user_id', $user->id)
-            ->whereBetween('date', [
+        // Source from LoanPayment (the authoritative record created by
+        // LoanController::recordPayment()) rather than matching transactions
+        // by category name. A transaction tagged "Loan Repayment" is not
+        // necessarily tied to a tracked Loan — e.g. a manual/duplicate entry,
+        // or one whose transaction date drifted from the loan's actual
+        // payment_date — and matching by name alone caused this section to
+        // report repayments that don't correspond to anything on the Loans
+        // page.
+        $payments = LoanPayment::where('user_id', $user->id)
+            ->whereBetween('payment_date', [
                 $startDate->toDateString(),
                 $endDate->toDateString(),
             ])
-            ->whereHas('category', fn($q) => $q->where('name', 'Loan Repayment'))
-            ->with(['category', 'account'])
+            ->with('loan')
             ->get();
 
         return [
             'count' => $payments->count(),
             'total' => $payments->sum('amount'),
-            'items' => $payments->map(fn($t) => [
-                'date'        => Carbon::parse($t->date)->format('M d, Y'),
-                'description' => $t->description,
-                'amount'      => $t->amount,
+            'items' => $payments->map(fn($p) => [
+                'date'        => Carbon::parse($p->payment_date)->format('M d, Y'),
+                'description' => 'Repayment to ' . ($p->loan->source ?? 'loan'),
+                'amount'      => $p->amount,
             ])->values()->toArray(),
         ];
     }
