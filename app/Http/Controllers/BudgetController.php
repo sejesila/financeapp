@@ -37,7 +37,7 @@ class BudgetController extends Controller
         // Load ONLY true income categories (exclude loans and adjustments)
         $incomeCategories = Category::where('user_id', Auth::id())
             ->where('type', 'income')
-            ->whereNotIn('name', ['Loan Disbursement', 'Loan Receipt', 'Balance Adjustment'])
+            ->whereNotIn('name', ['Loan Disbursement', 'Loan Receipt', 'Balance Adjustment', 'Friend Loan Given', 'Loan Recovery'])
             ->orderBy('name')
             ->get();
 
