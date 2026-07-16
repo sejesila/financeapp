@@ -5,8 +5,6 @@ namespace App\Services;
 use App\Models\Account;
 use App\Models\Category;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
 /**
  * Handles top-up category resolution and top-up transaction creation.
@@ -36,12 +34,6 @@ class TopUpService
     {
         $excluded = self::EXCLUDED;
 
-        $showSaccoDividends = $this->resolveSaccoDividends();
-
-        if (!$showSaccoDividends) {
-            $excluded[] = 'Sacco Dividends';
-        }
-
         $query = Category::where('user_id', Auth::id())
             ->where('is_active', true)
             ->whereNotIn('name', $excluded)
@@ -63,7 +55,7 @@ class TopUpService
             default        => $query->whereIn('type', ['income', 'liability'])->orderBy('name')->get(),
         };
 
-        return [$categories, $showSaccoDividends];
+        return $categories;
     }
 
     // ── Validation ────────────────────────────────────────────────────────────
@@ -86,15 +78,6 @@ class TopUpService
             return 'This category is reserved for system use only.';
         }
 
-        // Sacco Dividends window + once-per-year guard
-        if ($category->name === 'Sacco Dividends') {
-            if (!$this->inSaccoWindow()) {
-                return 'Sacco Dividends can only be recorded between 10 April and 10 May.';
-            }
-            if ($this->saccoAlreadyUsed()) {
-                return 'Sacco Dividends have already been recorded for this year.';
-            }
-        }
 
         // Bank accounts: only allow explicitly permitted income categories
         if ($account->type === 'bank'
@@ -108,36 +91,4 @@ class TopUpService
         return null; // all good
     }
 
-    // ── Sacco Dividends helpers ───────────────────────────────────────────────
-
-    private function resolveSaccoDividends(): bool
-    {
-        return $this->inSaccoWindow() && !$this->saccoAlreadyUsed();
-    }
-
-    private function inSaccoWindow(): bool
-    {
-        $today = now();
-        $start = $today->copy()->setDate($today->year, 4, 10);
-        $end   = $today->copy()->setDate($today->year, 5, 10);
-        return $today->between($start, $end);
-    }
-
-    private function saccoAlreadyUsed(): bool
-    {
-        $ids = Category::where('user_id', Auth::id())
-            ->where('name', 'Sacco Dividends')
-            ->pluck('id');
-
-        if ($ids->isEmpty()) {
-            return false;
-        }
-
-        return DB::table('transactions')
-            ->where('user_id', Auth::id())
-            ->whereIn('category_id', $ids)
-            ->whereYear('date', now()->year)
-            ->whereNull('deleted_at')
-            ->exists();
-    }
 }

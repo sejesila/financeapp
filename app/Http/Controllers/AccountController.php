@@ -607,16 +607,17 @@ class AccountController extends Controller
         }
 
         $isEtica = $account->type === 'savings' && strtolower($account->name) === 'etica';
-        if ($account->type === 'wallet' || ($account->type === 'savings' && ! $isEtica)) {
+        if ($account->type === 'wallet' || ($account->type === 'savings' && !$isEtica)) {
             return redirect()->route('accounts.index')
                 ->with('error', 'This account can only receive money via transfers.');
         }
 
-        [$categories, $showSaccoDividends] = $this->topUpService->getCategories($account->type);
+        $categories = $this->topUpService->getCategories($account->type);
         $isSavings = $account->type === 'savings';
 
-        return view('accounts.topup', compact('account', 'categories', 'showSaccoDividends', 'isSavings'));
+        return view('accounts.topup', compact('account', 'categories', 'isSavings'));
     }
+
 
     // ── top-up store ──────────────────────────────────────────────────────────
 

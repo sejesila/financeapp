@@ -23,20 +23,6 @@
                 {{ session('error') }}
             </div>
         @endif
-
-        {{-- Sacco Dividends availability banner --}}
-        @if($showSaccoDividends)
-            <div class="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded mb-6 flex items-start gap-3">
-                <div>
-                    <p class="font-semibold">Sacco Dividends available</p>
-                    <p class="text-sm mt-1">
-                        You can record your Sacco Dividends this month (10 Apr – 10 May).
-                        This option disappears once recorded or after 10 May.
-                    </p>
-                </div>
-            </div>
-        @endif
-
         <form method="POST" action="{{ route('accounts.topup.store', $account) }}" class="bg-white shadow rounded-lg p-6" id="topupForm" x-data="topupForm()">
             @csrf
 
