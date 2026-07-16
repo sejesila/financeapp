@@ -21,18 +21,8 @@ class MergeCategories extends Command
      */
     private array $mergeGroups = [
         [
-            'sources' => ['Mum', 'Sibling'],
-            'target'  => 'Family',
-            'icon'    => '👨‍👩‍👧‍👦',
-        ],
-        [
-            'sources' => ['School Fees', 'Books & Supplies'],
-            'target'  => 'School Fees & Supplies',
-            'icon'    => '🎓',
-        ],
-        [
             // Target already exists in your category list — will be reused, not recreated.
-            'sources' => ['Pharmacy', 'Home Appliances', 'Personal Care', 'Dining Out', 'Home Project', 'Drinking Water'],
+            'sources' => ['Furniture', 'Gym & Fitness', 'Doctor', 'Electronics', 'Kitchen Appliances'],
             'target'  => 'Other Expenses',
             'icon'    => '🔹',
         ],
