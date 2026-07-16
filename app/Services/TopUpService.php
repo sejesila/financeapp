@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Account;
 use App\Models\Category;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Database\Eloquent\Collection;
 
 /**
  * Handles top-up category resolution and top-up transaction creation.
@@ -30,7 +31,7 @@ class TopUpService
     /**
      * Returns [Collection $categories, bool $showSaccoDividends].
      */
-    public function getCategories(string $accountType): array
+    public function getCategories(string $accountType): Collection
     {
         $excluded = self::EXCLUDED;
 
