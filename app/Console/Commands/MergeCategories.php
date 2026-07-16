@@ -22,9 +22,9 @@ class MergeCategories extends Command
     private array $mergeGroups = [
         [
             // Target already exists in your category list — will be reused, not recreated.
-            'sources' => ['Furniture', 'Gym & Fitness', 'Doctor', 'Electronics', 'Kitchen Appliances'],
-            'target'  => 'Other Expenses',
-            'icon'    => '🔹',
+            'sources' => ['Sacco Dividends'],
+            'target'  => 'Interest',
+            'icon'    => '💰',
         ],
     ];
 
