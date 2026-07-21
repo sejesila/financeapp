@@ -706,7 +706,7 @@ class AccountController extends Controller
         ]);
 
 
-            $account->updateBalance();
+            //$account->updateBalance();
         $this->clearAccountCache($account->id);
 
         $verb = $account->type === 'savings' ? 'deposited to' : 'topped up';
@@ -763,7 +763,7 @@ class AccountController extends Controller
 
         $transaction->delete();
 
-        $account->updateBalance();
+        //$account->updateBalance();
         $this->clearAccountCache($account->id);
 
         return redirect()->route('accounts.show', ['account' => $account, 'tab' => 'topups'])
@@ -867,7 +867,7 @@ class AccountController extends Controller
             ]);
         }
 
-        $account->updateBalance();
+        //$account->updateBalance();
         Cache::forget("account.{$account->id}.stats");
 
         $formattedTotal = 'KES ' . number_format($request->amount, 0, '.', ',');
@@ -928,7 +928,7 @@ class AccountController extends Controller
         $feeAmount      = $feeTransaction?->amount ?? 0;
 
         DB::transaction(function () use ($transfer, $feeTransaction) {
-            $feeTransaction?->delete();
+            //$feeTransaction?->delete();
             $transfer->delete();
         });
 

@@ -219,7 +219,7 @@ class TransactionController extends Controller
         try {
             Transaction::find($transaction->related_fee_transaction_id)?->delete();
             $transaction->delete();
-            $transaction->account->updateBalance();
+            //$transaction->account->updateBalance();
 
             DB::commit();
 
@@ -265,7 +265,7 @@ class TransactionController extends Controller
         try {
             Transaction::onlyTrashed()->find($transaction->related_fee_transaction_id)?->forceDelete();
             $transaction->forceDelete();
-            $transaction->account?->updateBalance();
+           // $transaction->account?->updateBalance();
 
             DB::commit();
 
