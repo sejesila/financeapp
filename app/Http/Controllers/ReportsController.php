@@ -14,6 +14,29 @@ use Illuminate\Support\Facades\DB;
 
 class ReportsController extends Controller
 {
+    /**
+     * Category names that never represent real income or spending
+     * (loan mechanics / balance adjustments / client passthrough),
+     * mirrored from BudgetController::index()'s $actualsQuery and
+     * DashboardController::NON_SPENDING_CATEGORY_NAMES.
+     */
+    private const NON_SPENDING_CATEGORY_NAMES = [
+        'Loan Disbursement',
+        'Loan Receipt',
+        'Balance Adjustment',
+        'Client Funds',
+    ];
+
+    /**
+     * Additional category names excluded from *income* only, mirrored
+     * from BudgetController::index()'s $incomeCategories filter and
+     * DashboardController::NON_INCOME_ONLY_CATEGORY_NAMES.
+     */
+    private const NON_INCOME_ONLY_CATEGORY_NAMES = [
+        'Friend Loan Given',
+        'Loan Recovery',
+    ];
+
     public function index(Request $request)
     {
         $filter = $request->get('filter', 'this_month');
@@ -48,12 +71,14 @@ class ReportsController extends Controller
         }
 
         // 1. Spending by Category
-        $spendingByCategory = $this->excludeClientFunds(
-            Transaction::query()
-                ->join('categories', 'transactions.category_id', '=', 'categories.id')
-                ->select('categories.name', 'categories.type', DB::raw('SUM(transactions.amount) as total'))
-                ->whereBetween('transactions.date', [$startDate, $endDate])
-                ->where('transactions.user_id', auth()->id())
+        $spendingByCategory = $this->excludeNonSpendingCategories(
+            $this->excludeClientFunds(
+                Transaction::query()
+                    ->join('categories', 'transactions.category_id', '=', 'categories.id')
+                    ->select('categories.name', 'categories.type', DB::raw('SUM(transactions.amount) as total'))
+                    ->whereBetween('transactions.date', [$startDate, $endDate])
+                    ->where('transactions.user_id', auth()->id())
+            )
         )
             ->groupBy('categories.id', 'categories.name', 'categories.type')
             ->orderByDesc('total')
@@ -92,12 +117,14 @@ class ReportsController extends Controller
         $previousExpenses = 0;
 
         if ($previousStartDate) {
-            $previousExpenses = $this->excludeClientFunds(
-                Transaction::query()
-                    ->join('categories', 'transactions.category_id', '=', 'categories.id')
-                    ->where('categories.type', 'expense')
-                    ->whereBetween('transactions.date', [$previousStartDate, $previousEndDate])
-                    ->where('transactions.user_id', auth()->id())
+            $previousExpenses = $this->excludeNonSpendingCategories(
+                $this->excludeClientFunds(
+                    Transaction::query()
+                        ->join('categories', 'transactions.category_id', '=', 'categories.id')
+                        ->where('categories.type', 'expense')
+                        ->whereBetween('transactions.date', [$previousStartDate, $previousEndDate])
+                        ->where('transactions.user_id', auth()->id())
+                )
             )->sum('transactions.amount');
         }
 
@@ -212,17 +239,53 @@ class ReportsController extends Controller
 
     /**
      * Exclude transactions that represent client-fund pass-through money
-     * (i.e. not the user's own income/spending) from a query.
+     * (i.e. not the user's own income/spending) from a query — but keep
+     * Client Commission transactions booked to an income category, since
+     * those are real earned income, not passthrough.
      *
-     * Mirrors the exclusion applied in BudgetController and DashboardController
-     * so report totals stay consistent with the budgets, dashboard, and
+     * Mirrors the exclusion applied in BudgetController::index()'s
+     * $actualsQuery and DashboardController::excludeClientFunds() so
+     * report totals stay consistent with the budgets, dashboard, and
      * transactions summary views.
+     *
+     * Note: unlike Dashboard/Budget (which rely on whereHas/relations and
+     * therefore need a correlated EXISTS against `categories`), every query
+     * this method is applied to already joins `categories` directly, so we
+     * can reference `categories.type` inline instead of a subquery.
      */
     private function excludeClientFunds(Builder $query): Builder
     {
         return $query->where(function ($q) {
-            $q->whereNull('transactions.payment_method')
-                ->orWhereNotIn('transactions.payment_method', ['Client Fund', 'Client Commission']);
+            $q->where(function ($q2) {
+                $q2->where('transactions.payment_method', '!=', 'Client Fund')
+                    ->where('transactions.payment_method', '!=', 'Client Commission')
+                    ->orWhereNull('transactions.payment_method');
+            })
+                ->orWhere(function ($q3) {
+                    $q3->where('categories.type', 'income')
+                        ->where('transactions.payment_method', 'Client Commission');
+                });
         });
+    }
+
+    /**
+     * Exclude categories that don't represent real spending or income
+     * (loan mechanics, balance adjustments, client passthrough), plus the
+     * extra names that only get stripped from *income* totals (Friend Loan
+     * Given, Loan Recovery are loan mechanics, not earned income).
+     *
+     * Mirrors BudgetController::index()'s $actualsQuery / $incomeCategories
+     * filters and DashboardController::excludeNonSpending() /
+     * excludeNonIncome(). Since the queries here mix income and expense
+     * rows together (grouped by category, split afterwards), both name
+     * lists are excluded up front — the income-only names don't collide
+     * with real expense category names.
+     */
+    private function excludeNonSpendingCategories(Builder $query): Builder
+    {
+        return $query->whereNotIn('categories.name', array_merge(
+            self::NON_SPENDING_CATEGORY_NAMES,
+            self::NON_INCOME_ONLY_CATEGORY_NAMES
+        ));
     }
 }
