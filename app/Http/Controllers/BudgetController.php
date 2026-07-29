@@ -23,6 +23,18 @@ class BudgetController extends Controller
      */
     private const SAVINGS_REVERSAL_WINDOW_DAYS = 8;
 
+    /**
+     * Loan principal movements are never real income/expense — lending money
+     * converts cash into a receivable, and getting it back converts the
+     * receivable back into cash. Only interest (a separate, dedicated
+     * category — see LoanGivenController::splitInterestOutOfFinalPayment)
+     * is real profit and is allowed to show under Income.
+     */
+    private const EXCLUDED_LOAN_CATEGORIES = [
+        'Loan Disbursement', 'Loan Receipt', 'Balance Adjustment',
+        'Friend Loan Given', 'Loan Recovery',
+    ];
+
     public function index(Request $request, $year = null)
     {
         $year = $year ?? date('Y');
@@ -34,17 +46,15 @@ class BudgetController extends Controller
         $minYear = $minYear ?? date('Y');
         $maxYear = date('Y') + 1;
 
-        // Load ONLY true income categories (exclude loans and adjustments)
         $incomeCategories = Category::where('user_id', Auth::id())
             ->where('type', 'income')
-            ->whereNotIn('name', ['Loan Disbursement', 'Loan Receipt', 'Balance Adjustment', 'Friend Loan Given', 'Loan Recovery'])
+            ->whereNotIn('name', self::EXCLUDED_LOAN_CATEGORIES)
             ->orderBy('name')
             ->get();
 
-        // Load expense categories (include loan repayments)
         $expenseCategories = Category::where('user_id', Auth::id())
             ->where('type', 'expense')
-            ->whereNotIn('name', ['Loan Disbursement', 'Loan Receipt', 'Balance Adjustment', 'Friend Loan Given', 'Loan Recovery'])
+            ->whereNotIn('name', self::EXCLUDED_LOAN_CATEGORIES)
             ->orderBy('name')
             ->get();
 
@@ -61,13 +71,13 @@ class BudgetController extends Controller
             ->selectRaw('category_id, MONTH(COALESCE(period_date, date)) as month, SUM(amount) as total')
             ->where('user_id', Auth::id())
             ->whereYear(DB::raw('COALESCE(period_date, date)'), $year)
-            ->where(function($q) {
-                $q->where(function($q2) {
+            ->where(function ($q) {
+                $q->where(function ($q2) {
                     $q2->where('payment_method', '!=', 'Client Fund')
                         ->where('payment_method', '!=', 'Client Commission')
                         ->orWhereNull('payment_method');
                 })
-                    ->orWhereExists(function($query) {
+                    ->orWhereExists(function ($query) {
                         $query->select(DB::raw(1))
                             ->from('categories')
                             ->whereColumn('categories.id', 'transactions.category_id')
@@ -77,12 +87,7 @@ class BudgetController extends Controller
             })
             ->whereHas('category', function ($q) {
                 $q->whereIn('type', ['income', 'expense'])
-                    ->whereNotIn('name', [
-                        'Loan Disbursement',
-                        'Loan Receipt',
-                        'Balance Adjustment',
-                        'Client Funds',
-                    ]);
+                    ->whereNotIn('name', array_merge(self::EXCLUDED_LOAN_CATEGORIES, ['Client Funds']));
             })
             ->groupBy('category_id', DB::raw('MONTH(COALESCE(period_date, date))'))
             ->get();
@@ -90,7 +95,7 @@ class BudgetController extends Controller
         // Convert to lookup: [category_id][month] => total
         $actuals = [];
         foreach ($actualsQuery as $row) {
-            $actuals[$row->category_id][$row->month] = (float)$row->total;
+            $actuals[$row->category_id][$row->month] = (float) $row->total;
         }
 
         // Calculate yearly totals for income categories
@@ -239,6 +244,10 @@ class BudgetController extends Controller
      * Without this, a withdrawal that gets undone a few days later would
      * still be counted as spending, overstating "Savings Used".
      *
+     * Withdrawals flagged as a client fund OR as lending are excluded
+     * entirely up front — they're not the account owner's personal spend,
+     * so they never enter the reversal-matching process below at all.
+     *
      * Approach:
      *   1. Collect every "savings → non-savings" transfer (a candidate
      *      withdrawal) and every "non-savings → savings" transfer (a
@@ -265,6 +274,7 @@ class BudgetController extends Controller
             ->where('from_acc.type', 'savings')
             ->where('to_acc.type', '!=', 'savings')
             ->where('transfers.is_client_fund', false)
+            ->where('transfers.is_lending', false)
             ->select(
                 'transfers.id',
                 'transfers.to_account_id as intermediate_account_id',
@@ -305,12 +315,10 @@ class BudgetController extends Controller
         $netByMonth = [];
 
         foreach ($withdrawals as $w) {
-            $withdrawalDate   = Carbon::parse($w->date);
+            $withdrawalDate    = Carbon::parse($w->date);
             $reversalWindowEnd = $withdrawalDate->copy()->addDays(self::SAVINGS_REVERSAL_WINDOW_DAYS);
-            $remainingToMatch = (float) $w->amount;
+            $remainingToMatch  = (float) $w->amount;
 
-            // Candidate re-deposits: same intermediate account, on/after the
-            // withdrawal, within the reversal window, and not fully consumed yet.
             $candidates = $deposits
                 ->filter(fn($d) =>
                     $d->intermediate_account_id === $w->intermediate_account_id
@@ -326,7 +334,7 @@ class BudgetController extends Controller
                 }
 
                 $matched = min($remainingToMatch, $d->remaining);
-                $remainingToMatch   -= $matched;
+                $remainingToMatch -= $matched;
                 $deposits[$d->id]->remaining -= $matched;
             }
 

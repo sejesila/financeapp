@@ -1,12 +1,12 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between mb-6">
-        <h2 class="font-semibold text-lg sm:text-xl text-gray-800 dark:text-gray-200 leading-tight">
-            {{ __('Create New Account') }}
-        </h2>
-        <a href="{{ route('accounts.index') }}" class="text-indigo-600 hover:text-indigo-800">
-            ← Back to Accounts
-        </a>
+            <h2 class="font-semibold text-lg sm:text-xl text-gray-800 dark:text-gray-200 leading-tight">
+                {{ __('Create New Account') }}
+            </h2>
+            <a href="{{ route('accounts.index') }}" class="text-indigo-600 hover:text-indigo-800">
+                ← Back to Accounts
+            </a>
         </div>
     </x-slot>
     <div class="max-w-2xl mx-auto">
@@ -51,7 +51,8 @@
                     <option value="airtel_money" {{ old('type') == 'airtel_money' ? 'selected' : '' }}>📱 Airtel Money
                     </option>
                     <option value="bank" {{ old('type') == 'bank' ? 'selected' : '' }}>🏦 Bank Account</option>
-                    <option value="savings">Savings Account</option>
+                    <option value="savings" {{ old('type') == 'savings' ? 'selected' : '' }}>💰 Savings Account</option>
+                    <option value="referrer_float" {{ old('type') == 'referrer_float' ? 'selected' : '' }}>🔄 Referrer Float</option>
                 </select>
             </div>
 
@@ -94,4 +95,4 @@
             </div>
         </form>
     </div>
-    </x-app-layout>
+</x-app-layout>

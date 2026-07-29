@@ -599,14 +599,34 @@
                                         </td>
 
                                         {{-- Reverse button --}}
+                                        @php
+                                            $isLoanLinked = in_array($txn->category->name, ['Loan Interest', 'Loan Recovery']);
+                                        @endphp
+
                                         <td class="px-4 py-3 text-right whitespace-nowrap">
-                                            @if(!($txn->is_grouped ?? false) && $txn->created_at->diffInMinutes(now()) <= 30)
+                                            @if($txn->category->name === 'Loan Interest')
+                                                {{-- Route through the loan-aware reversal, not the generic top-up one --}}
+                                                <form id="reverse-interest-form-{{ $txn->id }}"
+                                                      action="{{ route('transactions.reverse-interest', $txn) }}"
+                                                      method="POST" class="hidden">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                </form>
+                                                <button type="button"
+                                                        onclick="if(confirm('Reverse this interest? This will merge it back into the original repayment and may reopen the loan.')) document.getElementById('reverse-interest-form-{{ $txn->id }}').submit();"
+                                                        title="Reverse this interest"
+                                                        class="inline-flex items-center gap-1 text-xs font-medium text-amber-600 hover:text-amber-800 dark:text-amber-400 transition-colors">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+                                                    </svg>
+                                                    Reverse
+                                                </button>
+                                            @elseif(!$isLoanLinked && !($txn->is_grouped ?? false) && $txn->created_at->diffInMinutes(now()) <= 30)
                                                 <a href="{{ route('accounts.topup.reverse.form', ['account' => $account, 'transaction' => $txn]) }}"
                                                    title="Reverse this top-up"
-                                                   class="inline-flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors">
+                                                   class="inline-flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-700 dark:text-red-400 transition-colors">
                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                              d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
                                                     </svg>
                                                     Reverse
                                                 </a>

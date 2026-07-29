@@ -17,6 +17,7 @@ class Transfer extends Model
         'value_date',
         'mpesa_reference',
         'is_client_fund',
+        'is_lending'
     ];
 
     protected $casts = [

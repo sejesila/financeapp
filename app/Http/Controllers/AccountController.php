@@ -558,7 +558,12 @@ class AccountController extends Controller
             'description'     => 'nullable|string',
             'transaction_fee' => 'nullable|numeric|min:0',
             'is_client_fund'  => 'nullable|boolean',
+            'is_lending'      => 'nullable|boolean',
         ]);
+        if ($request->boolean('is_client_fund') && $request->boolean('is_lending')) {
+            return redirect()->back()->withInput()
+                ->with('error', 'A transfer cannot be both a client fund and a lending withdrawal.');
+        }
 
         $from = Account::withoutGlobalScopes()->findOrFail($request->from_account_id);
         $to   = Account::withoutGlobalScopes()->findOrFail($request->to_account_id);
@@ -586,6 +591,7 @@ class AccountController extends Controller
                 $request->description,
                 $request->filled('transaction_fee') ? (float) $request->transaction_fee : null,
                 $request->boolean('is_client_fund'),
+                $request->boolean('is_lending'),
             );
         } catch (ValidationException $e) {
             return redirect()->back()->withInput()->withErrors($e->errors());

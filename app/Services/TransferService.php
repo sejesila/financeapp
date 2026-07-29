@@ -42,6 +42,8 @@ readonly class TransferService
      * @param string $date
      * @param string|null $description
      * @param float|null $manualFee User-supplied fee override (null = use calculator)
+     * @param bool $isClientFund Withdrawal is someone else's money, not personal spend
+     * @param bool $isLending Withdrawal is earmarked to lend out, not personal spend
      * @return TransferFee  The fee that was charged (amount may be 0).
      *
      * @throws ValidationException
@@ -54,6 +56,7 @@ readonly class TransferService
         ?string $description = null,
         ?float  $manualFee = null,
         bool    $isClientFund = false,
+        bool    $isLending = false,
     ): TransferFee
     {
         $this->enforceTransferRules($from, $to, $amount);
@@ -66,7 +69,7 @@ readonly class TransferService
 
         $this->enforceBalanceCheck($from, $amount, $fee);
 
-        DB::transaction(function () use ($from, $to, $amount, $date, $description, $fee, $isClientFund) {
+        DB::transaction(function () use ($from, $to, $amount, $date, $description, $fee, $isClientFund, $isLending) {
             $isInterestGated = $to->type === 'savings'
                 && stripos($to->name, 'etica') !== false;
 
@@ -83,6 +86,7 @@ readonly class TransferService
                 'description'     => $description,
                 'user_id'         => Auth::id(),
                 'is_client_fund'  => $isClientFund,
+                'is_lending'      => $isLending,
             ]);
 
             if ($fee->isCharged()) {

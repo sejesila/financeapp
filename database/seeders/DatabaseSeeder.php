@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             AccountSeeder::class,
             CategorySeeder::class,
+            ReferrerSeeder::class,
             LoanSeeder::class,
             BudgetSeeder::class,
             TransactionSeeder::class,

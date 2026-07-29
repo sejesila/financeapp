@@ -11,9 +11,6 @@ class TransactionObserver
     {
         $transaction->account->updateBalance();
 
-        if ($transaction->category?->name === 'Loan Recovery') {
-            app(FriendLoanReconciliationService::class)->reconcile($transaction);
-        }
     }
 
     public function updated(Transaction $transaction): void

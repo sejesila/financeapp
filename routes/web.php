@@ -11,6 +11,7 @@ use App\Http\Controllers\{AccountController,
     DashboardController,
     EmailPreferenceController,
     LoanController,
+    LoanGivenController,
     MpesaSmsController,
     ProfileController,
     ReportsController,
@@ -114,7 +115,10 @@ Route::middleware('auth')->group(function () {
     Route::prefix('transactions')->name('transactions.')->group(function () {
         Route::post('{id}/restore', [TransactionController::class, 'restore'])->name('restore');
         Route::delete('{id}/force', [TransactionController::class, 'forceDestroy'])->name('force-destroy');
+        Route::delete('{transaction}/reverse-interest', [LoanGivenController::class, 'reverseInterest'])
+            ->name('reverse-interest');
     });
+
 
     // ======================================================================
     // Categories Management
@@ -140,6 +144,18 @@ Route::middleware('auth')->group(function () {
         // Loan payment routes//
         Route::get('{loan}/payment', [LoanController::class, 'paymentForm'])->name('payment');
         Route::post('{loan}/payment', [LoanController::class, 'recordPayment'])->name('payment.store');
+    });
+
+    Route::prefix('loans-given')->name('loans-given.')->group(function () {
+        Route::get('/', [LoanGivenController::class, 'index'])->name('index');
+        Route::get('/create', [LoanGivenController::class, 'create'])->name('create');
+        Route::post('/', [LoanGivenController::class, 'store'])->name('store');
+        Route::get('/{loanGiven}', [LoanGivenController::class, 'show'])->name('show');
+        Route::get('/{loanGiven}/payment', [LoanGivenController::class, 'paymentForm'])->name('payment-form');
+        Route::post('/{loanGiven}/payment', [LoanGivenController::class, 'recordPayment'])->name('payment');
+        Route::post('/{loanGiven}/close', [LoanGivenController::class, 'close'])->name('close');
+        Route::put('/{loanGiven}/status', [LoanGivenController::class, 'markStatus'])->name('status');
+        Route::delete('/{loanGiven}', [LoanGivenController::class, 'destroy'])->name('destroy');
     });
 
     // ======================================================================

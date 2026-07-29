@@ -18,7 +18,8 @@ class TopUpService
     private const EXCLUDED = [
         'Loan Receipt', 'Loan Repayment', 'Excise Duty',
         'Loan Fees Refund', 'Facility Fee Refund',
-        'Balance Adjustment', 'Rolling Funds',
+        'Balance Adjustment',
+        'Loan Recovery', 'Friend Loan Given',
     ];
 
     private const EXCLUDED_PARENTS = ['Income', 'Loans'];
@@ -79,7 +80,6 @@ class TopUpService
             return 'This category is reserved for system use only.';
         }
 
-
         // Bank accounts: only allow explicitly permitted income categories
         if ($account->type === 'bank'
             && $category->type === 'income'
@@ -91,5 +91,4 @@ class TopUpService
 
         return null; // all good
     }
-
 }

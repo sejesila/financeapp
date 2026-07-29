@@ -125,29 +125,40 @@
                         ⚠️ Minimum M-Pesa withdrawal amount is KES 50
                     </p>
                 </div>
-                <!-- Personal vs Client Fund -->
+
+                <!-- Purpose: Personal vs Client Fund vs Lending -->
                 <div x-show="fromAccountType === 'savings'" x-transition class="mb-4">
                     <label class="block text-gray-700 dark:text-gray-200 font-semibold mb-2">
-                        Whose money is this?
+                        What's this transfer for?
                     </label>
-                    <div class="flex gap-3">
-                        <label class="flex-1 flex items-center gap-2 border rounded px-3 py-2 cursor-pointer"
-                               :class="!isClientFund ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-gray-300 dark:border-gray-600'">
-                            <input type="radio" name="is_client_fund_radio" value="0" x-model.number="isClientFund" class="hidden">
-                            <span class="text-sm">💼 My Money</span>
+                    <div class="grid grid-cols-3 gap-2">
+                        <label class="flex flex-col items-center gap-1 border rounded px-2 py-2 cursor-pointer text-center"
+                               :class="purpose === 'personal' ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-gray-300 dark:border-gray-600'">
+                            <input type="radio" name="purpose_radio" value="personal" x-model="purpose" class="hidden">
+                            <span class="text-sm">💼 My Spending</span>
                         </label>
-                        <label class="flex-1 flex items-center gap-2 border rounded px-3 py-2 cursor-pointer"
-                               :class="isClientFund ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'border-gray-300 dark:border-gray-600'">
-                            <input type="radio" name="is_client_fund_radio" value="1" x-model.number="isClientFund" class="hidden">
+                        <label class="flex flex-col items-center gap-1 border rounded px-2 py-2 cursor-pointer text-center"
+                               :class="purpose === 'client_fund' ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'border-gray-300 dark:border-gray-600'">
+                            <input type="radio" name="purpose_radio" value="client_fund" x-model="purpose" class="hidden">
                             <span class="text-sm">👤 Client Fund</span>
                         </label>
+                        <label class="flex flex-col items-center gap-1 border rounded px-2 py-2 cursor-pointer text-center"
+                               :class="purpose === 'lending' ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-gray-300 dark:border-gray-600'">
+                            <input type="radio" name="purpose_radio" value="lending" x-model="purpose" class="hidden">
+                            <span class="text-sm">🤝 Lending Out</span>
+                        </label>
                     </div>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1" x-show="purpose === 'client_fund'">
                         Client fund withdrawals won't count against your personal "Savings Used" in Budgets.
+                    </p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1" x-show="purpose === 'lending'">
+                        Money you're withdrawing to lend out won't count against your personal "Savings Used" either
+                        — head to Loans Given afterward to record who it's going to.
                     </p>
                 </div>
 
-                <input type="hidden" name="is_client_fund" :value="isClientFund ? '1' : '0'">
+                <input type="hidden" name="is_client_fund" :value="purpose === 'client_fund' ? '1' : '0'">
+                <input type="hidden" name="is_lending" :value="purpose === 'lending' ? '1' : '0'">
 
                 <!-- Editable Transaction Fee -->
                 <div x-show="showFee" x-transition class="mb-4">
@@ -270,10 +281,10 @@
                 toAccountType: '',
                 feeManuallyEdited: false,
 
-                // FIX: this was previously undeclared, so x-model="isClientFund"
-                // on the radio inputs had nothing to bind to and clicking did nothing.
-                // Uses a number (not string) so "0" doesn't evaluate as truthy in JS.
-                isClientFund: {{ old('is_client_fund', 0) }},
+                // 'personal' | 'client_fund' | 'lending' — single source of truth,
+                // driving the two hidden is_client_fund/is_lending inputs so they
+                // can never both end up true.
+                purpose: '{{ old('is_lending') ? "lending" : (old('is_client_fund') ? "client_fund" : "personal") }}',
 
                 ATM_FEE: 33 + (33 * 0.15),
 

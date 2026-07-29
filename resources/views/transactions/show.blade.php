@@ -148,9 +148,10 @@
             </div>
 
             <!-- Action Buttons Section (Bottom of Card) -->
+            <!-- Action Buttons Section (Bottom of Card) -->
             @if(!$transaction->is_transaction_fee)
                 <div class="px-4 sm:px-6 py-4 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-700">
-                    <div class="flex flex-col sm:flex-row gap-3 justify-end">
+                    <div class="flex flex-col sm:flex-row gap-3 flex-wrap">
                         <a href="{{ route('transactions.edit', $transaction) }}"
                            class="inline-flex items-center justify-center px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -158,6 +159,27 @@
                             </svg>
                             {{ __('Edit Transaction') }}
                         </a>
+
+                        {{-- Reverse Interest Button --}}
+                        @if(in_array($transaction->category->name, ['Interest', 'Loan Interest']) && $transaction->type === 'income')
+                            <button type="button"
+                                    onclick="confirmReverseInterest()"
+                                    class="inline-flex items-center justify-center px-4 py-2.5 bg-amber-500 text-white text-sm font-medium rounded-lg hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-colors">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+                                </svg>
+                                {{ __('Reverse Interest') }}
+                            </button>
+
+                            <!-- Hidden reverse interest form -->
+                            <form id="reverse-interest-form"
+                                  action="{{ route('transactions.reverse-interest', $transaction) }}"
+                                  method="POST"
+                                  class="hidden">
+                                @csrf
+                                @method('DELETE')
+                            </form>
+                        @endif
 
                         <button type="button"
                                 onclick="confirmDelete()"
@@ -208,6 +230,18 @@
         function confirmDelete() {
             if (confirm('Are you sure you want to delete this transaction?\n\nThis action cannot be undone and will update your account balance.')) {
                 document.getElementById('delete-form').submit();
+            }
+        }
+
+        function confirmReverseInterest() {
+            if (confirm('⚠️ Reverse Interest Transaction\n\n' +
+                'This will:\n' +
+                '• Remove this interest transaction\n' +
+                '• Restore the original payment amount\n' +
+                '• Recalculate the loan\'s interest and status\n' +
+                '• Update account balances\n\n' +
+                'Are you sure you want to proceed?')) {
+                document.getElementById('reverse-interest-form').submit();
             }
         }
     </script>
