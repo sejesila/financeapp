@@ -44,6 +44,7 @@ class BudgetController extends Controller
         // Load expense categories (include loan repayments)
         $expenseCategories = Category::where('user_id', Auth::id())
             ->where('type', 'expense')
+            ->whereNotIn('name', ['Loan Disbursement', 'Loan Receipt', 'Balance Adjustment', 'Friend Loan Given', 'Loan Recovery'])
             ->orderBy('name')
             ->get();
 
