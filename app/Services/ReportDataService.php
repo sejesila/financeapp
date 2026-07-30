@@ -442,8 +442,9 @@ class ReportDataService
         $insights = $this->generateInsights($user, $transactions, $startDate, $endDate, $type);
 
         $investmentIncome = $this->getInvestmentIncome($user, $startDate, $endDate);
-        $loansGivenActivity     = $this->getLoansGivenActivityInPeriod($user, $startDate, $endDate);
-        $totalInterestIncome = (float) $investmentIncome['total'] + (float) $loansGivenActivity['interest_earned'];
+        $loansGivenActivity = $this->getLoansGivenActivityInPeriod($user, $startDate, $endDate);
+        $loanGivenInterestIncome = $this->getLoanGivenInterestIncome($user, $startDate, $endDate);
+        $totalInterestIncome = (float) $investmentIncome['total'] + $loanGivenInterestIncome;
 
         return [
             'period_type'          => $type,
@@ -477,8 +478,19 @@ class ReportDataService
             'insights'             => $insights,
             'investment_income'    => $investmentIncome,
             'total_interest_income' => $totalInterestIncome,
+            'loan_given_interest_income' => $loanGivenInterestIncome,
 
         ];
+    }
+    private function getLoanGivenInterestIncome(User $user, Carbon $startDate, Carbon $endDate): float
+    {
+        return (float) Transaction::where('user_id', $user->id)
+            ->whereBetween('date', [
+                $startDate->toDateString(),
+                $endDate->toDateString(),
+            ])
+            ->whereHas('category', fn($q) => $q->where('name', 'Loan Interest'))
+            ->sum('amount');
     }
 
     /**
@@ -846,6 +858,30 @@ class ReportDataService
         }
 
         return $results;
+    }
+    /**
+     * Public summary of interest income for an arbitrary period — savings
+     * account interest plus interest earned on closed loans given, broken
+     * out and totaled. Used by screens (e.g. Reports index) that want this
+     * figure without generating a full report via generateReport().
+     *
+     * Returns:
+     *   [
+     *       'total'                => float,
+     *       'savings_interest'     => float,
+     *       'loan_given_interest'  => float,
+     *   ]
+     */
+    public function getInterestIncomeSummary(User $user, Carbon $startDate, Carbon $endDate): array
+    {
+        $savingsInterest    = (float) $this->getInvestmentIncome($user, $startDate, $endDate)['total'];
+        $loanGivenInterest  = $this->getLoanGivenInterestIncome($user, $startDate, $endDate);
+
+        return [
+            'total'               => $savingsInterest + $loanGivenInterest,
+            'savings_interest'    => $savingsInterest,
+            'loan_given_interest' => $loanGivenInterest,
+        ];
     }
     /**
      * Calculate what a user's outstanding client funds balance was at a specific

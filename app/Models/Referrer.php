@@ -47,6 +47,7 @@ class Referrer extends Model
         return $this->loans()
             ->where('status', 'paid')
             ->whereNull('referrer_payout_id')
+            ->where('referrer_deducted_before_deposit', false)
             ->sum('interest_amount');
     }
 }

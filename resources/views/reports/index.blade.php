@@ -56,8 +56,10 @@
                                 @click="open = !open"
                                 class="w-full md:w-auto rounded-md border border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500 px-3 py-2 text-left flex justify-between items-center gap-2 bg-white">
                             <span x-text="labels[filter]"></span>
-                            <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24"
+                                 stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M19 9l-7 7-7-7"/>
                             </svg>
                         </button>
 
@@ -119,11 +121,11 @@
         </div>
 
         {{-- Summary Cards --}}
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             <x-report-card
                 title="Total Income"
                 :value="$totalIncome"
-                color="green" />
+                color="green"/>
 
             <x-report-card
                 title="Total Expenses"
@@ -140,7 +142,18 @@
                 title="Net Cash Flow"
                 :value="$netCashFlow"
                 :color="$netCashFlow >= 0 ? 'blue' : 'orange'"
-                subtitle="{{ $netCashFlow >= 0 ? 'Surplus' : 'Deficit' }}" />
+                subtitle="{{ $netCashFlow >= 0 ? 'Surplus' : 'Deficit' }}"/>
+            <x-report-card
+                title="Interest Income This Period"
+                :value="$interestIncome['total']"
+                color="green">
+                @if($interestIncome['total'] > 0)
+                    <p class="text-xs mt-1 text-gray-500">
+                        Savings: KES {{ number_format($interestIncome['savings_interest'], 0) }}
+                        &bull; Loans given: KES {{ number_format($interestIncome['loan_given_interest'], 0) }}
+                    </p>
+                @endif
+            </x-report-card>
         </div>
         {{-- Salary → Savings Rate --}}
         @if(!empty($salarySavingsRate))
@@ -238,7 +251,8 @@
 
                     <div class="space-y-2 md:space-y-3">
                         @foreach($transactionTypeStats['mpesa']['period'] as $stat)
-                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded gap-2">
+                            <div
+                                class="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded gap-2">
                                 <div class="min-w-0">
                                     <p class="font-medium text-xs md:text-sm capitalize truncate">
                                         {{ str_replace('_', ' ', $stat->type) }}
@@ -252,7 +266,8 @@
                                         KSh {{ number_format($stat->total, 0) }}
                                     </p>
                                     <p class="text-xs text-gray-500 dark:text-gray-400">
-                                        {{ round(($stat->count / $transactionTypeStats['mpesa']['period']->sum('count')) * 100, 1) }}%
+                                        {{ round(($stat->count / $transactionTypeStats['mpesa']['period']->sum('count')) * 100, 1) }}
+                                        %
                                     </p>
                                 </div>
                             </div>
@@ -267,7 +282,8 @@
                             <div class="space-y-1 md:space-y-2">
                                 @foreach($transactionTypeStats['mpesa']['frequency'] as $freq)
                                     <div class="flex justify-between items-center text-xs gap-2">
-                                        <span class="capitalize truncate">{{ str_replace('_', ' ', $freq->transaction_type) }}</span>
+                                        <span
+                                            class="capitalize truncate">{{ str_replace('_', ' ', $freq->transaction_type) }}</span>
                                         <span class="font-medium whitespace-nowrap">{{ $freq->usage_count }} uses</span>
                                     </div>
                                 @endforeach
@@ -286,7 +302,8 @@
 
                     <div class="space-y-2 md:space-y-3">
                         @foreach($transactionTypeStats['airtel_money']['period'] as $stat)
-                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded gap-2">
+                            <div
+                                class="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded gap-2">
                                 <div class="min-w-0">
                                     <p class="font-medium text-xs md:text-sm capitalize truncate">
                                         {{ str_replace('_', ' ', $stat->type) }}
@@ -300,7 +317,8 @@
                                         KSh {{ number_format($stat->total, 0) }}
                                     </p>
                                     <p class="text-xs text-gray-500 dark:text-gray-400">
-                                        {{ round(($stat->count / $transactionTypeStats['airtel_money']['period']->sum('count')) * 100, 1) }}%
+                                        {{ round(($stat->count / $transactionTypeStats['airtel_money']['period']->sum('count')) * 100, 1) }}
+                                        %
                                     </p>
                                 </div>
                             </div>
@@ -315,7 +333,8 @@
                             <div class="space-y-1 md:space-y-2">
                                 @foreach($transactionTypeStats['airtel_money']['frequency'] as $freq)
                                     <div class="flex justify-between items-center text-xs gap-2">
-                                        <span class="capitalize truncate">{{ str_replace('_', ' ', $freq->transaction_type) }}</span>
+                                        <span
+                                            class="capitalize truncate">{{ str_replace('_', ' ', $freq->transaction_type) }}</span>
                                         <span class="font-medium whitespace-nowrap">{{ $freq->usage_count }} uses</span>
                                     </div>
                                 @endforeach
@@ -349,8 +368,8 @@
                 datasets: [{
                     data: @json($expensesByCategory->pluck('total')),
                     backgroundColor: [
-                        '#3B82F6','#EF4444','#10B981','#F59E0B','#8B5CF6',
-                        '#EC4899','#14B8A6','#F97316','#6366F1','#84CC16'
+                        '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
+                        '#EC4899', '#14B8A6', '#F97316', '#6366F1', '#84CC16'
                     ]
                 }]
             },
@@ -360,7 +379,7 @@
                 plugins: {
                     legend: {
                         position: window.innerWidth < 768 ? 'bottom' : 'right',
-                        labels: { font: { size: window.innerWidth < 768 ? 10 : 12 } }
+                        labels: {font: {size: window.innerWidth < 768 ? 10 : 12}}
                     }
                 }
             }
@@ -386,10 +405,10 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: true,
-                plugins: { legend: { display: false } },
-                scales: { y: { beginAtZero: true } }
+                plugins: {legend: {display: false}},
+                scales: {y: {beginAtZero: true}}
             }
         });
     </script>
-    <x-floating-action-button :quickAccount="$accounts->first()" />
+    <x-floating-action-button :quickAccount="$accounts->first()"/>
 </x-app-layout>

@@ -22,17 +22,30 @@ class ReferrerPayoutController extends Controller
         $unpaidLoans = $referrer->loans()
             ->where('status', 'paid')
             ->whereNull('referrer_payout_id')
+            ->where('referrer_deducted_before_deposit', false)
             ->orderBy('repaid_date')
             ->get();
 
+        // Per-loan cut, not a flat rate — each loan may carry its own
+        // referrer_share_percentage (it can be overridden per-loan at
+        // creation time in LoanGivenController@store), so the payout must
+        // respect what was actually promised on each individual loan.
+        $unpaidLoans = $unpaidLoans->map(function ($loan) use ($referrer) {
+            $sharePct = $loan->referrer_share_percentage ?? $referrer->default_share_percentage;
+            $loan->computed_share_percentage = $sharePct;
+            $loan->computed_cut = round($loan->interest_amount * ($sharePct / 100), 2);
+            return $loan;
+        });
+
         $totalInterest = $unpaidLoans->sum('interest_amount');
+        $totalCut = $unpaidLoans->sum('computed_cut');
 
         $accounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
 
-        return view('referrer-payouts.create', compact('referrer', 'unpaidLoans', 'totalInterest', 'accounts'));
+        return view('referrer-payouts.create', compact('referrer', 'unpaidLoans', 'totalInterest', 'totalCut', 'accounts'));
     }
 
     public function store(Request $request, Referrer $referrer)
@@ -40,11 +53,10 @@ class ReferrerPayoutController extends Controller
         $this->authorize('view', $referrer);
 
         $validated = $request->validate([
-            'period_start'      => 'required|date',
-            'period_end'        => 'required|date|after_or_equal:period_start',
-            'share_percentage'  => 'required|numeric|min:0|max:100',
-            'account_id'        => 'required|exists:accounts,id',
-            'paid_date'         => 'required|date',
+            'period_start' => 'required|date',
+            'period_end' => 'required|date|after_or_equal:period_start',
+            'account_id' => 'required|exists:accounts,id',
+            'paid_date' => 'required|date',
         ]);
 
         $account = Account::where('user_id', Auth::id())->findOrFail($validated['account_id']);
@@ -52,6 +64,7 @@ class ReferrerPayoutController extends Controller
         $loans = $referrer->loans()
             ->where('status', 'paid')
             ->whereNull('referrer_payout_id')
+            ->where('referrer_deducted_before_deposit', false)
             ->whereBetween('repaid_date', [$validated['period_start'], $validated['period_end']])
             ->get();
 
@@ -60,7 +73,20 @@ class ReferrerPayoutController extends Controller
         }
 
         $totalInterest = $loans->sum('interest_amount');
-        $amountPaid    = round($totalInterest * ($validated['share_percentage'] / 100), 2);
+        // Sum each loan's own cut rather than applying one blended rate —
+        // see create() for why this must be per-loan.
+        $amountPaid = $loans->sum(function ($loan) use ($referrer) {
+            $sharePct = $loan->referrer_share_percentage ?? $referrer->default_share_percentage;
+            return round($loan->interest_amount * ($sharePct / 100), 2);
+        });
+
+        // Stored on the payout record as a derived, informational figure —
+        // "what this batch worked out to, blended" — not used in any
+        // calculation. Guards div-by-zero if every matched loan somehow
+        // has zero interest.
+        $effectiveSharePercentage = $totalInterest > 0
+            ? round(($amountPaid / $totalInterest) * 100, 2)
+            : 0;
 
         if ($amountPaid <= 0) {
             return back()->with('error', 'Computed payout amount is zero — nothing to pay.');
@@ -81,29 +107,29 @@ class ReferrerPayoutController extends Controller
             ]);
 
             $transaction = Transaction::create([
-                'user_id'     => Auth::id(),
-                'account_id'  => $account->id,
+                'user_id' => Auth::id(),
+                'account_id' => $account->id,
                 'category_id' => $commissionCategory->id,
-                'type'        => 'expense',
+                'type' => 'expense',
                 'description' => "Referrer commission to {$referrer->name} ({$validated['period_start']} to {$validated['period_end']})",
-                'amount'      => $amountPaid,
-                'date'        => $validated['paid_date'],
+                'amount' => $amountPaid,
+                'date' => $validated['paid_date'],
             ]);
 
             $payout = ReferrerPayout::create([
-                'user_id'          => Auth::id(),
-                'referrer_id'      => $referrer->id,
-                'period_start'     => $validated['period_start'],
-                'period_end'       => $validated['period_end'],
-                'total_interest'   => $totalInterest,
-                'share_percentage' => $validated['share_percentage'],
-                'amount_paid'      => $amountPaid,
-                'account_id'       => $account->id,
-                'transaction_id'   => $transaction->id,
-                'paid_date'        => $validated['paid_date'],
+                'user_id' => Auth::id(),
+                'referrer_id' => $referrer->id,
+                'period_start' => $validated['period_start'],
+                'period_end' => $validated['period_end'],
+                'total_interest' => $totalInterest,
+                'share_percentage' => $effectiveSharePercentage,
+                'amount_paid' => $amountPaid,
+                'account_id' => $account->id,
+                'transaction_id' => $transaction->id,
+                'paid_date' => $validated['paid_date'],
             ]);
 
-           // $loans()->each(fn () => null); // n/a — kept for clarity, see line below
+            // $loans()->each(fn () => null); // n/a — kept for clarity, see line below
             $loans->each(function ($loan) use ($payout) {
                 $loan->referrer_payout_id = $payout->id;
                 $loan->save();
@@ -120,5 +146,11 @@ class ReferrerPayoutController extends Controller
             Log::error('ReferrerPayoutController@store failed', ['referrer_id' => $referrer->id, 'error' => $e->getMessage()]);
             return back()->with('error', 'Payout failed: ' . $e->getMessage());
         }
+    }
+    public function show(Referrer $referrer)
+    {
+        $this->authorize('view', $referrer);
+
+        return view('referrers.show', compact('referrer'));
     }
 }

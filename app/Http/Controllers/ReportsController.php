@@ -35,6 +35,7 @@ class ReportsController extends Controller
     private const NON_INCOME_ONLY_CATEGORY_NAMES = [
         'Friend Loan Given',
         'Loan Recovery',
+        'Loan Interest',
     ];
 
     public function index(Request $request)
@@ -144,6 +145,9 @@ class ReportsController extends Controller
         $salarySavingsRate = $reportDataService->getSalarySavingsRate(
             auth()->user(), $startDate, $endDate
         );
+        $interestIncome = $reportDataService->getInterestIncomeSummary(
+                        auth()->user(), $startDate, $endDate
+                    );
 
         return view('reports.index', compact(
             'filter',
@@ -159,7 +163,8 @@ class ReportsController extends Controller
             'expenseChange',
             'transactionTypeStats',
             'accounts',
-            'salarySavingsRate'
+            'salarySavingsRate',
+            'interestIncome'
         ));
     }
 

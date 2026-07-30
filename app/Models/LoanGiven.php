@@ -32,6 +32,8 @@ class LoanGiven extends Model
         'referrer_id',
         'referrer_share_percentage',
         'referrer_payout_id',
+        'referrer_deducted_before_deposit',
+        'referrer_retained_amount',
     ];
 
     protected $casts = [
@@ -44,6 +46,8 @@ class LoanGiven extends Model
         'due_date'         => 'date',
         'repaid_date'      => 'date',
         'referrer_share_percentage' => 'decimal:2',
+        'referrer_deducted_before_deposit' => 'boolean',
+        'referrer_retained_amount' => 'decimal:2',
     ];
 
     protected static function booted()

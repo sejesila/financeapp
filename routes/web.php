@@ -14,6 +14,7 @@ use App\Http\Controllers\{AccountController,
     LoanGivenController,
     MpesaSmsController,
     ProfileController,
+    ReferrerPayoutController,
     ReportsController,
     StatementController,
     TransactionController};
@@ -157,6 +158,12 @@ Route::middleware('auth')->group(function () {
         Route::put('/{loanGiven}/status', [LoanGivenController::class, 'markStatus'])->name('status');
         Route::delete('/{loanGiven}', [LoanGivenController::class, 'destroy'])->name('destroy');
     });
+    Route::get('referrers/{referrer}/payouts/create', [ReferrerPayoutController::class, 'create'])
+        ->name('referrer-payouts.create');
+        Route::post('referrers/{referrer}/payouts', [ReferrerPayoutController::class, 'store'])
+        ->name('referrer-payouts.store');
+    Route::get('referrers/{referrer}', [ReferrerPayoutController::class, 'show'])
+        ->name('referrers.show');
 
     // ======================================================================
     // Client Funds Management

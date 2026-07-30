@@ -20,7 +20,7 @@ class ReferrerPolicy
 
     public function view(User $user, Referrer $referrer): bool
     {
-        return $referrer->is_active === true;
+        return true;
     }
 
     public function create(User $user): bool

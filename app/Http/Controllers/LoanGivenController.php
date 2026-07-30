@@ -15,11 +15,11 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Throwable;
-use Illuminate\Support\Facades\Cache;
 
 class LoanGivenController extends Controller implements HasMiddleware
 {
@@ -37,10 +37,10 @@ class LoanGivenController extends Controller implements HasMiddleware
         try {
             $this->authorize('viewAny', LoanGiven::class);
 
-            $filter    = $request->get('filter', 'active');
-            $period    = $request->get('period');
+            $filter = $request->get('filter', 'active');
+            $period = $request->get('period');
             $startDate = $request->get('start_date');
-            $endDate   = $request->get('end_date');
+            $endDate = $request->get('end_date');
 
             $minYear = LoanGiven::where('user_id', Auth::id())->min(DB::raw('YEAR(disbursed_date)')) ?? date('Y');
             $maxYear = date('Y');
@@ -59,27 +59,27 @@ class LoanGivenController extends Controller implements HasMiddleware
                 match ($period) {
                     'this_month' => $paidLoansQuery->whereMonth('repaid_date', now()->month)->whereYear('repaid_date', now()->year),
                     'last_month' => $paidLoansQuery->whereMonth('repaid_date', now()->subMonth()->month)->whereYear('repaid_date', now()->subMonth()->year),
-                    'this_year'  => $paidLoansQuery->whereYear('repaid_date', now()->year),
-                    'last_year'  => $paidLoansQuery->whereYear('repaid_date', now()->year - 1),
-                    'custom'     => $startDate && $endDate
+                    'this_year' => $paidLoansQuery->whereYear('repaid_date', now()->year),
+                    'last_year' => $paidLoansQuery->whereYear('repaid_date', now()->year - 1),
+                    'custom' => $startDate && $endDate
                         ? $paidLoansQuery->whereBetween('repaid_date', [$startDate, $endDate])
                         : null,
-                    default      => null,
+                    default => null,
                 };
             }
 
             $paidLoans = $paidLoansQuery->orderBy('repaid_date', 'desc')->orderBy('updated_at', 'desc')->paginate(15)->withQueryString();
 
             // Stats (computed off actual rows, not accessors that assume upfront interest)
-            $allLoans              = LoanGiven::where('user_id', Auth::id())->get();
-            $paidLoansCollection   = $allLoans->where('status', 'paid');
+            $allLoans = LoanGiven::where('user_id', Auth::id())->get();
+            $paidLoansCollection = $allLoans->where('status', 'paid');
 
             $totalPrincipal = $allLoans->sum('principal_amount');
-            $totalRepaid    = $paidLoansCollection->sum('amount_paid');
-            $totalInterest  = $paidLoansCollection->sum('interest_amount');
+            $totalRepaid = $paidLoansCollection->sum('amount_paid');
+            $totalInterest = $paidLoansCollection->sum('interest_amount');
 
-            $loansWithInterest = $paidLoansCollection->filter(fn ($loan) => $loan->interest_amount > 0);
-            $avgInterestRate   = $loansWithInterest->isNotEmpty()
+            $loansWithInterest = $paidLoansCollection->filter(fn($loan) => $loan->interest_amount > 0);
+            $avgInterestRate = $loansWithInterest->isNotEmpty()
                 ? $loansWithInterest->avg('interest_rate')
                 : 0;
 
@@ -141,15 +141,15 @@ class LoanGivenController extends Controller implements HasMiddleware
             $this->authorize('create', LoanGiven::class);
 
             $validated = $request->validate([
-                'borrower_name'    => 'required|string|max:255',
+                'borrower_name' => 'required|string|max:255',
                 'borrower_contact' => 'nullable|string|max:255',
-                'account_id'       => 'required|exists:accounts,id',
+                'account_id' => 'required|exists:accounts,id',
                 'principal_amount' => 'required|numeric|min:1',
-                'disbursed_date'   => 'required|date',
-                'due_date'         => 'nullable|date|after:disbursed_date',
-                'notes'            => 'nullable|string',
-                'referrer_id'                => 'nullable|exists:referrers,id',
-                'referrer_share_percentage'  => 'nullable|numeric|min:0|max:100',
+                'disbursed_date' => 'required|date',
+                'due_date' => 'nullable|date|after:disbursed_date',
+                'notes' => 'nullable|string',
+                'referrer_id' => 'nullable|exists:referrers,id',
+                'referrer_share_percentage' => 'nullable|numeric|min:0|max:100',
             ]);
 
             $referrerSharePercentage = null;
@@ -173,37 +173,37 @@ class LoanGivenController extends Controller implements HasMiddleware
             DB::beginTransaction();
 
             try {
-                $principalAmount = (float) $validated['principal_amount'];
-                $disbursedDate   = Carbon::parse($validated['disbursed_date']);
-                $dueDate         = ($validated['due_date'] ?? null)
+                $principalAmount = (float)$validated['principal_amount'];
+                $disbursedDate = Carbon::parse($validated['disbursed_date']);
+                $dueDate = ($validated['due_date'] ?? null)
                     ? Carbon::parse($validated['due_date'])
                     : $disbursedDate->copy()->addDays(30);
 
                 $loan = LoanGiven::create([
-                    'user_id'          => Auth::id(),
-                    'account_id'       => $validated['account_id'],
-                    'borrower_name'    => $validated['borrower_name'],
+                    'user_id' => Auth::id(),
+                    'account_id' => $validated['account_id'],
+                    'borrower_name' => $validated['borrower_name'],
                     'borrower_contact' => $validated['borrower_contact'] ?? null,
                     'principal_amount' => $principalAmount,
-                    'balance'          => $principalAmount,
-                    'disbursed_date'   => $disbursedDate,
-                    'due_date'         => $dueDate,
-                    'status'           => 'active',
-                    'notes'            => $validated['notes'] ?? null,
-                    'referrer_id'               => $validated['referrer_id'] ?? null,
+                    'balance' => $principalAmount,
+                    'disbursed_date' => $disbursedDate,
+                    'due_date' => $dueDate,
+                    'status' => 'active',
+                    'notes' => $validated['notes'] ?? null,
+                    'referrer_id' => $validated['referrer_id'] ?? null,
                     'referrer_share_percentage' => $referrerSharePercentage,
                 ]);
 
                 $loanCategory = $this->firstOrCreateCategory('Friend Loan Given', 'expense');
 
                 $transaction = Transaction::create([
-                    'user_id'     => Auth::id(),
-                    'account_id'  => $validated['account_id'],
+                    'user_id' => Auth::id(),
+                    'account_id' => $validated['account_id'],
                     'category_id' => $loanCategory->id,
-                    'type'        => 'expense',
+                    'type' => 'expense',
                     'description' => "Loan disbursed to {$validated['borrower_name']}",
-                    'amount'      => $principalAmount,
-                    'date'        => $disbursedDate,
+                    'amount' => $principalAmount,
+                    'date' => $disbursedDate,
                 ]);
 
                 // Direct link so destroy() never has to guess which transaction to remove.
@@ -257,12 +257,12 @@ class LoanGivenController extends Controller implements HasMiddleware
             // pin it down explicitly: always request the absolute (unsigned) day count,
             // cast to int to drop any fractional part, then apply sign ourselves based
             // on isPast()/isFuture() — which are unambiguous regardless of Carbon version.
-            $daysElapsed = (int) $today->diffInDays($loanGiven->disbursed_date->copy()->startOfDay(), true);
+            $daysElapsed = (int)$today->diffInDays($loanGiven->disbursed_date->copy()->startOfDay(), true);
 
             $daysRemaining = null;
             if ($loanGiven->due_date) {
                 $dueDate = $loanGiven->due_date->copy()->startOfDay();
-                $diff    = (int) $today->diffInDays($dueDate, true);
+                $diff = (int)$today->diffInDays($dueDate, true);
                 $daysRemaining = $dueDate->isPast() ? -$diff : ($dueDate->isToday() ? 0 : $diff);
             }
 
@@ -282,11 +282,12 @@ class LoanGivenController extends Controller implements HasMiddleware
             // Referrer's cut is only meaningful once there's an actual interest
             // amount to split — before that (active loan) we just show the %.
             $referrerPayout = null;
-            if ($loanGiven->referrer_id && $loanGiven->referrer_share_percentage !== null && $loanGiven->interest_amount > 0) {
+            if ($loanGiven->referrer_id && $loanGiven->referrer_share_percentage !== null
+                && $loanGiven->interest_amount > 0 && !$loanGiven->referrer_deducted_before_deposit) {
                 $referrerPayout = round($loanGiven->interest_amount * ($loanGiven->referrer_share_percentage / 100), 2);
             }
 
-            return view('loans-given.show', compact('loanGiven', 'daysElapsed', 'daysRemaining', 'isOverdue', 'referrerPayout','closingLandsInFloat', 'interestDestinationAccounts'));
+            return view('loans-given.show', compact('loanGiven', 'daysElapsed', 'daysRemaining', 'isOverdue', 'referrerPayout', 'closingLandsInFloat', 'interestDestinationAccounts'));
 
         } catch (ValidationException|AuthorizationException $e) {
             throw $e;
@@ -337,19 +338,20 @@ class LoanGivenController extends Controller implements HasMiddleware
             }
 
             $validated = $request->validate([
-                'payment_account_id'  => 'required|exists:accounts,id',
-                'payment_amount'      => 'required|numeric|min:0.01',
-                'payment_date'        => 'required|date|before_or_equal:today',
-                'notes'               => 'nullable|string',
-                'close_loan'          => 'nullable|in:1',
+                'payment_account_id' => 'required|exists:accounts,id',
+                'payment_amount' => 'required|numeric|min:0.01',
+                'payment_date' => 'required|date|before_or_equal:today',
+                'notes' => 'nullable|string',
+                'close_loan' => 'nullable|in:1',
                 'interest_account_id' => 'nullable|exists:accounts,id',
+                'referrer_deducted_before_deposit' => 'nullable|in:1',
             ]);
 
             DB::beginTransaction();
 
             try {
-                $paymentAmount  = (float) $validated['payment_amount'];
-                $paymentDate    = $validated['payment_date'];
+                $paymentAmount = (float)$validated['payment_amount'];
+                $paymentDate = $validated['payment_date'];
                 $paymentAccount = Account::findOrFail($validated['payment_account_id']);
 
                 if ($paymentAccount->user_id !== Auth::id()) {
@@ -368,29 +370,29 @@ class LoanGivenController extends Controller implements HasMiddleware
                 // returning, not new income. Only the interest portion, split out below
                 // if the loan closes, is real profit.)
                 $transaction = Transaction::create([
-                    'user_id'     => Auth::id(),
-                    'account_id'  => $paymentAccount->id,
+                    'user_id' => Auth::id(),
+                    'account_id' => $paymentAccount->id,
                     'category_id' => $repaymentCategory->id,
-                    'type'        => 'income',
+                    'type' => 'income',
                     'description' => "Loan repayment from {$loanGiven->borrower_name}",
-                    'amount'      => $paymentAmount,
-                    'date'        => $paymentDate,
+                    'amount' => $paymentAmount,
+                    'date' => $paymentDate,
                 ]);
 
                 LoanGivenPayment::create([
-                    'user_id'        => Auth::id(),
-                    'loan_given_id'  => $loanGiven->id,
-                    'account_id'     => $paymentAccount->id,
-                    'amount'         => $paymentAmount,
-                    'payment_date'   => $paymentDate,
+                    'user_id' => Auth::id(),
+                    'loan_given_id' => $loanGiven->id,
+                    'account_id' => $paymentAccount->id,
+                    'amount' => $paymentAmount,
+                    'payment_date' => $paymentDate,
                     'transaction_id' => $transaction->id,
-                    'notes'          => $validated['notes'] ?? null,
+                    'notes' => $validated['notes'] ?? null,
                 ]);
 
                 // Just accumulate — no principal/interest split, since the split isn't
                 // knowable until the loan is closed out below.
                 $loanGiven->amount_paid += $paymentAmount;
-                $loanGiven->balance      = max(0, $loanGiven->principal_amount - $loanGiven->amount_paid);
+                $loanGiven->balance = max(0, $loanGiven->principal_amount - $loanGiven->amount_paid);
                 $loanGiven->save();
 
                 $closedNow = false;
@@ -417,6 +419,7 @@ class LoanGivenController extends Controller implements HasMiddleware
 
                     $loanGiven->closeAsRepaid($paymentDate);
                     $affectedAccountIds = $this->splitInterestOutOfFinalPayment($loanGiven, $interestAccount);
+                    $this->applyReferrerDeduction($loanGiven, ($validated['referrer_deducted_before_deposit'] ?? null) === '1');
                     $closedNow = true;
                 }
 
@@ -438,8 +441,12 @@ class LoanGivenController extends Controller implements HasMiddleware
                             . " (" . number_format($loanGiven->interest_rate, 1) . "%).";
 
                         if ($loanGiven->referrer_id && $loanGiven->referrer_share_percentage !== null) {
-                            $referrerPayout = round($loanGiven->interest_amount * ($loanGiven->referrer_share_percentage / 100), 2);
-                            $successMessage .= " Referrer's cut (" . number_format($loanGiven->referrer_share_percentage, 1) . "%): KES " . number_format($referrerPayout, 0) . ".";
+                            if ($loanGiven->referrer_deducted_before_deposit) {
+                                $successMessage .= " Referrer already kept KES " . number_format($loanGiven->referrer_retained_amount, 0) . " before depositing — nothing further owed.";
+                            } else {
+                                $referrerPayout = round($loanGiven->interest_amount * ($loanGiven->referrer_share_percentage / 100), 2);
+                                $successMessage .= " Referrer's cut (" . number_format($loanGiven->referrer_share_percentage, 1) . "%): KES " . number_format($referrerPayout, 0) . ".";
+                            }
                         }
                     } else {
                         $successMessage .= " No interest was received above principal.";
@@ -458,9 +465,9 @@ class LoanGivenController extends Controller implements HasMiddleware
         } catch (Throwable $e) {
             Log::error('LoanGivenController@recordPayment failed', [
                 'loan_given_id' => $loanGiven->id,
-                'user_id'       => Auth::id(),
-                'error'         => $e->getMessage(),
-                'trace'         => $e->getTraceAsString(),
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return back()->with('error', 'Payment failed: ' . $e->getMessage())->withInput();
@@ -512,6 +519,7 @@ class LoanGivenController extends Controller implements HasMiddleware
             try {
                 $loanGiven->closeAsRepaid();
                 $affectedAccountIds = $this->splitInterestOutOfFinalPayment($loanGiven, $interestAccount);
+                $this->applyReferrerDeduction($loanGiven, $request->boolean('referrer_deducted_before_deposit'));
 
                 DB::commit();
 
@@ -544,7 +552,7 @@ class LoanGivenController extends Controller implements HasMiddleware
         } catch (Throwable $e) {
             Log::error('LoanGivenController@close failed', [
                 'loan_given_id' => $loanGiven->id,
-                'error'         => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
 
             return back()->with('error', 'Failed to close loan: ' . $e->getMessage());
@@ -662,17 +670,17 @@ class LoanGivenController extends Controller implements HasMiddleware
         }
 
         return Category::create([
-            'user_id'   => Auth::id(),
+            'user_id' => Auth::id(),
             'parent_id' => null,
-            'name'      => $name,
-            'type'      => $type,
+            'name' => $name,
+            'type' => $type,
             'is_active' => true,
         ]);
     }
 
     private function splitInterestOutOfFinalPayment(LoanGiven $loanGiven, ?Account $interestAccount = null): array
     {
-        $interestAmount = (float) $loanGiven->interest_amount;
+        $interestAmount = (float)$loanGiven->interest_amount;
 
         if ($interestAmount <= 0) {
             return [];
@@ -695,8 +703,8 @@ class LoanGivenController extends Controller implements HasMiddleware
 
         $affectedAccountIds = [$lastPayment->account_id];
 
-        $interestAmount = min($interestAmount, (float) $transaction->amount);
-        $remainder      = round($transaction->amount - $interestAmount, 2);
+        $interestAmount = min($interestAmount, (float)$transaction->amount);
+        $remainder = round($transaction->amount - $interestAmount, 2);
 
         if ($remainder <= 0) {
             $transaction->delete();
@@ -710,22 +718,45 @@ class LoanGivenController extends Controller implements HasMiddleware
         $destinationAccountId = $interestAccount->id ?? $lastPayment->account_id;
 
         Transaction::create([
-            'user_id'     => Auth::id(),
-            'account_id'  => $destinationAccountId,
+            'user_id' => Auth::id(),
+            'account_id' => $destinationAccountId,
             'category_id' => $interestCategory->id,
-            'type'        => 'income',
+            'type' => 'income',
             'description' => "Interest earned from {$loanGiven->borrower_name}'s loan"
                 . ($interestAccount ? " (routed out of {$lastPayment->account->name})" : ''),
-            'amount'      => $interestAmount,
-            'date'        => $lastPayment->payment_date,
+            'amount' => $interestAmount,
+            'date' => $lastPayment->payment_date,
         ]);
 
         $affectedAccountIds[] = $destinationAccountId;
 
         return array_unique($affectedAccountIds);
     }
-    // ── reverse interest transaction ──────────────────────────────────────────────
 
+    private function applyReferrerDeduction(LoanGiven $loanGiven, bool $deductedBeforeDeposit): void
+    {
+        if (!$deductedBeforeDeposit || !$loanGiven->referrer_id || $loanGiven->referrer_share_percentage === null) {
+            return;
+        }
+
+        $share = (float)$loanGiven->referrer_share_percentage;
+
+        if ($share <= 0 || $share >= 100) {
+            return;
+        }
+
+        $interest = (float)$loanGiven->interest_amount;
+
+        if ($interest <= 0) {
+            return;
+        }
+
+        $retained = round($interest * ($share / (100 - $share)), 2);
+
+        $loanGiven->referrer_deducted_before_deposit = true;
+        $loanGiven->referrer_retained_amount = $retained;
+        $loanGiven->save();
+    }
 
 // ── reverse interest transaction ──────────────────────────────────────────────
     public function reverseInterest(Transaction $transaction)
@@ -785,6 +816,13 @@ class LoanGivenController extends Controller implements HasMiddleware
                     . 'If the payout itself needs correcting, that has to be handled first.'
                 );
             }
+            if ($loanGiven->referrer_deducted_before_deposit) {
+                return back()->with('error',
+                    'The referrer already deducted and kept their share (KES '
+                    . number_format($loanGiven->referrer_retained_amount, 0) . ') on this loan before depositing. '
+                    . 'Reversing the interest here wouldn\'t get that money back — it can no longer be reversed.'
+                );
+            }
 
             $this->authorize('view', $loanGiven);
 
@@ -816,14 +854,14 @@ class LoanGivenController extends Controller implements HasMiddleware
                     throw new Exception('Original payment transaction not found.');
                 }
 
-                $interestAmount = (float) $transaction->amount;
+                $interestAmount = (float)$transaction->amount;
 
                 if ($originalTransaction->trashed()) {
                     // The whole payment was interest — restore it at its full amount.
                     $originalTransaction->restore();
                     $originalTransaction->amount = $payment->amount;
                     $originalTransaction->save();
-                } elseif ($originalTransaction->amount < (float) $payment->amount) {
+                } elseif ($originalTransaction->amount < (float)$payment->amount) {
                     // Only part of the payment was split off as interest — add it back.
                     $originalTransaction->amount += $interestAmount;
                     $originalTransaction->save();
@@ -836,7 +874,7 @@ class LoanGivenController extends Controller implements HasMiddleware
                 // it reverts to being an unallocated part of amount_paid, so pull it
                 // back out and recompute everything from that.
                 $loanGiven->amount_paid = max(0, $loanGiven->amount_paid - $interestAmount);
-                $loanGiven->balance     = max(0, $loanGiven->principal_amount - $loanGiven->amount_paid);
+                $loanGiven->balance = max(0, $loanGiven->principal_amount - $loanGiven->amount_paid);
                 $loanGiven->interest_amount = max(0, $loanGiven->amount_paid - $loanGiven->principal_amount);
 
                 $loanGiven->interest_rate = ($loanGiven->principal_amount > 0 && $loanGiven->interest_amount > 0)

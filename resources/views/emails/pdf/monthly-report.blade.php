@@ -4,48 +4,238 @@
     <meta charset="utf-8">
     <title>Monthly Financial Report</title>
     <style>
-        @page { margin: 15mm 20mm 20mm 20mm; size: A4 portrait; }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; font-size: 11px; line-height: 1.5; color: #333; background: white; }
+        @page {
+            margin: 15mm 20mm 20mm 20mm;
+            size: A4 portrait;
+        }
 
-        .watermark { position: absolute; top: 280px; left: 40px; transform: rotate(-45deg); font-size: 80px; color: rgba(139, 92, 246, 0.06); z-index: 0; font-weight: bold; pointer-events: none; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-        .header { text-align: center; padding: 16px 0; margin-bottom: 14px; background: #6366F1; color: white; border-radius: 8px; page-break-after: avoid; }
-        .header h1 { font-size: 20px; letter-spacing: 1px; font-weight: bold; }
-        .header .period { font-size: 11px; margin-top: 4px; opacity: 0.95; }
-        .header .user-info { font-size: 11px; margin-top: 6px; font-weight: 600; }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11px;
+            line-height: 1.5;
+            color: #333;
+            background: white;
+        }
 
-        .net-worth-banner { background: #6366F1; color: white; padding: 14px; text-align: center; margin: 14px 0; border-radius: 8px; page-break-after: avoid; }
-        .net-worth-banner h3 { margin: 0 0 6px 0; font-size: 10px; opacity: 0.95; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; }
-        .net-worth-banner .amount { font-size: 22px; font-weight: bold; margin-bottom: 4px; }
-        .net-worth-banner .breakdown { font-size: 9px; opacity: 0.9; margin-top: 4px; }
+        .watermark {
+            position: absolute;
+            top: 280px;
+            left: 40px;
+            transform: rotate(-45deg);
+            font-size: 80px;
+            color: rgba(139, 92, 246, 0.06);
+            z-index: 0;
+            font-weight: bold;
+            pointer-events: none;
+        }
 
-        .section { margin: 14px 0; page-break-inside: avoid; }
-        .section-title { font-size: 12px; font-weight: bold; color: #1F2937; margin-bottom: 8px; padding: 6px 10px; background: #F9FAFB; border-left: 4px solid #8B5CF6; border-radius: 4px; page-break-after: avoid; }
+        .header {
+            text-align: center;
+            padding: 16px 0;
+            margin-bottom: 14px;
+            background: #6366F1;
+            color: white;
+            border-radius: 8px;
+            page-break-after: avoid;
+        }
 
-        table { width: 100%; border-collapse: collapse; margin: 8px 0; background: white; }
-        table th { background: #F3F4F6; padding: 7px 8px; text-align: left; font-size: 8px; color: #4B5563; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; border-bottom: 2px solid #E5E7EB; }
-        table td { padding: 6px 8px; border-bottom: 1px solid #F3F4F6; font-size: 10px; }
-        table tr.total-row { background: #F9FAFB; font-weight: bold; border-top: 2px solid #8B5CF6; }
+        .header h1 {
+            font-size: 20px;
+            letter-spacing: 1px;
+            font-weight: bold;
+        }
+
+        .header .period {
+            font-size: 11px;
+            margin-top: 4px;
+            opacity: 0.95;
+        }
+
+        .header .user-info {
+            font-size: 11px;
+            margin-top: 6px;
+            font-weight: 600;
+        }
+
+        .net-worth-banner {
+            background: #6366F1;
+            color: white;
+            padding: 14px;
+            text-align: center;
+            margin: 14px 0;
+            border-radius: 8px;
+            page-break-after: avoid;
+        }
+
+        .net-worth-banner h3 {
+            margin: 0 0 6px 0;
+            font-size: 10px;
+            opacity: 0.95;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: bold;
+        }
+
+        .net-worth-banner .amount {
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .net-worth-banner .breakdown {
+            font-size: 9px;
+            opacity: 0.9;
+            margin-top: 4px;
+        }
+
+        .section {
+            margin: 14px 0;
+            page-break-inside: avoid;
+        }
+
+        .section-title {
+            font-size: 12px;
+            font-weight: bold;
+            color: #1F2937;
+            margin-bottom: 8px;
+            padding: 6px 10px;
+            background: #F9FAFB;
+            border-left: 4px solid #8B5CF6;
+            border-radius: 4px;
+            page-break-after: avoid;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8px 0;
+            background: white;
+        }
+
+        table th {
+            background: #F3F4F6;
+            padding: 7px 8px;
+            text-align: left;
+            font-size: 8px;
+            color: #4B5563;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid #E5E7EB;
+        }
+
+        table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #F3F4F6;
+            font-size: 10px;
+        }
+
+        table tr.total-row {
+            background: #F9FAFB;
+            font-weight: bold;
+            border-top: 2px solid #8B5CF6;
+        }
 
         /* Dense label/value stat table — replaces card grids, stat grids, trend boxes */
-        .stat-table td { padding: 6px 10px; font-size: 10px; border-bottom: 1px solid #F3F4F6; }
-        .stat-table td.label { width: 25%; color: #6B7280; text-transform: uppercase; font-weight: 700; font-size: 8px; letter-spacing: 0.4px; }
-        .stat-table td.value { width: 25%; font-weight: bold; color: #1F2937; }
+        .stat-table td {
+            padding: 6px 10px;
+            font-size: 10px;
+            border-bottom: 1px solid #F3F4F6;
+        }
 
-        .alert { padding: 9px 12px; border-radius: 6px; margin: 10px 0; border-left: 4px solid; font-size: 10px; page-break-inside: avoid; }
-        .alert.warning { background: #FEF3C7; border-color: #F59E0B; color: #92400E; }
-        .alert.info    { background: #DBEAFE; border-color: #3B82F6; color: #1E40AF; }
-        .alert.success { background: #D1FAE5; border-color: #10B981; color: #065F46; }
+        .stat-table td.label {
+            width: 25%;
+            color: #6B7280;
+            text-transform: uppercase;
+            font-weight: 700;
+            font-size: 8px;
+            letter-spacing: 0.4px;
+        }
 
-        .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
-        .badge.success { background: #D1FAE5; color: #065F46; }
-        .badge.danger  { background: #FEE2E2; color: #991B1B; }
-        .badge.warning { background: #FEF3C7; color: #92400E; }
-        .badge.neutral { background: #F3F4F6; color: #4B5563; }
+        .stat-table td.value {
+            width: 25%;
+            font-weight: bold;
+            color: #1F2937;
+        }
 
-        .footer { margin-top: 22px; padding-top: 12px; border-top: 2px solid #E5E7EB; text-align: center; font-size: 9px; color: #6B7280; page-break-before: avoid; }
-        .footer .confidential { color: #DC2626; font-weight: bold; margin-bottom: 6px; }
+        .alert {
+            padding: 9px 12px;
+            border-radius: 6px;
+            margin: 10px 0;
+            border-left: 4px solid;
+            font-size: 10px;
+            page-break-inside: avoid;
+        }
+
+        .alert.warning {
+            background: #FEF3C7;
+            border-color: #F59E0B;
+            color: #92400E;
+        }
+
+        .alert.info {
+            background: #DBEAFE;
+            border-color: #3B82F6;
+            color: #1E40AF;
+        }
+
+        .alert.success {
+            background: #D1FAE5;
+            border-color: #10B981;
+            color: #065F46;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 8px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .badge.success {
+            background: #D1FAE5;
+            color: #065F46;
+        }
+
+        .badge.danger {
+            background: #FEE2E2;
+            color: #991B1B;
+        }
+
+        .badge.warning {
+            background: #FEF3C7;
+            color: #92400E;
+        }
+
+        .badge.neutral {
+            background: #F3F4F6;
+            color: #4B5563;
+        }
+
+        .footer {
+            margin-top: 22px;
+            padding-top: 12px;
+            border-top: 2px solid #E5E7EB;
+            text-align: center;
+            font-size: 9px;
+            color: #6B7280;
+            page-break-before: avoid;
+        }
+
+        .footer .confidential {
+            color: #DC2626;
+            font-weight: bold;
+            margin-bottom: 6px;
+        }
     </style>
 </head>
 <body>
@@ -112,9 +302,13 @@
     </tr>
     <tr>
         <td class="label">Net Cash Flow</td>
-        <td class="value" style="color: {{ $netFlow >= 0 ? '#059669' : '#DC2626' }};">{{ $netFlow >= 0 ? '+' : '' }}{{ $currency }} {{ number_format($netFlow) }}</td>
+        <td class="value"
+            style="color: {{ $netFlow >= 0 ? '#059669' : '#DC2626' }};">{{ $netFlow >= 0 ? '+' : '' }}{{ $currency }} {{ number_format($netFlow) }}</td>
         <td class="label">Surplus Rate</td>
-        <td class="value" style="color: {{ $savingsRate >= 20 ? '#059669' : ($savingsRate >= 10 ? '#D97706' : '#DC2626') }};">{{ number_format($savingsRate, 1) }}%</td>
+        <td class="value"
+            style="color: {{ $savingsRate >= 20 ? '#059669' : ($savingsRate >= 10 ? '#D97706' : '#DC2626') }};">{{ number_format($savingsRate, 1) }}
+            %
+        </td>
     </tr>
     <tr>
         <td class="label">Transactions</td>
@@ -126,13 +320,16 @@
         <td class="label">Accounts</td>
         <td class="value">{{ $data['accounts']->count() }}</td>
         <td class="label">Income vs Last Month</td>
-        <td class="value" style="color: {{ $incomeTrend === null ? '#9CA3AF' : ($incomeTrend >= 0 ? '#059669' : '#DC2626') }};">
+        <td class="value"
+            style="color: {{ $incomeTrend === null ? '#9CA3AF' : ($incomeTrend >= 0 ? '#059669' : '#DC2626') }};">
             {{ $incomeTrend !== null ? ($incomeTrend >= 0 ? '+' : '') . number_format($incomeTrend, 1) . '%' : 'No prior data' }}
         </td>
     </tr>
     <tr>
         <td class="label">Budget Adherence</td>
-        <td class="value" style="color: {{ $budgetsOver === 0 ? '#059669' : '#D97706' }};">{{ $budgetsUnder }}/{{ $budgetsTotal }} on track</td>
+        <td class="value" style="color: {{ $budgetsOver === 0 ? '#059669' : '#D97706' }};">{{ $budgetsUnder }}
+            /{{ $budgetsTotal }} on track
+        </td>
         <td class="label">Interest Income</td>
         <td class="value" style="color: #059669;">{{ $currency }} {{ number_format($totalInterestIncome) }}</td>
     </tr>
@@ -140,11 +337,17 @@
 
 <!-- Financial Health Alert -->
 @if($savingsRate >= 20)
-    <div class="alert success"><strong>&#10003; Excellent financial health</strong> &mdash; {{ number_format($savingsRate, 1) }}% surplus rate this month.</div>
+    <div class="alert success"><strong>&#10003; Excellent financial health</strong>
+        &mdash; {{ number_format($savingsRate, 1) }}% surplus rate this month.
+    </div>
 @elseif($savingsRate >= 10)
-    <div class="alert info"><strong>&#8505; Decent surplus</strong> &mdash; {{ number_format($savingsRate, 1) }}% this month. Aim for 20%+.</div>
+    <div class="alert info"><strong>&#8505; Decent surplus</strong> &mdash; {{ number_format($savingsRate, 1) }}% this
+        month. Aim for 20%+.
+    </div>
 @else
-    <div class="alert warning"><strong>&#9888; Low surplus rate</strong> &mdash; {{ number_format($savingsRate, 1) }}%, below the recommended 20%.</div>
+    <div class="alert warning"><strong>&#9888; Low surplus rate</strong> &mdash; {{ number_format($savingsRate, 1) }}%,
+        below the recommended 20%.
+    </div>
 @endif
 
 <!-- Budget Performance -->
@@ -175,7 +378,9 @@
                     <td style="text-align: right; color: {{ $budget['remaining'] >= 0 ? '#059669' : '#DC2626' }};">
                         {{ $budget['remaining'] >= 0 ? '' : '-' }}{{ $currency }} {{ number_format(abs($budget['remaining'])) }}
                     </td>
-                    <td style="text-align: right; font-weight: bold; color: {{ $pctColor }};">{{ number_format($budget['percentage'], 1) }}%</td>
+                    <td style="text-align: right; font-weight: bold; color: {{ $pctColor }};">{{ number_format($budget['percentage'], 1) }}
+                        %
+                    </td>
                 </tr>
             @endforeach
             </tbody>
@@ -216,7 +421,8 @@
                 @endphp
                 <tr>
                     <td style="font-weight: 600;">{{ $account->name }}</td>
-                    <td style="text-align: center;"><span class="badge {{ $healthClass }}">{{ $healthLabel }}</span></td>
+                    <td style="text-align: center;"><span class="badge {{ $healthClass }}">{{ $healthLabel }}</span>
+                    </td>
                     <td style="text-align: right; font-weight: bold;">{{ $currency }} {{ number_format($account->display_balance) }}</td>
                     <td style="text-align: right; color: #6B7280;">{{ number_format($pct, 1) }}%</td>
                 </tr>
@@ -245,18 +451,20 @@
             <tbody>
             @foreach($investmentIncome['accounts'] as $acct)
                 <tr>
-                    <td style="font-weight: 600;">{{ $acct['name'] }} <span style="color:#9CA3AF; font-size:8px;">(savings)</span></td>
+                    <td style="font-weight: 600;">{{ $acct['name'] }} <span style="color:#9CA3AF; font-size:8px;">(savings)</span>
+                    </td>
                     <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($acct['amount']) }}</td>
                 </tr>
             @endforeach
-                        @foreach($loansGivenActivity['items'] ?? [] as $item)
-                                @if(($item['interest'] ?? 0) > 0)
-                                        <tr>
-                                                <td style="font-weight: 600;">{{ $item['borrower'] }} <span style="color:#9CA3AF; font-size:8px;">(loan given)</span></td>
-                                                <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($item['interest']) }}</td>
-                                            </tr>
-                                    @endif
-                            @endforeach
+            @foreach($loansGivenActivity['items'] ?? [] as $item)
+                @if(($item['interest'] ?? 0) > 0)
+                    <tr>
+                        <td style="font-weight: 600;">{{ $item['borrower'] }} <span
+                                style="color:#9CA3AF; font-size:8px;">(loan given)</span></td>
+                        <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($item['interest']) }}</td>
+                    </tr>
+                @endif
+            @endforeach
             <tr class="total-row">
                 <td>Total</td>
                 <td style="text-align: right; color: #059669;">{{ $currency }} {{ number_format($totalInterestIncome) }}</td>
@@ -264,29 +472,34 @@
             </tbody>
         </table>
     </div>
-    @elseif($totalInterestIncome > 0)
-        {{-- Only loan-given interest exists this period, no savings interest --}}
-        <div class="section">
-                <div class="section-title">Interest Income</div>
-                <table>
-                        <thead>
-                        <tr><th>Source</th><th style="text-align: right;">Interest Earned</th></tr>
-                        </thead>
-                        <tbody>
-                        @foreach($loansGivenActivity['items'] ?? [] as $item)
-                                @if(($item['interest'] ?? 0) > 0)
-                                        <tr>
-                                                <td style="font-weight: 600;">{{ $item['borrower'] }} <span style="color:#9CA3AF; font-size:8px;">(loan given)</span></td>
-                                                <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($item['interest']) }}</td>
-                                            </tr>
-                                    @endif
-                            @endforeach<tr class="total-row">
-                                <td>Total</td>
-                                <td style="text-align: right; color: #059669;">{{ $currency }} {{ number_format($totalInterestIncome) }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-            </div>
+@elseif($totalInterestIncome > 0)
+    {{-- Only loan-given interest exists this period, no savings interest --}}
+    <div class="section">
+        <div class="section-title">Interest Income</div>
+        <table>
+            <thead>
+            <tr>
+                <th>Source</th>
+                <th style="text-align: right;">Interest Earned</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach($loansGivenActivity['items'] ?? [] as $item)
+                @if(($item['interest'] ?? 0) > 0)
+                    <tr>
+                        <td style="font-weight: 600;">{{ $item['borrower'] }} <span
+                                style="color:#9CA3AF; font-size:8px;">(loan given)</span></td>
+                        <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($item['interest']) }}</td>
+                    </tr>
+                @endif
+            @endforeach
+            <tr class="total-row">
+                <td>Total</td>
+                <td style="text-align: right; color: #059669;">{{ $currency }} {{ number_format($totalInterestIncome) }}</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
 @endif
 
 <!-- Top Spending Categories -->
@@ -339,7 +552,8 @@
                     <td class="label">Loans Fully Cleared</td>
                     <td class="value">{{ $loansCleared['count'] }}</td>
                     <td class="label">Principal Cleared</td>
-                    <td class="value" style="color: #059669;">{{ $currency }} {{ number_format($loansCleared['principal_total']) }}</td>
+                    <td class="value"
+                        style="color: #059669;">{{ $currency }} {{ number_format($loansCleared['principal_total']) }}</td>
                 </tr>
             @endif
         </table>
@@ -348,64 +562,65 @@
 
 <!-- Loans Given Activity -->
 @php
-        $loansGiven = $data['loans_given_activity'] ?? [
-            'disbursed_count' => 0, 'disbursed_total' => 0,
-            'repayments_count' => 0, 'repayments_total' => 0,
-            'closed_count' => 0, 'principal_recovered' => 0, 'interest_earned' => 0,
-            'items' => [],
-        ];
-        $activeLoansGiven = $data['active_loans_given'] ?? collect();
+    $loansGiven = $data['loans_given_activity'] ?? [
+        'disbursed_count' => 0, 'disbursed_total' => 0,
+        'repayments_count' => 0, 'repayments_total' => 0,
+        'closed_count' => 0, 'principal_recovered' => 0, 'interest_earned' => 0,
+        'items' => [],
+    ];
+    $activeLoansGiven = $data['active_loans_given'] ?? collect();
 
-    @endphp
+@endphp
 @if($loansGiven['disbursed_count'] > 0 || $loansGiven['repayments_count'] > 0 || $activeLoansGiven->isNotEmpty())
-        <div class="section">
-                <div class="section-title">Loans Given Activity</div>
-                <table class="stat-table">
-                        <tr>
-                                <td class="label">Disbursed</td>
-                                <td class="value">{{ $currency }} {{ number_format($loansGiven['disbursed_total']) }}</td>
-                                <td class="label">Repayments Received</td>
-                                <td class="value" style="color: #059669;">{{ $currency }} {{ number_format($loansGiven['repayments_total']) }}</td>
-                            </tr>
-                        <tr>
-                                <td class="label">Loans Closed</td>
-                                <td class="value">{{ $loansGiven['closed_count'] }}</td>
-                            <td class="label"></td>
-                            <td class="value"></td>
-                            </tr>
-                    </table>
+    <div class="section">
+        <div class="section-title">Loans Given Activity</div>
+        <table class="stat-table">
+            <tr>
+                <td class="label">Disbursed</td>
+                <td class="value">{{ $currency }} {{ number_format($loansGiven['disbursed_total']) }}</td>
+                <td class="label">Repayments Received</td>
+                <td class="value"
+                    style="color: #059669;">{{ $currency }} {{ number_format($loansGiven['repayments_total']) }}</td>
+            </tr>
+            <tr>
+                <td class="label">Loans Closed</td>
+                <td class="value">{{ $loansGiven['closed_count'] }}</td>
+                <td class="label"></td>
+                <td class="value"></td>
+            </tr>
+        </table>
 
-                @if($activeLoansGiven->isNotEmpty())
-                        <table>
-                                <thead>
-                                <tr>
-                                        <th>Borrower</th>
-                                        <th style="text-align: right;">Principal</th>
-                                        <th style="text-align: right;">Outstanding</th>
-                                        <th style="text-align: center;">Due Date</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                @foreach($activeLoansGiven as $loan)
-                                        <tr>
-                                                <td style="font-weight: 600;">{{ $loan->borrower_name }}</td>
-                                                <td style="text-align: right;">{{ $currency }} {{ number_format($loan->principal_amount) }}</td>
-                                                <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($loan->balance) }}</td>
-                                                <td style="text-align: center; color: #6B7280;">
-                                                        {{ $loan->due_date ? \Carbon\Carbon::parse($loan->due_date)->format('M j, Y') : '—' }}
-                                                    </td>
-                                            </tr>
-                                @endforeach
-                                <tr class="total-row">
-                                        <td colspan="2">Total Outstanding</td>
-                                        <td style="text-align: right; color: #059669;">{{ $currency }} {{ number_format($totalLoansGiven) }}</td>
-                                        <td></td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                    @endif
-            </div>
-    @endif
+        @if($activeLoansGiven->isNotEmpty())
+            <table>
+                <thead>
+                <tr>
+                    <th>Borrower</th>
+                    <th style="text-align: right;">Principal</th>
+                    <th style="text-align: right;">Outstanding</th>
+                    <th style="text-align: center;">Due Date</th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach($activeLoansGiven as $loan)
+                    <tr>
+                        <td style="font-weight: 600;">{{ $loan->borrower_name }}</td>
+                        <td style="text-align: right;">{{ $currency }} {{ number_format($loan->principal_amount) }}</td>
+                        <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($loan->balance) }}</td>
+                        <td style="text-align: center; color: #6B7280;">
+                            {{ $loan->due_date ? \Carbon\Carbon::parse($loan->due_date)->format('M j, Y') : '—' }}
+                        </td>
+                    </tr>
+                @endforeach
+                <tr class="total-row">
+                    <td colspan="2">Total Outstanding</td>
+                    <td style="text-align: right; color: #059669;">{{ $currency }} {{ number_format($totalLoansGiven) }}</td>
+                    <td></td>
+                </tr>
+                </tbody>
+            </table>
+        @endif
+    </div>
+@endif
 
 {{-- Salary → Savings Rate --}}
 @php
@@ -439,7 +654,8 @@
                 @php $avgPct = round(collect($salarySavings)->avg('savings_percentage'), 1); @endphp
                 <tr class="total-row">
                     <td colspan="3">Average Saved</td>
-                    <td style="text-align: right; color: {{ $avgPct >= 20 ? '#059669' : '#D97706' }};">{{ $avgPct }}%</td>
+                    <td style="text-align: right; color: {{ $avgPct >= 20 ? '#059669' : '#D97706' }};">{{ $avgPct }}%
+                    </td>
                 </tr>
             @endif
             </tbody>
@@ -485,9 +701,11 @@
 <div class="footer">
     <p class="confidential">CONFIDENTIAL FINANCIAL DOCUMENT</p>
     <p>Generated on {{ now()->format('F j, Y') }}</p>
-    <p>Report ID: MTH-{{ $startDate->format('Y-m') }}-{{ strtoupper(substr(md5($user->id . $data['start_date']), 0, 8)) }}</p>
+    <p>Report ID: MTH-{{ $startDate->format('Y-m') }}
+        -{{ strtoupper(substr(md5($user->id . $data['start_date']), 0, 8)) }}</p>
     <p style="margin-top: 6px;">&#169; {{ now()->year }} Financial Report System. All rights reserved.</p>
-    <p style="margin-top: 4px; font-size: 8px; color: #9CA3AF;">This document contains highly confidential financial information. Store securely and do not share with unauthorized parties.</p>
+    <p style="margin-top: 4px; font-size: 8px; color: #9CA3AF;">This document contains highly confidential financial
+        information. Store securely and do not share with unauthorized parties.</p>
 </div>
 
 </body>
