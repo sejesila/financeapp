@@ -391,7 +391,13 @@
 <!-- Account Balances -->
 @if($data['accounts']->isNotEmpty())
     @php
-        $adjustedAccounts = $data['accounts']->where('current_balance', '!=', 0)->map(function ($account) {
+        // Filter on the SAME field we display (balance_as_at), not current_balance —
+        // an account that's since been drained to zero today but still had money
+        // in it as of the report's end date was previously vanishing from this
+        // table entirely (filtered on current_balance) while still being counted
+        // in totals elsewhere in the report, which is the kind of mismatch that
+        // makes "the numbers don't add up" bugs like this one hard to spot.
+        $adjustedAccounts = $data['accounts']->where('balance_as_at', '!=', 0)->map(function ($account) {
 
                 return (object) [
                     'id'              => $account->id,
@@ -401,6 +407,7 @@
             });
             $adjustedTotal = $adjustedAccounts->sum('display_balance');
     @endphp
+
     <div class="section">
         <div class="section-title">Account Overview</div>
         <table>

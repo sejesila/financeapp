@@ -468,7 +468,7 @@ class ReportDataService
             'user' => $user,
             'accounts' => $accountsAsAt,
             'total_balance' => $totalBalance,
-            'savings_balance' => $savingsBalance,
+            'savings_balance' => $ownedSavings,
             'total_loans' => $totalLoanBalance,
             'total_loans_given' => $totalLoansGivenBalance,
             'total_client_funds' => $totalClientFunds,
