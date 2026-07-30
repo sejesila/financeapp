@@ -443,6 +443,7 @@ class ReportDataService
 
         $investmentIncome = $this->getInvestmentIncome($user, $startDate, $endDate);
         $loansGivenActivity     = $this->getLoansGivenActivityInPeriod($user, $startDate, $endDate);
+        $totalInterestIncome = (float) $investmentIncome['total'] + (float) $loansGivenActivity['interest_earned'];
 
         return [
             'period_type'          => $type,
@@ -475,6 +476,7 @@ class ReportDataService
             'budget_performance'   => $budgetPerformance,
             'insights'             => $insights,
             'investment_income'    => $investmentIncome,
+            'total_interest_income' => $totalInterestIncome,
 
         ];
     }

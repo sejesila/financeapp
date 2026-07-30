@@ -131,8 +131,8 @@
     <tr>
         <td class="label">Budget Adherence</td>
         <td class="value" style="color: {{ $budgetsOver === 0 ? '#059669' : '#D97706' }};">{{ $budgetsUnder }}/{{ $budgetsTotal }} on track</td>
-        <td class="label">Investment Income</td>
-        <td class="value" style="color: #059669;">{{ $currency }} {{ number_format($investmentIncome['total']) }}</td>
+        <td class="label">Interest Income</td>
+        <td class="value" style="color: #059669;">{{ $currency }} {{ number_format($totalInterestIncome) }}</td>
     </tr>
 </table>
 
@@ -185,11 +185,11 @@
 @if($data['accounts']->isNotEmpty())
     @php
         $adjustedAccounts = $data['accounts']->where('current_balance', '!=', 0)->map(function ($account) use ($netWorth) {
-            $isEtica = strtolower($account->name) === 'etica';
+
             return (object) [
                 'id'              => $account->id,
                 'name'            => $account->name,
-                'display_balance' => $isEtica ? $netWorth : $account->balance_as_at,
+                'display_balance' => $account->balance_as_at,
             ];
         });
         $adjustedTotal = $adjustedAccounts->sum('display_balance');
@@ -229,31 +229,66 @@
     </div>
 @endif
 
-<!-- Investment Income -->
++<!-- Interest Income (Savings + Loans Given) -->
+@php
+        $loansGivenActivity = $data['loans_given_activity'] ?? ['items' => []];
+        $totalInterestIncome = $data['total_interest_income'] ?? $investmentIncome['total'];
+    @endphp
 @if($investmentIncome['total'] > 0)
     <div class="section">
-        <div class="section-title">Investment Income (Savings Interest)</div>
+        <div class="section-title">Interest Income</div>
         <table>
             <thead>
             <tr>
-                <th>Savings Account</th>
+                <th>Source</th>
                 <th style="text-align: right;">Interest Earned</th>
             </tr>
             </thead>
             <tbody>
             @foreach($investmentIncome['accounts'] as $acct)
                 <tr>
-                    <td style="font-weight: 600;">{{ $acct['name'] }}</td>
+                    <td style="font-weight: 600;">{{ $acct['name'] }} <span style="color:#9CA3AF; font-size:8px;">(savings)</span></td>
                     <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($acct['amount']) }}</td>
                 </tr>
             @endforeach
+                        @foreach($loansGivenActivity['items'] ?? [] as $item)
+                                @if(($item['interest'] ?? 0) > 0)
+                                        <tr>
+                                                <td style="font-weight: 600;">{{ $item['borrower'] }} <span style="color:#9CA3AF; font-size:8px;">(loan given)</span></td>
+                                                <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($item['interest']) }}</td>
+                                            </tr>
+                                    @endif
+                            @endforeach
             <tr class="total-row">
                 <td>Total</td>
-                <td style="text-align: right; color: #059669;">{{ $currency }} {{ number_format($investmentIncome['total']) }}</td>
+                <td style="text-align: right; color: #059669;">{{ $currency }} {{ number_format($totalInterestIncome) }}</td>
             </tr>
             </tbody>
         </table>
     </div>
+    @elseif($totalInterestIncome > 0)
+        {{-- Only loan-given interest exists this period, no savings interest --}}
+        <div class="section">
+                <div class="section-title">Interest Income</div>
+                <table>
+                        <thead>
+                        <tr><th>Source</th><th style="text-align: right;">Interest Earned</th></tr>
+                        </thead>
+                        <tbody>
+                        @foreach($loansGivenActivity['items'] ?? [] as $item)
+                                @if(($item['interest'] ?? 0) > 0)
+                                        <tr>
+                                                <td style="font-weight: 600;">{{ $item['borrower'] }} <span style="color:#9CA3AF; font-size:8px;">(loan given)</span></td>
+                                                <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($item['interest']) }}</td>
+                                            </tr>
+                                    @endif
+                            @endforeach<tr class="total-row">
+                                <td>Total</td>
+                                <td style="text-align: right; color: #059669;">{{ $currency }} {{ number_format($totalInterestIncome) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+            </div>
 @endif
 
 <!-- Top Spending Categories -->
@@ -322,7 +357,7 @@
             'items' => [],
         ];
         $activeLoansGiven = $data['active_loans_given'] ?? collect();
-        $loanGivenInterest = $data['loans_given_activity']['interest_earned'] ?? 0;
+
     @endphp
 @if($loansGiven['disbursed_count'] > 0 || $loansGiven['repayments_count'] > 0 || $activeLoansGiven->isNotEmpty())
         <div class="section">
@@ -337,8 +372,8 @@
                         <tr>
                                 <td class="label">Loans Closed</td>
                                 <td class="value">{{ $loansGiven['closed_count'] }}</td>
-                                <td class="label">Interest Earned</td>
-                                <td class="value" style="color: #059669;">{{ $currency }} {{ number_format($loanGivenInterest) }}</td>
+                            <td class="label"></td>
+                            <td class="value"></td>
                             </tr>
                     </table>
 
