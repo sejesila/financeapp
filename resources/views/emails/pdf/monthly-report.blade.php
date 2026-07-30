@@ -322,7 +322,7 @@
             'items' => [],
         ];
         $activeLoansGiven = $data['active_loans_given'] ?? collect();
-        $loanGivenInterest = $data['loan_given_interest_income'] ?? 0;
+        $loanGivenInterest = $data['loans_given_activity']['interest_earned'] ?? 0;
     @endphp
 @if($loansGiven['disbursed_count'] > 0 || $loansGiven['repayments_count'] > 0 || $activeLoansGiven->isNotEmpty())
         <div class="section">

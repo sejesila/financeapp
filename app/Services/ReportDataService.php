@@ -443,7 +443,6 @@ class ReportDataService
 
         $investmentIncome = $this->getInvestmentIncome($user, $startDate, $endDate);
         $loansGivenActivity     = $this->getLoansGivenActivityInPeriod($user, $startDate, $endDate);
-        $loanGivenInterestIncome = $this->getLoanGivenInterestIncome($user, $startDate, $endDate);
 
         return [
             'period_type'          => $type,
@@ -476,7 +475,6 @@ class ReportDataService
             'budget_performance'   => $budgetPerformance,
             'insights'             => $insights,
             'investment_income'    => $investmentIncome,
-            'loan_given_interest_income' => $loanGivenInterestIncome,
 
         ];
     }
@@ -527,13 +525,6 @@ class ReportDataService
             'total'    => (float) $interestByAccount->sum(),
             'accounts' => $accounts,
         ];
-    }
-    private function getLoanGivenInterestIncome(User $user, Carbon $startDate, Carbon $endDate): float
-    {
-        return (float) Transaction::where('user_id', $user->id)
-            ->whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])
-            ->whereHas('category', fn($q) => $q->where('name', 'Loan Interest'))
-            ->sum('amount');
     }
 
     /**
