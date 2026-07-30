@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\ClientFund;
+use App\Models\LoanGiven;
+use App\Models\LoanGivenPayment;
 use App\Models\Transfer;
 use App\Models\User;
 use App\Models\Transaction;
@@ -248,6 +250,9 @@ class ReportDataService
                         'Loan Receipt',
                         'Balance Adjustment',
                         'Client Funds',
+                        'Friend Loan Given',   // disbursement — not a real expense
+                        'Loan Recovery',       // principal returning — not real income
+                        'Loan Interest',       // handled separately below, own section
                     ]);
             })
             ->with(['category', 'account'])
@@ -325,6 +330,8 @@ class ReportDataService
 
         $activeLoans      = Loan::where('user_id', $user->id)->where('status', 'active')->with('account')->get();
         $totalLoanBalance = $activeLoans->sum('balance');
+        $activeLoansGiven      = LoanGiven::where('user_id', $user->id)->where('status', 'active')->get();
+        $totalLoansGivenBalance = $activeLoansGiven->sum('balance');
 
         // Historical client funds balance — what was still outstanding as of $endDate,
 // not what's outstanding today.
@@ -333,7 +340,7 @@ class ReportDataService
         // Historical savings balance — what was actually in savings at period end, not today
         $savingsBalance = $this->getSavingsBalanceAsAt($user, $endDate);
         $ownedSavings = max(0, $savingsBalance - $totalClientFunds);
-        $netWorth     = max(0, $ownedSavings - $totalLoanBalance);
+        $netWorth = max(0, $ownedSavings + $totalLoansGivenBalance - $totalLoanBalance);
 
         // --- Transactions ---
         $transactions = $this->getFilteredTransactions($user, $startDate, $endDate)
@@ -435,6 +442,8 @@ class ReportDataService
         $insights = $this->generateInsights($user, $transactions, $startDate, $endDate, $type);
 
         $investmentIncome = $this->getInvestmentIncome($user, $startDate, $endDate);
+        $loansGivenActivity     = $this->getLoansGivenActivityInPeriod($user, $startDate, $endDate);
+        $loanGivenInterestIncome = $this->getLoanGivenInterestIncome($user, $startDate, $endDate);
 
         return [
             'period_type'          => $type,
@@ -445,6 +454,7 @@ class ReportDataService
             'total_balance'        => $totalBalance,
             'savings_balance'      => $savingsBalance,
             'total_loans'          => $totalLoanBalance,
+            'total_loans_given'    => $totalLoansGivenBalance,
             'total_client_funds'   => $totalClientFunds,
             'net_worth'            => $netWorth,
             'transactions'         => match ($type) {
@@ -461,9 +471,13 @@ class ReportDataService
             'largest_transactions' => $largestTransactions,
             'daily_spending'       => $dailySpending,
             'active_loans'         => $activeLoans,
+            'active_loans_given'   => $activeLoansGiven,
+            'loans_given_activity' => $loansGivenActivity,
             'budget_performance'   => $budgetPerformance,
             'insights'             => $insights,
             'investment_income'    => $investmentIncome,
+            'loan_given_interest_income' => $loanGivenInterestIncome,
+
         ];
     }
 
@@ -513,6 +527,13 @@ class ReportDataService
             'total'    => (float) $interestByAccount->sum(),
             'accounts' => $accounts,
         ];
+    }
+    private function getLoanGivenInterestIncome(User $user, Carbon $startDate, Carbon $endDate): float
+    {
+        return (float) Transaction::where('user_id', $user->id)
+            ->whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])
+            ->whereHas('category', fn($q) => $q->where('name', 'Loan Interest'))
+            ->sum('amount');
     }
 
     /**
@@ -856,5 +877,37 @@ class ReportDataService
 
             return max(0, $balanceAsAt);
         });
+    }
+    private function getLoansGivenActivityInPeriod(User $user, Carbon $startDate, Carbon $endDate): array
+    {
+        $disbursed = LoanGiven::where('user_id', $user->id)
+            ->whereBetween('disbursed_date', [$startDate->toDateString(), $endDate->toDateString()])
+            ->get();
+
+        $payments = LoanGivenPayment::where('user_id', $user->id)
+            ->whereBetween('payment_date', [$startDate->toDateString(), $endDate->toDateString()])
+            ->with('loanGiven')
+            ->get();
+
+        $closedInPeriod = LoanGiven::where('user_id', $user->id)
+            ->where('status', 'paid')
+            ->whereBetween('repaid_date', [$startDate, $endDate])
+            ->get();
+
+        return [
+            'disbursed_count'   => $disbursed->count(),
+            'disbursed_total'   => $disbursed->sum('principal_amount'),
+            'repayments_count'  => $payments->count(),
+            'repayments_total'  => $payments->sum('amount'),
+            'closed_count'      => $closedInPeriod->count(),
+            'principal_recovered' => $closedInPeriod->sum('principal_amount'),
+            'interest_earned'   => $closedInPeriod->sum('interest_amount'),
+            'items'             => $closedInPeriod->map(fn($l) => [
+                'borrower'  => $l->borrower_name,
+                'principal' => $l->principal_amount,
+                'interest'  => $l->interest_amount,
+                'repaid_date' => Carbon::parse($l->repaid_date)->format('M d, Y'),
+            ])->values()->toArray(),
+        ];
     }
 }

@@ -773,6 +773,19 @@ class LoanGivenController extends Controller implements HasMiddleware
                 return back()->with('error', 'Could not find the loan associated with this interest transaction.');
             }
 
+            // Once this loan's interest has been included in a referrer payout,
+            // interest_amount is no longer just "this loan's own" figure to freely
+            // recompute — a payout record downstream depends on it being final.
+            // Block the reversal outright rather than let it silently desync from
+            // what was actually paid out.
+            if ($loanGiven->referrer_payout_id) {
+                return back()->with('error',
+                    'This loan\'s interest has already been included in a referrer payout '
+                    . '(payout #' . $loanGiven->referrer_payout_id . '). It can no longer be reversed. '
+                    . 'If the payout itself needs correcting, that has to be handled first.'
+                );
+            }
+
             $this->authorize('view', $loanGiven);
 
             DB::beginTransaction();
@@ -830,9 +843,9 @@ class LoanGivenController extends Controller implements HasMiddleware
                     ? round(($loanGiven->interest_amount / $loanGiven->principal_amount) * 100, 2)
                     : 0;
 
-// Interest only ever exists because closeAsRepaid() generated it. Reversing
-// it is undoing that closure, not a question of whether principal still
-// nets to zero — so a 'paid' loan always reopens here.
+                // Interest only ever exists because closeAsRepaid() generated it. Reversing
+                // it is undoing that closure, not a question of whether principal still
+                // nets to zero — so a 'paid' loan always reopens here.
                 if ($loanGiven->status === 'paid') {
                     $loanGiven->status = 'active';
                     $loanGiven->repaid_date = null;

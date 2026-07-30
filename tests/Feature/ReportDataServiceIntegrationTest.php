@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\Account;
 use App\Models\Category;
 use App\Models\Loan;
+use App\Models\LoanGiven;
+use App\Models\LoanGivenPayment;
 use App\Models\LoanPayment;
 use App\Models\Transaction;
 use App\Models\User;
@@ -236,6 +238,105 @@ class ReportDataServiceIntegrationTest extends TestCase
 
         $this->assertEquals(50000, $report['total_loans']);
         $this->assertEquals(100000, $report['net_worth']);
+    }
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_keeps_loans_given_out_of_income_and_expenses_while_including_them_in_net_worth()
+    {
+        $savingsAccount = Account::factory()->for($this->user)->create([
+            'type'            => 'savings',
+            'current_balance' => 200000,
+        ]);
+        $mpesaAccount = Account::factory()->for($this->user)->create([
+            'type'            => 'mpesa',
+            'current_balance' => 100000,
+        ]);
+
+        $priorYear = now()->subYear()->year;
+        $startDate = Carbon::create($priorYear, 1, 1);
+
+        $salaryCategory        = $this->createCategory('Salary', 'income');
+        $foodCategory           = $this->createCategory('Food', 'expense');
+        $friendLoanGivenCat     = $this->createCategory('Friend Loan Given', 'expense');
+        $loanRecoveryCat        = $this->createCategory('Loan Recovery', 'income');
+        $loanInterestCat        = $this->createCategory('Loan Interest', 'income');
+
+        // Ordinary income/expense — the baseline the loan-given activity
+        // must not disturb.
+        Transaction::factory()
+            ->for($this->user)->for($mpesaAccount)->for($salaryCategory)
+            ->create(['type' => 'income', 'amount' => 100000, 'date' => $startDate->copy()->addMonth(1)]);
+
+        Transaction::factory()
+            ->for($this->user)->for($mpesaAccount)->for($foodCategory)
+            ->create(['type' => 'expense', 'amount' => 20000, 'date' => $startDate->copy()->addMonth(1)]);
+
+        // Loan given: disburse 50,000, borrower repays 55,000 (5,000 interest),
+        // loan fully closed within the year.
+        $loanGiven = LoanGiven::factory()
+            ->for($this->user)
+            ->for($mpesaAccount)
+            ->create([
+                'status'           => 'paid',
+                'borrower_name'    => 'Sam K.',
+                'principal_amount' => 50000,
+                'balance'          => 0,
+                'amount_paid'      => 55000,
+                'interest_amount'  => 5000,
+                'interest_rate'    => 10.0,
+                'disbursed_date'   => $startDate->copy()->addMonth(2),
+                'repaid_date'      => $startDate->copy()->addMonth(5),
+            ]);
+
+        Transaction::factory()
+            ->for($this->user)->for($mpesaAccount)->for($friendLoanGivenCat)
+            ->create(['type' => 'expense', 'amount' => 50000, 'date' => $startDate->copy()->addMonth(2)]);
+
+        Transaction::factory()
+            ->for($this->user)->for($mpesaAccount)->for($loanRecoveryCat)
+            ->create(['type' => 'income', 'amount' => 50000, 'date' => $startDate->copy()->addMonth(5)]);
+
+        Transaction::factory()
+            ->for($this->user)->for($mpesaAccount)->for($loanInterestCat)
+            ->create(['type' => 'income', 'amount' => 5000, 'date' => $startDate->copy()->addMonth(5)]);
+
+        LoanGivenPayment::create([
+            'user_id'       => $this->user->id,
+            'loan_given_id' => $loanGiven->id,
+            'account_id'    => $mpesaAccount->id,
+            'amount'        => 55000,
+            'payment_date'  => $startDate->copy()->addMonth(5),
+        ]);
+
+        DB::statement('UPDATE accounts SET current_balance = 200000 WHERE id = ?', [$savingsAccount->id]);
+        DB::statement('UPDATE accounts SET current_balance = 100000 WHERE id = ?', [$mpesaAccount->id]);
+
+        $report = $this->service->generateAnnualReport($this->user);
+
+        // Only the ordinary salary/food transactions should count —
+        // none of the loan-given cash flows leak into these totals.
+        $this->assertEquals(100000, $report['income']);
+        $this->assertEquals(20000, $report['expenses']);
+
+        // Loan is fully closed by year end, so total_loans_given (active
+        // only) is 0 — the balance already came back as cash in savings.
+        $this->assertEquals(0, $report['total_loans_given']);
+
+        // Interest earned is tracked on its own line.
+        $this->assertEquals(5000, $report['loan_given_interest_income']);
+
+        // Activity summary reflects the full lifecycle.
+        $activity = $report['loans_given_activity'];
+        $this->assertEquals(1, $activity['disbursed_count']);
+        $this->assertEquals(50000, $activity['disbursed_total']);
+        $this->assertEquals(1, $activity['repayments_count']);
+        $this->assertEquals(55000, $activity['repayments_total']);
+        $this->assertEquals(1, $activity['closed_count']);
+        $this->assertEquals(50000, $activity['principal_recovered']);
+        $this->assertEquals(5000, $activity['interest_earned']);
+
+        // net_worth: 200,000 savings + 0 outstanding loans given (already
+        // closed) - 0 borrowed loans = 200,000.
+        $this->assertEquals(200000, $report['net_worth']);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

@@ -66,6 +66,7 @@
     $savingsRate     = $data['savings_rate']    ?? 0;
     $netWorth        = $data['net_worth']       ?? 0;
     $totalLoans      = $data['total_loans']     ?? 0;
+    $totalLoansGiven = $data['total_loans_given'] ?? 0;
     $totalBal        = $data['total_balance']   ?? 0;
     $txCount         = $data['transaction_count']  ?? 0;
     $profitMonths    = $data['profitable_months']  ?? 0;
@@ -102,6 +103,7 @@
     <div class="amount">{{ $currency }} {{ number_format($netWorth) }}</div>
     <div class="breakdown">
         Savings Accounts: {{ $currency }} {{ number_format($savingsBalance) }}
+        &bull; Outstanding Loans Given: {{ $currency }} {{ number_format($totalLoansGiven) }}
         &bull; Active Loans: {{ $currency }} {{ number_format($totalLoans) }}
     </div>
 </div>
@@ -157,8 +159,8 @@
     <tr>
         <td class="label">Investment Income</td>
         <td class="value" style="color: #059669;">{{ $currency }} {{ number_format($investmentIncome['total']) }}</td>
-        <td class="label"></td>
-        <td class="value"></td>
+        <td class="label">Outstanding Loans Given</td>
+        <td class="value" style="color: #059669;">{{ $currency }} {{ number_format($totalLoansGiven) }}</td>
     </tr>
 </table>
 
@@ -241,6 +243,92 @@
         </table>
     </div>
 @endif
+<!-- Loans Given Activity -->
+@php
+       $loansGiven = $data['loans_given_activity'] ?? [
+           'disbursed_count' => 0, 'disbursed_total' => 0,
+           'repayments_count' => 0, 'repayments_total' => 0,
+           'closed_count' => 0, 'principal_recovered' => 0, 'interest_earned' => 0,
+           'items' => [],
+      ];
+       $activeLoansGiven = $data['active_loans_given'] ?? collect();
+       $loanGivenInterest = $data['loan_given_interest_income'] ?? 0;
+    @endphp
+@if($loansGiven['disbursed_count'] > 0 || $loansGiven['repayments_count'] > 0 || $activeLoansGiven->isNotEmpty())
+        <div class="section">
+                <div class="section-title">Loans Given Activity — {{ $year }}</div>
+                <table class="stat-table">
+                        <tr>
+                                <td class="label">Disbursed</td>
+                                <td class="value">{{ $currency }} {{ number_format($loansGiven['disbursed_total']) }}</td>
+                                <td class="label">Repayments Received</td>
+                                <td class="value" style="color: #059669;">{{ $currency }} {{ number_format($loansGiven['repayments_total']) }}</td>
+                            </tr>
+                        <tr>
+                                <td class="label">Loans Closed</td>
+                                <td class="value">{{ $loansGiven['closed_count'] }}</td>
+                                <td class="label">Interest Earned</td>
+                                <td class="value" style="color: #059669;">{{ $currency }} {{ number_format($loanGivenInterest) }}</td>
+                            </tr>
+                    </table>
+
+                @if($activeLoansGiven->isNotEmpty())
+                        <table>
+                            <thead>
+                                <tr>
+                                        <th>Borrower</th>
+                                        <th style="text-align: right;">Principal</th>
+                                        <th style="text-align: right;">Outstanding</th>
+                                        <th style="text-align: center;">Due Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                @foreach($activeLoansGiven as $loan)
+                                        <tr>
+                                                <td style="font-weight: 600;">{{ $loan->borrower_name }}</td>
+                                                <td style="text-align: right;">{{ $currency }} {{ number_format($loan->principal_amount) }}</td>
+                                                <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($loan->balance) }}</td>
+                                                <td style="text-align: center; color: #6B7280;">
+                                                        {{ $loan->due_date ? \Carbon\Carbon::parse($loan->due_date)->format('M j, Y') : '—' }}
+                                                    </td>
+                                            </tr>
+                                    @endforeach
+                                <tr class="total-row">
+                                        <td colspan="2">Total Outstanding</td>
+                                        <td style="text-align: right; color: #059669;">{{ $currency }} {{ number_format($totalLoansGiven) }}</td>
+                                        <td></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                    @endif
+
+                @if(!empty($loansGiven['items']))
+                        <div class="month-drill">
+                                <div class="month-drill-title">Loans Fully Repaid in {{ $year }}</div>
+                                <table>
+                                        <thead>
+                                        <tr>
+                                                <th>Borrower</th>
+                                                <th style="text-align: right;">Principal</th>
+                                                <th style="text-align: right;">Interest</th>
+                                                <th style="text-align: center;">Repaid Date</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                        @foreach($loansGiven['items'] as $item)
+                                                <tr>
+                                                        <td style="font-weight: 600;">{{ $item['borrower'] }}</td>
+                                                        <td style="text-align: right;">{{ $currency }} {{ number_format($item['principal']) }}</td>
+                                                        <td style="text-align: right; color: #059669;">{{ $currency }} {{ number_format($item['interest']) }}</td>
+                                                        <td style="text-align: center; color: #6B7280;">{{ $item['repaid_date'] }}</td>
+                                                    </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                            </div>
+                    @endif
+            </div>
+    @endif
 
 <!-- Month-by-Month Breakdown with Budget vs Actual -->
 @if(!empty($monthlyBreakdown))

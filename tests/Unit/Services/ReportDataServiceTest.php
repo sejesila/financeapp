@@ -7,6 +7,8 @@ use App\Models\Category;
 use App\Models\ClientFund;
 use App\Models\ClientFundTransaction;
 use App\Models\Loan;
+use App\Models\LoanGiven;
+use App\Models\LoanGivenPayment;
 use App\Models\LoanPayment;
 use App\Models\Transaction;
 use App\Models\User;
@@ -592,6 +594,253 @@ class ReportDataServiceTest extends TestCase
         $report = $this->service->generateMonthlyReport($this->user);
 
         $this->assertEquals(70000, $report['net_worth']);
+    }
+    // ────────────────────────────────────────────────────────────────────────
+    // LOANS GIVEN TESTS
+    //
+    // LoanGiven/LoanGivenPayment (money lent OUT) are a separate model from
+    // Loan/LoanPayment (money owed). Their transactions use dedicated
+    // category names — 'Friend Loan Given' (disbursement), 'Loan Recovery'
+    // (principal repayment), 'Loan Interest' (interest earned) — which must
+    // be excluded from general income/expense the same way borrowed-loan
+    // categories already are, to avoid inflating those figures.
+    // ────────────────────────────────────────────────────────────────────────
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_excludes_friend_loan_given_category_from_expenses()
+    {
+        $startDate = now()->startOfMonth();
+        $category  = $this->createCategory($this->user, 'Friend Loan Given', 'expense');
+
+        Transaction::factory()
+            ->for($this->user)
+            ->for($this->account)
+            ->for($category)
+            ->create([
+                'type'   => 'expense',
+                'amount' => 50000,
+                'date'   => $startDate->copy()->addDays(1),
+            ]);
+
+        $report = $this->service->generateMonthlyReport($this->user);
+
+        // Disbursing a loan given is not a real expense — it's cash
+        // converting to a receivable, not consumption.
+        $this->assertEquals(0, $report['expenses']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_excludes_loan_recovery_category_from_income()
+    {
+        $startDate = now()->startOfMonth();
+        $category  = $this->createCategory($this->user, 'Loan Recovery', 'income');
+
+        Transaction::factory()
+            ->for($this->user)
+            ->for($this->account)
+            ->for($category)
+            ->create([
+                'type'   => 'income',
+                'amount' => 15000,
+                'date'   => $startDate->copy()->addDays(1),
+            ]);
+
+        $report = $this->service->generateMonthlyReport($this->user);
+
+        // Principal coming back is not real income.
+        $this->assertEquals(0, $report['income']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_excludes_loan_interest_category_from_general_income()
+    {
+        $startDate = now()->startOfMonth();
+        $category  = $this->createCategory($this->user, 'Loan Interest', 'income');
+
+        Transaction::factory()
+            ->for($this->user)
+            ->for($this->account)
+            ->for($category)
+            ->create([
+                'type'   => 'income',
+                'amount' => 3000,
+                'date'   => $startDate->copy()->addDays(1),
+            ]);
+
+        $report = $this->service->generateMonthlyReport($this->user);
+
+        // Interest is real profit but gets its own dedicated line, not
+        // lumped into general income.
+        $this->assertEquals(0, $report['income']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_calculates_loan_given_interest_income_separately()
+    {
+        $startDate = $this->reportStart;
+        $category  = $this->createCategory($this->user, 'Loan Interest', 'income');
+
+        Transaction::factory()
+            ->for($this->user)
+            ->for($this->account)
+            ->for($category)
+            ->create([
+                'type'   => 'income',
+                'amount' => 3000,
+                'date'   => $startDate->copy()->addDays(5),
+            ]);
+
+        $report = $this->service->generateMonthlyReport($this->user);
+
+        $this->assertEquals(3000, $report['loan_given_interest_income']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_only_includes_active_loans_given_in_total()
+    {
+        LoanGiven::factory()
+            ->for($this->user)
+            ->for($this->account)
+            ->create(['status' => 'active', 'balance' => 20000]);
+
+        // Paid off — already back as cash, shouldn't double-count.
+        LoanGiven::factory()
+            ->for($this->user)
+            ->for($this->account)
+            ->create(['status' => 'paid', 'balance' => 0, 'repaid_date' => now()->subMonth()]);
+
+        // Written off — not realistically collectible.
+               LoanGiven::factory()
+               ->writtenOff()
+                ->for($this->user)
+                ->for($this->account)
+                ->create(['balance' => 10000]);
+
+        $report = $this->service->generateMonthlyReport($this->user);
+
+        $this->assertEquals(20000, $report['total_loans_given']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_adds_outstanding_loans_given_to_net_worth()
+    {
+        $savingsAccount = Account::factory()
+            ->for($this->user)
+            ->create(['type' => 'savings', 'current_balance' => 50000]);
+
+        LoanGiven::factory()
+            ->for($this->user)
+            ->for($this->account)
+            ->create(['status' => 'active', 'balance' => 20000]);
+
+        $report = $this->service->generateMonthlyReport($this->user);
+
+        $this->assertEquals(20000, $report['total_loans_given']);
+        // 50,000 savings + 20,000 outstanding loans given, no borrowed loans.
+        $this->assertEquals(70000, $report['net_worth']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_nets_loans_given_against_borrowed_loans_in_net_worth()
+    {
+        $savingsAccount = Account::factory()
+            ->for($this->user)
+            ->create(['type' => 'savings', 'current_balance' => 50000]);
+
+        LoanGiven::factory()
+            ->for($this->user)
+            ->for($this->account)
+            ->create(['status' => 'active', 'balance' => 20000]);
+
+        Loan::factory()
+            ->for($this->user)
+            ->for($savingsAccount)
+            ->create(['status' => 'active', 'balance' => 15000]);
+
+        $report = $this->service->generateMonthlyReport($this->user);
+
+        // 50,000 + 20,000 (given) - 15,000 (owed) = 55,000
+        $this->assertEquals(55000, $report['net_worth']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_tracks_loans_given_disbursed_and_repaid_within_period()
+    {
+        $startDate = $this->reportStart;
+
+        $loanGiven = LoanGiven::factory()
+            ->for($this->user)
+            ->for($this->account)
+            ->create([
+                'status'           => 'active',
+                'principal_amount' => 30000,
+                'balance'          => 20000,
+                'amount_paid'      => 10000,
+                'disbursed_date'   => $startDate->copy()->addDays(2),
+            ]);
+
+        LoanGivenPayment::create([
+            'user_id'       => $this->user->id,
+            'loan_given_id' => $loanGiven->id,
+            'account_id'    => $this->account->id,
+            'amount'        => 10000,
+            'payment_date'  => $startDate->copy()->addDays(10),
+        ]);
+
+        $report = $this->service->generateMonthlyReport($this->user);
+
+        $this->assertEquals(1, $report['loans_given_activity']['disbursed_count']);
+        $this->assertEquals(30000, $report['loans_given_activity']['disbursed_total']);
+        $this->assertEquals(1, $report['loans_given_activity']['repayments_count']);
+        $this->assertEquals(10000, $report['loans_given_activity']['repayments_total']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_tracks_loans_given_closed_with_interest_in_period()
+    {
+        $startDate = $this->reportStart;
+
+        LoanGiven::factory()
+            ->for($this->user)
+            ->for($this->account)
+            ->create([
+                'status'           => 'paid',
+                'borrower_name'    => 'Jane Doe',
+                'principal_amount' => 30000,
+                'balance'          => 0,
+                'amount_paid'      => 33000,
+                'interest_amount'  => 3000,
+                'interest_rate'    => 10.0,
+                'disbursed_date'   => $startDate->copy()->subMonths(2),
+                'repaid_date'      => $startDate->copy()->addDays(15),
+            ]);
+
+        $report = $this->service->generateMonthlyReport($this->user);
+
+        $activity = $report['loans_given_activity'];
+        $this->assertEquals(1, $activity['closed_count']);
+        $this->assertEquals(30000, $activity['principal_recovered']);
+        $this->assertEquals(3000, $activity['interest_earned']);
+        $this->assertCount(1, $activity['items']);
+        $this->assertEquals('Jane Doe', $activity['items'][0]['borrower']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_excludes_loans_given_activity_disbursed_outside_period()
+    {
+        $startDate = $this->reportStart;
+
+        LoanGiven::factory()
+            ->for($this->user)
+            ->for($this->account)
+            ->create([
+                'status'         => 'active',
+                'disbursed_date' => $startDate->copy()->subMonths(3),
+            ]);
+
+        $report = $this->service->generateMonthlyReport($this->user);
+
+        $this->assertEquals(0, $report['loans_given_activity']['disbursed_count']);
     }
 
     // ────────────────────────────────────────────────────────────────────────
