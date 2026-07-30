@@ -349,13 +349,35 @@ class ReportDataService
         $totalLoansGivenBalance = $activeLoansGiven->sum('balance');
 
         // Historical client funds balance — what was still outstanding as of $endDate,
-// not what's outstanding today.
+        // not what's outstanding today. This is the GLOBAL figure across every
+        // account (mpesa/bank/savings — see ClientFundController@store, client
+        // funds aren't savings-only) and is what the "excludes KES X" footnote
+        // in the report templates uses.
         $totalClientFunds = $this->getClientFundsBalanceAsAt($user, $endDate);
 
         // Historical savings balance — what was actually in savings at period end, not today
         $savingsBalance = $this->getSavingsBalanceAsAt($user, $endDate);
-        $ownedSavings = max(0, $savingsBalance - $totalClientFunds);
+
+        // For working out how much of the SAVINGS balance is actually owned,
+        // we need client funds specifically parked in savings accounts — NOT
+        // $totalClientFunds above, which spans every account type. Subtracting
+        // the global figure here was wrongly pulling money out of savings that
+        // was never there to begin with (e.g. client funds sitting in M-Pesa),
+        // understating owned savings any time most client money lives outside
+        // savings accounts.
+        $savingsAccountIds = Account::where('user_id', $user->id)
+            ->where('type', 'savings')
+            ->where('is_active', true)
+            ->pluck('id');
+
+        $clientFundsInSavings = $savingsAccountIds->isEmpty()
+            ? 0.0
+            : $savingsAccountIds->sum(fn($id) => $this->getClientFundsBalanceAsAt($user, $endDate, $id));
+
+        $ownedSavings = max(0, $savingsBalance - $clientFundsInSavings);
         $netWorth = max(0, $ownedSavings + $totalLoansGivenBalance - $totalLoanBalance);
+
+
 
         // --- Transactions ---
         $transactions = $this->getFilteredTransactions($user, $startDate, $endDate)
