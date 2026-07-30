@@ -313,67 +313,67 @@
     </div>
 @endif
 
-+<!-- Loans Given Activity -->
-+@php
-    +    $loansGiven = $data['loans_given_activity'] ?? [
-    +        'disbursed_count' => 0, 'disbursed_total' => 0,
-    +        'repayments_count' => 0, 'repayments_total' => 0,
-    +        'closed_count' => 0, 'principal_recovered' => 0, 'interest_earned' => 0,
-    +        'items' => [],
-    +    ];
-    +    $activeLoansGiven = $data['active_loans_given'] ?? collect();
-    +    $loanGivenInterest = $data['loan_given_interest_income'] ?? 0;
-    +@endphp
-+@if($loansGiven['disbursed_count'] > 0 || $loansGiven['repayments_count'] > 0 || $activeLoansGiven->isNotEmpty())
-    +    <div class="section">
-        +        <div class="section-title">Loans Given Activity</div>
-        +        <table class="stat-table">
-            +            <tr>
-                +                <td class="label">Disbursed</td>
-                +                <td class="value">{{ $currency }} {{ number_format($loansGiven['disbursed_total']) }}</td>
-                +                <td class="label">Repayments Received</td>
-                +                <td class="value" style="color: #059669;">{{ $currency }} {{ number_format($loansGiven['repayments_total']) }}</td>
-                +            </tr>
-            +            <tr>
-                +                <td class="label">Loans Closed</td>
-                +                <td class="value">{{ $loansGiven['closed_count'] }}</td>
-                +                <td class="label">Interest Earned</td>
-                +                <td class="value" style="color: #059669;">{{ $currency }} {{ number_format($loanGivenInterest) }}</td>
-                +            </tr>
-            +        </table>
-        +
-        +        @if($activeLoansGiven->isNotEmpty())
-            +            <table>
-                +                <thead>
-                +                <tr>
-                    +                    <th>Borrower</th>
-                    +                    <th style="text-align: right;">Principal</th>
-                    +                    <th style="text-align: right;">Outstanding</th>
-                    +                    <th style="text-align: center;">Due Date</th>
-                    +                </tr>
-                +                </thead>
-                +                <tbody>
-                +                @foreach($activeLoansGiven as $loan)
-                    +                    <tr>
-                        +                        <td style="font-weight: 600;">{{ $loan->borrower_name }}</td>
-                        +                        <td style="text-align: right;">{{ $currency }} {{ number_format($loan->principal_amount) }}</td>
-                        +                        <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($loan->balance) }}</td>
-                        +                        <td style="text-align: center; color: #6B7280;">
-                            +                            {{ $loan->due_date ? \Carbon\Carbon::parse($loan->due_date)->format('M j, Y') : '—' }}
-                            +                        </td>
-                        +                    </tr>
-                    +                @endforeach
-                +                <tr class="total-row">
-                    +                    <td colspan="2">Total Outstanding</td>
-                    +                    <td style="text-align: right; color: #059669;">{{ $currency }} {{ number_format($totalLoansGiven) }}</td>
-                    +                    <td></td>
-                    +                </tr>
-                +                </tbody>
-                +            </table>
-            +        @endif
-        +    </div>
-    +@endif
-+
+<!-- Loans Given Activity -->
+@php
+        $loansGiven = $data['loans_given_activity'] ?? [
+            'disbursed_count' => 0, 'disbursed_total' => 0,
+            'repayments_count' => 0, 'repayments_total' => 0,
+            'closed_count' => 0, 'principal_recovered' => 0, 'interest_earned' => 0,
+            'items' => [],
+        ];
+        $activeLoansGiven = $data['active_loans_given'] ?? collect();
+        $loanGivenInterest = $data['loan_given_interest_income'] ?? 0;
+    @endphp
+@if($loansGiven['disbursed_count'] > 0 || $loansGiven['repayments_count'] > 0 || $activeLoansGiven->isNotEmpty())
+        <div class="section">
+                <div class="section-title">Loans Given Activity</div>
+                <table class="stat-table">
+                        <tr>
+                                <td class="label">Disbursed</td>
+                                <td class="value">{{ $currency }} {{ number_format($loansGiven['disbursed_total']) }}</td>
+                                <td class="label">Repayments Received</td>
+                                <td class="value" style="color: #059669;">{{ $currency }} {{ number_format($loansGiven['repayments_total']) }}</td>
+                            </tr>
+                        <tr>
+                                <td class="label">Loans Closed</td>
+                                <td class="value">{{ $loansGiven['closed_count'] }}</td>
+                                <td class="label">Interest Earned</td>
+                                <td class="value" style="color: #059669;">{{ $currency }} {{ number_format($loanGivenInterest) }}</td>
+                            </tr>
+                    </table>
+
+                @if($activeLoansGiven->isNotEmpty())
+                        <table>
+                                <thead>
+                                <tr>
+                                        <th>Borrower</th>
+                                        <th style="text-align: right;">Principal</th>
+                                        <th style="text-align: right;">Outstanding</th>
+                                        <th style="text-align: center;">Due Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                @foreach($activeLoansGiven as $loan)
+                                        <tr>
+                                                <td style="font-weight: 600;">{{ $loan->borrower_name }}</td>
+                                                <td style="text-align: right;">{{ $currency }} {{ number_format($loan->principal_amount) }}</td>
+                                                <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($loan->balance) }}</td>
+                                                <td style="text-align: center; color: #6B7280;">
+                                                        {{ $loan->due_date ? \Carbon\Carbon::parse($loan->due_date)->format('M j, Y') : '—' }}
+                                                    </td>
+                                            </tr>
+                                @endforeach
+                                <tr class="total-row">
+                                        <td colspan="2">Total Outstanding</td>
+                                        <td style="text-align: right; color: #059669;">{{ $currency }} {{ number_format($totalLoansGiven) }}</td>
+                                        <td></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                    @endif
+            </div>
+    @endif
+
 {{-- Salary → Savings Rate --}}
 @php
     $salarySavings = $data['salary_savings_rate'] ?? [];
