@@ -2,16 +2,16 @@
 
 namespace App\Services;
 
+use App\Models\Account;
+use App\Models\Budget;
 use App\Models\ClientFund;
+use App\Models\Loan;
 use App\Models\LoanGiven;
 use App\Models\LoanGivenPayment;
+use App\Models\LoanPayment;
+use App\Models\Transaction;
 use App\Models\Transfer;
 use App\Models\User;
-use App\Models\Transaction;
-use App\Models\Account;
-use App\Models\Loan;
-use App\Models\LoanPayment;
-use App\Models\Budget;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -21,14 +21,15 @@ class ReportDataService
     private const MIN_SALARY_AMOUNT_FOR_SAVINGS_RATE = 40000;
     private const SALARY_TO_SAVINGS_WINDOW_HOURS = 72;
     private const SAVINGS_REVERSAL_WINDOW_DAYS = 8;
+
     /**
      * Generate annual report for the prior full year
      */
     public function generateAnnualReport(User $user): array
     {
-        $year      = now()->subYear()->year;
+        $year = now()->subYear()->year;
         $startDate = Carbon::create($year, 1, 1)->startOfDay();
-        $endDate   = Carbon::create($year, 12, 31)->endOfDay();
+        $endDate = Carbon::create($year, 12, 31)->endOfDay();
 
         Log::info('Generating annual report for user: ' . $user->email . ' | year: ' . $year);
 
@@ -43,19 +44,19 @@ class ReportDataService
 
         // Load all lookback transactions once (3 months before Jan 1) — fixes N+1
         $lookbackStart = Carbon::create($year, 1, 1)->startOfDay()->subMonths(3)->startOfMonth();
-        $lookbackEnd   = Carbon::create($year, 1, 1)->startOfDay()->subDay()->endOfDay();
-        $lookbackTx    = $this->getFilteredTransactions($user, $lookbackStart, $lookbackEnd);
+        $lookbackEnd = Carbon::create($year, 1, 1)->startOfDay()->subDay()->endOfDay();
+        $lookbackTx = $this->getFilteredTransactions($user, $lookbackStart, $lookbackEnd);
 
         $monthlyBreakdown = [];
         for ($month = 1; $month <= 12; $month++) {
             $mStart = Carbon::create($year, $month, 1)->startOfDay();
-            $mEnd   = $mStart->copy()->endOfMonth()->endOfDay();
+            $mEnd = $mStart->copy()->endOfMonth()->endOfDay();
 
             $monthTransactions = $this->getFilteredTransactions($user, $mStart, $mEnd);
 
-            $mIncome   = $monthTransactions->filter(fn($t) => $t->category->type === 'income')->sum('amount');
+            $mIncome = $monthTransactions->filter(fn($t) => $t->category->type === 'income')->sum('amount');
             $mExpenses = $monthTransactions->filter(fn($t) => $t->category->type === 'expense')->sum('amount');
-            $mNet      = $mIncome - $mExpenses;
+            $mNet = $mIncome - $mExpenses;
 
             // Stored budgets for this month, keyed by category_id
             $monthBudgets = $allBudgets->get($month, collect());
@@ -65,7 +66,7 @@ class ReportDataService
                 ->filter(fn($t) => $t->category->type === 'expense')
                 ->groupBy('category_id')
                 ->map(fn($group) => [
-                    'name'  => $group->first()->category->name,
+                    'name' => $group->first()->category->name,
                     'spent' => $group->sum('amount'),
                 ]);
 
@@ -77,39 +78,39 @@ class ReportDataService
                 ->unique();
 
             $categoryPerformance = [];
-            $totalBudgeted       = 0;
-            $totalSpent          = 0;
-            $catsOver            = 0;
-            $catsUnder           = 0;
+            $totalBudgeted = 0;
+            $totalSpent = 0;
+            $catsOver = 0;
+            $catsUnder = 0;
 
             foreach ($allCatIds as $catId) {
                 $spent = $actualByCat[$catId]['spent'] ?? 0;
                 if ($spent === 0) continue;
 
-                $catName   = $actualByCat[$catId]['name']
+                $catName = $actualByCat[$catId]['name']
                     ?? $baselines[$catId]['name']
                     ?? 'Unknown';
                 $hasBudget = $monthBudgets->has($catId);
-                $budgeted  = $hasBudget
-                    ? (float) $monthBudgets[$catId]->amount
+                $budgeted = $hasBudget
+                    ? (float)$monthBudgets[$catId]->amount
                     : ($baselines[$catId]['baseline'] ?? $spent);
 
-                $remaining  = $budgeted - $spent;
+                $remaining = $budgeted - $spent;
                 $percentage = $budgeted > 0 ? ($spent / $budgeted) * 100 : 100;
 
                 $categoryPerformance[] = [
-                    'category'    => $catName,
-                    'budgeted'    => round($budgeted, 2),
-                    'spent'       => round($spent, 2),
-                    'remaining'   => round($remaining, 2),
-                    'percentage'  => round($percentage, 1),
-                    'has_budget'  => $hasBudget,
+                    'category' => $catName,
+                    'budgeted' => round($budgeted, 2),
+                    'spent' => round($spent, 2),
+                    'remaining' => round($remaining, 2),
+                    'percentage' => round($percentage, 1),
+                    'has_budget' => $hasBudget,
                     'months_used' => $baselines[$catId]['months_used'] ?? 0,
-                    'is_new'      => ($baselines[$catId]['months_used'] ?? 0) === 0,
+                    'is_new' => ($baselines[$catId]['months_used'] ?? 0) === 0,
                 ];
 
                 $totalBudgeted += $budgeted;
-                $totalSpent    += $spent;
+                $totalSpent += $spent;
                 $percentage >= 100 ? $catsOver++ : $catsUnder++;
             }
 
@@ -121,58 +122,58 @@ class ReportDataService
                 ->sum('amount');
 
             $monthlyBreakdown[] = [
-                'month'                => $mStart->format('F Y'),
-                'month_short'          => $mStart->format('M'),
-                'income'               => $mIncome,
-                'expenses'             => $mExpenses,
-                'net_flow'             => $mNet,
-                'savings_rate'         => $mIncome > 0 ? ($mNet / $mIncome) * 100 : 0,
-                'transaction_count'    => $monthTransactions->count(),
-                'budgeted_expenses'    => round($totalBudgeted, 2),
-                'budgeted_income'      => round($mIncomeBudgeted, 2),
-                'budget_variance'      => round($totalBudgeted - $totalSpent, 2),
-                'cats_over_budget'     => $catsOver,
-                'cats_under_budget'    => $catsUnder,
+                'month' => $mStart->format('F Y'),
+                'month_short' => $mStart->format('M'),
+                'income' => $mIncome,
+                'expenses' => $mExpenses,
+                'net_flow' => $mNet,
+                'savings_rate' => $mIncome > 0 ? ($mNet / $mIncome) * 100 : 0,
+                'transaction_count' => $monthTransactions->count(),
+                'budgeted_expenses' => round($totalBudgeted, 2),
+                'budgeted_income' => round($mIncomeBudgeted, 2),
+                'budget_variance' => round($totalBudgeted - $totalSpent, 2),
+                'cats_over_budget' => $catsOver,
+                'cats_under_budget' => $catsUnder,
                 'category_performance' => $categoryPerformance,
             ];
         }
 
-        $collection   = collect($monthlyBreakdown);
-        $bestMonth    = $collection->sortByDesc('net_flow')->first();
-        $worstMonth   = $collection->sortBy('net_flow')->first();
+        $collection = collect($monthlyBreakdown);
+        $bestMonth = $collection->sortByDesc('net_flow')->first();
+        $worstMonth = $collection->sortBy('net_flow')->first();
         $profitMonths = $collection->where('net_flow', '>', 0)->count();
 
         // Annual budget summary across all months
         $annualBudgetedExpenses = $collection->sum('budgeted_expenses');
-        $annualActualExpenses   = $collection->sum('expenses');
-        $annualBudgetVariance   = $annualBudgetedExpenses - $annualActualExpenses;
-        $monthsOverBudget       = $collection->where('cats_over_budget', '>', 0)->count();
+        $annualActualExpenses = $collection->sum('expenses');
+        $annualBudgetVariance = $annualBudgetedExpenses - $annualActualExpenses;
+        $monthsOverBudget = $collection->where('cats_over_budget', '>', 0)->count();
 
-        $loansPaidInYear       = $this->getLoanPaymentsInPeriod($user, $startDate, $endDate);
+        $loansPaidInYear = $this->getLoanPaymentsInPeriod($user, $startDate, $endDate);
         $loansRepaidDuringYear = $this->getLoansRepaidInPeriod($user, $startDate, $endDate);
 
-        $priorYearStart  = Carbon::create($year - 1, 1, 1)->startOfDay();
-        $priorYearEnd    = Carbon::create($year - 1, 12, 31)->endOfDay();
+        $priorYearStart = Carbon::create($year - 1, 1, 1)->startOfDay();
+        $priorYearEnd = Carbon::create($year - 1, 12, 31)->endOfDay();
         $priorYearIncome = $this->getFilteredTransactions($user, $priorYearStart, $priorYearEnd)
             ->filter(fn($t) => $t->category->type === 'income')
             ->sum('amount');
 
-        $report['monthly_breakdown']        = $monthlyBreakdown;
-        $report['best_month']               = $bestMonth;
-        $report['worst_month']              = $worstMonth;
-        $report['profitable_months']        = $profitMonths;
-        $report['loans_paid_in_period']     = $loansPaidInYear;
-        $report['loans_repaid_in_period']   = $loansRepaidDuringYear;
-        $report['prior_period_income']      = $priorYearIncome;
-        $report['income_trend']             = $priorYearIncome > 0
+        $report['monthly_breakdown'] = $monthlyBreakdown;
+        $report['best_month'] = $bestMonth;
+        $report['worst_month'] = $worstMonth;
+        $report['profitable_months'] = $profitMonths;
+        $report['loans_paid_in_period'] = $loansPaidInYear;
+        $report['loans_repaid_in_period'] = $loansRepaidDuringYear;
+        $report['prior_period_income'] = $priorYearIncome;
+        $report['income_trend'] = $priorYearIncome > 0
             ? (($report['income'] - $priorYearIncome) / $priorYearIncome) * 100
             : null;
-        $report['period_type']              = 'annual';
-        $report['year']                     = $year;
-        $report['salary_savings_rate']      = $this->getSalarySavingsRate($user, $startDate, $endDate);
+        $report['period_type'] = 'annual';
+        $report['year'] = $year;
+        $report['salary_savings_rate'] = $this->getSalarySavingsRate($user, $startDate, $endDate);
         $report['annual_budgeted_expenses'] = $annualBudgetedExpenses;
-        $report['annual_budget_variance']   = $annualBudgetVariance;
-        $report['months_over_budget']       = $monthsOverBudget;
+        $report['annual_budget_variance'] = $annualBudgetVariance;
+        $report['months_over_budget'] = $monthsOverBudget;
 
         return $report;
     }
@@ -183,28 +184,28 @@ class ReportDataService
     public function generateMonthlyReport(User $user): array
     {
         $startDate = now()->subMonth()->startOfMonth();
-        $endDate   = now()->subMonth()->endOfMonth();
+        $endDate = now()->subMonth()->endOfMonth();
 
         $report = $this->generateReport($user, $startDate, $endDate, 'monthly');
 
-        $report['loans_paid_in_period']   = $this->getLoanPaymentsInPeriod($user, $startDate, $endDate);
+        $report['loans_paid_in_period'] = $this->getLoanPaymentsInPeriod($user, $startDate, $endDate);
         $report['loans_repaid_in_period'] = $this->getLoansRepaidInPeriod($user, $startDate, $endDate);
 
         $prevStart = $startDate->copy()->subMonth()->startOfMonth();
-        $prevEnd   = $prevStart->copy()->endOfMonth();
+        $prevEnd = $prevStart->copy()->endOfMonth();
 
         $priorMonthIncome = $this->getFilteredTransactions($user, $prevStart, $prevEnd)
             ->filter(fn($t) => $t->category->type === 'income')
             ->sum('amount');
 
         $report['prior_period_income'] = $priorMonthIncome;
-        $report['income_trend']        = $priorMonthIncome > 0
+        $report['income_trend'] = $priorMonthIncome > 0
             ? (($report['income'] - $priorMonthIncome) / $priorMonthIncome) * 100
             : null;
 
-        $budgetPerf              = collect($report['budget_performance']);
+        $budgetPerf = collect($report['budget_performance']);
         $report['budgets_under'] = $budgetPerf->where('percentage', '<=', 100)->count();
-        $report['budgets_over']  = $budgetPerf->where('percentage', '>', 100)->count();
+        $report['budgets_over'] = $budgetPerf->where('percentage', '>', 100)->count();
         $report['budgets_total'] = $budgetPerf->count();
 
         $report['salary_savings_rate'] = $this->getSalarySavingsRate($user, $startDate, $endDate);
@@ -277,7 +278,7 @@ class ReportDataService
 
         for ($i = 1; $i <= $lookbackMonths; $i++) {
             $mStart = $startDate->copy()->subMonths($i)->startOfMonth();
-            $mEnd   = $mStart->copy()->endOfMonth();
+            $mEnd = $mStart->copy()->endOfMonth();
 
             if ($preloadedTx !== null) {
                 $monthTx = $preloadedTx->filter(function ($t) use ($mStart, $mEnd) {
@@ -292,12 +293,12 @@ class ReportDataService
             foreach ($monthTx->groupBy('category_id') as $catId => $group) {
                 if (!isset($baselines[$catId])) {
                     $baselines[$catId] = [
-                        'name'        => $group->first()->category->name,
-                        'total'       => 0.0,
+                        'name' => $group->first()->category->name,
+                        'total' => 0.0,
                         'months_used' => 0,
                     ];
                 }
-                $baselines[$catId]['total']       += $group->sum('amount');
+                $baselines[$catId]['total'] += $group->sum('amount');
                 $baselines[$catId]['months_used'] += 1;
             }
         }
@@ -321,16 +322,30 @@ class ReportDataService
         $accounts = Account::where('user_id', $user->id)->where('is_active', true)->get();
 
         // Reconstruct each account's balance as of $endDate, not today
-        $accountsAsAt = $accounts->map(function ($account) use ($endDate) {
-            $account->balance_as_at = $this->getAccountBalanceAsAt($account, $endDate);
+        $accountsAsAt = $accounts->map(function ($account) use ($user, $endDate) {
+            $rawBalance = $this->getAccountBalanceAsAt($account, $endDate);
+            $clientFundsInAccount = $this->getClientFundsBalanceAsAt($user, $endDate, $account->id);
+            if (($rawBalance - $clientFundsInAccount) < 0) {
+                Log::warning('ReportDataService: client funds exceed reconstructed account balance', [
+                    'account_id' => $account->id,
+                    'account_name' => $account->name,
+                    'as_at_date' => $endDate->toDateString(),
+                    'raw_balance' => $rawBalance,
+                    'client_funds' => $clientFundsInAccount,
+                    'shortfall' => $rawBalance - $clientFundsInAccount,
+                ]);
+            }
+            $account->raw_balance_as_at = $rawBalance;
+            $account->client_funds_as_at = $clientFundsInAccount;
+            $account->balance_as_at = max(0, $rawBalance - $clientFundsInAccount);
             return $account;
         });
 
         $totalBalance = $accountsAsAt->sum('balance_as_at');
 
-        $activeLoans      = Loan::where('user_id', $user->id)->where('status', 'active')->with('account')->get();
+        $activeLoans = Loan::where('user_id', $user->id)->where('status', 'active')->with('account')->get();
         $totalLoanBalance = $activeLoans->sum('balance');
-        $activeLoansGiven      = LoanGiven::where('user_id', $user->id)->where('status', 'active')->get();
+        $activeLoansGiven = LoanGiven::where('user_id', $user->id)->where('status', 'active')->get();
         $totalLoansGivenBalance = $activeLoansGiven->sum('balance');
 
         // Historical client funds balance — what was still outstanding as of $endDate,
@@ -348,17 +363,17 @@ class ReportDataService
             ->reverse()
             ->values();
 
-        $income   = $transactions->filter(fn($t) => $t->category->type === 'income')->sum('amount');
+        $income = $transactions->filter(fn($t) => $t->category->type === 'income')->sum('amount');
         $expenses = $transactions->filter(fn($t) => $t->category->type === 'expense')->sum('amount');
-        $netFlow  = $income - $expenses;
+        $netFlow = $income - $expenses;
 
         $topCategories = $transactions
             ->filter(fn($t) => $t->category->type === 'expense')
             ->groupBy('category_id')
             ->map(fn($group) => [
                 'category' => $group->first()->category->name,
-                'amount'   => $group->sum('amount'),
-                'count'    => $group->count(),
+                'amount' => $group->sum('amount'),
+                'count' => $group->count(),
             ])
             ->sortByDesc('amount')
             ->take(5)
@@ -374,7 +389,7 @@ class ReportDataService
             ->filter(fn($t) => $t->category->type === 'expense')
             ->groupBy(fn($t) => Carbon::parse($t->date)->format('Y-m-d'))
             ->map(fn($group, $date) => [
-                'date'   => Carbon::parse($date)->format('M d'),
+                'date' => Carbon::parse($date)->format('M d'),
                 'amount' => $group->sum('amount'),
             ])
             ->sortKeys()
@@ -385,7 +400,7 @@ class ReportDataService
 
         if ($type === 'monthly') {
             $reportMonth = $startDate->month;
-            $reportYear  = $startDate->year;
+            $reportYear = $startDate->year;
 
             $storedBudgets = Budget::where('user_id', $user->id)
                 ->where('year', $reportYear)
@@ -399,7 +414,7 @@ class ReportDataService
                 ->filter(fn($t) => $t->category->type === 'expense')
                 ->groupBy('category_id')
                 ->map(fn($group) => [
-                    'name'  => $group->first()->category->name,
+                    'name' => $group->first()->category->name,
                     'spent' => $group->sum('amount'),
                 ]);
 
@@ -416,23 +431,23 @@ class ReportDataService
                     ?? $baselines[$catId]['name']
                     ?? 'Unknown';
 
-                $hasBudget  = isset($storedBudgets[$catId]);
-                $baseline   = $hasBudget
-                    ? (float) $storedBudgets[$catId]->amount
+                $hasBudget = isset($storedBudgets[$catId]);
+                $baseline = $hasBudget
+                    ? (float)$storedBudgets[$catId]->amount
                     : ($baselines[$catId]['baseline'] ?? $spent);
                 $monthsUsed = $baselines[$catId]['months_used'] ?? 0;
-                $remaining  = $baseline - $spent;
+                $remaining = $baseline - $spent;
                 $percentage = $baseline > 0 ? ($spent / $baseline) * 100 : ($spent > 0 ? 100 : 0);
 
                 $budgetPerformance[] = [
-                    'category'    => $catName,
-                    'budgeted'    => round($baseline, 2),
-                    'spent'       => round($spent, 2),
-                    'remaining'   => round($remaining, 2),
-                    'percentage'  => round($percentage, 1),
+                    'category' => $catName,
+                    'budgeted' => round($baseline, 2),
+                    'spent' => round($spent, 2),
+                    'remaining' => round($remaining, 2),
+                    'percentage' => round($percentage, 1),
                     'months_used' => $monthsUsed,
-                    'is_new'      => $monthsUsed === 0,
-                    'has_budget'  => $hasBudget,
+                    'is_new' => $monthsUsed === 0,
+                    'has_budget' => $hasBudget,
                 ];
             }
 
@@ -444,47 +459,48 @@ class ReportDataService
         $investmentIncome = $this->getInvestmentIncome($user, $startDate, $endDate);
         $loansGivenActivity = $this->getLoansGivenActivityInPeriod($user, $startDate, $endDate);
         $loanGivenInterestIncome = $this->getLoanGivenInterestIncome($user, $startDate, $endDate);
-        $totalInterestIncome = (float) $investmentIncome['total'] + $loanGivenInterestIncome;
+        $totalInterestIncome = (float)$investmentIncome['total'] + $loanGivenInterestIncome;
 
         return [
-            'period_type'          => $type,
-            'start_date'           => $startDate->format('M d, Y'),
-            'end_date'             => $endDate->format('M d, Y'),
-            'user'                 => $user,
-            'accounts'             => $accountsAsAt,
-            'total_balance'        => $totalBalance,
-            'savings_balance'      => $savingsBalance,
-            'total_loans'          => $totalLoanBalance,
-            'total_loans_given'    => $totalLoansGivenBalance,
-            'total_client_funds'   => $totalClientFunds,
-            'net_worth'            => $netWorth,
-            'transactions'         => match ($type) {
-                'annual'  => $transactions->take(50),
+            'period_type' => $type,
+            'start_date' => $startDate->format('M d, Y'),
+            'end_date' => $endDate->format('M d, Y'),
+            'user' => $user,
+            'accounts' => $accountsAsAt,
+            'total_balance' => $totalBalance,
+            'savings_balance' => $savingsBalance,
+            'total_loans' => $totalLoanBalance,
+            'total_loans_given' => $totalLoansGivenBalance,
+            'total_client_funds' => $totalClientFunds,
+            'net_worth' => $netWorth,
+            'transactions' => match ($type) {
+                'annual' => $transactions->take(50),
                 'monthly' => $transactions->take(30),
-                default   => $transactions->take(25),
+                default => $transactions->take(25),
             },
-            'transaction_count'    => $transactions->count(),
-            'income'               => $income,
-            'expenses'             => $expenses,
-            'net_flow'             => $netFlow,
-            'savings_rate'         => $income > 0 ? ($netFlow / $income) * 100 : 0,
-            'top_categories'       => $topCategories,
+            'transaction_count' => $transactions->count(),
+            'income' => $income,
+            'expenses' => $expenses,
+            'net_flow' => $netFlow,
+            'savings_rate' => $income > 0 ? ($netFlow / $income) * 100 : 0,
+            'top_categories' => $topCategories,
             'largest_transactions' => $largestTransactions,
-            'daily_spending'       => $dailySpending,
-            'active_loans'         => $activeLoans,
-            'active_loans_given'   => $activeLoansGiven,
+            'daily_spending' => $dailySpending,
+            'active_loans' => $activeLoans,
+            'active_loans_given' => $activeLoansGiven,
             'loans_given_activity' => $loansGivenActivity,
-            'budget_performance'   => $budgetPerformance,
-            'insights'             => $insights,
-            'investment_income'    => $investmentIncome,
+            'budget_performance' => $budgetPerformance,
+            'insights' => $insights,
+            'investment_income' => $investmentIncome,
             'total_interest_income' => $totalInterestIncome,
             'loan_given_interest_income' => $loanGivenInterestIncome,
 
         ];
     }
+
     private function getLoanGivenInterestIncome(User $user, Carbon $startDate, Carbon $endDate): float
     {
-        return (float) Transaction::where('user_id', $user->id)
+        return (float)Transaction::where('user_id', $user->id)
             ->whereBetween('date', [
                 $startDate->toDateString(),
                 $endDate->toDateString(),
@@ -527,8 +543,8 @@ class ReportDataService
 
         $accounts = $savingsAccounts
             ->map(fn($account) => [
-                'name'   => $account->name,
-                'amount' => (float) ($interestByAccount[$account->id] ?? 0),
+                'name' => $account->name,
+                'amount' => (float)($interestByAccount[$account->id] ?? 0),
             ])
             ->filter(fn($a) => $a['amount'] > 0)
             ->sortByDesc('amount')
@@ -536,7 +552,7 @@ class ReportDataService
             ->all();
 
         return [
-            'total'    => (float) $interestByAccount->sum(),
+            'total' => (float)$interestByAccount->sum(),
             'accounts' => $accounts,
         ];
     }
@@ -606,7 +622,7 @@ class ReportDataService
      */
     private function getAccountBalanceAsAt(Account $account, Carbon $asAtDate): float
     {
-        $currentBalance = (float) $account->current_balance;
+        $currentBalance = (float)$account->current_balance;
 
         $txAfter = Transaction::where('user_id', $account->user_id)
             ->where('account_id', $account->id)
@@ -668,9 +684,9 @@ class ReportDataService
             'count' => $payments->count(),
             'total' => $payments->sum('amount'),
             'items' => $payments->map(fn($p) => [
-                'date'        => Carbon::parse($p->payment_date)->format('M d, Y'),
+                'date' => Carbon::parse($p->payment_date)->format('M d, Y'),
                 'description' => 'Repayment to ' . ($p->loan->source ?? 'loan'),
-                'amount'      => $p->amount,
+                'amount' => $p->amount,
             ])->values()->toArray(),
         ];
     }
@@ -686,13 +702,13 @@ class ReportDataService
             ->get();
 
         return [
-            'count'           => $repaidLoans->count(),
-            'total'           => $repaidLoans->sum('total_amount'),
+            'count' => $repaidLoans->count(),
+            'total' => $repaidLoans->sum('total_amount'),
             'principal_total' => $repaidLoans->sum('principal_amount'),
-            'items'           => $repaidLoans->map(fn($loan) => [
-                'source'      => $loan->source,
-                'principal'   => $loan->principal_amount,
-                'total'       => $loan->total_amount,
+            'items' => $repaidLoans->map(fn($loan) => [
+                'source' => $loan->source,
+                'principal' => $loan->principal_amount,
+                'total' => $loan->total_amount,
                 'repaid_date' => Carbon::parse($loan->repaid_date)->format('M d, Y'),
             ])->values()->toArray(),
         ];
@@ -705,53 +721,53 @@ class ReportDataService
     {
         $insights = [];
 
-        $days          = $startDate->diffInDays($endDate) + 1;
+        $days = $startDate->diffInDays($endDate) + 1;
         $totalExpenses = $transactions->filter(fn($t) => $t->category->type === 'expense')->sum('amount');
-        $income        = $transactions->filter(fn($t) => $t->category->type === 'income')->sum('amount');
-        $avgDaily      = $days > 0 ? $totalExpenses / $days : 0;
+        $income = $transactions->filter(fn($t) => $t->category->type === 'income')->sum('amount');
+        $avgDaily = $days > 0 ? $totalExpenses / $days : 0;
 
         $insights[] = [
-            'icon'        => '📊',
-            'title'       => 'Average Daily Spending',
-            'value'       => 'KES ' . number_format($avgDaily, 0),
+            'icon' => '📊',
+            'title' => 'Average Daily Spending',
+            'value' => 'KES ' . number_format($avgDaily, 0),
             'description' => 'You spent an average of KES ' . number_format($avgDaily, 0) . ' per day',
         ];
 
         $periodLabel = match ($type) {
-            'annual'  => 'year',
+            'annual' => 'year',
             'monthly' => 'month',
-            default   => 'period',
+            default => 'period',
         };
 
         if ($type === 'annual') {
             $prevStart = $startDate->copy()->subYear();
-            $prevEnd   = $endDate->copy()->subYear();
+            $prevEnd = $endDate->copy()->subYear();
         } else {
             $prevStart = $startDate->copy()->subMonth();
-            $prevEnd   = $endDate->copy()->subMonth();
+            $prevEnd = $endDate->copy()->subMonth();
         }
 
         $prevTransactions = $this->getFilteredTransactions($user, $prevStart, $prevEnd);
-        $prevExpenses     = $prevTransactions->filter(fn($t) => $t->category->type === 'expense')->sum('amount');
+        $prevExpenses = $prevTransactions->filter(fn($t) => $t->category->type === 'expense')->sum('amount');
 
-        $change        = $totalExpenses - $prevExpenses;
+        $change = $totalExpenses - $prevExpenses;
         $changePercent = $prevExpenses > 0 ? (($change / $prevExpenses) * 100) : 0;
 
         if ($change > 0) {
             $insights[] = [
-                'icon'        => '📈',
-                'title'       => 'Spending Increased',
-                'value'       => '+' . number_format($changePercent, 1) . '%',
+                'icon' => '📈',
+                'title' => 'Spending Increased',
+                'value' => '+' . number_format($changePercent, 1) . '%',
                 'description' => 'You spent KES ' . number_format($change, 0) . ' more than last ' . $periodLabel,
-                'trend'       => 'up',
+                'trend' => 'up',
             ];
         } elseif ($change < 0) {
             $insights[] = [
-                'icon'        => '📉',
-                'title'       => 'Spending Decreased',
-                'value'       => number_format($changePercent, 1) . '%',
+                'icon' => '📉',
+                'title' => 'Spending Decreased',
+                'value' => number_format($changePercent, 1) . '%',
                 'description' => 'You spent KES ' . number_format(abs($change), 0) . ' less than last ' . $periodLabel,
-                'trend'       => 'down',
+                'trend' => 'down',
             ];
         }
 
@@ -762,19 +778,19 @@ class ReportDataService
 
         if ($biggestExpense) {
             $insights[] = [
-                'icon'        => '💸',
-                'title'       => 'Biggest Expense',
-                'value'       => 'KES ' . number_format($biggestExpense->amount, 0),
+                'icon' => '💸',
+                'title' => 'Biggest Expense',
+                'value' => 'KES ' . number_format($biggestExpense->amount, 0),
                 'description' => $biggestExpense->description . ' (' . $biggestExpense->category->name . ')',
             ];
         }
 
         if ($income > 0) {
             $savingsRate = (($income - $totalExpenses) / $income) * 100;
-            $insights[]  = [
-                'icon'        => $savingsRate > 20 ? '🎯' : '⚠️',
-                'value'       => number_format($savingsRate, 1) . '%',
-                'title'       => 'Surplus Rate',
+            $insights[] = [
+                'icon' => $savingsRate > 20 ? '🎯' : '⚠️',
+                'value' => number_format($savingsRate, 1) . '%',
+                'title' => 'Surplus Rate',
                 'description' => $savingsRate > 20
                     ? "Great! You're generating a strong surplus"
                     : 'Consider reducing expenses to improve your surplus rate',
@@ -783,7 +799,6 @@ class ReportDataService
 
         return $insights;
     }
-
 
 
     public function getSalarySavingsRate(User $user, Carbon $startDate, Carbon $endDate): array
@@ -812,7 +827,7 @@ class ReportDataService
 
         foreach ($salaryTransactions as $salary) {
             $salaryDate = Carbon::parse($salary->date);
-            $windowEnd  = $salaryDate->copy()->addHours(self::SALARY_TO_SAVINGS_WINDOW_HOURS);
+            $windowEnd = $salaryDate->copy()->addHours(self::SALARY_TO_SAVINGS_WINDOW_HOURS);
 
             // Client-fund transfers are excluded — that money was never the
             // user's own salary savings, so it shouldn't count as "saved".
@@ -846,11 +861,11 @@ class ReportDataService
             $netSaved = max(0, $transferredToSavings - $transferredFromSavings);
 
             $results[] = [
-                'salary_date'        => $salaryDate->format('M d, Y'),
-                'salary_amount'      => (float) $salary->amount,
-                'saved_amount'       => (float) $netSaved,
-                'gross_saved_amount' => (float) $transferredToSavings,
-                'reversed_amount'    => (float) $transferredFromSavings,
+                'salary_date' => $salaryDate->format('M d, Y'),
+                'salary_amount' => (float)$salary->amount,
+                'saved_amount' => (float)$netSaved,
+                'gross_saved_amount' => (float)$transferredToSavings,
+                'reversed_amount' => (float)$transferredFromSavings,
                 'savings_percentage' => $salary->amount > 0
                     ? round(($netSaved / $salary->amount) * 100, 1)
                     : 0,
@@ -859,6 +874,7 @@ class ReportDataService
 
         return $results;
     }
+
     /**
      * Public summary of interest income for an arbitrary period — savings
      * account interest plus interest earned on closed loans given, broken
@@ -874,25 +890,27 @@ class ReportDataService
      */
     public function getInterestIncomeSummary(User $user, Carbon $startDate, Carbon $endDate): array
     {
-        $savingsInterest    = (float) $this->getInvestmentIncome($user, $startDate, $endDate)['total'];
-        $loanGivenInterest  = $this->getLoanGivenInterestIncome($user, $startDate, $endDate);
+        $savingsInterest = (float)$this->getInvestmentIncome($user, $startDate, $endDate)['total'];
+        $loanGivenInterest = $this->getLoanGivenInterestIncome($user, $startDate, $endDate);
 
         return [
-            'total'               => $savingsInterest + $loanGivenInterest,
-            'savings_interest'    => $savingsInterest,
+            'total' => $savingsInterest + $loanGivenInterest,
+            'savings_interest' => $savingsInterest,
             'loan_given_interest' => $loanGivenInterest,
         ];
     }
+
     /**
      * Calculate what a user's outstanding client funds balance was at a specific
      * point in time, by taking each fund's current balance and adding back any
      * expense/profit reductions recorded after $asAtDate.
      */
-    private function getClientFundsBalanceAsAt(User $user, Carbon $asAtDate): float
+    private function getClientFundsBalanceAsAt(User $user, Carbon $asAtDate, ?int $accountId = null): float
     {
         $clientFunds = ClientFund::where('user_id', $user->id)
             ->where('received_date', '<=', $asAtDate)
             ->whereNotIn('status', ['cancelled'])
+            ->when($accountId !== null, fn($q) => $q->where('account_id', $accountId))
             ->with(['transactions' => function ($q) use ($asAtDate) {
                 $q->whereIn('type', ['expense', 'profit'])
                     ->where('date', '>', $asAtDate);
@@ -902,11 +920,12 @@ class ReportDataService
         return $clientFunds->sum(function ($fund) {
             // Reverse out any balance reduction that happened after the period end
             $reductionsAfter = $fund->transactions->sum('amount');
-            $balanceAsAt = (float) $fund->balance + (float) $reductionsAfter;
+            $balanceAsAt = (float)$fund->balance + (float)$reductionsAfter;
 
             return max(0, $balanceAsAt);
         });
     }
+
     private function getLoansGivenActivityInPeriod(User $user, Carbon $startDate, Carbon $endDate): array
     {
         $disbursed = LoanGiven::where('user_id', $user->id)
@@ -924,17 +943,17 @@ class ReportDataService
             ->get();
 
         return [
-            'disbursed_count'   => $disbursed->count(),
-            'disbursed_total'   => $disbursed->sum('principal_amount'),
-            'repayments_count'  => $payments->count(),
-            'repayments_total'  => $payments->sum('amount'),
-            'closed_count'      => $closedInPeriod->count(),
+            'disbursed_count' => $disbursed->count(),
+            'disbursed_total' => $disbursed->sum('principal_amount'),
+            'repayments_count' => $payments->count(),
+            'repayments_total' => $payments->sum('amount'),
+            'closed_count' => $closedInPeriod->count(),
             'principal_recovered' => $closedInPeriod->sum('principal_amount'),
-            'interest_earned'   => $closedInPeriod->sum('interest_amount'),
-            'items'             => $closedInPeriod->map(fn($l) => [
-                'borrower'  => $l->borrower_name,
+            'interest_earned' => $closedInPeriod->sum('interest_amount'),
+            'items' => $closedInPeriod->map(fn($l) => [
+                'borrower' => $l->borrower_name,
                 'principal' => $l->principal_amount,
-                'interest'  => $l->interest_amount,
+                'interest' => $l->interest_amount,
                 'repaid_date' => Carbon::parse($l->repaid_date)->format('M d, Y'),
             ])->values()->toArray(),
         ];

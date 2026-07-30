@@ -241,7 +241,7 @@
 <body>
 
 @php
-    $currency    = 'KES';
+    use Carbon\Carbon;$currency    = 'KES';
     $income      = $data['income']              ?? 0;
     $expenses    = $data['expenses']            ?? 0;
     $netFlow     = $data['net_flow']            ?? 0;
@@ -261,8 +261,8 @@
     $loansGivenActivity = $data['loans_given_activity'] ?? ['items' => []];
     $totalInterestIncome = $data['total_interest_income'] ?? $investmentIncome['total'];
 
-    $startDate = \Carbon\Carbon::parse($data['start_date']);
-    $endDate   = \Carbon\Carbon::parse($data['end_date']);
+    $startDate = Carbon::parse($data['start_date']);
+    $endDate   = Carbon::parse($data['end_date']);
     $days      = $startDate->diffInDays($endDate) + 1;
     $dailyAvg  = $days > 0 ? $expenses / $days : 0;
 
@@ -391,15 +391,15 @@
 <!-- Account Balances -->
 @if($data['accounts']->isNotEmpty())
     @php
-        $adjustedAccounts = $data['accounts']->where('current_balance', '!=', 0)->map(function ($account) use ($netWorth) {
+        $adjustedAccounts = $data['accounts']->where('current_balance', '!=', 0)->map(function ($account) {
 
-            return (object) [
-                'id'              => $account->id,
-                'name'            => $account->name,
-                'display_balance' => $account->balance_as_at,
-            ];
-        });
-        $adjustedTotal = $adjustedAccounts->sum('display_balance');
+                return (object) [
+                    'id'              => $account->id,
+                    'name'            => $account->name,
+                    'display_balance' => $account->balance_as_at,
+                ];
+            });
+            $adjustedTotal = $adjustedAccounts->sum('display_balance');
     @endphp
     <div class="section">
         <div class="section-title">Account Overview</div>
@@ -434,6 +434,12 @@
             </tr>
             </tbody>
         </table>
+        @if(($data['total_client_funds'] ?? 0) > 0)
+            <p style="font-size: 8px; color: #9CA3AF; margin-top: 4px;">
+                Balances above already exclude {{ $currency }} {{ number_format($data['total_client_funds']) }} in
+                client funds held in trust.
+            </p>
+        @endif
     </div>
 @endif
 
@@ -607,7 +613,7 @@
                         <td style="text-align: right;">{{ $currency }} {{ number_format($loan->principal_amount) }}</td>
                         <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($loan->balance) }}</td>
                         <td style="text-align: center; color: #6B7280;">
-                            {{ $loan->due_date ? \Carbon\Carbon::parse($loan->due_date)->format('M j, Y') : '—' }}
+                            {{ $loan->due_date ? Carbon::parse($loan->due_date)->format('M j, Y') : '—' }}
                         </td>
                     </tr>
                 @endforeach
@@ -683,7 +689,7 @@
                     <td style="font-weight: 600;">{{ $loan->source }}</td>
                     <td style="text-align: right;">{{ $currency }} {{ number_format($loan->principal_amount) }}</td>
                     <td style="text-align: right; color: #DC2626; font-weight: bold;">{{ $currency }} {{ number_format($loan->balance) }}</td>
-                    <td style="text-align: center; color: #6B7280;">{{ \Carbon\Carbon::parse($loan->due_date)->format('M j, Y') }}</td>
+                    <td style="text-align: center; color: #6B7280;">{{ Carbon::parse($loan->due_date)->format('M j, Y') }}</td>
                     <td style="text-align: center;"><span class="badge warning">{{ ucfirst($loan->status) }}</span></td>
                 </tr>
             @endforeach
