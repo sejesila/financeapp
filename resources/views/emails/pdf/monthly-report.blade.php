@@ -68,6 +68,8 @@
     $txCount      = $data['transaction_count']  ?? 0;
     $savingsBalance = $data['savings_balance'] ?? 0;
     $investmentIncome = $data['investment_income'] ?? ['total' => 0, 'accounts' => []];
+    $loansGivenActivity = $data['loans_given_activity'] ?? ['items' => []];
+    $totalInterestIncome = $data['total_interest_income'] ?? $investmentIncome['total'];
 
     $startDate = \Carbon\Carbon::parse($data['start_date']);
     $endDate   = \Carbon\Carbon::parse($data['end_date']);
@@ -229,11 +231,7 @@
     </div>
 @endif
 
-+<!-- Interest Income (Savings + Loans Given) -->
-@php
-        $loansGivenActivity = $data['loans_given_activity'] ?? ['items' => []];
-        $totalInterestIncome = $data['total_interest_income'] ?? $investmentIncome['total'];
-    @endphp
+<!-- Interest Income (Savings + Loans Given) -->
 @if($investmentIncome['total'] > 0)
     <div class="section">
         <div class="section-title">Interest Income</div>
