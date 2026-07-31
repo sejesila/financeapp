@@ -4,11 +4,13 @@ namespace App\Services;
 
 use App\Models\Account;
 use App\Models\Category;
+use App\Models\ClientFund;
 use App\Models\Transaction;
 use App\Models\Transfer;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -70,7 +72,9 @@ readonly class TransferService
 
         $this->enforceBalanceCheck($from, $amount, $fee);
 
-        DB::transaction(function () use ($from, $to, $amount, $date, $description, $fee, $isClientFund, $isLending) {
+        $needsReconciliation = ! $isClientFund && $this->hasOutstandingClientFunds($from);
+
+        DB::transaction(function () use ($from, $to, $amount, $date, $description, $fee, $isClientFund, $isLending, $clientFundId, $needsReconciliation) {
             $isInterestGated = $to->type === 'savings'
                 && stripos($to->name, 'etica') !== false;
 
@@ -79,16 +83,17 @@ readonly class TransferService
                 : null;
 
             $transfer = Transfer::create([
-                'from_account_id' => $from->id,
-                'to_account_id'   => $to->id,
-                'amount'          => $amount,
-                'date'            => $date,
-                'value_date'      => $valueDate,
-                'description'     => $description,
-                'user_id'         => Auth::id(),
-                'is_client_fund'  => $isClientFund,
-                'is_lending'      => $isLending,
+                'from_account_id'       => $from->id,
+                'to_account_id'         => $to->id,
+                'amount'                => $amount,
+                'date'                  => $date,
+                'value_date'            => $valueDate,
+                'description'           => $description,
+                'user_id'               => Auth::id(),
+                'is_client_fund'        => $isClientFund,
+                'is_lending'            => $isLending,
                 'client_fund_id'        => $clientFundId,
+                'needs_reconciliation'  => $needsReconciliation,
             ]);
 
             if ($fee->isCharged()) {
@@ -99,7 +104,33 @@ readonly class TransferService
             $to->updateBalance();
         });
 
+        if ($needsReconciliation) {
+            Log::warning('TransferService: transfer moved money out of an account with outstanding client funds — not flagged as client fund, needs manual reconciliation', [
+                'user_id'         => Auth::id(),
+                'from_account_id' => $from->id,
+                'amount'          => $amount,
+            ]);
+        }
+
         return $fee;
+    }
+
+    // ── Client fund safety check ────────────────────────────────────────────
+
+    /**
+     * Mirrors TransferRecorder::attemptClientFundAutoMatch()'s outstanding-
+     * balance check for the manual transfer form. Doesn't block the transfer
+     * — same warn-and-allow behavior as the webhook path — just flags it so
+     * it surfaces for review rather than silently drifting the way the
+     * Sanlam MMF client funds did.
+     */
+    private function hasOutstandingClientFunds(Account $from): bool
+    {
+        return ClientFund::where('user_id', Auth::id())
+            ->where('account_id', $from->id)
+            ->where('balance', '>', 0)
+            ->whereNotIn('status', ['cancelled'])
+            ->exists();
     }
 
     // ── Transfer rule validation ───────────────────────────────────────────────
@@ -155,6 +186,38 @@ readonly class TransferService
                     . ", Required: " . number_format($total, 2, '.', ',')
                     . " (Transfer: " . number_format($amount, 0, '.', ',')
                     . " + Fee: " . number_format($fee->amount, 2, '.', ',') . ")",
+            ]);
+        }
+    }
+    // ── Client fund safety check ────────────────────────────────────────────
+
+    /**
+     * Block transfers out of an account holding outstanding client funds
+     * unless the transfer is explicitly flagged as a client fund movement.
+     * Without this, money can silently leave an account that ClientFund
+     * records still believe is holding someone else's cash — the exact
+     * drift that later requires manual reconciliation in reports (see
+     * ReportDataService::getClientFundsBalanceAsAt(), which can only trace
+     * a fund's location through Transfer rows explicitly tagged to it).
+     */
+    private function enforceClientFundSafety(Account $from, bool $isClientFund): void
+    {
+        if ($isClientFund) {
+            return; // user already told us this transfer is a client fund movement
+        }
+
+        $hasOutstanding = ClientFund::where('user_id', Auth::id())
+            ->where('account_id', $from->id)
+            ->where('balance', '>', 0)
+            ->whereNotIn('status', ['cancelled'])
+            ->exists();
+
+        if ($hasOutstanding) {
+            throw ValidationException::withMessages([
+                'is_client_fund' => "{$from->name} is holding outstanding client funds. "
+                    . "Confirm whether this transfer includes client money by checking "
+                    . "'This is a client fund' before continuing — otherwise the client "
+                    . "fund balance will drift out of sync with this account.",
             ]);
         }
     }

@@ -9,6 +9,7 @@ use App\Models\Transaction;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Services\ReportDataService;
 
 class DashboardController extends Controller
 {
@@ -17,21 +18,6 @@ class DashboardController extends Controller
      * (loan mechanics / balance adjustments / client passthrough),
      * mirrored from BudgetController::index()'s $actualsQuery.
      */
-    private const NON_SPENDING_CATEGORY_NAMES = [
-        'Loan Disbursement',
-        'Loan Receipt',
-        'Balance Adjustment',
-        'Client Funds',
-    ];
-
-    /**
-     * Additional category names excluded from *income* only, mirrored
-     * from BudgetController::index()'s $incomeCategories filter.
-     */
-    private const NON_INCOME_ONLY_CATEGORY_NAMES = [
-        'Friend Loan Given',
-        'Loan Recovery',
-    ];
 
     public function index()
     {
@@ -274,13 +260,13 @@ class DashboardController extends Controller
 
     /**
      * Exclude categories that don't represent real spending or income
-     * (loan mechanics, balance adjustments, client passthrough).
-     * Mirrors BudgetController::index()'s $actualsQuery category filter.
+     * (loan mechanics, balance adjustments, client passthrough). Single
+     * shared list — see ReportDataService::NON_SPENDING_CATEGORY_NAMES.
      */
     private function excludeNonSpending(Builder $query): Builder
     {
         return $query->whereHas('category', function ($q) {
-            $q->whereNotIn('name', self::NON_SPENDING_CATEGORY_NAMES);
+            $q->whereNotIn('name', ReportDataService::nonSpendingCategoryNames());
         });
     }
 
@@ -289,13 +275,15 @@ class DashboardController extends Controller
      * strips specifically from its $incomeCategories list (Friend Loan
      * Given, Loan Recovery are loan mechanics, not earned income).
      */
+    /**
+     * Exclude categories that don't represent real spending or income
+     * (loan mechanics, balance adjustments, client passthrough). Single
+     * shared list — see ReportDataService::NON_SPENDING_CATEGORY_NAMES.
+     */
+
+
     private function excludeNonIncome(Builder $query): Builder
     {
-        return $query->whereHas('category', function ($q) {
-            $q->whereNotIn('name', array_merge(
-                self::NON_SPENDING_CATEGORY_NAMES,
-                self::NON_INCOME_ONLY_CATEGORY_NAMES
-            ));
-        });
+        return $this->excludeNonSpending($query);
     }
 }

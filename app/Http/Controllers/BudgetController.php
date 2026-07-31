@@ -9,6 +9,7 @@ use App\Models\Loan;
 use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -33,6 +34,13 @@ class BudgetController extends Controller
     private const EXCLUDED_LOAN_CATEGORIES = [
         'Loan Disbursement', 'Loan Receipt', 'Balance Adjustment',
         'Friend Loan Given', 'Loan Recovery',
+        // 'Loan Interest' intentionally NOT excluded here — Budget is the one
+        // view that shows every real income/expense category unfiltered, with
+        // no separate "Interest Income" card the way Reports/PDF reports have.
+        // Excluding it would make closed loan-given interest invisible on
+        // this page entirely, not just move it elsewhere. See LoanGivenTest
+        // > 'excludes principal recovery but includes Loan Interest as real
+        // income once closed' for the asserted behavior.
     ];
 
     public function index(Request $request, $year = null)
@@ -95,7 +103,7 @@ class BudgetController extends Controller
         // Convert to lookup: [category_id][month] => total
         $actuals = [];
         foreach ($actualsQuery as $row) {
-            $actuals[$row->category_id][$row->month] = (float) $row->total;
+            $actuals[$row->category_id][$row->month] = (float)$row->total;
         }
 
         // Calculate yearly totals for income categories
@@ -177,9 +185,9 @@ class BudgetController extends Controller
     {
         $validated = $request->validate([
             'category_id' => 'required|integer|exists:categories,id',
-            'year'        => 'required|integer|min:2000|max:2100',
-            'month'       => 'required|integer|min:1|max:12',
-            'amount'      => 'required|numeric|min:0',
+            'year' => 'required|integer|min:2000|max:2100',
+            'month' => 'required|integer|min:1|max:12',
+            'amount' => 'required|numeric|min:0',
         ]);
 
         // Ensure the category belongs to the authenticated user
@@ -189,10 +197,10 @@ class BudgetController extends Controller
 
         $budget = Budget::updateOrCreate(
             [
-                'user_id'     => Auth::id(),
+                'user_id' => Auth::id(),
                 'category_id' => $validated['category_id'],
-                'year'        => $validated['year'],
-                'month'       => $validated['month'],
+                'year' => $validated['year'],
+                'month' => $validated['month'],
             ],
             [
                 'amount' => $validated['amount'],
@@ -201,7 +209,7 @@ class BudgetController extends Controller
 
         return response()->json([
             'success' => true,
-            'budget'  => $budget,
+            'budget' => $budget,
         ]);
     }
 
@@ -225,8 +233,8 @@ class BudgetController extends Controller
             ->sum('balance');
 
         return [
-            'disbursed'      => $loansDisbursed,
-            'payments'       => $loanPayments,
+            'disbursed' => $loansDisbursed,
+            'payments' => $loanPayments,
             'active_balance' => $activeLoanBalance,
         ];
     }
@@ -264,7 +272,7 @@ class BudgetController extends Controller
      *   - Slower reversals (withdraw, then change your mind and put it
      *     back within the week), without needing separate logic for each.
      */
-    private function calculateNetSavingsWithdrawals(int $year): \Illuminate\Support\Collection
+    private function calculateNetSavingsWithdrawals(int $year): Collection
     {
         $withdrawals = DB::table('transfers')
             ->join('accounts as from_acc', 'transfers.from_account_id', '=', 'from_acc.id')
@@ -304,24 +312,23 @@ class BudgetController extends Controller
             )
             ->orderBy('transfers.date')
             ->get()
-            ->map(fn($d) => (object) [
-                'id'                      => $d->id,
+            ->map(fn($d) => (object)[
+                'id' => $d->id,
                 'intermediate_account_id' => $d->intermediate_account_id,
-                'date'                    => Carbon::parse($d->date),
-                'remaining'               => (float) $d->amount,
+                'date' => Carbon::parse($d->date),
+                'remaining' => (float)$d->amount,
             ])
             ->keyBy('id');
 
         $netByMonth = [];
 
         foreach ($withdrawals as $w) {
-            $withdrawalDate    = Carbon::parse($w->date);
+            $withdrawalDate = Carbon::parse($w->date);
             $reversalWindowEnd = $withdrawalDate->copy()->addDays(self::SAVINGS_REVERSAL_WINDOW_DAYS);
-            $remainingToMatch  = (float) $w->amount;
+            $remainingToMatch = (float)$w->amount;
 
             $candidates = $deposits
-                ->filter(fn($d) =>
-                    $d->intermediate_account_id === $w->intermediate_account_id
+                ->filter(fn($d) => $d->intermediate_account_id === $w->intermediate_account_id
                     && $d->remaining > 0
                     && $d->date->greaterThanOrEqualTo($withdrawalDate)
                     && $d->date->lessThanOrEqualTo($reversalWindowEnd)
@@ -343,7 +350,7 @@ class BudgetController extends Controller
         }
 
         return collect($netByMonth)
-            ->map(fn($total, $month) => (object) [
+            ->map(fn($total, $month) => (object)[
                 'month' => $month,
                 'total' => $total,
             ])

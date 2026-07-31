@@ -15,10 +15,7 @@ use Illuminate\Support\Facades\DB;
 class ReportsController extends Controller
 {
     /**
-     * Category names that never represent real income or spending
-     * (loan mechanics / balance adjustments / client passthrough),
-     * mirrored from BudgetController::index()'s $actualsQuery and
-     * DashboardController::NON_SPENDING_CATEGORY_NAMES.
+     * Mirrors ReportDataService::NON_SPENDING_CATEGORY_NAMES.
      */
     private const NON_SPENDING_CATEGORY_NAMES = [
         'Loan Disbursement',

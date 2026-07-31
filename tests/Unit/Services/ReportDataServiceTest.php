@@ -678,16 +678,27 @@ class ReportDataServiceTest extends TestCase
     public function it_calculates_loan_given_interest_income_separately()
     {
         $startDate = $this->reportStart;
-        $category  = $this->createCategory($this->user, 'Loan Interest', 'income');
 
-        Transaction::factory()
+        // loan_given_interest_income is sourced from LoanGiven.interest_amount
+        // for loans closed (repaid_date) within the report period — not from
+        // matching 'Loan Interest' Transaction rows by date. Those transactions
+        // are stamped with the last payment's date (see
+        // LoanGivenController::splitInterestOutOfFinalPayment()), which can
+        // fall outside the report window even when the loan's actual closing
+        // date is inside it (e.g. closed via the standalone close() action
+        // days after the last payment was recorded).
+        LoanGiven::factory()
             ->for($this->user)
             ->for($this->account)
-            ->for($category)
             ->create([
-                'type'   => 'income',
-                'amount' => 3000,
-                'date'   => $startDate->copy()->addDays(5),
+                'status'           => 'paid',
+                'principal_amount' => 30000,
+                'balance'          => 0,
+                'amount_paid'      => 33000,
+                'interest_amount'  => 3000,
+                'interest_rate'    => 10.0,
+                'disbursed_date'   => $startDate->copy()->subMonths(2),
+                'repaid_date'      => $startDate->copy()->addDays(5),
             ]);
 
         $report = $this->service->generateMonthlyReport($this->user);
@@ -738,6 +749,35 @@ class ReportDataServiceTest extends TestCase
         $this->assertEquals(20000, $report['total_loans_given']);
         // 50,000 savings + 20,000 outstanding loans given, no borrowed loans.
         $this->assertEquals(70000, $report['net_worth']);
+    }
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_includes_loan_given_interest_when_closed_after_the_last_payment_date()
+    {
+        // Regression test: repaid_date and the last payment's date can
+        // diverge when a loan is closed via the standalone close() action
+        // some time after the final payment was recorded. interest income
+        // must be keyed off repaid_date, not the payment/transaction date.
+        $startDate = $this->reportStart;
+
+        LoanGiven::factory()
+            ->for($this->user)
+            ->for($this->account)
+            ->create([
+                'status'           => 'paid',
+                'principal_amount' => 10000,
+                'balance'          => 0,
+                'amount_paid'      => 10500,
+                'interest_amount'  => 500,
+                'interest_rate'    => 5.0,
+                // Last payment/disbursement happened well BEFORE the report
+                // period — only repaid_date falls inside it.
+                'disbursed_date'   => $startDate->copy()->subMonths(3),
+                'repaid_date'      => $startDate->copy()->addDays(10),
+            ]);
+
+        $report = $this->service->generateMonthlyReport($this->user);
+
+        $this->assertEquals(500, $report['loan_given_interest_income']);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

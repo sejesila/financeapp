@@ -21,6 +21,38 @@ class ReportDataService
     private const MIN_SALARY_AMOUNT_FOR_SAVINGS_RATE = 40000;
     private const SALARY_TO_SAVINGS_WINDOW_HOURS = 72;
     private const SAVINGS_REVERSAL_WINDOW_DAYS = 8;
+    /**
+     * Category names that represent loan mechanics, balance corrections, or
+     * client-fund passthrough — never the user's own real income or spending.
+     * This is the single canonical list; DashboardController, BudgetController,
+     * and ReportsController all pull from here via the accessor below instead
+     * of maintaining their own copies. Previously each controller hardcoded
+     * its own version of this list and they drifted apart — e.g. Dashboard
+     * omitted 'Friend Loan Given' from its expense exclusions (so lending
+     * money to someone spiked "This Month" spending there but nowhere else)
+     * and omitted 'Loan Interest' from income (so closed loan-given interest
+     * got folded into regular income there but nowhere else). Any category
+     * added here automatically stops leaking into all four surfaces at once.
+     */
+    public const NON_SPENDING_CATEGORY_NAMES = [
+        'Loan Disbursement',
+        'Loan Receipt',
+        'Balance Adjustment',
+        'Client Funds',
+        'Friend Loan Given',   // disbursement — not a real expense
+        'Loan Recovery',       // principal returning — not real income
+        'Loan Interest',       // handled as its own Interest Income section
+    ];
+
+    /**
+     * Accessor so callers don't reference the const directly (keeps the
+     * option open to make this dynamic/DB-driven later without breaking
+     * every call site).
+     */
+    public static function nonSpendingCategoryNames(): array
+    {
+        return self::NON_SPENDING_CATEGORY_NAMES;
+    }
 
     /**
      * Generate annual report for the prior full year
@@ -246,15 +278,7 @@ class ReportDataService
             })
             ->whereHas('category', function ($q) {
                 $q->whereIn('type', ['income', 'expense'])
-                    ->whereNotIn('name', [
-                        'Loan Disbursement',
-                        'Loan Receipt',
-                        'Balance Adjustment',
-                        'Client Funds',
-                        'Friend Loan Given',   // disbursement — not a real expense
-                        'Loan Recovery',       // principal returning — not real income
-                        'Loan Interest',       // handled separately below, own section
-                    ]);
+                    ->whereNotIn('name', self::NON_SPENDING_CATEGORY_NAMES);
             })
             ->with(['category', 'account'])
             ->get();
