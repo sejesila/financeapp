@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Account;
 use App\Models\Category;
+use App\Models\ClientFund;
 use App\Models\Transaction;
 use App\Models\Transfer;
 use App\Services\InterestService;
@@ -538,7 +539,14 @@ class AccountController extends Controller
             ->where('is_active', true)
             ->get();
 
-        return view('accounts.transfer', compact('sourceAccounts', 'destinationAccounts'));
+        // Outstanding client funds, grouped by the account currently holding them
+        $outstandingFunds = ClientFund::where('user_id', Auth::id())
+            ->where('balance', '>', 0)
+            ->whereNotIn('status', ['cancelled'])
+            ->get()
+            ->groupBy('account_id');
+
+        return view('accounts.transfer', compact('sourceAccounts', 'destinationAccounts', 'outstandingFunds'));
     }
 
     // ── transfer post ─────────────────────────────────────────────────────────
@@ -559,7 +567,9 @@ class AccountController extends Controller
             'transaction_fee' => 'nullable|numeric|min:0',
             'is_client_fund'  => 'nullable|boolean',
             'is_lending'      => 'nullable|boolean',
+            'client_fund_id'  => 'nullable|exists:client_funds,id',
         ]);
+
         if ($request->boolean('is_client_fund') && $request->boolean('is_lending')) {
             return redirect()->back()->withInput()
                 ->with('error', 'A transfer cannot be both a client fund and a lending withdrawal.');
@@ -570,6 +580,20 @@ class AccountController extends Controller
 
         if ($from->user_id !== Auth::id() || $to->user_id !== Auth::id()) {
             abort(403);
+        }
+
+        // If flagged as a client fund transfer, the selected fund must actually
+        // belong to the source account — prevents cross-account mismatches.
+        if ($request->boolean('is_client_fund') && $request->filled('client_fund_id')) {
+            $fund = \App\Models\ClientFund::where('id', $request->client_fund_id)
+                ->where('user_id', Auth::id())
+                ->where('account_id', $from->id)
+                ->first();
+
+            if (!$fund) {
+                return redirect()->back()->withInput()
+                    ->with('error', 'Selected client fund does not match the source account.');
+            }
         }
 
         if ($this->interestService->requiresInterestBeforeWithdrawal($from)
@@ -592,6 +616,7 @@ class AccountController extends Controller
                 $request->filled('transaction_fee') ? (float) $request->transaction_fee : null,
                 $request->boolean('is_client_fund'),
                 $request->boolean('is_lending'),
+                $request->filled('client_fund_id') ? (int) $request->client_fund_id : null,
             );
         } catch (ValidationException $e) {
             return redirect()->back()->withInput()->withErrors($e->errors());
@@ -603,7 +628,6 @@ class AccountController extends Controller
         return redirect()->route('accounts.index')
             ->with('success', 'Transfer completed successfully!' . $fee->successSuffix());
     }
-
     // ── top-up form ───────────────────────────────────────────────────────────
 
     public function topUpForm(Account $account)

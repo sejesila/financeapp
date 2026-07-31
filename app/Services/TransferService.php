@@ -57,6 +57,7 @@ readonly class TransferService
         ?float  $manualFee = null,
         bool    $isClientFund = false,
         bool    $isLending = false,
+        ?int    $clientFundId = null,
     ): TransferFee
     {
         $this->enforceTransferRules($from, $to, $amount);
@@ -87,6 +88,7 @@ readonly class TransferService
                 'user_id'         => Auth::id(),
                 'is_client_fund'  => $isClientFund,
                 'is_lending'      => $isLending,
+                'client_fund_id'        => $clientFundId,
             ]);
 
             if ($fee->isCharged()) {

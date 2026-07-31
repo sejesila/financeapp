@@ -932,22 +932,41 @@ class ReportDataService
         $clientFunds = ClientFund::where('user_id', $user->id)
             ->where('received_date', '<=', $asAtDate)
             ->whereNotIn('status', ['cancelled'])
-            ->when($accountId !== null, fn($q) => $q->where('account_id', $accountId))
             ->with(['transactions' => function ($q) use ($asAtDate) {
                 $q->whereIn('type', ['expense', 'profit'])
                     ->where('date', '>', $asAtDate);
             }])
             ->get();
 
-        return $clientFunds->sum(function ($fund) {
-            // Reverse out any balance reduction that happened after the period end
+        return $clientFunds->sum(function ($fund) use ($accountId, $asAtDate) {
             $reductionsAfter = $fund->transactions->sum('amount');
-            $balanceAsAt = (float)$fund->balance + (float)$reductionsAfter;
+            $balanceAsAt = max(0, (float) $fund->balance + (float) $reductionsAfter);
 
-            return max(0, $balanceAsAt);
+            if ($accountId === null) {
+                return $balanceAsAt;
+            }
+
+            // Trace where this fund's cash actually sat as of $asAtDate by
+            // replaying any transfers explicitly tagged to it, rather than
+            // trusting the static account_id — which can go stale the moment
+            // the money moves without a tagged transfer recording it.
+            $currentAccountId = $fund->account_id;
+
+            $movements = Transfer::withoutGlobalScopes()
+                ->where('client_fund_id', $fund->id)
+                ->where('date', '<=', $asAtDate)
+                ->orderBy('date')
+                ->get();
+
+            foreach ($movements as $m) {
+                if ($m->from_account_id === $currentAccountId) {
+                    $currentAccountId = $m->to_account_id;
+                }
+            }
+
+            return $currentAccountId === $accountId ? $balanceAsAt : 0.0;
         });
     }
-
     private function getLoansGivenActivityInPeriod(User $user, Carbon $startDate, Carbon $endDate): array
     {
         $disbursed = LoanGiven::where('user_id', $user->id)

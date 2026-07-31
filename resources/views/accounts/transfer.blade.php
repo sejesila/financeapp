@@ -35,7 +35,7 @@
                         name="from_account_id"
                         id="from_account_id"
                         x-model="fromAccountId"
-                        @change="calculateFee(); updateDestinationOptions();"
+                        @change="calculateFee(); updateDestinationOptions(); updateFundOptions();"
                         required
                         class="w-full border border-gray-300 dark:border-gray-600 rounded px-4 py-2 dark:bg-gray-700 dark:text-gray-200"
                     >
@@ -156,6 +156,33 @@
                         — head to Loans Given afterward to record who it's going to.
                     </p>
                 </div>
+                <!-- Client Fund Selector -->
+                <div x-show="purpose === 'client_fund'" x-transition class="mb-4">
+                    <label for="client_fund_id" class="block text-gray-700 dark:text-gray-200 font-semibold mb-2">
+                        Which client fund is this?
+                    </label>
+                    <select
+                        name="client_fund_id"
+                        id="client_fund_id"
+                        x-model="clientFundId"
+                        class="w-full border border-gray-300 dark:border-gray-600 rounded px-4 py-2 dark:bg-gray-700 dark:text-gray-200"
+                    >
+                        <option value="">-- Select fund --</option>
+                        @foreach($outstandingFunds ?? [] as $accountId => $funds)
+                            @foreach($funds as $fund)
+                                <option value="{{ $fund->id }}" data-account="{{ $accountId }}">
+                                    Fund #{{ $fund->id }} — received {{ \Carbon\Carbon::parse($fund->received_date)->format('M d, Y') }} — KES {{ number_format($fund->balance, 0, '.', ',') }}
+                                </option>
+                            @endforeach
+                        @endforeach
+                    </select>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Optional but recommended — keeps this fund's balance correctly tracked if the money moves again later.
+                    </p>
+                </div>
+
+                <input type="hidden" name="is_client_fund" :value="purpose === 'client_fund' ? '1' : '0'">
+                <input type="hidden" name="is_lending" :value="purpose === 'lending' ? '1' : '0'">
 
                 <input type="hidden" name="is_client_fund" :value="purpose === 'client_fund' ? '1' : '0'">
                 <input type="hidden" name="is_lending" :value="purpose === 'lending' ? '1' : '0'">
@@ -285,6 +312,16 @@
                 // driving the two hidden is_client_fund/is_lending inputs so they
                 // can never both end up true.
                 purpose: '{{ old('is_lending') ? "lending" : (old('is_client_fund') ? "client_fund" : "personal") }}',
+                updateFundOptions() {
+                    const fundSelect = document.getElementById('client_fund_id');
+                    if (!fundSelect) return;
+                    Array.from(fundSelect.options).forEach(opt => {
+                        if (!opt.value) return;
+                        opt.hidden = opt.dataset.account !== this.fromAccountId;
+                    });
+                    const current = fundSelect.querySelector(`option[value="${this.clientFundId}"]`);
+                    if (current && current.hidden) this.clientFundId = '';
+                },
 
                 ATM_FEE: 33 + (33 * 0.15),
 
@@ -475,6 +512,7 @@
                     this.$nextTick(() => {
                         this.updateDestinationOptions();
                         this.calculateFee();
+                        this.updateFundOptions();
                     });
                 }
             }

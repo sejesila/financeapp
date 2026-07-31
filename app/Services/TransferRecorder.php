@@ -4,6 +4,7 @@
 namespace App\Services;
 
 use App\Models\Account;
+use App\Models\ClientFund;
 use App\Models\Transaction;
 use App\Models\Transfer;
 use App\Models\User;
@@ -285,7 +286,7 @@ class TransferRecorder
                 Carbon::parse($parsed['date'])
             )->format('Y-m-d');
 
-            Transfer::create([
+            $transfer = Transfer::create([
                 'user_id'         => $user->id,
                 'from_account_id' => $bankAccount->id,
                 'to_account_id'   => $savingsAccount->id,
@@ -295,6 +296,7 @@ class TransferRecorder
                 'description'     => $parsed['description'] . ' [' . $parsed['reference'] . ']',
                 'mpesa_reference'  => $parsed['reference'],
             ]);
+            $this->attemptClientFundAutoMatch($transfer, $user, $bankAccount, $parsed['amount']);
 
             if ($parsed['fee'] > 0) {
                 $feeCategory = $this->categories->findOrCreate($user, 'Transaction Fees', 'expense');
@@ -411,16 +413,17 @@ class TransferRecorder
                 ? KenyanBusinessDays::nextBusinessDay(Carbon::parse($parsed['date']))->format('Y-m-d')
                 : null;
 
-            Transfer::create([
+            $transfer = Transfer::create([
                 'user_id'         => $user->id,
                 'from_account_id' => $mpesaAccount->id,
                 'to_account_id'   => $destinationAccount->id,
                 'amount'          => $parsed['amount'],
-                'date'            => $parsed['date'],   // was: now()
+                'date'            => $parsed['date'],
                 'value_date'      => $valueDate,
                 'description'     => $parsed['description'] . ' [' . $parsed['reference'] . ']',
                 'mpesa_reference' => $parsed['reference'],
             ]);
+            $this->attemptClientFundAutoMatch($transfer, $user, $mpesaAccount, $parsed['amount']);
 
             if (!empty($parsed['fee']) && $parsed['fee'] > 0) {
                 $feeCategory = $this->categories->findOrCreate($user, 'Transaction Fees', 'expense');
@@ -541,5 +544,43 @@ class TransferRecorder
             'from'    => $sourceAccount->name,
             'to'      => $mpesaAccount->name,
         ], 201);
+    }
+    private function attemptClientFundAutoMatch(Transfer $transfer, User $user, Account $fromAccount, float $amount): void
+    {
+        $candidateFund = ClientFund::where('user_id', $user->id)
+            ->where('account_id', $fromAccount->id)
+            ->where('balance', $amount)
+            ->whereNotIn('status', ['cancelled'])
+            ->first();
+
+        if ($candidateFund) {
+            $transfer->update([
+                'client_fund_id' => $candidateFund->id,
+                'is_client_fund' => true,
+            ]);
+
+            Log::info('Webhook: auto-matched transfer to client fund', [
+                'transfer_id'    => $transfer->id,
+                'client_fund_id' => $candidateFund->id,
+                'amount'         => $amount,
+            ]);
+            return;
+        }
+
+        $hasOutstanding = ClientFund::where('user_id', $user->id)
+            ->where('account_id', $fromAccount->id)
+            ->where('balance', '>', 0)
+            ->whereNotIn('status', ['cancelled'])
+            ->exists();
+
+        if ($hasOutstanding) {
+            $transfer->update(['needs_reconciliation' => true]);
+
+            Log::warning('Webhook: transfer moved money out of an account with outstanding client funds — could not auto-match, needs manual reconciliation', [
+                'transfer_id'      => $transfer->id,
+                'from_account_id'  => $fromAccount->id,
+                'amount'           => $amount,
+            ]);
+        }
     }
 }
