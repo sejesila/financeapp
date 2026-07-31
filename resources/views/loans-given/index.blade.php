@@ -29,7 +29,26 @@
                     </div>
 
                     <!-- Statistics Dashboard -->
-                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
+                        <!-- Total Outstanding (NEW) -->
+                        <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 overflow-hidden shadow-sm rounded-lg border border-indigo-200">
+                            <div class="p-4">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0 bg-indigo-500 rounded-lg p-3">
+                                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="ml-4">
+                                        <p class="text-sm font-medium text-gray-500">Total Outstanding</p>
+                                        <p class="text-lg font-semibold text-gray-900">
+                                            KES {{ number_format($totalOutstanding ?? 0, 0) }}</p>
+                                        <p class="text-xs text-gray-500">Across active loans</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <!-- Total Principal -->
                         <div
                             class="bg-gradient-to-br from-blue-50 to-blue-100 overflow-hidden shadow-sm rounded-lg border border-blue-200">

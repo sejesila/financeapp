@@ -77,6 +77,7 @@ class LoanGivenController extends Controller implements HasMiddleware
             $totalPrincipal = $allLoans->sum('principal_amount');
             $totalRepaid = $paidLoansCollection->sum('amount_paid');
             $totalInterest = $paidLoansCollection->sum('interest_amount');
+            $totalOutstanding = $activeLoans->sum('balance');
 
             $loansWithInterest = $paidLoansCollection->filter(fn($loan) => $loan->interest_amount > 0);
             $avgInterestRate = $loansWithInterest->isNotEmpty()
@@ -95,7 +96,7 @@ class LoanGivenController extends Controller implements HasMiddleware
             return view('loans-given.index', compact(
                 'activeLoans', 'paidLoans', 'filter', 'period',
                 'startDate', 'endDate', 'minYear', 'maxYear', 'accounts',
-                'totalPrincipal', 'totalRepaid', 'totalInterest', 'avgInterestRate', 'repaymentRate'
+                'totalPrincipal', 'totalRepaid', 'totalInterest', 'avgInterestRate', 'repaymentRate','totalOutstanding'
             ));
 
         } catch (ValidationException|AuthorizationException $e) {

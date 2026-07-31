@@ -8,15 +8,17 @@ use Illuminate\Support\Facades\DB;
 
 class TransactionStatsService
 {
+    // TransactionStatsService.php — totals()
     public function totals(): array
     {
         $base = Transaction::where('user_id', Auth::id())->where('is_transaction_fee', false);
+        $lastMonth = now()->subMonthNoOverflow();
 
         return [
             'totalThisWeek'  => (clone $base)->whereBetween('date', [now()->startOfWeek(), now()->endOfWeek()])->sum('amount'),
             'totalLastWeek'  => (clone $base)->whereBetween('date', [now()->subWeek()->startOfWeek(), now()->subWeek()->endOfWeek()])->sum('amount'),
             'totalThisMonth' => (clone $base)->whereMonth('date', now()->month)->whereYear('date', now()->year)->sum('amount'),
-            'totalLastMonth' => (clone $base)->whereMonth('date', now()->subMonth()->month)->whereYear('date', now()->subMonth()->year)->sum('amount'),
+            'totalLastMonth' => (clone $base)->whereMonth('date', $lastMonth->month)->whereYear('date', $lastMonth->year)->sum('amount'),
             'totalThisYear'  => (clone $base)->whereYear('date', now()->year)->sum('amount'),
             'totalLastYear'  => (clone $base)->whereYear('date', now()->subYear()->year)->sum('amount'),
             'totalAll'       => (clone $base)->sum('amount'),
@@ -80,8 +82,9 @@ class TransactionStatsService
     {
         $m  = now()->month;
         $y  = now()->year;
-        $lm = now()->subMonth()->month;
-        $ly = now()->subMonth()->year;
+        $lastMonth = now()->subMonthNoOverflow();
+        $lm= $lastMonth->month;
+        $ly = $lastMonth->year;
         $lastYear = now()->subYear()->year;
 
         $result = $this->summaryBaseQuery()
