@@ -8,8 +8,9 @@ use App\Http\Requests\UpdateTransactionRequest;
 use App\Models\Account;
 use App\Models\Category;
 use App\Models\MobileMoneyTypeUsage;
-use App\Services\MobileMoneyRates;
 use App\Models\Transaction;
+use App\Services\MobileMoneyRates;
+use App\Services\ReportDataService;
 use App\Services\TransactionService;
 use App\Services\TransactionStatsService;
 use Exception;
@@ -23,40 +24,25 @@ class TransactionController extends Controller
 {
     use AuthorizesRequests;
 
-
-    private const EXCLUDED_CATEGORIES = [
-        'Income', 'Loans', 'Loan Receipt', 'Excise Duty',
-        'Loan Fees Refund', 'Facility Fee Refund', 'Transaction Fees',
-        'Balance Adjustment',
-        'Friend Loan Given', 'Loan Recovery',
-        'Loan Disbursement', 'Client Funds', 'Loan Interest', // system-generated —
-        // created automatically by LoanController / ClientFundController /
-        // LoanGivenController, never meant to be hand-picked. Selecting one
-        // manually would silently exclude that transaction from every
-        // income/expense total in the app — see
-        // ReportDataService::NON_SPENDING_CATEGORY_NAMES, which these three
-        // are also excluded from for reporting.
-    ];
-
-
-
     public function __construct(
         protected TransactionService      $transactionService,
         protected TransactionStatsService $stats,
-    ) {}
+    )
+    {
+    }
 
     public function index(Request $request)
     {
-        $filter     = $request->query('filter', 'today');
-        $search     = $request->query('search');
+        $filter = $request->query('filter', 'today');
+        $search = $request->query('search');
         $categoryId = $request->query('category_id');
-        $accountId  = $request->query('account_id');
-        $startDate  = $request->query('start_date');
-        $endDate    = $request->query('end_date');
-        $showFees   = $request->boolean('show_fees');
+        $accountId = $request->query('account_id');
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+        $showFees = $request->boolean('show_fees');
 
-        $allowedSorts  = ['date', 'description', 'amount', 'account', 'category'];
-        $sortColumn    = in_array($request->query('sort'), $allowedSorts) ? $request->query('sort') : 'date';
+        $allowedSorts = ['date', 'description', 'amount', 'account', 'category'];
+        $sortColumn = in_array($request->query('sort'), $allowedSorts) ? $request->query('sort') : 'date';
         $sortDirection = $request->query('direction') === 'asc' ? 'asc' : 'desc';
 
         $minYear = Transaction::selectRaw('YEAR(MIN(date)) as min_year')->value('min_year') ?? date('Y');
@@ -87,13 +73,13 @@ class TransactionController extends Controller
         TransactionFilter::applyDateFilter($query, $filter, $startDate, $endDate);
 
         match ($sortColumn) {
-            'account'  => $query->leftJoin('accounts', 'transactions.account_id', '=', 'accounts.id')
+            'account' => $query->leftJoin('accounts', 'transactions.account_id', '=', 'accounts.id')
                 ->orderBy('accounts.name', $sortDirection)
                 ->select('transactions.*'),
             'category' => $query->leftJoin('categories', 'transactions.category_id', '=', 'categories.id')
                 ->orderBy('categories.name', $sortDirection)
                 ->select('transactions.*'),
-            default    => tap($query->orderBy($sortColumn, $sortDirection), function ($q) use ($sortColumn, $sortDirection) {
+            default => tap($query->orderBy($sortColumn, $sortDirection), function ($q) use ($sortColumn, $sortDirection) {
                 if ($sortColumn === 'date') {
                     $q->orderBy('id', $sortDirection);
                 }
@@ -101,8 +87,8 @@ class TransactionController extends Controller
         };
 
         $transactions = $query->paginate(25)->withQueryString();
-        $categories   = Category::where('user_id', Auth::id())->orderBy('type')->orderBy('name')->get();
-        $accounts     = $this->getActiveAccounts();
+        $categories = Category::where('user_id', Auth::id())->orderBy('type')->orderBy('name')->get();
+        $accounts = $this->getActiveAccounts();
 
         return view('transactions.index', array_merge(
             compact(
@@ -134,7 +120,7 @@ class TransactionController extends Controller
         $validated = $request->validated();
 
         try {
-            $account    = Account::findOrFail($validated['account_id']);
+            $account = Account::findOrFail($validated['account_id']);
             $oldBalance = $account->current_balance;
 
             $transaction = $this->transactionService->createTransaction($validated);
@@ -202,7 +188,7 @@ class TransactionController extends Controller
         $this->authorize('update', $transaction);
 
         try {
-            $validated          = $request->validated();
+            $validated = $request->validated();
             $updatedTransaction = $this->transactionService->updateTransaction($transaction, $validated);
 
             if ($transaction->category_id != $validated['category_id']) {
@@ -276,7 +262,7 @@ class TransactionController extends Controller
         try {
             Transaction::onlyTrashed()->find($transaction->related_fee_transaction_id)?->forceDelete();
             $transaction->forceDelete();
-           // $transaction->account?->updateBalance();
+            // $transaction->account?->updateBalance();
 
             DB::commit();
 
@@ -295,14 +281,14 @@ class TransactionController extends Controller
         return array_merge(
             $this->getCategoriesForForm(),
             [
-                'accounts'               => $accounts,
-                'mpesaCosts'             => MobileMoneyRates::costs('mpesa'),
-                'airtelCosts'            => MobileMoneyRates::costs('airtel_money'),
-                'mpesaTransactionTypes'  => $this->getTransactionTypes('mpesa'),
+                'accounts' => $accounts,
+                'mpesaCosts' => MobileMoneyRates::costs('mpesa'),
+                'airtelCosts' => MobileMoneyRates::costs('airtel_money'),
+                'mpesaTransactionTypes' => $this->getTransactionTypes('mpesa'),
                 'airtelTransactionTypes' => $this->getTransactionTypes('airtel_money'),
-                'defaultMpesaType'       => MobileMoneyTypeUsage::getMostUsedType(Auth::id(), 'mpesa') ?? 'send_money',
-                'defaultAirtelType'      => MobileMoneyTypeUsage::getMostUsedType(Auth::id(), 'airtel_money') ?? 'send_money',
-                'mpesaAccount'           => $accounts->where('type', 'mpesa')->first(),
+                'defaultMpesaType' => MobileMoneyTypeUsage::getMostUsedType(Auth::id(), 'mpesa') ?? 'send_money',
+                'defaultAirtelType' => MobileMoneyTypeUsage::getMostUsedType(Auth::id(), 'airtel_money') ?? 'send_money',
+                'mpesaAccount' => $accounts->where('type', 'mpesa')->first(),
             ]
         );
     }
@@ -313,7 +299,7 @@ class TransactionController extends Controller
 
         if ($transaction->feeTransaction) {
             $feeAmount = number_format($transaction->feeTransaction->amount, 2);
-            $message  .= " (including KSh {$feeAmount} transaction fee)";
+            $message .= " (including KSh {$feeAmount} transaction fee)";
         }
 
         return $message;
@@ -321,33 +307,42 @@ class TransactionController extends Controller
 
     private function getCategoriesForForm(): array
     {
+        $excludedCategories = array_merge(
+            ReportDataService::nonSpendingCategoryNames(),
+            // Picker-only exclusions: parent groupers and fee/refund
+            // categories that are never real income/expense but also
+            // aren't part of the reporting exclusion list (they're not
+            // reachable via normal transaction entry to begin with,
+            // or are meta-categories like 'Income'/'Loans' used only
+            // as parent groupers in the category tree).
+            ['Income', 'Loans', 'Excise Duty', 'Loan Fees Refund', 'Facility Fee Refund', 'Transaction Fees'],
+        );
 
         $allowedChildren = ['Loan Repayment']; // exceptions that bypass parent exclusion
 
         $allCategories = Category::where('user_id', Auth::id())
             ->whereNotNull('parent_id')
             ->where('is_active', true)
-            ->whereNotIn('name', self::EXCLUDED_CATEGORIES)
-            ->with('parent')  // ← no constraint here
+            ->whereNotIn('name', $excludedCategories)
+            ->with('parent')
             ->orderBy('usage_count', 'desc')
             ->orderBy('name')
             ->get()
             ->filter(fn($c) => $c->parent && (
-                    !in_array($c->parent->name, self::EXCLUDED_CATEGORIES)
+                    !in_array($c->parent->name, $excludedCategories)
                     || in_array($c->name, $allowedChildren)
                 ));
 
         $parentCategories = Category::where('user_id', Auth::id())
             ->whereNull('parent_id')
             ->where('is_active', true)
-            ->whereNotIn('name', self::EXCLUDED_CATEGORIES)
+            ->whereNotIn('name', $excludedCategories)
             ->get()
             ->keyBy('id');
 
-        // For allowed children whose parent is excluded, inject a synthetic parent group
         $injectedParents = collect();
         foreach ($allCategories as $child) {
-            if ($child->parent && in_array($child->parent->name, self::EXCLUDED_CATEGORIES)) {
+            if ($child->parent && in_array($child->parent->name, $excludedCategories)) {
                 $injectedParents->put($child->parent_id, $child->parent);
             }
         }

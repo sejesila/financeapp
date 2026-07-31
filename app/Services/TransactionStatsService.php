@@ -8,12 +8,6 @@ use Illuminate\Support\Facades\DB;
 
 class TransactionStatsService
 {
-    private const EXCLUDED_SUMMARY_CATEGORIES = [
-        'Loan Disbursement', 'Loan Receipt', 'Balance Adjustment', 'Client Funds',
-    ];
-
-    // ── public API ────────────────────────────────────────────────────────────
-
     public function totals(): array
     {
         $base = Transaction::where('user_id', Auth::id())->where('is_transaction_fee', false);
@@ -131,7 +125,7 @@ class TransactionStatsService
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('transactions.user_id', Auth::id())
             ->whereNull('transactions.deleted_at')
-            ->whereNotIn('categories.name', self::EXCLUDED_SUMMARY_CATEGORIES)
+            ->whereNotIn('categories.name', ReportDataService::nonSpendingCategoryNames())
             ->whereIn('categories.type', ['income', 'expense'])
             ->where(function ($q) {
                 $q->where(function ($q2) {
