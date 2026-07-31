@@ -29,6 +29,13 @@ class TransactionController extends Controller
         'Loan Fees Refund', 'Facility Fee Refund', 'Transaction Fees',
         'Balance Adjustment',
         'Friend Loan Given', 'Loan Recovery',
+        'Loan Disbursement', 'Client Funds', 'Loan Interest', // system-generated —
+        // created automatically by LoanController / ClientFundController /
+        // LoanGivenController, never meant to be hand-picked. Selecting one
+        // manually would silently exclude that transaction from every
+        // income/expense total in the app — see
+        // ReportDataService::NON_SPENDING_CATEGORY_NAMES, which these three
+        // are also excluded from for reporting.
     ];
 
 
