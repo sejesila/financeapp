@@ -343,6 +343,17 @@ class ReportDataService
 
         $totalBalance = $accountsAsAt->sum('balance_as_at');
 
+// balance_as_at is clamped per-account for display (an account can't show
+// negative cash), which can silently drop money from a naive sum when one
+// account's client funds exceed its own balance — exactly the Sanlam MMF
+// scenario (client funds tagged to an account whose real balance is now 0
+// because the underlying cash moved through an untracked path). total_balance
+// must therefore never be a sum of the clamped display values; it's the
+// pooled raw balance minus pooled client funds, computed once, unaffected
+// by any single account's shortfall.
+        $totalBalanceUnclamped = $accountsAsAt->sum('raw_balance_as_at') - $accountsAsAt->sum('client_funds_as_at');
+        $totalBalance = max(0, $totalBalanceUnclamped);
+
         $activeLoans = Loan::where('user_id', $user->id)->where('status', 'active')->with('account')->get();
         $totalLoanBalance = $activeLoans->sum('balance');
         $activeLoansGiven = LoanGiven::where('user_id', $user->id)->where('status', 'active')->get();
@@ -376,7 +387,6 @@ class ReportDataService
 
         $ownedSavings = max(0, $savingsBalance - $clientFundsInSavings);
         $netWorth = max(0, $ownedSavings + $totalLoansGivenBalance - $totalLoanBalance);
-
 
 
         // --- Transactions ---
@@ -522,13 +532,10 @@ class ReportDataService
 
     private function getLoanGivenInterestIncome(User $user, Carbon $startDate, Carbon $endDate): float
     {
-        return (float)Transaction::where('user_id', $user->id)
-            ->whereBetween('date', [
-                $startDate->toDateString(),
-                $endDate->toDateString(),
-            ])
-            ->whereHas('category', fn($q) => $q->where('name', 'Loan Interest'))
-            ->sum('amount');
+        return (float)LoanGiven::where('user_id', $user->id)
+            ->where('status', 'paid')
+            ->whereBetween('repaid_date', [$startDate, $endDate])
+            ->sum('interest_amount');
     }
 
     /**
@@ -940,7 +947,7 @@ class ReportDataService
 
         return $clientFunds->sum(function ($fund) use ($accountId, $asAtDate) {
             $reductionsAfter = $fund->transactions->sum('amount');
-            $balanceAsAt = max(0, (float) $fund->balance + (float) $reductionsAfter);
+            $balanceAsAt = max(0, (float)$fund->balance + (float)$reductionsAfter);
 
             if ($accountId === null) {
                 return $balanceAsAt;
@@ -967,6 +974,7 @@ class ReportDataService
             return $currentAccountId === $accountId ? $balanceAsAt : 0.0;
         });
     }
+
     private function getLoansGivenActivityInPeriod(User $user, Carbon $startDate, Carbon $endDate): array
     {
         $disbursed = LoanGiven::where('user_id', $user->id)

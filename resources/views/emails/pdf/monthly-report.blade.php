@@ -405,7 +405,7 @@
                     'display_balance' => $account->balance_as_at,
                 ];
             });
-            $adjustedTotal = $adjustedAccounts->sum('display_balance');
+            $adjustedTotal = $totalBal; // pooled figure from the service — see ReportDataService::generateReport()
     @endphp
 
     <div class="section">
