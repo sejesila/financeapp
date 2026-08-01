@@ -27,7 +27,7 @@ class SendMonthlyReports extends Command
 
         $targetMonth = $this->option('month')
             ? Carbon::parse($this->option('month') . '-01')->startOfMonth()
-            : now()->subMonth()->startOfMonth();
+            : now()->subMonthNoOverflow()->startOfMonth();
 
         $from   = $targetMonth->copy()->startOfMonth();
         $to     = $targetMonth->copy()->endOfMonth();

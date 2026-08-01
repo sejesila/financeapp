@@ -42,7 +42,7 @@ class MonthlyReportMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Your Monthly Financial Report — ' . now()->subMonth()->format('F Y'),
+            subject: 'Your Monthly Financial Report — ' . now()->subMonthNoOverflow()->format('F Y'),
         );
     }
 
@@ -63,7 +63,7 @@ class MonthlyReportMail extends Mailable
         $attachments = [];
 
         if ($this->user->emailPreference?->include_pdf) {
-            $filename      = 'monthly-report-' . now()->subMonth()->format('Y-m') . '.pdf';
+            $filename      = 'monthly-report-' . now()->subMonthNoOverflow()->format('Y-m') . '.pdf';
             $attachments[] = Attachment::fromData(
                 fn() => $this->generateMonthlyReportPdf(),
                 $filename

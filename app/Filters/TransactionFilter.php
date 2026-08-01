@@ -20,13 +20,15 @@ class TransactionFilter
             ]);
         }
 
+        $lastMonth = now()->subMonthNoOverflow();
+
         return match ($filter) {
             'today'      => $query->whereDate('date', today()),
             'yesterday'  => $query->whereDate('date', today()->subDay()),
             'this_week'  => $query->whereBetween('date', [now()->startOfWeek(), now()->endOfWeek()]),
             'last_week'  => $query->whereBetween('date', [now()->subWeek()->startOfWeek(), now()->subWeek()->endOfWeek()]),
             'this_month' => $query->whereMonth('date', now()->month)->whereYear('date', now()->year),
-            'last_month' => $query->whereMonth('date', now()->subMonth()->month)->whereYear('date', now()->subMonth()->year),
+            'last_month' => $query->whereMonth('date', $lastMonth->month)->whereYear('date', $lastMonth->year),
             'this_year'  => $query->whereYear('date', now()->year),
             default      => $query,
         };

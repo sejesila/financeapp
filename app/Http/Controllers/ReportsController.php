@@ -40,16 +40,16 @@ class ReportsController extends Controller
         $filter = $request->get('filter', 'this_month');
         $startDate = null;
         $endDate = null;
-
-        // Apply date filters
+// Main date filter
         switch ($filter) {
             case 'this_month':
                 $startDate = now()->startOfMonth();
                 $endDate = now()->endOfMonth();
                 break;
             case 'last_month':
-                $startDate = now()->subMonth()->startOfMonth();
-                $endDate = now()->subMonth()->endOfMonth();
+                $lastMonth = now()->subMonthNoOverflow();
+                $startDate = $lastMonth->copy()->startOfMonth();
+                $endDate = $lastMonth->copy()->endOfMonth();
                 break;
             case 'this_year':
                 $startDate = now()->startOfYear();
@@ -97,14 +97,17 @@ class ReportsController extends Controller
         $previousStartDate = null;
         $previousEndDate = null;
 
+        // Previous-period comparison
         switch ($filter) {
             case 'this_month':
-                $previousStartDate = now()->subMonth()->startOfMonth();
-                $previousEndDate = now()->subMonth()->endOfMonth();
+                $lastMonth = now()->subMonthNoOverflow();
+                $previousStartDate = $lastMonth->copy()->startOfMonth();
+                $previousEndDate = $lastMonth->copy()->endOfMonth();
                 break;
             case 'last_month':
-                $previousStartDate = now()->subMonths(2)->startOfMonth();
-                $previousEndDate = now()->subMonths(2)->endOfMonth();
+                $twoMonthsAgo = now()->subMonthsNoOverflow(2);
+                $previousStartDate = $twoMonthsAgo->copy()->startOfMonth();
+                $previousEndDate = $twoMonthsAgo->copy()->endOfMonth();
                 break;
             case 'this_year':
                 $previousStartDate = now()->subYear()->startOfYear();
@@ -143,8 +146,8 @@ class ReportsController extends Controller
             auth()->user(), $startDate, $endDate
         );
         $interestIncome = $reportDataService->getInterestIncomeSummary(
-                        auth()->user(), $startDate, $endDate
-                    );
+            auth()->user(), $startDate, $endDate
+        );
 
         return view('reports.index', compact(
             'filter',

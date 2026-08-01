@@ -246,6 +246,6 @@ class InterestService
     /** @deprecated Not used in day-based logic */
     public function getTargetMonth(): \Carbon\Carbon
     {
-        return now()->subMonth()->startOfMonth();
+        return now()->subMonthNoOverflow()->startOfMonth();
     }
 }

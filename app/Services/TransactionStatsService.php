@@ -28,10 +28,11 @@ class TransactionStatsService
     public function feeTotals(): array
     {
         $fees = Transaction::where('user_id', Auth::id())->where('is_transaction_fee', true);
+        $lastMonth = now()->subMonthNoOverflow();
 
         return [
             'totalFeesThisMonth' => (clone $fees)->whereMonth('date', now()->month)->whereYear('date', now()->year)->sum('amount'),
-            'totalFeesLastMonth' => (clone $fees)->whereMonth('date', now()->subMonth()->month)->whereYear('date', now()->subMonth()->year)->sum('amount'),
+            'totalFeesLastMonth' => (clone $fees)->whereMonth('date', $lastMonth->month)->whereYear('date', $lastMonth->year)->sum('amount'),
             'totalFeesAll'       => (clone $fees)->sum('amount'),
         ];
     }

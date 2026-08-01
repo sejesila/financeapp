@@ -119,9 +119,10 @@ class EmailPreferenceController extends Controller
         $user = Auth::user();
         try {
             $reportData = $reportService->generateMonthlyReport($user);
-            $from       = now()->subMonth()->startOfMonth();
-            $to         = now()->subMonth()->endOfMonth();
-            $period     = now()->subMonth()->format('F Y');
+            $lastMonth  = now()->subMonthNoOverflow();
+            $from       = $lastMonth->copy()->startOfMonth();
+            $to         = $lastMonth->copy()->endOfMonth();
+            $period     = $lastMonth->format('F Y');
 
             $mailable = (new MonthlyReportMail($user, $reportData))
                 ->withEticaStatements($this->buildEticaStatements($user, $from, $to, $period));
@@ -171,9 +172,10 @@ class EmailPreferenceController extends Controller
         }
 
         try {
-            $from   = now()->subMonth()->startOfMonth();
-            $to     = now()->subMonth()->endOfMonth();
-            $period = now()->subMonth()->format('F Y');
+            $lastMonth = now()->subMonthNoOverflow();
+            $from   = $lastMonth->copy()->startOfMonth();
+            $to     = $lastMonth->copy()->endOfMonth();
+            $period = $lastMonth->format('F Y');
 
             $statementData = $this->statementService->buildStatementData($eticaAccount, $from, $to);
 

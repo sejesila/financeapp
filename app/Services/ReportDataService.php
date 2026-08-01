@@ -215,8 +215,9 @@ class ReportDataService
      */
     public function generateMonthlyReport(User $user): array
     {
-        $startDate = now()->subMonth()->startOfMonth();
-        $endDate = now()->subMonth()->endOfMonth();
+        $lastMonth = now()->subMonthNoOverflow();
+        $startDate = $lastMonth->copy()->startOfMonth();
+        $endDate = $lastMonth->copy()->endOfMonth();
 
         $report = $this->generateReport($user, $startDate, $endDate, 'monthly');
 
@@ -794,10 +795,10 @@ class ReportDataService
 
         if ($type === 'annual') {
             $prevStart = $startDate->copy()->subYear();
-            $prevEnd = $endDate->copy()->subYear();
+            $prevEnd   = $endDate->copy()->subYear();
         } else {
-            $prevStart = $startDate->copy()->subMonth();
-            $prevEnd = $endDate->copy()->subMonth();
+            $prevStart = $startDate->copy()->subMonthNoOverflow();
+            $prevEnd   = $endDate->copy()->subMonthNoOverflow();
         }
 
         $prevTransactions = $this->getFilteredTransactions($user, $prevStart, $prevEnd);

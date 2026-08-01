@@ -50,9 +50,11 @@ class LoanController extends Controller implements HasMiddleware
             ->where('status', 'paid');
 
         if ($period) {
+            $lastMonth = now()->subMonthNoOverflow();
+
             match ($period) {
                 'this_month' => $paidLoansQuery->whereMonth('repaid_date', now()->month)->whereYear('repaid_date', now()->year),
-                'last_month' => $paidLoansQuery->whereMonth('repaid_date', now()->subMonth()->month)->whereYear('repaid_date', now()->subMonth()->year),
+                'last_month' => $paidLoansQuery->whereMonth('repaid_date', $lastMonth->month)->whereYear('repaid_date', $lastMonth->year),
                 'this_year'  => $paidLoansQuery->whereYear('repaid_date', now()->year),
                 'last_year'  => $paidLoansQuery->whereYear('repaid_date', now()->year - 1),
                 'custom'     => $startDate && $endDate

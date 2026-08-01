@@ -169,11 +169,13 @@ class DashboardController extends Controller
 
         // ============ MONTH COMPARISON ============
 
+        $lastMonth = now()->subMonthNoOverflow();
+
         $lastMonthTotal = $this->excludeNonSpending(
             $this->excludeClientFunds(
                 Transaction::where('user_id', $userId)
-                    ->whereMonth('date', now()->subMonth()->month)
-                    ->whereYear('date', now()->subMonth()->year)
+                    ->whereMonth('date', $lastMonth->month)
+                    ->whereYear('date', $lastMonth->year)
                     ->whereHas('category', fn($q) => $q->where('type', 'expense'))
             )
         )->sum('amount');
