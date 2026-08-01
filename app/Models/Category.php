@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 
 class Category extends Model
 {
@@ -19,6 +20,16 @@ class Category extends Model
         'usage_count',
     ];
 
+    protected static function booted()
+    {
+        static::addGlobalScope('ownedByUser', function ($builder) {
+            if (Auth::check()) {
+                $table = $builder->getModel()->getTable();
+                $builder->where("{$table}.user_id", Auth::id());
+            }
+        });
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);
@@ -29,7 +40,6 @@ class Category extends Model
         return $this->hasMany(Transaction::class);
     }
 
-    // ✅ REQUIRED for hierarchy
     public function children()
     {
         return $this->hasMany(Category::class, 'parent_id');
@@ -40,4 +50,3 @@ class Category extends Model
         return $this->belongsTo(Category::class, 'parent_id');
     }
 }
-

@@ -498,6 +498,53 @@ class MpesaSmsParserTest extends TestCase
         // Fee must be 0.00, not garbage from a failed parse
         $this->assertEquals(0, $result['fee']);
     }
+    // ── Airtel: Cashback/Bonus moved to wallet ───────────────────────────────
+
+    public function test_airtel_cashback_moved_to_wallet()
+    {
+        $sms = 'Ref Q3PH3911CC5. Ksh 5  moved to your wallet  0731xxx277 on 01/08/26 at 08:13 AM Bal: Ksh 0.65. Airtel Money Wallet Bal: Ksh 14452.0';
+
+        $result = MpesaSmsParser::parse($sms);
+
+        $this->assertNotNull($result);
+        $this->assertEquals('airtel', $result['bank']);
+        $this->assertEquals('income', $result['type']);
+        $this->assertEquals('airtelcashback', $result['subtype']);
+        $this->assertEquals('Q3PH3911CC5', $result['reference']);
+        $this->assertEquals(5.00, $result['amount']);
+        $this->assertEquals('0731xxx277', $result['phone']);
+        $this->assertEquals(0.65, $result['balance']);
+        $this->assertEquals(14452.00, $result['wallet_balance']);
+        $this->assertEquals(0, $result['fee']);
+        $this->assertStringContainsString('Cashback', $result['description']);
+    }
+
+    public function test_airtel_cashback_second_sample_message()
+    {
+        $sms = 'Ref I3PH3QT326S. Ksh 25  moved to your wallet  0731xxx277 on 01/08/26 at 08:28 AM Bal: Ksh 0.43. Airtel Money Wallet Bal: Ksh 1020.0';
+
+        $result = MpesaSmsParser::parse($sms);
+
+        $this->assertNotNull($result);
+        $this->assertEquals('airtel', $result['bank']);
+        $this->assertEquals('airtelcashback', $result['subtype']);
+        $this->assertEquals('I3PH3QT326S', $result['reference']);
+        $this->assertEquals(25.00, $result['amount']);
+        $this->assertEquals(0.43, $result['balance']);
+        $this->assertEquals(1020.00, $result['wallet_balance']);
+    }
+
+    public function test_airtel_cashback_masked_phone_not_confused_with_digits_only()
+    {
+        // Regression guard: phone number is masked with 'x' characters (0731xxx277).
+        // If the regex ever reverts to (\d+) for the phone group, this will fail to match.
+        $sms = 'Ref Q3PH3911CC5. Ksh 5  moved to your wallet  0731xxx277 on 01/08/26 at 08:13 AM Bal: Ksh 0.65. Airtel Money Wallet Bal: Ksh 14452.0';
+
+        $result = MpesaSmsParser::parse($sms);
+
+        $this->assertNotNull($result);
+        $this->assertStringContainsString('xxx', $result['phone']);
+    }
 
 // ── Till: trailing number + dot stripped from recipient ───────────────────────
 
