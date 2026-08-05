@@ -202,8 +202,8 @@
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 @foreach($activeLoans as $loan)
                                     <div
-                                        class="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
-                                        <div class="p-5">
+                                        class="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 flex flex-col h-full">
+                                        <div class="p-5 flex-1">
                                             <div class="flex justify-between items-start mb-3">
                                                 <h3 class="text-lg font-medium text-gray-900">{{ $loan->borrower_name }}</h3>
                                                 <span
@@ -274,7 +274,7 @@
                                                 </div>
                                             @endif
                                         </div>
-                                        <div class="bg-gray-50 px-5 py-3 rounded-b-lg border-t border-gray-200">
+                                        <div class="bg-gray-50 px-5 py-3 rounded-b-lg border-t border-gray-200 mt-auto">
                                             <div class="flex space-x-2">
                                                 <a href="{{ route('loans-given.show', $loan->id) }}"
                                                    class="flex-1 inline-flex justify-center items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition ease-in-out duration-150">
