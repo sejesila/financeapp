@@ -382,9 +382,6 @@ class ClientFundController extends Controller
     /**
      * Show the form for editing basic client fund details
      */
-    /**
-     * Show the form for editing basic client fund details
-     */
     public function edit(ClientFund $clientFund)
     {
         if ($clientFund->user_id !== Auth::id()) {
@@ -595,9 +592,7 @@ class ClientFundController extends Controller
         }
     }
 
-    use App\Models\ClientFundTransaction;
-
-// ── diagnostic: how much is currently unrecorded as borrowed ───────────────
+    // ── record a borrowed amount against ONE client fund ───────────────────────
 
     public function recordBorrowed(Request $request, ClientFund $clientFund)
     {
@@ -638,8 +633,6 @@ class ClientFundController extends Controller
             return back()->with('error', 'Failed to record borrowed amount: ' . $e->getMessage());
         }
     }
-
-// ── record a borrowed amount against ONE client fund ───────────────────────
 
     /**
      * Mirrors TransferService::recordBorrowedFromClientFunds() — same FIFO
@@ -712,7 +705,7 @@ class ClientFundController extends Controller
         }
     }
 
-// ── reconcile a shortfall across a client's outstanding funds (FIFO) ───────
+    // ── diagnostic: how much is currently unrecorded as borrowed ───────────────
 
     /**
      * If the account holding pooled client money has a balance lower than the
