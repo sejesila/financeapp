@@ -30,6 +30,15 @@
                 </div>
             @endif
 
+            @if(($borrowedTotal ?? 0) > 0)
+                <div class="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-400 p-3 sm:p-4 mb-4">
+                    <p class="text-sm text-red-800 dark:text-red-300">
+                        🚩 KES {{ number_format($borrowedTotal, 0) }} of this fund's balance is
+                        currently <strong>borrowed</strong> and not yet returned.
+                    </p>
+                </div>
+            @endif
+
             <!-- Summary Cards -->
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
                 <div class="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-lg shadow">
@@ -156,6 +165,14 @@
                                     </button>
                                 @endif
 
+                                <button
+                                    onclick="openModal('borrowedModal')"
+                                    class="w-full bg-red-500 hover:bg-red-600 text-white px-4 py-2.5 sm:py-2 rounded text-sm font-medium transition"
+                                    {{ $clientFund->balance <= 0 ? 'disabled' : '' }}
+                                >
+                                    🚩 Record Borrowed
+                                </button>
+
                                 @if($clientFund->balance <= 0)
                                     <form method="POST" action="{{ route('client-funds.complete', $clientFund) }}">
                                         @csrf
@@ -188,13 +205,21 @@
                                         <div class="flex-1 min-w-0">
                                             <div class="flex items-center gap-2 mb-1 flex-wrap">
                                                 <span class="text-base sm:text-lg">
-                                                    @if($transaction->type === 'receipt') 📥
+                                                    @if($transaction->is_borrowed) 🚩
+                                                    @elseif($transaction->type === 'receipt') 📥
                                                     @elseif($transaction->type === 'expense') 📤
                                                     @elseif($transaction->type === 'profit') 💰
                                                     @elseif($transaction->type === 'return') 🔄
                                                     @endif
                                                 </span>
-                                                <span class="font-semibold capitalize text-sm sm:text-base">{{ $transaction->type }}</span>
+                                                <span class="font-semibold capitalize text-sm sm:text-base">
+                                                    {{ $transaction->is_borrowed ? 'Borrowed' : $transaction->type }}
+                                                </span>
+                                                @if($transaction->is_borrowed)
+                                                    <span class="px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
+                                                        Not yet returned
+                                                    </span>
+                                                @endif
                                                 <span class="text-xs text-gray-500">
                                                     {{ $transaction->date->format('M d, Y') }}
                                                 </span>
@@ -205,9 +230,10 @@
                                         </div>
                                         <div class="text-right flex-shrink-0">
                                             <p class="font-bold text-base sm:text-lg
-                                                {{ $transaction->type === 'receipt' ? 'text-blue-600' : '' }}
-                                                {{ $transaction->type === 'expense' ? 'text-orange-600' : '' }}
-                                                {{ $transaction->type === 'profit' ? 'text-green-600' : '' }}">
+                                                {{ $transaction->is_borrowed ? 'text-red-600' : '' }}
+                                                {{ !$transaction->is_borrowed && $transaction->type === 'receipt' ? 'text-blue-600' : '' }}
+                                                {{ !$transaction->is_borrowed && $transaction->type === 'expense' ? 'text-orange-600' : '' }}
+                                                {{ !$transaction->is_borrowed && $transaction->type === 'profit' ? 'text-green-600' : '' }}">
                                                 {{ $transaction->type === 'receipt' || $transaction->type === 'return' ? '+' : '-' }}
                                                 {{ number_format($transaction->amount, 0) }}
                                             </p>
@@ -218,7 +244,7 @@
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit"
-                                                            onclick="return confirm('Delete this {{ $transaction->type }}?')"
+                                                            onclick="return confirm('Delete this {{ $transaction->is_borrowed ? 'borrowed entry' : $transaction->type }}?')"
                                                             class="text-xs text-red-600 hover:text-red-800">
                                                         Delete
                                                     </button>
@@ -393,6 +419,75 @@
             </div>
         </div>
     @endif
+
+    <!-- Borrowed Modal -->
+    <div id="borrowedModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 sm:p-6 max-w-md w-full">
+            <h3 class="text-base sm:text-lg font-semibold mb-1">Record Borrowed Amount</h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-3 sm:mb-4">
+                Use this if money from this fund was spent personally — e.g. a pooled
+                savings account ran short and this client's balance covered it. This
+                does not move money anywhere; it only marks that amount as owed back.
+            </p>
+
+            <form method="POST" action="{{ route('client-funds.record-borrowed', $clientFund) }}">
+                @csrf
+
+                <div class="mb-3 sm:mb-4">
+                    <label class="block text-xs sm:text-sm font-medium mb-1 sm:mb-2">Amount</label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        name="amount"
+                        max="{{ $clientFund->balance }}"
+                        placeholder="Enter amount borrowed"
+                        class="w-full border rounded px-3 py-2 text-sm sm:text-base dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+                        required
+                    >
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Available: KES {{ number_format($clientFund->balance, 0, '.', ',') }}
+                    </p>
+                </div>
+
+                <div class="mb-3 sm:mb-4">
+                    <label class="block text-xs sm:text-sm font-medium mb-1 sm:mb-2">Note (optional)</label>
+                    <input
+                        type="text"
+                        name="description"
+                        placeholder="e.g. Covered a personal withdrawal from Etica"
+                        class="w-full border rounded px-3 py-2 text-sm sm:text-base dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+                    >
+                </div>
+
+                <div class="mb-4 sm:mb-6">
+                    <label class="block text-xs sm:text-sm font-medium mb-1 sm:mb-2">Date</label>
+                    <input
+                        type="date"
+                        name="date"
+                        value="{{ date('Y-m-d') }}"
+                        class="w-full border rounded px-3 py-2 text-sm sm:text-base dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+                        required
+                    >
+                </div>
+
+                <div class="flex flex-col-reverse sm:flex-row gap-2">
+                    <button
+                        type="button"
+                        onclick="closeModal('borrowedModal')"
+                        class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2.5 sm:py-2 rounded text-sm font-medium transition"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        class="flex-1 bg-red-500 hover:bg-red-600 text-white px-4 py-2.5 sm:py-2 rounded text-sm font-medium transition"
+                    >
+                        Record Borrowed
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <script>
         function openModal(modalId) {

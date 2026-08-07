@@ -48,9 +48,9 @@ class ClientFundController extends Controller
 
         $summary = [
             'total_received' => $allClientFunds->sum('amount_received'),
-            'total_spent'    => $allClientFunds->sum('amount_spent'),
-            'total_profit'   => $allClientFunds->sum('profit_amount'),
-            'total_balance'  => $allClientFunds->where('status', '!=', 'completed')->sum('balance'),
+            'total_spent' => $allClientFunds->sum('amount_spent'),
+            'total_profit' => $allClientFunds->sum('profit_amount'),
+            'total_balance' => $allClientFunds->where('status', '!=', 'completed')->sum('balance'),
         ];
 
         // ── Per-client totals (always global, for the summary table) ──
@@ -73,6 +73,18 @@ class ClientFundController extends Controller
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
+        // Diagnostic: per pooled account, how much borrowing is currently unrecorded
+        $unrecordedShortfalls = $allAccounts
+            ->mapWithKeys(fn($account) => [$account->id => $this->getUnrecordedBorrowShortfall($account)])
+            ->filter(fn($amount) => $amount > 0);
+
+        $totalBorrowed = ClientFundTransaction::whereIn(
+            'client_fund_id',
+            ClientFund::where('user_id', Auth::id())->pluck('id')
+        )->where('is_borrowed', true)->sum('amount');
+
+        $summary['total_borrowed'] = $totalBorrowed;
+
 
         return view('client-funds.index', compact(
             'clientFunds',
@@ -80,7 +92,8 @@ class ClientFundController extends Controller
             'allAccounts',
             'clientTotals',
             'clientFilter',
-            'showCompleted'
+            'showCompleted',
+            'unrecordedShortfalls'
         ));
     }
 
@@ -206,7 +219,11 @@ class ClientFundController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('client-funds.show', compact('clientFund', 'expenseAccounts'));
+        $borrowedTotal = $clientFund->transactions
+            ->where('is_borrowed', true)
+            ->sum('amount');
+
+        return view('client-funds.show', compact('clientFund', 'expenseAccounts', 'borrowedTotal'));
     }
 
     public function recordExpense(Request $request, ClientFund $clientFund)
@@ -216,10 +233,10 @@ class ClientFundController extends Controller
         }
 
         $request->validate([
-            'account_id'  => 'required|exists:accounts,id',
-            'amount'      => 'required|numeric|min:0.01|max:' . $clientFund->balance,
+            'account_id' => 'required|exists:accounts,id',
+            'amount' => 'required|numeric|min:0.01|max:' . $clientFund->balance,
             'description' => 'required|string',
-            'date'        => 'required|date',
+            'date' => 'required|date',
             'category_id' => 'required|exists:categories,id',
         ]);
 
@@ -237,23 +254,23 @@ class ClientFundController extends Controller
         DB::beginTransaction();
         try {
             $expenseTransaction = Transaction::create([
-                'user_id'        => Auth::id(),
-                'account_id'     => $expenseAccount->id,
-                'category_id'    => $request->category_id,
-                'amount'         => $request->amount,
-                'date'           => $request->date,
-                'period_date'    => $request->date,
-                'description'    => "{$request->description} (Client: {$clientFund->client_name})",
+                'user_id' => Auth::id(),
+                'account_id' => $expenseAccount->id,
+                'category_id' => $request->category_id,
+                'amount' => $request->amount,
+                'date' => $request->date,
+                'period_date' => $request->date,
+                'description' => "{$request->description} (Client: {$clientFund->client_name})",
                 'payment_method' => 'Client Fund',
             ]);
 
             ClientFundTransaction::create([
                 'client_fund_id' => $clientFund->id,
                 'transaction_id' => $expenseTransaction->id,
-                'type'           => 'expense',
-                'amount'         => $request->amount,
-                'date'           => $request->date,
-                'description'    => $request->description,
+                'type' => 'expense',
+                'amount' => $request->amount,
+                'date' => $request->date,
+                'description' => $request->description,
             ]);
 
             $clientFund->amount_spent += $request->amount;
@@ -576,5 +593,144 @@ class ClientFundController extends Controller
             DB::rollBack();
             return back()->with('error', 'Failed to complete: ' . $e->getMessage());
         }
+    }
+
+    use App\Models\ClientFundTransaction;
+
+// ── diagnostic: how much is currently unrecorded as borrowed ───────────────
+
+    public function recordBorrowed(Request $request, ClientFund $clientFund)
+    {
+        if ($clientFund->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        $request->validate([
+            'amount' => 'required|numeric|min:0.01|max:' . $clientFund->balance,
+            'description' => 'nullable|string',
+            'date' => 'required|date',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $clientFund->amount_spent += $request->amount;
+            $clientFund->updateBalance();
+
+            ClientFundTransaction::create([
+                'client_fund_id' => $clientFund->id,
+                'transaction_id' => null,
+                'transfer_id' => null,
+                'type' => 'expense',
+                'is_borrowed' => true,
+                'amount' => $request->amount,
+                'date' => $request->date,
+                'description' => $request->description
+                    ?: 'Manually recorded — money borrowed for personal use (reconciliation)',
+            ]);
+
+            DB::commit();
+
+            return back()->with('success',
+                'Borrowed amount of KES ' . number_format($request->amount, 0) . ' recorded against this client fund.'
+            );
+        } catch (Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to record borrowed amount: ' . $e->getMessage());
+        }
+    }
+
+// ── record a borrowed amount against ONE client fund ───────────────────────
+
+    /**
+     * Mirrors TransferService::recordBorrowedFromClientFunds() — same FIFO
+     * logic, but for backfilling historical borrowing rather than a live
+     * transfer. Doesn't touch account balances or create a Transaction: the
+     * money already left the account at some point in the past without being
+     * tracked; this only corrects the ClientFund-side bookkeeping so balances
+     * reflect reality.
+     */
+    public function reconcileBorrowed(Request $request)
+    {
+        $request->validate([
+            'client_name' => 'required|string',
+            'amount' => 'required|numeric|min:0.01',
+            'date' => 'required|date',
+            'description' => 'nullable|string',
+        ]);
+
+        $outstandingFunds = ClientFund::where('user_id', Auth::id())
+            ->where('client_name', $request->client_name)
+            ->where('balance', '>', 0)
+            ->whereNotIn('status', ['cancelled'])
+            ->orderBy('received_date')
+            ->get();
+
+        $available = $outstandingFunds->sum('balance');
+
+        if ($request->amount > $available) {
+            return back()->with('error',
+                "Amount exceeds {$request->client_name}'s outstanding balance of KES " . number_format($available, 0) . '.'
+            );
+        }
+
+        DB::beginTransaction();
+        try {
+            $remaining = (float)$request->amount;
+
+            foreach ($outstandingFunds as $fund) {
+                if ($remaining <= 0) break;
+
+                $portion = min($remaining, (float)$fund->balance);
+                if ($portion <= 0) continue;
+
+                $fund->amount_spent += $portion;
+                $fund->updateBalance();
+
+                ClientFundTransaction::create([
+                    'client_fund_id' => $fund->id,
+                    'transaction_id' => null,
+                    'transfer_id' => null,
+                    'type' => 'expense',
+                    'is_borrowed' => true,
+                    'amount' => $portion,
+                    'date' => $request->date,
+                    'description' => $request->description
+                        ?: 'Reconciliation — borrowed against pooled client funds',
+                ]);
+
+                $remaining -= $portion;
+            }
+
+            DB::commit();
+
+            return back()->with('success',
+                'KES ' . number_format($request->amount, 0) . " recorded as borrowed across {$request->client_name}'s outstanding funds (oldest first)."
+            );
+        } catch (Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Reconciliation failed: ' . $e->getMessage());
+        }
+    }
+
+// ── reconcile a shortfall across a client's outstanding funds (FIFO) ───────
+
+    /**
+     * If the account holding pooled client money has a balance lower than the
+     * sum of what ClientFund records say is still outstanding, the difference
+     * is money that's been spent/withdrawn against client funds without ever
+     * being logged as "borrowed" — either from before this feature existed,
+     * or from a transfer that wasn't flagged as a client fund movement.
+     */
+    private function getUnrecordedBorrowShortfall(Account $account): float
+    {
+        $outstandingTotal = ClientFund::where('user_id', Auth::id())
+            ->where('account_id', $account->id)
+            ->where('balance', '>', 0)
+            ->whereNotIn('status', ['cancelled'])
+            ->sum('balance');
+
+        $shortfall = $outstandingTotal - (float)$account->current_balance;
+
+        return max(0, round($shortfall, 2));
     }
 }

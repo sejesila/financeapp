@@ -26,8 +26,24 @@
                 </div>
             @endif
 
+            {{-- Unrecorded borrow shortfall diagnostics --}}
+            @foreach($unrecordedShortfalls ?? [] as $accountId => $shortfall)
+                @php $shortfallAccount = $allAccounts->firstWhere('id', $accountId); @endphp
+                @if($shortfallAccount)
+                    <div class="mb-4 bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 p-3 sm:p-4">
+                        <p class="text-sm text-amber-800 dark:text-amber-300">
+                            ⚠️ <strong>{{ $shortfallAccount->name }}</strong> is short
+                            KES {{ number_format($shortfall, 0) }} against what client fund
+                            records say is still outstanding — likely borrowed but never
+                            recorded. Open the relevant client below and use
+                            <span class="font-medium">"Record Borrowed"</span> to log it.
+                        </p>
+                    </div>
+                @endif
+            @endforeach
+
             {{-- Summary Cards --}}
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4 mb-6">
                 <div class="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-lg shadow">
                     <p class="text-xs text-gray-600 dark:text-gray-400 mb-1">
                         {{ $clientFilter ? 'Received' : 'Total Received' }}
@@ -58,6 +74,14 @@
                     </p>
                     <p class="text-lg sm:text-xl font-bold text-purple-600">
                         KES {{ number_format($summary['total_balance'], 0, '.', ',') }}
+                    </p>
+                </div>
+                <div class="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-lg shadow">
+                    <p class="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        Borrowed (Unreturned)
+                    </p>
+                    <p class="text-lg sm:text-xl font-bold text-red-600">
+                        KES {{ number_format($summary['total_borrowed'] ?? 0, 0, '.', ',') }}
                     </p>
                 </div>
             </div>
@@ -253,6 +277,51 @@
                     </div>
                 </div>
 
+                {{-- Reconcile borrowed amount for this client --}}
+                @php
+                    $clientOutstanding = $clientTotals->firstWhere('client_name', $clientFilter)->pending_balance
+                        ?? $clientFunds->sum('balance');
+                @endphp
+                @if(($clientOutstanding ?? 0) > 0)
+                    <div class="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-3 sm:p-4">
+                        <h4 class="text-sm font-semibold text-red-800 dark:text-red-300 mb-1">
+                            Record Borrowed Amount for {{ $clientFilter }}
+                        </h4>
+                        <p class="text-xs text-red-600 dark:text-red-400 mb-3">
+                            If money that belongs to {{ $clientFilter }} was spent personally
+                            (e.g. pooled savings account ran short), log it here. It's applied
+                            oldest-fund-first against their outstanding balance
+                            (KES {{ number_format($clientOutstanding, 0) }} available).
+                        </p>
+                        <form method="POST" action="{{ route('client-funds.reconcile-borrowed') }}"
+                              class="grid grid-cols-1 sm:grid-cols-4 gap-2 sm:gap-3 items-end">
+                            @csrf
+                            <input type="hidden" name="client_name" value="{{ $clientFilter }}">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Amount (KES)</label>
+                                <input type="number" step="0.01" min="0.01" max="{{ $clientOutstanding }}" name="amount"
+                                       class="w-full border rounded px-3 py-2 text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" required>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Date</label>
+                                <input type="date" name="date" value="{{ now()->format('Y-m-d') }}"
+                                       class="w-full border rounded px-3 py-2 text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" required>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Note (optional)</label>
+                                <input type="text" name="description"
+                                       class="w-full border rounded px-3 py-2 text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                            </div>
+                            <div>
+                                <button type="submit"
+                                        class="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm font-medium transition">
+                                    Record as Borrowed
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                @endif
+
                 {{-- Funds List --}}
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
                     <div class="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700">
@@ -278,6 +347,14 @@
                                             {{ $fund->type === 'commission' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700' }}">
                                             {{ $fund->type === 'commission' ? '💰 Profit' : '🔄 No Profit' }}
                                         </span>
+                                        @php
+                                            $fundBorrowed = $fund->transactions->where('is_borrowed', true)->sum('amount');
+                                        @endphp
+                                        @if($fundBorrowed > 0)
+                                            <span class="px-2 py-1 text-xs rounded-full whitespace-nowrap bg-red-100 text-red-700">
+                                                🚩 KES {{ number_format($fundBorrowed, 0) }} borrowed
+                                            </span>
+                                        @endif
                                     </div>
                                     <p class="text-sm font-medium text-gray-800 dark:text-gray-200 mb-1">{{ $fund->purpose }}</p>
                                     <p class="text-xs text-gray-500">
