@@ -5,9 +5,11 @@ namespace App\Services;
 use App\Models\Account;
 use App\Models\Category;
 use App\Models\ClientFund;
+use App\Models\ClientFundTransaction;
 use App\Models\Transaction;
 use App\Models\Transfer;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -20,6 +22,9 @@ use Illuminate\Validation\ValidationException;
  *   - Enforce transfer-rule validation (account-type constraints)
  *   - Calculate and record any applicable transaction fee
  *   - Create the Transfer record
+ *   - Auto-reconcile transfers out of savings that dip into money still
+ *     owed to clients, by recording the shortfall as "borrowed" against
+ *     the relevant ClientFund(s)
  *   - Trigger balance recalculation on both accounts
  *
  * Throws ValidationException so the controller can let Laravel's normal
@@ -74,7 +79,37 @@ readonly class TransferService
 
         $needsReconciliation = ! $isClientFund && $this->hasOutstandingClientFunds($from);
 
-        DB::transaction(function () use ($from, $to, $amount, $date, $description, $fee, $isClientFund, $isLending, $clientFundId, $needsReconciliation) {
+        // Savings accounts often pool the user's own money alongside money
+        // still owed to clients (tracked via ClientFund). If this transfer
+        // isn't itself flagged as a client fund movement but the amount
+        // (plus fee) exceeds what the user actually owns in that account,
+        // the shortfall is being funded by client money. Rather than just
+        // logging a warning, record it as borrowed against the oldest
+        // outstanding client fund(s) so it's reflected in that fund's
+        // balance and stays auditable.
+        //
+        // enforceBalanceCheck() above guarantees amount + fee <= current
+        // balance, and current balance = ownedBalance + outstandingTotal,
+        // so the shortfall can never exceed outstandingTotal here.
+        $outstandingFunds = collect();
+        $borrowShortfall  = 0.0;
+
+        if ($from->type === 'savings' && ! $isClientFund) {
+            $outstandingFunds = $this->getOutstandingClientFunds($from);
+            $outstandingTotal = (float) $outstandingFunds->sum(fn($f) => (float) $f->balance);
+
+            if ($outstandingTotal > 0) {
+                $ownedBalance    = (float) $from->current_balance - $outstandingTotal;
+                $totalDeduction  = $amount + $fee->amount;
+                $borrowShortfall = min(max(0, $totalDeduction - $ownedBalance), $outstandingTotal);
+            }
+        }
+
+        DB::transaction(function () use (
+            $from, $to, $amount, $date, $description, $fee,
+            $isClientFund, $isLending, $clientFundId, $needsReconciliation,
+            $outstandingFunds, $borrowShortfall,
+        ) {
             $isInterestGated = $to->type === 'savings'
                 && stripos($to->name, 'etica') !== false;
 
@@ -93,22 +128,37 @@ readonly class TransferService
                 'is_client_fund'        => $isClientFund,
                 'is_lending'            => $isLending,
                 'client_fund_id'        => $clientFundId,
-                'needs_reconciliation'  => $needsReconciliation,
+                // A savings shortfall is auto-resolved by the borrow logic
+                // below, so it never needs manual reconciliation.
+                'needs_reconciliation'  => $from->type === 'savings' ? false : $needsReconciliation,
             ]);
 
             if ($fee->isCharged()) {
                 $this->recordFeeTransaction($from, $to, $date, $fee, $description, $transfer);
             }
 
+            if ($borrowShortfall > 0) {
+                $this->recordBorrowedFromClientFunds(
+                    $outstandingFunds, $borrowShortfall, $date, $to, $description, $transfer
+                );
+            }
+
             $from->updateBalance();
             $to->updateBalance();
         });
 
-        if ($needsReconciliation) {
+        if ($from->type !== 'savings' && $needsReconciliation) {
             Log::warning('TransferService: transfer moved money out of an account with outstanding client funds — not flagged as client fund, needs manual reconciliation', [
                 'user_id'         => Auth::id(),
                 'from_account_id' => $from->id,
                 'amount'          => $amount,
+            ]);
+        } elseif ($borrowShortfall > 0) {
+            Log::info('TransferService: transfer partially funded by borrowing against outstanding client fund(s)', [
+                'user_id'          => Auth::id(),
+                'from_account_id'  => $from->id,
+                'amount'           => $amount,
+                'amount_borrowed'  => $borrowShortfall,
             ]);
         }
 
@@ -131,6 +181,69 @@ readonly class TransferService
             ->where('balance', '>', 0)
             ->whereNotIn('status', ['cancelled'])
             ->exists();
+    }
+
+    /**
+     * Outstanding (unfinished) client funds currently sitting in this
+     * account, oldest first — used both to size a potential borrow and to
+     * decide which fund(s) absorb it (FIFO).
+     */
+    private function getOutstandingClientFunds(Account $from): Collection
+    {
+        return ClientFund::where('user_id', Auth::id())
+            ->where('account_id', $from->id)
+            ->where('balance', '>', 0)
+            ->whereNotIn('status', ['cancelled'])
+            ->orderBy('received_date')
+            ->get();
+    }
+
+    /**
+     * Apply a shortfall against outstanding client fund(s), oldest first,
+     * recording each portion as a "borrowed" ClientFundTransaction. This
+     * reduces the fund's balance exactly like a real expense would (so
+     * reporting/reconciliation stays accurate) but is tagged is_borrowed
+     * and linked to the Transfer rather than a Transaction, since the
+     * money already left the account via the transfer itself.
+     */
+    private function recordBorrowedFromClientFunds(
+        Collection $outstandingFunds,
+        float      $shortfall,
+        string     $date,
+        Account    $to,
+        ?string    $description,
+        Transfer   $transfer,
+    ): void
+    {
+        $remaining = $shortfall;
+
+        foreach ($outstandingFunds as $fund) {
+            if ($remaining <= 0) {
+                break;
+            }
+
+            $portion = min($remaining, (float) $fund->balance);
+            if ($portion <= 0) {
+                continue;
+            }
+
+            $fund->amount_spent += $portion;
+            $fund->updateBalance();
+
+            ClientFundTransaction::create([
+                'client_fund_id' => $fund->id,
+                'transaction_id' => null,
+                'transfer_id'    => $transfer->id,
+                'type'           => 'expense',
+                'is_borrowed'    => true,
+                'amount'         => $portion,
+                'date'           => $date,
+                'description'    => "Borrowed for personal transfer to {$to->name}"
+                    . ($description ? " ({$description})" : ''),
+            ]);
+
+            $remaining -= $portion;
+        }
     }
 
     // ── Transfer rule validation ───────────────────────────────────────────────
@@ -199,6 +312,10 @@ readonly class TransferService
      * drift that later requires manual reconciliation in reports (see
      * ReportDataService::getClientFundsBalanceAsAt(), which can only trace
      * a fund's location through Transfer rows explicitly tagged to it).
+     *
+     * Currently unused for savings accounts (the borrow logic above
+     * auto-resolves the shortfall instead of blocking); left available for
+     * account types where you'd rather hard-stop than auto-reconcile.
      */
     private function enforceClientFundSafety(Account $from, bool $isClientFund): void
     {
