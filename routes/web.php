@@ -182,6 +182,8 @@ Route::middleware('auth')->group(function () {
 
         Route::post('reconcile-borrowed', [ClientFundController::class, 'reconcileBorrowed'])
             ->name('reconcile-borrowed');
+        Route::post('return-borrowed', [ClientFundController::class, 'returnBorrowed'])
+            ->name('return-borrowed');
     });
 
     // ======================================================================

@@ -78,12 +78,29 @@ class ClientFundController extends Controller
             ->mapWithKeys(fn($account) => [$account->id => $this->getUnrecordedBorrowShortfall($account)])
             ->filter(fn($amount) => $amount > 0);
 
-        $totalBorrowed = ClientFundTransaction::whereIn(
-            'client_fund_id',
-            ClientFund::where('user_id', Auth::id())->pluck('id')
-        )->where('is_borrowed', true)->sum('amount');
+        $userFundIds = ClientFund::where('user_id', Auth::id())->pluck('id');
 
-        $summary['total_borrowed'] = $totalBorrowed;
+        $totalBorrowedGross = ClientFundTransaction::whereIn('client_fund_id', $userFundIds)
+            ->where('is_borrowed', true)->sum('amount');
+
+        $totalReturned = ClientFundTransaction::whereIn('client_fund_id', $userFundIds)
+            ->where('type', 'return')->sum('amount');
+
+        // "Unreturned" = ever borrowed, minus whatever's already been paid back.
+        $summary['total_borrowed'] = max(0, $totalBorrowedGross - $totalReturned);
+        if ($clientFilter) {
+            $clientFundIds = ClientFund::where('user_id', Auth::id())
+                ->where('client_name', $clientFilter)
+                ->pluck('id');
+
+            $clientBorrowedGross = ClientFundTransaction::whereIn('client_fund_id', $clientFundIds)
+                ->where('is_borrowed', true)->sum('amount');
+
+            $clientReturned = ClientFundTransaction::whereIn('client_fund_id', $clientFundIds)
+                ->where('type', 'return')->sum('amount');
+
+            $summary['client_unreturned_borrowed'] = max(0, $clientBorrowedGross - $clientReturned);
+        }
 
 
         return view('client-funds.index', compact(
@@ -219,9 +236,9 @@ class ClientFundController extends Controller
             ->orderBy('name')
             ->get();
 
-        $borrowedTotal = $clientFund->transactions
-            ->where('is_borrowed', true)
-            ->sum('amount');
+        $borrowedGross = $clientFund->transactions->where('is_borrowed', true)->sum('amount');
+        $returnedTotal = $clientFund->transactions->where('type', 'return')->sum('amount');
+        $borrowedTotal = max(0, $borrowedGross - $returnedTotal);
 
         return view('client-funds.show', compact('clientFund', 'expenseAccounts', 'borrowedTotal'));
     }
@@ -702,6 +719,131 @@ class ClientFundController extends Controller
         } catch (Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Reconciliation failed: ' . $e->getMessage());
+        }
+    }
+
+    // ── return (repay) previously borrowed money ────────────────────────────────
+
+    /**
+     * Unlike recordBorrowed()/reconcileBorrowed() (bookkeeping-only corrections),
+     * this represents real money physically going back into an account — so it
+     * creates an actual Transaction (same liability mechanism as the original
+     * client-fund receipt, since it's restoring money meant to be held for the
+     * client) AND reverses the earlier borrow bookkeeping by reducing
+     * amount_spent back down, oldest-borrowed-fund first.
+     */
+    public function returnBorrowed(Request $request)
+    {
+        $request->validate([
+            'client_name' => 'required|string',
+            'account_id'  => 'required|exists:accounts,id',
+            'amount'      => 'required|numeric|min:0.01',
+            'date'        => 'required|date',
+            'description' => 'nullable|string',
+        ]);
+
+        $account = Account::where('id', $request->account_id)
+            ->where('user_id', Auth::id())
+            ->whereIn('type', ['mpesa', 'bank', 'savings'])
+            ->first();
+
+        if (!$account) {
+            return back()
+                ->withInput()
+                ->withErrors(['account_id' => 'Please select a valid M-Pesa, Bank, or Savings account to return the money into.']);
+        }
+
+        // This client's funds, each annotated with how much borrowed-but-not-yet-
+        // returned they're currently carrying, oldest fund first (FIFO).
+        $fundsWithUnreturned = ClientFund::where('user_id', Auth::id())
+            ->where('client_name', $request->client_name)
+            ->whereNotIn('status', ['cancelled'])
+            ->orderBy('received_date')
+            ->get()
+            ->map(function ($fund) {
+                $borrowed = $fund->transactions()->where('is_borrowed', true)->sum('amount');
+                $returned = $fund->transactions()->where('type', 'return')->sum('amount');
+                $fund->unreturned_borrowed = max(0, $borrowed - $returned);
+                return $fund;
+            })
+            ->filter(fn($f) => $f->unreturned_borrowed > 0)
+            ->values();
+
+        $available = $fundsWithUnreturned->sum('unreturned_borrowed');
+
+        if ($available <= 0) {
+            return back()->with('error', "{$request->client_name} has no unreturned borrowed balance to repay.");
+        }
+
+        if ($request->amount > $available) {
+            return back()->with('error',
+                "Amount exceeds {$request->client_name}'s unreturned borrowed total of KES " . number_format($available, 0) . '.'
+            );
+        }
+
+        DB::beginTransaction();
+        try {
+            $liabilityCategory = Category::firstOrCreate(
+                ['name' => 'Client Funds', 'user_id' => Auth::id()],
+                ['type' => 'liability', 'parent_id' => null],
+            );
+
+            // Real deposit — increases the account's actual balance, same
+            // mechanism as the original client fund receipt.
+            $depositTransaction = Transaction::create([
+                'user_id'        => Auth::id(),
+                'account_id'     => $account->id,
+                'category_id'    => $liabilityCategory->id,
+                'amount'         => $request->amount,
+                'date'           => $request->date,
+                'period_date'    => $request->date,
+                'description'    => "Returned borrowed funds — {$request->client_name}"
+                    . ($request->description ? ": {$request->description}" : ''),
+                'payment_method' => 'Client Fund',
+            ]);
+
+            $remaining = (float) $request->amount;
+
+            foreach ($fundsWithUnreturned as $fund) {
+                if ($remaining <= 0) {
+                    break;
+                }
+
+                $portion = min($remaining, $fund->unreturned_borrowed);
+                if ($portion <= 0) {
+                    continue;
+                }
+
+                // Reverses the earlier borrow: less counts as "spent", so the
+                // amount available for the client rises back up.
+                $fund->amount_spent -= $portion;
+                $fund->updateBalance();
+
+                ClientFundTransaction::create([
+                    'client_fund_id' => $fund->id,
+                    'transaction_id' => $depositTransaction->id,
+                    'transfer_id'    => null,
+                    'type'           => 'return',
+                    'is_borrowed'    => false,
+                    'amount'         => $portion,
+                    'date'           => $request->date,
+                    'description'    => $request->description
+                        ?: "Borrowed amount returned to {$fund->client_name}'s fund",
+                ]);
+
+                $remaining -= $portion;
+            }
+
+            DB::commit();
+            $account->updateBalance();
+
+            return back()->with('success',
+                'KES ' . number_format($request->amount, 0)
+                . " returned and applied against {$request->client_name}'s outstanding borrowed balance (oldest first)."
+            );
+        } catch (Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to record return: ' . $e->getMessage());
         }
     }
 

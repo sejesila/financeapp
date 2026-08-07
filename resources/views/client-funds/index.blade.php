@@ -322,6 +322,56 @@
                     </div>
                 @endif
 
+                {{-- Return (repay) borrowed amount for this client --}}
+                @if(($summary['client_unreturned_borrowed'] ?? 0) > 0)
+                    <div class="mb-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-3 sm:p-4">
+                        <h4 class="text-sm font-semibold text-green-800 dark:text-green-300 mb-1">
+                            Return Borrowed Amount to {{ $clientFilter }}
+                        </h4>
+                        <p class="text-xs text-green-600 dark:text-green-400 mb-3">
+                            Use this once you've actually deposited real money back — it will be applied
+                            against {{ $clientFilter }}'s unreturned borrowed total
+                            (KES {{ number_format($summary['client_unreturned_borrowed'], 0) }} outstanding),
+                            oldest-borrowed-first.
+                        </p>
+                        <form method="POST" action="{{ route('client-funds.return-borrowed') }}"
+                              class="grid grid-cols-1 sm:grid-cols-5 gap-2 sm:gap-3 items-end">
+                            @csrf
+                            <input type="hidden" name="client_name" value="{{ $clientFilter }}">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Deposit Into</label>
+                                <select name="account_id" class="w-full border rounded px-3 py-2 text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" required>
+                                    <option value="">Select account</option>
+                                    @foreach($allAccounts->whereIn('type', ['mpesa', 'bank', 'savings']) as $account)
+                                        <option value="{{ $account->id }}">{{ $account->name }} ({{ ucfirst($account->type) }})</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Amount (KES)</label>
+                                <input type="number" step="0.01" min="0.01" max="{{ $summary['client_unreturned_borrowed'] }}" name="amount"
+                                       class="w-full border rounded px-3 py-2 text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" required>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Date</label>
+                                <input type="date" name="date" value="{{ now()->format('Y-m-d') }}"
+                                       class="w-full border rounded px-3 py-2 text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" required>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Note (optional)</label>
+                                <input type="text" name="description"
+                                       class="w-full border rounded px-3 py-2 text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                            </div>
+                            <div>
+                                <button type="submit"
+                                        class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm font-medium transition">
+                                    Record Return
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                @endif
+
                 {{-- Funds List --}}
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
                     <div class="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700">
@@ -348,7 +398,8 @@
                                             {{ $fund->type === 'commission' ? '💰 Profit' : '🔄 No Profit' }}
                                         </span>
                                         @php
-                                            $fundBorrowed = $fund->transactions->where('is_borrowed', true)->sum('amount');
+                                            $fundBorrowed = $fund->transactions->where('is_borrowed', true)->sum('amount')
+                                                - $fund->transactions->where('type', 'return')->sum('amount');
                                         @endphp
                                         @if($fundBorrowed > 0)
                                             <span class="px-2 py-1 text-xs rounded-full whitespace-nowrap bg-red-100 text-red-700">
