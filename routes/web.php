@@ -177,7 +177,7 @@ Route::middleware('auth')->group(function () {
         // Delete transactions
         Route::delete('{clientFund}/expense/{transaction}', [ClientFundController::class, 'deleteExpense'])->name('expense.delete');
         Route::delete('{clientFund}/profit/{transaction}', [ClientFundController::class, 'deleteProfit'])->name('profit.delete');
-        Route::post('{clientFund}/borrow', [ClientFundController::class, 'recordBorrowed'])
+        Route::post('{clientFund}/record-borrowed', [ClientFundController::class, 'recordBorrowed'])
             ->name('record-borrowed');
 
         Route::post('reconcile-borrowed', [ClientFundController::class, 'reconcileBorrowed'])

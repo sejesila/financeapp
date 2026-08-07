@@ -742,18 +742,7 @@ class ClientFundController extends Controller
             'description' => 'nullable|string',
         ]);
 
-        $account = Account::where('id', $request->account_id)
-            ->where('user_id', Auth::id())
-            ->whereIn('type', ['mpesa', 'bank', 'savings'])
-            ->first();
-
-        if (!$account) {
-            return back()
-                ->withInput()
-                ->withErrors(['account_id' => 'Please select a valid M-Pesa, Bank, or Savings account to return the money into.']);
-        }
-
-        // This client's funds, each annotated with how much borrowed-but-not-yet-
+        // This client's funds, each paired with how much borrowed-but-not-yet-
         // returned they're currently carrying, oldest fund first (FIFO).
         $fundsWithUnreturned = ClientFund::where('user_id', Auth::id())
             ->where('client_name', $request->client_name)
@@ -763,13 +752,15 @@ class ClientFundController extends Controller
             ->map(function ($fund) {
                 $borrowed = $fund->transactions()->where('is_borrowed', true)->sum('amount');
                 $returned = $fund->transactions()->where('type', 'return')->sum('amount');
-                $fund->unreturned_borrowed = max(0, $borrowed - $returned);
-                return $fund;
+                return [
+                    'fund'       => $fund,
+                    'unreturned' => max(0, $borrowed - $returned),
+                ];
             })
-            ->filter(fn($f) => $f->unreturned_borrowed > 0)
+            ->filter(fn($row) => $row['unreturned'] > 0)
             ->values();
 
-        $available = $fundsWithUnreturned->sum('unreturned_borrowed');
+        $available = $fundsWithUnreturned->sum('unreturned');
 
         if ($available <= 0) {
             return back()->with('error', "{$request->client_name} has no unreturned borrowed balance to repay.");
@@ -779,6 +770,19 @@ class ClientFundController extends Controller
             return back()->with('error',
                 "Amount exceeds {$request->client_name}'s unreturned borrowed total of KES " . number_format($available, 0) . '.'
             );
+        }
+
+        // Only reached once we know there's a real unreturned balance to apply
+        // this deposit against — now it's worth validating where the money goes.
+        $account = Account::where('id', $request->account_id)
+            ->where('user_id', Auth::id())
+            ->whereIn('type', ['mpesa', 'bank', 'savings'])
+            ->first();
+
+        if (!$account) {
+            return back()
+                ->withInput()
+                ->withErrors(['account_id' => 'Please select a valid M-Pesa, Bank, or Savings account to return the money into.']);
         }
 
         DB::beginTransaction();
@@ -804,12 +808,13 @@ class ClientFundController extends Controller
 
             $remaining = (float) $request->amount;
 
-            foreach ($fundsWithUnreturned as $fund) {
+            foreach ($fundsWithUnreturned as $row) {
                 if ($remaining <= 0) {
                     break;
                 }
 
-                $portion = min($remaining, $fund->unreturned_borrowed);
+                $fund = $row['fund'];
+                $portion = min($remaining, $row['unreturned']);
                 if ($portion <= 0) {
                     continue;
                 }

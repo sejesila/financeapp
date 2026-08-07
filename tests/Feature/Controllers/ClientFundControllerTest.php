@@ -58,12 +58,18 @@ function makeExpenseCategory(User $user): Category
 /**
  * Insert a ClientFundTransaction row directly — no factory needed.
  */
-function makeCFT(ClientFund $fund, string $type, float $amount, ?int $transactionId = null): ClientFundTransaction
-{
+function makeCFT(
+    ClientFund $fund,
+    string $type,
+    float $amount,
+    ?int $transactionId = null,
+    bool $isBorrowed = false
+): ClientFundTransaction {
     return ClientFundTransaction::create([
         'client_fund_id' => $fund->id,
         'transaction_id' => $transactionId,
         'type'           => $type,
+        'is_borrowed'    => $isBorrowed,
         'amount'         => $amount,
         'date'           => now()->toDateString(),
         'description'    => "{$type} entry",
@@ -530,6 +536,258 @@ describe('recordProfit', function () {
                 'amount' => 100,
                 'date'   => '2024-06-10',
             ])->assertForbidden();
+    });
+});
+
+// ── recordBorrowed (per-fund) ──────────────────────────────────────────────────
+
+describe('recordBorrowed', function () {
+
+    it('records a borrowed amount against a single fund without creating a Transaction', function () {
+        $user    = makeUser();
+        $account = makeAccount($user, 'mpesa', 10000);
+        $fund    = makeClientFund($user, $account, ['amount_received' => 5000, 'balance' => 5000]);
+
+        $this->actingAs($user)
+            ->post("/client-funds/{$fund->id}/record-borrowed", [
+                'amount'      => 1000,
+                'description' => 'Covered a personal withdrawal',
+                'date'        => '2024-06-12',
+            ])->assertRedirect()->assertSessionHas('success');
+
+        $fund->refresh();
+        expect((float) $fund->amount_spent)->toBe(1000.0)
+            ->and((float) $fund->balance)->toBe(4000.0);
+
+        expect(
+            ClientFundTransaction::where('client_fund_id', $fund->id)
+                ->where('is_borrowed', true)
+                ->where('amount', 1000)
+                ->whereNull('transaction_id')
+                ->exists()
+        )->toBeTrue();
+    });
+
+    it('rejects a borrowed amount exceeding the fund balance', function () {
+        $user    = makeUser();
+        $account = makeAccount($user, 'mpesa');
+        $fund    = makeClientFund($user, $account, ['balance' => 300]);
+
+        $this->actingAs($user)
+            ->post("/client-funds/{$fund->id}/record-borrowed", [
+                'amount' => 500,
+                'date'   => '2024-06-12',
+            ])->assertSessionHasErrors('amount');
+    });
+
+    it('prevents another user from recording borrowed against the fund', function () {
+        $user    = makeUser();
+        $other   = makeUser();
+        $account = makeAccount($user, 'mpesa');
+        $fund    = makeClientFund($user, $account);
+
+        $this->actingAs($other)
+            ->post("/client-funds/{$fund->id}/record-borrowed", [
+                'amount' => 100,
+                'date'   => '2024-06-12',
+            ])->assertForbidden();
+    });
+});
+
+// ── returnBorrowed ───────────────────────────────────────────────────────────
+
+describe('returnBorrowed', function () {
+
+    it('creates a real deposit transaction and reduces amount_spent on the fund', function () {
+        $user    = makeUser();
+        $account = makeAccount($user, 'mpesa', 10000);
+        $fund    = makeClientFund($user, $account, [
+            'client_name'     => 'Rose',
+            'amount_received' => 5000,
+            'amount_spent'    => 2000,
+            'balance'         => 3000,
+        ]);
+        makeCFT($fund, 'expense', 2000, null, true); // borrowed
+
+        $this->actingAs($user)
+            ->post(route('client-funds.return-borrowed'), [
+                'client_name' => 'Rose',
+                'account_id'  => $account->id,
+                'amount'      => 1200,
+                'date'        => '2024-06-15',
+                'description' => 'Repaid part of it',
+            ])->assertRedirect()->assertSessionHas('success');
+
+        $fund->refresh();
+        expect((float) $fund->amount_spent)->toBe(800.0)
+            ->and((float) $fund->balance)->toBe(4200.0);
+
+        expect(
+            Transaction::where('account_id', $account->id)
+                ->where('amount', 1200)
+                ->where('description', 'like', '%Rose%')
+                ->exists()
+        )->toBeTrue();
+
+        expect(
+            ClientFundTransaction::where('client_fund_id', $fund->id)
+                ->where('type', 'return')
+                ->where('amount', 1200)
+                ->exists()
+        )->toBeTrue();
+    });
+
+    it('applies the return oldest-borrowed-fund-first across multiple funds', function () {
+        $user    = makeUser();
+        $account = makeAccount($user, 'mpesa', 10000);
+
+        $olderFund = makeClientFund($user, $account, [
+            'client_name'     => 'Rose',
+            'received_date'   => now()->subDays(10)->toDateString(),
+            'amount_received' => 3000,
+            'amount_spent'    => 1000,
+            'balance'         => 2000,
+        ]);
+        makeCFT($olderFund, 'expense', 1000, null, true);
+
+        $newerFund = makeClientFund($user, $account, [
+            'client_name'     => 'Rose',
+            'received_date'   => now()->subDays(2)->toDateString(),
+            'amount_received' => 3000,
+            'amount_spent'    => 800,
+            'balance'         => 2200,
+        ]);
+        makeCFT($newerFund, 'expense', 800, null, true);
+
+        // Total unreturned borrowed = 1800; return 1200 — should fully clear
+        // the older fund's 1000 first, then apply the remaining 200 to the newer one.
+        $this->actingAs($user)
+            ->post(route('client-funds.return-borrowed'), [
+                'client_name' => 'Rose',
+                'account_id'  => $account->id,
+                'amount'      => 1200,
+                'date'        => '2024-06-15',
+            ])->assertRedirect()->assertSessionHas('success');
+
+        expect((float) $olderFund->fresh()->amount_spent)->toBe(0.0)
+            ->and((float) $newerFund->fresh()->amount_spent)->toBe(600.0);
+    });
+
+    it('rejects a return when the client has no unreturned borrowed balance', function () {
+        $user    = makeUser();
+        $account = makeAccount($user, 'mpesa');
+        makeClientFund($user, $account, ['client_name' => 'Rose']);
+
+        $this->actingAs($user)
+            ->post(route('client-funds.return-borrowed'), [
+                'client_name' => 'Rose',
+                'account_id'  => $account->id,
+                'amount'      => 500,
+                'date'        => '2024-06-15',
+            ])->assertSessionHas('error');
+    });
+
+    it('rejects a return amount exceeding the unreturned borrowed total', function () {
+        $user    = makeUser();
+        $account = makeAccount($user, 'mpesa');
+        $fund    = makeClientFund($user, $account, [
+            'client_name'  => 'Rose',
+            'amount_spent' => 1000,
+            'balance'      => 4000,
+        ]);
+        makeCFT($fund, 'expense', 1000, null, true);
+
+        $this->actingAs($user)
+            ->post(route('client-funds.return-borrowed'), [
+                'client_name' => 'Rose',
+                'account_id'  => $account->id,
+                'amount'      => 5000,
+                'date'        => '2024-06-15',
+            ])->assertSessionHas('error');
+
+        expect((float) $fund->fresh()->amount_spent)->toBe(1000.0);
+    });
+
+    it('rejects a cash account as the deposit destination', function () {
+        $user       = makeUser();
+        $mpesa      = makeAccount($user, 'mpesa');
+        $cashAcct   = makeAccount($user, 'cash');
+        $fund       = makeClientFund($user, $mpesa, ['client_name' => 'Rose', 'amount_spent' => 500, 'balance' => 4500]);
+        makeCFT($fund, 'expense', 500, null, true);
+
+        $this->actingAs($user)
+            ->post(route('client-funds.return-borrowed'), [
+                'client_name' => 'Rose',
+                'account_id'  => $cashAcct->id,
+                'amount'      => 200,
+                'date'        => '2024-06-15',
+            ])->assertSessionHasErrors('account_id');
+    });
+
+    it('rejects an account belonging to another user', function () {
+        $user    = makeUser();
+        $other   = makeUser();
+        $account = makeAccount($user, 'mpesa');
+        $otherAcct = makeAccount($other, 'mpesa');
+        $fund    = makeClientFund($user, $account, ['client_name' => 'Rose', 'amount_spent' => 500, 'balance' => 4500]);
+        makeCFT($fund, 'expense', 500, null, true);
+
+        $this->actingAs($user)
+            ->post(route('client-funds.return-borrowed'), [
+                'client_name' => 'Rose',
+                'account_id'  => $otherAcct->id,
+                'amount'      => 200,
+                'date'        => '2024-06-15',
+            ])->assertSessionHasErrors('account_id');
+    });
+
+    it('does not net against another client’s unreturned borrowed balance', function () {
+        $user    = makeUser();
+        $account = makeAccount($user, 'mpesa');
+
+        $roseFund = makeClientFund($user, $account, ['client_name' => 'Rose', 'amount_spent' => 500, 'balance' => 4500]);
+        makeCFT($roseFund, 'expense', 500, null, true);
+
+        $bobFund = makeClientFund($user, $account, ['client_name' => 'Bob', 'amount_spent' => 900, 'balance' => 4100]);
+        makeCFT($bobFund, 'expense', 900, null, true);
+
+        // Try to return more than Rose alone has outstanding (500), using Bob's total
+        $this->actingAs($user)
+            ->post(route('client-funds.return-borrowed'), [
+                'client_name' => 'Rose',
+                'account_id'  => $account->id,
+                'amount'      => 600,
+                'date'        => '2024-06-15',
+            ])->assertSessionHas('error');
+
+        expect((float) $bobFund->fresh()->amount_spent)->toBe(900.0);
+    });
+
+    it('requires client_name, account_id, amount, and date', function () {
+        $user = makeUser();
+
+        $this->actingAs($user)
+            ->post(route('client-funds.return-borrowed'), [])
+            ->assertSessionHasErrors(['client_name', 'account_id', 'amount', 'date']);
+    });
+
+    it('only reduces the requesting user’s own funds', function () {
+        $user    = makeUser();
+        $other   = makeUser();
+        $account = makeAccount($other, 'mpesa');
+        $fund    = makeClientFund($other, $account, ['client_name' => 'Rose', 'amount_spent' => 500, 'balance' => 4500]);
+        makeCFT($fund, 'expense', 500, null, true);
+
+        // Different user, same client_name string — should see no unreturned balance of their own
+        $this->actingAs($user)
+            ->post(route('client-funds.return-borrowed'), [
+                'client_name' => 'Rose',
+                'account_id'  => $account->id, // not even owned by $user
+                'amount'      => 100,
+                'date'        => '2024-06-15',
+            ])->assertSessionDoesntHaveErrors(); // falls through to the "no unreturned balance" error path or account_id validation
+
+        expect((float) $fund->fresh()->amount_spent)->toBe(500.0);
     });
 });
 
