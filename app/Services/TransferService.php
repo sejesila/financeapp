@@ -268,7 +268,7 @@ readonly class TransferService
 
         // Rule: Savings can only transfer to Cash, mobile money, or Bank
         if ($from->type === 'savings') {
-            $allowed = ['cash', 'mpesa', 'airtel_money', 'bank'];
+            $allowed = ['cash', 'mpesa', 'airtel_money', 'bank','referrer_float'];
             if (!in_array($to->type, $allowed)) {
                 throw ValidationException::withMessages([
                     'to_account_id' => 'Savings accounts can only transfer to Cash, M-Pesa, Airtel Money, or Bank accounts.',

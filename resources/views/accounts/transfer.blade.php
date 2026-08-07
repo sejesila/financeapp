@@ -52,6 +52,7 @@
                                 @elseif($account->type == 'airtel_money') 📲
                                 @elseif($account->type == 'bank') 🏦
                                 @elseif($account->type == 'savings') 💰
+                                @elseif($account->type == 'referrer_float') 🤝
                                 @endif
                                 {{ $account->name }}
                                 @if($account->type !== 'savings')
@@ -89,6 +90,7 @@
                                 @elseif($account->type == 'airtel_money') 📲
                                 @elseif($account->type == 'bank') 🏦
                                 @elseif($account->type == 'savings') 💰
+                                @elseif($account->type == 'referrer_float') 🤝
                                 @endif
                                 {{ $account->name }}
                                 @if($account->type !== 'savings')
@@ -475,18 +477,19 @@
                             return;
                         }
 
-                        // Bank source: allow mpesa, airtel_money, cash, savings
+                        // Bank source: allow mpesa, airtel_money, cash, savings, referrer_float
                         if (fromAccount && fromAccount.type === 'bank') {
-                            const allowed = ['mpesa', 'airtel_money', 'cash', 'savings'];
+                            const allowed = ['mpesa', 'airtel_money', 'cash', 'savings', 'referrer_float'];
                             option.disabled = !allowed.includes(optionType);
                             option.hidden   = !allowed.includes(optionType);
                         }
-                        // Savings source: allow mpesa, airtel_money, bank, cash
+                        // Savings source: allow mpesa, airtel_money, bank, cash, referrer_float
                         else if (fromAccount && fromAccount.type === 'savings') {
-                            const allowed = ['mpesa', 'airtel_money', 'bank', 'cash'];
+                            const allowed = ['mpesa', 'airtel_money', 'bank', 'cash', 'referrer_float'];
                             option.disabled = !allowed.includes(optionType);
-                            option.hidden   = !allowed.includes(optionType);
+                            option.hidden = !allowed.includes(optionType);
                         }
+
                         else {
                             option.disabled = false;
                             option.hidden   = false;
