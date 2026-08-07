@@ -308,81 +308,187 @@
 
                         <!-- Paid Loans Section -->
                     @else
-                        <div class="p-4 border-b border-gray-200">
-                            <div class="flex flex-wrap items-center justify-between gap-4">
-                                <h2 class="text-lg font-medium text-gray-900">Paid Loans</h2>
+                        <div class="bg-white rounded-lg border border-gray-200">
+                            <div class="p-4 border-b border-gray-200">
+                                <div class="flex flex-wrap items-center justify-between gap-4">
+                                    <h2 class="text-lg font-medium text-gray-900">Paid Loans</h2>
 
-                                <form method="GET"
-                                      action="{{ route('loans-given.index') }}"
-                                      x-data="{
-                  open: false,
-                  period: '{{ $period ?: '' }}',
-                  labels: {
-                      '':           'All Time',
-                      this_month:   'This Month',
-                      last_month:   'Last Month',
-                      this_year:    'This Year',
-                      last_year:    'Last Year',
-                      custom:       'Custom Range',
-                  },
-                  select(value) {
-                      this.period = value;
-                      this.open = false;
-                      if (value !== 'custom') {
-                          window.location = '{{ route('loans-given.index') }}?filter=paid&period=' + value;
-                      }
-                      // Custom: leave the date fields + Apply visible so the
-                      // user can pick a range before the page reloads.
-                  }
-              }"
-                                      class="flex flex-wrap items-center gap-2">
+                                    <form method="GET"
+                                          action="{{ route('loans-given.index') }}"
+                                          x-data="{
+                                              open: false,
+                                              period: '{{ $period ?: '' }}',
+                                              labels: {
+                                                  '':           'All Time',
+                                                  this_month:   'This Month',
+                                                  last_month:   'Last Month',
+                                                  this_year:    'This Year',
+                                                  last_year:    'Last Year',
+                                                  custom:       'Custom Range',
+                                              },
+                                              select(value) {
+                                                  this.period = value;
+                                                  this.open = false;
+                                                  if (value !== 'custom') {
+                                                      window.location = '{{ route('loans-given.index') }}?filter=paid&period=' + value;
+                                                  }
+                                              }
+                                          }"
+                                          class="flex flex-wrap items-center gap-2">
 
-                                    <input type="hidden" name="filter" value="paid">
-                                    <input type="hidden" name="period" :value="period">
+                                        <input type="hidden" name="filter" value="paid">
+                                        <input type="hidden" name="period" :value="period">
 
-                                    <div @mouseenter="open = true"
-                                         @mouseleave="open = false"
-                                         @click.outside="open = false"
-                                         class="relative w-44">
-                                        <button type="button"
-                                                @click="open = !open"
-                                                class="w-full rounded-md border border-gray-300 shadow-sm text-sm px-3 py-2 text-left flex justify-between items-center gap-2 bg-white focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                                            <span x-text="labels[period]"></span>
-                                            <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                                            </svg>
-                                        </button>
-
-                                        <ul x-show="open"
-                                            x-transition
-                                            x-cloak
-                                            class="absolute z-20 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg text-sm overflow-hidden">
-                                            <template x-for="(label, value) in labels" :key="value">
-                                                <li @click="select(value)"
-                                                    :class="{ 'bg-indigo-50': period === value }"
-                                                    class="px-3 py-2 cursor-pointer hover:bg-indigo-100"
-                                                    x-text="label">
-                                                </li>
-                                            </template>
-                                        </ul>
-                                    </div>
-
-                                    <template x-if="period === 'custom'">
-                                        <div class="flex items-center gap-2">
-                                            <input type="date" name="start_date"
-                                                   class="rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 text-sm"
-                                                   value="{{ $startDate }}">
-                                            <input type="date" name="end_date"
-                                                   class="rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 text-sm"
-                                                   value="{{ $endDate }}">
-                                            <button type="submit"
-                                                    class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                                                Apply
+                                        <div @mouseenter="open = true"
+                                             @mouseleave="open = false"
+                                             @click.outside="open = false"
+                                             class="relative w-44">
+                                            <button type="button"
+                                                    @click="open = !open"
+                                                    class="w-full rounded-md border border-gray-300 shadow-sm text-sm px-3 py-2 text-left flex justify-between items-center gap-2 bg-white focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                                                <span x-text="labels[period]"></span>
+                                                <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                                </svg>
                                             </button>
+
+                                            <ul x-show="open"
+                                                x-transition
+                                                x-cloak
+                                                class="absolute z-20 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg text-sm overflow-hidden">
+                                                <template x-for="(label, value) in labels" :key="value">
+                                                    <li @click="select(value)"
+                                                        :class="{ 'bg-indigo-50': period === value }"
+                                                        class="px-3 py-2 cursor-pointer hover:bg-indigo-100"
+                                                        x-text="label">
+                                                    </li>
+                                                </template>
+                                            </ul>
                                         </div>
-                                    </template>
-                                </form>
+
+                                        <template x-if="period === 'custom'">
+                                            <div class="flex items-center gap-2">
+                                                <input type="date" name="start_date"
+                                                       class="rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 text-sm"
+                                                       value="{{ $startDate }}">
+                                                <input type="date" name="end_date"
+                                                       class="rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 text-sm"
+                                                       value="{{ $endDate }}">
+                                                <button type="submit"
+                                                        class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                                    Apply
+                                                </button>
+                                            </div>
+                                        </template>
+                                    </form>
+                                </div>
                             </div>
+
+                            @if($paidLoans->isEmpty())
+                                <div class="p-6">
+                                    <div class="bg-blue-50 border-l-4 border-blue-400 p-4">
+                                        <div class="flex">
+                                            <div class="flex-shrink-0">
+                                                <svg class="h-5 w-5 text-blue-400" fill="none" stroke="currentColor"
+                                                     viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                          stroke-width="2"
+                                                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                </svg>
+                                            </div>
+                                            <div class="ml-3">
+                                                <p class="text-sm text-blue-700">No paid loans found.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            @else
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-gray-200">
+                                        <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Borrower
+                                            </th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Principal
+                                            </th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Interest
+                                            </th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Referrer
+                                            </th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Total Received
+                                            </th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Repaid Date
+                                            </th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Actions
+                                            </th>
+                                        </tr>
+                                        </thead>
+                                        <tbody class="bg-white divide-y divide-gray-200">
+                                        @foreach($paidLoans as $loan)
+                                            <tr>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $loan->borrower_name }}</td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    KES {{ number_format($loan->principal_amount, 0) }}</td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    @if($loan->interest_amount > 0)
+                                                        KES {{ number_format($loan->interest_amount, 0) }}
+                                                        ({{ number_format($loan->interest_rate, 1) }}%)
+                                                    @else
+                                                        -
+                                                    @endif
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    @if($loan->referrer)
+                                                        <a href="{{ route('referrers.show', $loan->referrer->id) }}"
+                                                           class="text-indigo-600 hover:text-indigo-900">
+                                                            {{ $loan->referrer->name }}
+                                                        </a>
+                                                        @if($loan->referrer_deducted_before_deposit)
+                                                            <span class="block text-xs text-gray-500">
+            KES {{ number_format($loan->referrer_retained_amount, 0) }} retain</span>
+                                                        @elseif($loan->interest_amount > 0 && $loan->referrer_share_percentage !== null)
+                                                            <span class="block text-xs text-purple-600">
+                KES {{ number_format($loan->interest_amount * ($loan->referrer_share_percentage / 100), 0) }}
+                ({{ number_format($loan->referrer_share_percentage, 1) }}%)
+            </span>
+                                                        @endif
+                                                    @else
+                                                        -
+                                                    @endif
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
+                                                    KES {{ number_format($loan->amount_paid, 0) }}</td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $loan->repaid_date ? $loan->repaid_date->format('M d, Y') : '-' }}</td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    <a href="{{ route('loans-given.show', $loan->id) }}"
+                                                       class="text-indigo-600 hover:text-indigo-900">
+                                                        <svg class="w-5 h-5 inline" fill="none" stroke="currentColor"
+                                                             viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                  stroke-width="2"
+                                                                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                  stroke-width="2"
+                                                                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                                        </svg>
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="px-6 py-4 border-t border-gray-200">
+                                    {{ $paidLoans->links() }}
+                                </div>
+                            @endif
                         </div>
                     @endif
                 </div>
