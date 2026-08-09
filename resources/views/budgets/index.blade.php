@@ -450,7 +450,7 @@
                             <td class="px-3 py-1.5 text-center font-bold bg-indigo-50 dark:bg-indigo-900/30 text-gray-800 dark:text-gray-200">
                                 <div>{{ number_format($category->yearly_total, 0) }}</div>
                                 <div class="text-xs font-normal text-gray-400 dark:text-gray-500">
-                                    {{ $category->yearly_percentage }}% of income
+                                    {{ $category->yearly_percentage }}%
                                 </div>
                                 <div x-show="showBudget && {{ $category->yearly_budget > 0 ? 'true' : 'false' }}" class="text-xs font-normal text-indigo-500 dark:text-indigo-400">
                                     / {{ number_format($category->yearly_budget, 0) }}
@@ -554,7 +554,7 @@
                             <td class="px-3 py-1.5 text-center font-bold bg-indigo-50 dark:bg-indigo-900/30 text-gray-800 dark:text-gray-200">
                                 <div>{{ number_format($category->yearly_total, 0) }}</div>
                                 <div class="text-xs font-normal text-gray-400 dark:text-gray-500">
-                                    {{ $category->yearly_percentage }}% of expenses
+                                    {{ $category->yearly_percentage }}%
                                 </div>
                                 <div x-show="showBudget && {{ $category->yearly_budget > 0 ? 'true' : 'false' }}" class="text-xs font-normal text-indigo-500 dark:text-indigo-400">
                                     / {{ number_format($category->yearly_budget, 0) }}
