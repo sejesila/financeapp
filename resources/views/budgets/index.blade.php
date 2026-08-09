@@ -145,14 +145,20 @@
                                         $budgetKey = $category->id . '-' . $m;
                                         $budgetAmount = $budgets->get($budgetKey)->amount ?? 0;
                                         $variance = $actualAmount - $budgetAmount;
+                                        $monthSharePercent = $monthIncome > 0 ? round(($actualAmount / $monthIncome) * 100, 1) : 0;
                                     @endphp
                                     @if($actualAmount > 0 || $budgetAmount > 0)
                                         <div class="text-sm">
                                             <div class="flex items-center justify-between">
                                                 <span class="text-gray-700 dark:text-gray-300">{{ $category->name }}</span>
-                                                <span class="font-medium text-green-600 dark:text-green-400">
-                                                    {{ number_format($actualAmount, 0) }}
-                                                </span>
+                                                <div class="flex items-center gap-2">
+                                                    @if($actualAmount > 0)
+                                                        <span class="text-xs text-gray-400 dark:text-gray-500">{{ $monthSharePercent }}%</span>
+                                                    @endif
+                                                    <span class="font-medium text-green-600 dark:text-green-400">
+                                                        {{ number_format($actualAmount, 0) }}
+                                                    </span>
+                                                </div>
                                             </div>
                                             <div x-show="showBudget" class="mt-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
                                                 <span>Budget</span>
@@ -195,14 +201,20 @@
                                         $budgetKey = $category->id . '-' . $m;
                                         $budgetAmount = $budgets->get($budgetKey)->amount ?? 0;
                                         $variance = $actualAmount - $budgetAmount;
+                                        $monthSharePercent = $monthExpense > 0 ? round(($actualAmount / $monthExpense) * 100, 1) : 0;
                                     @endphp
                                     @if($actualAmount > 0 || $budgetAmount > 0)
                                         <div class="text-sm">
                                             <div class="flex items-center justify-between">
                                                 <span class="text-gray-700 dark:text-gray-300">{{ $category->name }}</span>
-                                                <span class="font-medium text-red-600 dark:text-red-400">
-                                                    {{ number_format($actualAmount, 0) }}
-                                                </span>
+                                                <div class="flex items-center gap-2">
+                                                    @if($actualAmount > 0)
+                                                        <span class="text-xs text-gray-400 dark:text-gray-500">{{ $monthSharePercent }}%</span>
+                                                    @endif
+                                                    <span class="font-medium text-red-600 dark:text-red-400">
+                                                        {{ number_format($actualAmount, 0) }}
+                                                    </span>
+                                                </div>
                                             </div>
                                             <div x-show="showBudget" class="mt-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
                                                 <span>Budget</span>
@@ -437,6 +449,9 @@
                             @endfor
                             <td class="px-3 py-1.5 text-center font-bold bg-indigo-50 dark:bg-indigo-900/30 text-gray-800 dark:text-gray-200">
                                 <div>{{ number_format($category->yearly_total, 0) }}</div>
+                                <div class="text-xs font-normal text-gray-400 dark:text-gray-500">
+                                    {{ $category->yearly_percentage }}% of income
+                                </div>
                                 <div x-show="showBudget && {{ $category->yearly_budget > 0 ? 'true' : 'false' }}" class="text-xs font-normal text-indigo-500 dark:text-indigo-400">
                                     / {{ number_format($category->yearly_budget, 0) }}
                                 </div>
@@ -538,6 +553,9 @@
                             @endfor
                             <td class="px-3 py-1.5 text-center font-bold bg-indigo-50 dark:bg-indigo-900/30 text-gray-800 dark:text-gray-200">
                                 <div>{{ number_format($category->yearly_total, 0) }}</div>
+                                <div class="text-xs font-normal text-gray-400 dark:text-gray-500">
+                                    {{ $category->yearly_percentage }}% of expenses
+                                </div>
                                 <div x-show="showBudget && {{ $category->yearly_budget > 0 ? 'true' : 'false' }}" class="text-xs font-normal text-indigo-500 dark:text-indigo-400">
                                     / {{ number_format($category->yearly_budget, 0) }}
                                 </div>

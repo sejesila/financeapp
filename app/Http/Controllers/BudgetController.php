@@ -144,6 +144,26 @@ class BudgetController extends Controller
             ->filter(fn($c) => $c->yearly_total > 0)
             ->sortByDesc('yearly_total');
 
+        // Each category's share of its own type's yearly total — income
+        // categories are compared against total yearly income, expense
+        // categories against total yearly expenses, so the two sides never
+        // get mixed into one misleading denominator.
+        $incomeYearlyTotal = $incomeCategories->sum('yearly_total');
+        $incomeCategories = $incomeCategories->map(function ($category) use ($incomeYearlyTotal) {
+            $category->yearly_percentage = $incomeYearlyTotal > 0
+                ? round(($category->yearly_total / $incomeYearlyTotal) * 100, 1)
+                : 0;
+            return $category;
+        });
+
+        $expenseYearlyTotal = $expenseCategories->sum('yearly_total');
+        $expenseCategories = $expenseCategories->map(function ($category) use ($expenseYearlyTotal) {
+            $category->yearly_percentage = $expenseYearlyTotal > 0
+                ? round(($category->yearly_total / $expenseYearlyTotal) * 100, 1)
+                : 0;
+            return $category;
+        });
+
         // Get loan statistics for the year
         $loanStats = $this->getLoanStats($year);
 
