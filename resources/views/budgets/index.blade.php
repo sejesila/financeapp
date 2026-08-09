@@ -329,36 +329,20 @@
                 </div>
 
                 {{-- Budget comparison toggle (desktop) --}}
-                <div class="flex items-center gap-5">
-                    <div class="flex items-center gap-2">
-                        <label for="minPercentFilter" class="text-sm text-gray-500 dark:text-gray-400">Hide below</label>
-                        <select
-                            id="minPercentFilter"
-                            x-model.number="minPercentFilter"
-                            class="text-sm rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                        >
-                            <option value="0">All</option>
-                            <option value="1">1%</option>
-                            <option value="2">2%</option>
-                            <option value="5">5%</option>
-                        </select>
-                    </div>
-
-                    <div class="flex items-center gap-3">
-                        <span class="text-sm text-gray-500 dark:text-gray-400">Show budget comparison</span>
-                        <button
-                            @click="showBudget = !showBudget"
-                            :class="showBudget ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'"
-                            class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                            role="switch"
-                            :aria-checked="showBudget"
-                        >
-                            <span
-                                :class="showBudget ? 'translate-x-5' : 'translate-x-0'"
-                                class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-                            ></span>
-                        </button>
-                    </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-sm text-gray-500 dark:text-gray-400">Show budget comparison</span>
+                    <button
+                        @click="showBudget = !showBudget"
+                        :class="showBudget ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'"
+                        class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                        role="switch"
+                        :aria-checked="showBudget"
+                    >
+                        <span
+                            :class="showBudget ? 'translate-x-5' : 'translate-x-0'"
+                            class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                        ></span>
+                    </button>
                 </div>
             </div>
 
@@ -405,8 +389,8 @@
                         <td colspan="14" class="p-2 font-bold text-gray-800 dark:text-gray-200">INCOME</td>
                     </tr>
 
-                    @foreach($incomeCategories as $category)
-                        <tr class="border-b hover:bg-gray-50 dark:hover:bg-gray-700/50" x-show="{{ $category->yearly_percentage }} >= minPercentFilter">
+                    @foreach($incomeCategoriesDisplay as $category)
+                        <tr class="border-b hover:bg-gray-50 dark:hover:bg-gray-700/50">
                             <td class="px-3 py-1.5 font-medium text-gray-700 dark:text-gray-300">
                                 {{ $category->name }}
                             </td>
@@ -509,8 +493,8 @@
                         <td colspan="14" class="p-2 font-bold text-gray-800 dark:text-gray-200">EXPENSES</td>
                     </tr>
 
-                    @foreach($expenseCategories as $category)
-                        <tr class="border-b hover:bg-gray-50 dark:hover:bg-gray-700/50" x-show="{{ $category->yearly_percentage }} >= minPercentFilter">
+                    @foreach($expenseCategoriesDisplay as $category)
+                        <tr class="border-b hover:bg-gray-50 dark:hover:bg-gray-700/50">
                             <td class="px-3 py-1.5 font-medium text-gray-700 dark:text-gray-300">
                                 {{ $category->name }}
                             </td>
@@ -834,7 +818,6 @@
         function budgetPage() {
             return {
                 showBudget: false,
-                minPercentFilter: 0,
 
                 async saveBudgetCell(event) {
                     const input = event.target;
