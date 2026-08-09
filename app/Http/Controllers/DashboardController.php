@@ -44,8 +44,17 @@ class DashboardController extends Controller
 
         // ============ FINANCIAL OVERVIEW ============
 
-        $totalAssets = $accounts->sum('current_balance')
-            + $walletAccounts->sum('current_balance');
+        // Cash-only total, shown on the "Total Cash" card (wallets excluded
+        // from this figure per product decision — wallets get their own card).
+        $totalCash = $accounts->sum('current_balance');
+
+        // Wallet-only total, shown on its own "Total Wallets" card/section.
+        $totalWallets = $walletAccounts->sum('current_balance');
+
+        // Net worth / debt ratio still treat cash + wallets as assets — this
+        // is unchanged from prior behaviour, only the *display* split above
+        // is new.
+        $totalAssets = $totalCash + $totalWallets;
 
         $totalSavings = $savingsAccounts->sum('current_balance');
 
@@ -206,6 +215,8 @@ class DashboardController extends Controller
             'accounts',
             'savingsAccounts',
             'walletAccounts',
+            'totalCash',
+            'totalWallets',
             'totalAssets',
             'totalSavings',
             'totalLiabilities',

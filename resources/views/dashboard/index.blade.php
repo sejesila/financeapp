@@ -102,6 +102,18 @@
                         </svg>
                         <span id="savingsToggleText" class="font-medium text-sm">Show Savings</span>
                     </button>
+
+                    {{-- Wallets Balance Toggle --}}
+                    @if($walletAccounts->count() > 0)
+                        <button id="toggleWalletsBalance"
+                                class="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl shadow-md hover:shadow-lg transition-all duration-200">
+                            <svg id="walletsEyeIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                            </svg>
+                            <span id="walletsToggleText" class="font-medium text-sm">Show Wallets</span>
+                        </button>
+                    @endif
                 </div>
             </div>
 
@@ -111,11 +123,11 @@
                     $mainCards = [
                         [
                             'title' => 'Total Cash',
-                            'amount' => $totalAssets,
+                            'amount' => $totalCash,
                             'subtitle' => 'Across ' . $accounts->count() . ' account' . ($accounts->count() != 1 ? 's' : ''),
                             'gradient' => 'from-emerald-500 to-green-600',
                             'icon' => 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z',
-                            'isSavings' => false
+                            'type' => 'cash'
                         ],
                         [
                             'title' => 'Total Savings',
@@ -123,7 +135,7 @@
                             'subtitle' => 'Across all savings accounts',
                             'gradient' => 'from-teal-500 to-cyan-600',
                             'icon' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
-                            'isSavings' => true
+                            'type' => 'savings'
                         ],
                         [
                             'title' => 'Total Liabilities',
@@ -131,7 +143,7 @@
                             'subtitle' => $activeLoans->count() . ' active loan' . ($activeLoans->count() != 1 ? 's' : ''),
                             'gradient' => 'from-rose-500 to-pink-600',
                             'icon' => 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z',
-                            'isSavings' => false
+                            'type' => 'cash'
                         ],
                         [
                             'title' => 'Net Balance',
@@ -139,13 +151,24 @@
                             'subtitle' => 'Debt ratio: ' . number_format($debtToAssetRatio, 1) . '%',
                             'gradient' => $netWorth >= 0 ? 'from-blue-500 to-indigo-600' : 'from-orange-500 to-amber-600',
                             'icon' => 'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z',
-                            'isSavings' => false
-                        ]
+                            'type' => 'cash'
+                        ],
                     ];
+
+                    if ($walletAccounts->count() > 0) {
+                        $mainCards[] = [
+                            'title' => 'Total Wallets',
+                            'amount' => $totalWallets,
+                            'subtitle' => 'Across ' . $walletAccounts->count() . ' wallet' . ($walletAccounts->count() != 1 ? 's' : ''),
+                            'gradient' => 'from-sky-500 to-blue-600',
+                            'icon' => 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z',
+                            'type' => 'wallet'
+                        ];
+                    }
                 @endphp
 
                 @foreach($mainCards as $card)
-                    @if($card['isSavings'])
+                    @if($card['type'] === 'savings')
                         <div class="stat-card rounded-2xl shadow-lg p-5 sm:p-6 text-white bg-gradient-to-br {{ $card['gradient'] }} savings-balance-hidden">
                             <div class="flex items-center justify-between mb-4">
                                 <div class="p-3 rounded-xl bg-white/20 backdrop-blur-sm">
@@ -166,6 +189,29 @@
                                 </div>
                                 <p class="text-sm opacity-80 savings-balance-amount">{{ $card['subtitle'] }}</p>
                                 <p class="text-sm opacity-80 savings-balance-hidden-placeholder hidden">Hidden</p>
+                            </div>
+                        </div>
+                    @elseif($card['type'] === 'wallet')
+                        <div class="stat-card rounded-2xl shadow-lg p-5 sm:p-6 text-white bg-gradient-to-br {{ $card['gradient'] }} wallet-balance-hidden">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="p-3 rounded-xl bg-white/20 backdrop-blur-sm">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $card['icon'] }}"/>
+                                    </svg>
+                                </div>
+                                <span class="text-sm font-medium opacity-90">{{ $card['title'] }}</span>
+                            </div>
+
+                            <div class="space-y-1">
+                                <h3 class="text-3xl font-bold wallet-balance-amount">
+                                    KES {{ number_format($card['amount'], 0, '.', ',') }}
+                                </h3>
+                                <div class="flex items-center gap-2 wallet-balance-hidden-placeholder hidden">
+                                    <h3 class="text-3xl font-bold">KES</h3>
+                                    <div class="w-20 h-8 bg-white/20 rounded animate-pulse"></div>
+                                </div>
+                                <p class="text-sm opacity-80 wallet-balance-amount">{{ $card['subtitle'] }}</p>
+                                <p class="text-sm opacity-80 wallet-balance-hidden-placeholder hidden">Hidden</p>
                             </div>
                         </div>
                     @else
@@ -440,6 +486,70 @@
                 </div>
             @endif
 
+            {{-- Wallets Section --}}
+            @if($walletAccounts->count() > 0)
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 sm:p-6 mb-6 sm:mb-8">
+                    <div class="flex justify-between items-center mb-5">
+                        <div>
+                            <h3 class="text-lg sm:text-xl font-bold text-gray-800 dark:text-white">Wallets</h3>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                {{ $walletAccounts->count() }} wallet{{ $walletAccounts->count() != 1 ? 's' : '' }}
+                            </p>
+                        </div>
+                        <a href="{{ route('accounts.index') }}"
+                           class="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium transition-colors">
+                            Manage →
+                        </a>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        @php
+                            $walletGradients = ['from-sky-500 to-blue-600', 'from-cyan-500 to-blue-600', 'from-blue-500 to-indigo-600'];
+                            $walletIcon = 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z';
+                        @endphp
+
+                        @foreach($walletAccounts as $account)
+                            <div class="relative group">
+                                <div
+                                    class="bg-gradient-to-br {{ $walletGradients[$loop->index % count($walletGradients)] }} rounded-xl p-4 text-white shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 wallet-balance-hidden">
+                                    <div class="flex justify-between items-start mb-3">
+                                        <span
+                                            class="px-2 py-1 rounded-full text-xs font-medium bg-white/20 backdrop-blur-sm">
+                                            Wallet
+                                        </span>
+                                        <div
+                                            class="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="{{ $walletIcon }}"/>
+                                            </svg>
+                                        </div>
+                                    </div>
+
+                                    <h4 class="font-bold text-base mb-3 truncate">{{ $account->name }}</h4>
+
+                                    <div>
+                                        <p class="text-xs opacity-70 mb-1">Balance</p>
+                                        <p class="text-xl font-bold wallet-balance-amount">KES {{ number_format($account->current_balance, 0, '.', ',') }}</p>
+                                        <div class="flex items-center gap-2 wallet-balance-hidden-placeholder hidden">
+                                            <p class="text-xl font-bold">KES ••••••</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div
+                                    class="hidden sm:flex mt-2 gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    <a href="{{ route('accounts.show', $account) }}"
+                                       class="flex-1 text-center px-2 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                                        View
+                                    </a>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             {{-- Three Column Layout --}}
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
 
@@ -592,9 +702,10 @@
         // ── State (persisted independently) ──────────────────────────────────
         let balancesVisible = localStorage.getItem('balancesVisible') === 'true';
         let savingsVisible = localStorage.getItem('savingsVisible') === 'true';
+        let walletsVisible = localStorage.getItem('walletsVisible') === 'true';
         let lowBalanceAccountsVisible = localStorage.getItem('lowBalanceAccountsVisible') === 'true';
 
-        // ── Main cash / wallet toggle ─────────────────────────────────────────
+        // ── Main cash toggle ─────────────────────────────────────────
         function updateBalanceVisibility() {
             document.querySelectorAll('.balance-hidden').forEach(container => {
                 const amount = container.querySelector('.balance-amount');
@@ -624,6 +735,26 @@
             document.getElementById('savingsEyeIcon').innerHTML = savingsVisible
                 ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>'
                 : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>';
+        }
+
+        // ── Wallets-only toggle ───────────────────────────────────────────────
+        function updateWalletVisibility() {
+            document.querySelectorAll('.wallet-balance-hidden').forEach(container => {
+                const amount = container.querySelector('.wallet-balance-amount');
+                const placeholder = container.querySelector('.wallet-balance-hidden-placeholder') || container.querySelector('.wallet-balance-hidden');
+                if (amount && placeholder) {
+                    amount.classList.toggle('hidden', !walletsVisible);
+                    placeholder.classList.toggle('hidden', walletsVisible);
+                }
+            });
+            const toggleTextEl = document.getElementById('walletsToggleText');
+            const eyeIconEl = document.getElementById('walletsEyeIcon');
+            if (toggleTextEl) toggleTextEl.textContent = walletsVisible ? 'Hide Wallets' : 'Show Wallets';
+            if (eyeIconEl) {
+                eyeIconEl.innerHTML = walletsVisible
+                    ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>'
+                    : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>';
+            }
         }
 
         // ── Low-balance accounts toggle ───────────────────────────────────────
@@ -661,9 +792,20 @@
                 updateSavingsVisibility();
             });
 
+            // Set up wallets toggle (only present when the user has wallet accounts)
+            const toggleWalletsBtn = document.getElementById('toggleWalletsBalance');
+            if (toggleWalletsBtn) {
+                toggleWalletsBtn.addEventListener('click', function () {
+                    walletsVisible = !walletsVisible;
+                    localStorage.setItem('walletsVisible', walletsVisible);
+                    updateWalletVisibility();
+                });
+            }
+
             // Initialize visibility on load
             updateBalanceVisibility();
             updateSavingsVisibility();
+            updateWalletVisibility();
             updateLowBalanceAccountsVisibility();
         });
     </script>
