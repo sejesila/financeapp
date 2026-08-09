@@ -49,7 +49,7 @@ class AccountController extends Controller
             ->get();
 
         $totalBalance = number_format(
-            $accounts->sum('current_balance') + $walletAccounts->sum('current_balance'),
+            $accounts->sum('current_balance'),
             2, '.', ''
         );
         $totalSavings = number_format($savingsAccounts->sum('current_balance'), 2, '.', '');

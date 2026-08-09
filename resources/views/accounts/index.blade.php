@@ -56,7 +56,7 @@
                         <span class="balance-amount hidden">KES {{ number_format($totalBalance, 0, '.', ',') }}</span>
                         <span class="balance-placeholder">KES ••••••</span>
                     </p>
-                    @php $totalAccountCount = $accounts->count() + $walletAccounts->count(); @endphp
+                    @php $totalAccountCount = $accounts->count(); @endphp
                     <p class="text-xs mt-1 opacity-90">
                         Across {{ $totalAccountCount }} {{ Str::plural('account', $totalAccountCount) }}
                     </p>
