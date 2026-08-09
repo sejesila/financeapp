@@ -164,16 +164,16 @@ class BudgetController extends Controller
             return $category;
         });
 
-        // Categories under 0.01% of their type's yearly total are noise as
+        // Categories under 0.05% of their type's yearly total are noise as
         // individual line items — this filter only trims which rows are
         // *displayed*; $incomeCategories/$expenseCategories (used for the
         // TOTAL INCOME/EXPENSES rows) keep every category so totals stay
         // exact.
         $incomeCategoriesDisplay = $incomeCategories
-            ->filter(fn($c) => $incomeYearlyTotal <= 0 || ($c->yearly_total / $incomeYearlyTotal) * 100 >= 0.01);
+            ->filter(fn($c) => $incomeYearlyTotal <= 0 || ($c->yearly_total / $incomeYearlyTotal) * 100 >= 0.05);
 
         $expenseCategoriesDisplay = $expenseCategories
-            ->filter(fn($c) => $expenseYearlyTotal <= 0 || ($c->yearly_total / $expenseYearlyTotal) * 100 >= 0.01);
+            ->filter(fn($c) => $expenseYearlyTotal <= 0 || ($c->yearly_total / $expenseYearlyTotal) * 100 >= 0.05);
 
         // Get loan statistics for the year
         $loanStats = $this->getLoanStats($year);
