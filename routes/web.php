@@ -144,6 +144,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('loans-given')->name('loans-given.')->group(function () {
         Route::get('/', [LoanGivenController::class, 'index'])->name('index');
         Route::get('/create', [LoanGivenController::class, 'create'])->name('create');
+        Route::get('/report', [LoanGivenController::class, 'report'])->name('report'); // moved up here
         Route::post('/', [LoanGivenController::class, 'store'])->name('store');
         Route::get('/{loanGiven}', [LoanGivenController::class, 'show'])->name('show');
         Route::get('/{loanGiven}/payment', [LoanGivenController::class, 'paymentForm'])->name('payment-form');
@@ -151,8 +152,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/{loanGiven}/close', [LoanGivenController::class, 'close'])->name('close');
         Route::put('/{loanGiven}/status', [LoanGivenController::class, 'markStatus'])->name('status');
         Route::delete('/{loanGiven}', [LoanGivenController::class, 'destroy'])->name('destroy');
-        Route::get('/report', [LoanGivenController::class, 'report'])
-            ->name('report');
     });
 
     Route::get('referrers/{referrer}/payouts/create', [ReferrerPayoutController::class, 'create'])
