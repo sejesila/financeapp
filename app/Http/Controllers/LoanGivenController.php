@@ -46,15 +46,20 @@ class LoanGivenController extends Controller implements HasMiddleware
             $maxYear = date('Y');
 
             $sort = $request->get('sort', 'date_desc');
+            $referrerId = $request->get('referrer_id');
 
             $activeLoansQuery = LoanGiven::with(['account', 'payments', 'referrer'])
                 ->where('user_id', Auth::id())
                 ->where('status', 'active');
 
+            if ($referrerId) {
+                $activeLoansQuery->where('referrer_id', $referrerId);
+            }
+
             match ($sort) {
                 'referrer' => $activeLoansQuery
                     ->leftJoin('referrers', 'loan_givens.referrer_id', '=', 'referrers.id')
-                    ->orderByRaw('referrers.name IS NULL') // unreferred loans sink to the bottom
+                    ->orderByRaw('referrers.name IS NULL')
                     ->orderBy('referrers.name')
                     ->orderBy('loan_givens.disbursed_date', 'desc')
                     ->orderBy('loan_givens.created_at', 'desc')
@@ -65,7 +70,7 @@ class LoanGivenController extends Controller implements HasMiddleware
             };
 
             $activeLoans = $activeLoansQuery->get();
-
+            $referrers = Referrer::where('is_active', true)->orderBy('name')->get();
             $paidLoansQuery = LoanGiven::with(['account', 'payments', 'referrer'])
                 ->where('user_id', Auth::id())
                 ->where('status', 'paid');
@@ -111,7 +116,7 @@ class LoanGivenController extends Controller implements HasMiddleware
                 ->get();
 
             return view('loans-given.index', compact(
-                'activeLoans', 'paidLoans', 'filter', 'period','sort',
+                'activeLoans', 'paidLoans', 'filter', 'period','sort', 'referrerId', 'referrers',
                 'startDate', 'endDate', 'minYear', 'maxYear', 'accounts',
                 'totalPrincipal', 'totalRepaid', 'totalInterest', 'avgInterestRate', 'repaymentRate','totalOutstanding'
             ));

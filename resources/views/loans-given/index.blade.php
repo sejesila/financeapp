@@ -183,18 +183,55 @@
 
                     <!-- Active Loans Section -->
                     @if($filter === 'active')
-                        <div class="flex justify-end mb-4"
-                             x-data="{
-                                 open: false,
-                                 sort: '{{ $sort ?? 'date_desc' }}',
-                                 labels: { date_desc: 'Date Given (Newest)', referrer: 'Referrer' },
-                                 select(value) {
-                                     this.sort = value;
-                                     this.open = false;
-                                     window.location = '{{ route('loans-given.index') }}?filter=active&sort=' + value;
-                                 }
-                             }">
-                            <div @mouseenter="open = true" @mouseleave="open = false" @click.outside="open = false"
+                        <div class="flex justify-end gap-3 mb-4">
+                            <!-- Referrer filter -->
+                            <div x-data="{
+                                     open: false,
+                                     referrerId: '{{ $referrerId ?? '' }}',
+                                     labels: {
+                                         '': 'All Referrers',
+                                         @foreach($referrers as $referrer)
+                                             '{{ $referrer->id }}': '{{ $referrer->name }}',
+                                         @endforeach
+                                     },
+                                     select(value) {
+                                         this.referrerId = value;
+                                         this.open = false;
+                                         window.location = '{{ route('loans-given.index') }}?filter=active&sort={{ $sort ?? 'date_desc' }}&referrer_id=' + value;
+                                     }
+                                 }"
+                                 @mouseenter="open = true" @mouseleave="open = false" @click.outside="open = false"
+                                 class="relative w-52">
+                                <button type="button" @click="open = !open"
+                                        class="w-full rounded-md border border-gray-300 shadow-sm text-sm px-3 py-2 text-left flex justify-between items-center gap-2 bg-white focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                                    <span x-text="labels[referrerId]"></span>
+                                    <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                    </svg>
+                                </button>
+                                <ul x-show="open" x-transition x-cloak
+                                    class="absolute z-20 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg text-sm overflow-hidden">
+                                    <template x-for="(label, value) in labels" :key="value">
+                                        <li @click="select(value)"
+                                            :class="{ 'bg-indigo-50': referrerId === value }"
+                                            class="px-3 py-2 cursor-pointer hover:bg-indigo-100"
+                                            x-text="label"></li>
+                                    </template>
+                                </ul>
+                            </div>
+
+                            <!-- Sort -->
+                            <div x-data="{
+                                     open: false,
+                                     sort: '{{ $sort ?? 'date_desc' }}',
+                                     labels: { date_desc: 'Date Given (Newest)', referrer: 'Referrer (A-Z)' },
+                                     select(value) {
+                                         this.sort = value;
+                                         this.open = false;
+                                         window.location = '{{ route('loans-given.index') }}?filter=active&sort=' + value + '&referrer_id={{ $referrerId ?? '' }}';
+                                     }
+                                 }"
+                                 @mouseenter="open = true" @mouseleave="open = false" @click.outside="open = false"
                                  class="relative w-52">
                                 <button type="button" @click="open = !open"
                                         class="w-full rounded-md border border-gray-300 shadow-sm text-sm px-3 py-2 text-left flex justify-between items-center gap-2 bg-white focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
