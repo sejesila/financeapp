@@ -180,18 +180,20 @@
                             </a>
                         </nav>
                     </div>
+
+                    <!-- Active Loans Section -->
                     @if($filter === 'active')
                         <div class="flex justify-end mb-4"
                              x-data="{
-             open: false,
-             sort: '{{ $sort ?? 'date_desc' }}',
-             labels: { date_desc: 'Date Given (Newest)', referrer: 'Referrer' },
-             select(value) {
-                 this.sort = value;
-                 this.open = false;
-                 window.location = '{{ route('loans-given.index') }}?filter=active&sort=' + value;
-             }
-         }">
+                                 open: false,
+                                 sort: '{{ $sort ?? 'date_desc' }}',
+                                 labels: { date_desc: 'Date Given (Newest)', referrer: 'Referrer' },
+                                 select(value) {
+                                     this.sort = value;
+                                     this.open = false;
+                                     window.location = '{{ route('loans-given.index') }}?filter=active&sort=' + value;
+                                 }
+                             }">
                             <div @mouseenter="open = true" @mouseleave="open = false" @click.outside="open = false"
                                  class="relative w-52">
                                 <button type="button" @click="open = !open"
@@ -213,8 +215,6 @@
                             </div>
                         </div>
 
-                    <!-- Active Loans Section -->
-                    @if($filter === 'active')
                         @if($activeLoans->isEmpty())
                             <div class="bg-blue-50 border-l-4 border-blue-400 p-4">
                                 <div class="flex">
