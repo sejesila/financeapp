@@ -52,7 +52,7 @@
 
                     <!-- Statistics Dashboard -->
                     <div class="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
-                        <!-- Total Outstanding (NEW) -->
+                        <!-- Total Outstanding -->
                         <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 overflow-hidden shadow-sm rounded-lg border border-indigo-200">
                             <div class="p-4">
                                 <div class="flex items-center">
