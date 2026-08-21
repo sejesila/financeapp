@@ -45,11 +45,26 @@ class LoanGivenController extends Controller implements HasMiddleware
             $minYear = LoanGiven::where('user_id', Auth::id())->min(DB::raw('YEAR(disbursed_date)')) ?? date('Y');
             $maxYear = date('Y');
 
-            $activeLoans = LoanGiven::with(['account', 'payments', 'referrer'])
+            $sort = $request->get('sort', 'date_desc');
+
+            $activeLoansQuery = LoanGiven::with(['account', 'payments', 'referrer'])
                 ->where('user_id', Auth::id())
-                ->where('status', 'active')
-                ->orderBy('disbursed_date', 'desc')
-                ->get();
+                ->where('status', 'active');
+
+            match ($sort) {
+                'referrer' => $activeLoansQuery
+                    ->leftJoin('referrers', 'loan_givens.referrer_id', '=', 'referrers.id')
+                    ->orderByRaw('referrers.name IS NULL') // unreferred loans sink to the bottom
+                    ->orderBy('referrers.name')
+                    ->orderBy('loan_givens.disbursed_date', 'desc')
+                    ->orderBy('loan_givens.created_at', 'desc')
+                    ->select('loan_givens.*'),
+                default => $activeLoansQuery
+                    ->orderBy('disbursed_date', 'desc')
+                    ->orderBy('created_at', 'desc'),
+            };
+
+            $activeLoans = $activeLoansQuery->get();
 
             $paidLoansQuery = LoanGiven::with(['account', 'payments', 'referrer'])
                 ->where('user_id', Auth::id())
@@ -96,7 +111,7 @@ class LoanGivenController extends Controller implements HasMiddleware
                 ->get();
 
             return view('loans-given.index', compact(
-                'activeLoans', 'paidLoans', 'filter', 'period',
+                'activeLoans', 'paidLoans', 'filter', 'period','sort',
                 'startDate', 'endDate', 'minYear', 'maxYear', 'accounts',
                 'totalPrincipal', 'totalRepaid', 'totalInterest', 'avgInterestRate', 'repaymentRate','totalOutstanding'
             ));
