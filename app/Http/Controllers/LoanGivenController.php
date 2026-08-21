@@ -496,6 +496,53 @@ class LoanGivenController extends Controller implements HasMiddleware
             return back()->with('error', 'Payment failed: ' . $e->getMessage())->withInput();
         }
     }
+    // ── report ────────────────────────────────────────────────────────────────
+
+    public function report(Request $request)
+    {
+        try {
+            $this->authorize('viewAny', LoanGiven::class);
+
+            $status = $request->get('status', 'active'); // active | paid | all
+            $referrerId = $request->get('referrer_id');
+
+            $query = LoanGiven::with('referrer')
+                ->where('user_id', Auth::id());
+
+            if ($status === 'active') {
+                $query->where('status', 'active');
+            } elseif ($status === 'paid') {
+                $query->where('status', 'paid');
+            }
+            // 'all' => no status filter, includes defaulted/written_off too
+
+            if ($referrerId) {
+                $query->where('referrer_id', $referrerId);
+            }
+
+            $loans = $query->orderBy('due_date')->get();
+
+            $groupedLoans = $loans
+                ->groupBy(fn($loan) => $loan->referrer?->name ?? 'No Referrer')
+                ->sortKeys();
+
+            $referrers = Referrer::where('is_active', true)->orderBy('name')->get();
+
+            $grandTotalPrincipal = $loans->sum('principal_amount');
+            $grandTotalOutstanding = $loans->sum('balance');
+
+            return view('loans-given.report', compact(
+                'groupedLoans', 'status', 'referrerId', 'referrers',
+                'grandTotalPrincipal', 'grandTotalOutstanding'
+            ));
+
+        } catch (ValidationException|AuthorizationException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            Log::error('LoanGivenController@report failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return redirect()->route('loans-given.index')->with('error', 'Could not generate report: ' . $e->getMessage());
+        }
+    }
 
     // ── close as repaid (standalone action, e.g. from the loan page) ───────────
 

@@ -151,6 +151,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/{loanGiven}/close', [LoanGivenController::class, 'close'])->name('close');
         Route::put('/{loanGiven}/status', [LoanGivenController::class, 'markStatus'])->name('status');
         Route::delete('/{loanGiven}', [LoanGivenController::class, 'destroy'])->name('destroy');
+        Route::get('/report', [LoanGivenController::class, 'report'])
+            ->name('report');
     });
 
     Route::get('referrers/{referrer}/payouts/create', [ReferrerPayoutController::class, 'create'])
