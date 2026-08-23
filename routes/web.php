@@ -16,6 +16,7 @@ use App\Http\Controllers\{AccountController,
     ProfileController,
     ReferrerPayoutController,
     ReportsController,
+    RollingFundController,
     StatementController,
     TransactionController};
 use App\Http\Controllers\Auth\{AuthenticatedSessionController,
@@ -186,6 +187,14 @@ Route::middleware('auth')->group(function () {
         Route::post('return-borrowed', [ClientFundController::class, 'returnBorrowed'])
             ->name('return-borrowed');
     });
+
+    Route::get('/rolling-funds', [RollingFundController::class, 'index'])->name('rolling-funds.index');
+    Route::get('/rolling-funds/create', [RollingFundController::class, 'create'])->name('rolling-funds.create');
+    Route::post('/rolling-funds', [RollingFundController::class, 'store'])->name('rolling-funds.store');
+    Route::post('/rolling-funds/save-limits', [RollingFundController::class, 'saveLimits'])->name('rolling-funds.save-limits');
+    Route::get('/rolling-funds/{rollingFund}', [RollingFundController::class, 'show'])->name('rolling-funds.show');
+    Route::post('/rolling-funds/{rollingFund}/record-outcome', [RollingFundController::class, 'recordOutcome'])->name('rolling-funds.record-outcome');
+    Route::delete('/rolling-funds/{rollingFund}', [RollingFundController::class, 'destroy'])->name('rolling-funds.destroy');
 
     // ======================================================================
     // Cafeteria
