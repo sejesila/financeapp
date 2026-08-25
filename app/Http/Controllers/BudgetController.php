@@ -42,6 +42,9 @@ class BudgetController extends Controller
         // > 'excludes principal recovery but includes Loan Interest as real
         // income once closed' for the asserted behavior.
     ];
+    private const EXCLUDED_ROLLING_FUND_CATEGORIES = [
+        'Rolling Funds',
+    ];
 
     public function index(Request $request, $year = null)
     {
@@ -56,13 +59,13 @@ class BudgetController extends Controller
 
         $incomeCategories = Category::where('user_id', Auth::id())
             ->where('type', 'income')
-            ->whereNotIn('name', self::EXCLUDED_LOAN_CATEGORIES)
+            ->whereNotIn('name', array_merge(self::EXCLUDED_LOAN_CATEGORIES, self::EXCLUDED_ROLLING_FUND_CATEGORIES))
             ->orderBy('name')
             ->get();
 
         $expenseCategories = Category::where('user_id', Auth::id())
             ->where('type', 'expense')
-            ->whereNotIn('name', self::EXCLUDED_LOAN_CATEGORIES)
+            ->whereNotIn('name', array_merge(self::EXCLUDED_LOAN_CATEGORIES, self::EXCLUDED_ROLLING_FUND_CATEGORIES))
             ->orderBy('name')
             ->get();
 
@@ -95,10 +98,12 @@ class BudgetController extends Controller
             })
             ->whereHas('category', function ($q) {
                 $q->whereIn('type', ['income', 'expense'])
-                    ->whereNotIn('name', array_merge(self::EXCLUDED_LOAN_CATEGORIES, ['Client Funds']));
-            })
-            ->groupBy('category_id', DB::raw('MONTH(COALESCE(period_date, date))'))
-            ->get();
+                    ->whereNotIn('name', array_merge(
+                        self::EXCLUDED_LOAN_CATEGORIES,
+                        self::EXCLUDED_ROLLING_FUND_CATEGORIES,
+                        ['Client Funds']
+                    ));
+            });
 
         // Convert to lookup: [category_id][month] => total
         $actuals = [];
