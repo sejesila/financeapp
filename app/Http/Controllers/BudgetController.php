@@ -103,7 +103,9 @@ class BudgetController extends Controller
                         self::EXCLUDED_ROLLING_FUND_CATEGORIES,
                         ['Client Funds']
                     ));
-            });
+            })
+            ->groupBy('category_id', DB::raw('MONTH(COALESCE(period_date, date))'))
+            ->get();
 
         // Convert to lookup: [category_id][month] => total
         $actuals = [];
