@@ -135,7 +135,7 @@ class CategoryResolver
         }
 
         if (str_contains($r, 'co-operative') && $accountNo === '1040616#0889') {
-            return 'School Fees';
+            return 'School Fees & Supplies';
         }
 
         return 'Other Expenses';
@@ -147,7 +147,7 @@ class CategoryResolver
 
         if (str_contains($r, 'naivas') || str_contains($r, 'quick mart')
             || str_contains($r, 'vuno') || str_contains($r, 'jeremiah mutuku')
-            || str_contains($r, 'waeconmatt')) {
+            || str_contains($r, 'streetking')|| str_contains($r, 'waeconmatt')) {
             return 'Groceries';
         }
 
