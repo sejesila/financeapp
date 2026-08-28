@@ -121,7 +121,7 @@ class CategoryResolver
     {
         $r = strtolower($recipient);
 
-        if (str_contains($r, 'kplc')) {
+        if (str_contains($r, 'kplc') || str_contains($r, 'kenya power')) {
             return 'Electricity';
         }
 

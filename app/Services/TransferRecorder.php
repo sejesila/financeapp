@@ -282,9 +282,16 @@ class TransferRecorder
 
         // ── Happy path: Transfer + fee transaction ────────────────────────
         DB::transaction(function () use ($user, $parsed, $bankAccount, $savingsAccount) {
-            $valueDate = KenyanBusinessDays::nextBusinessDay(
-                Carbon::parse($parsed['date'])
-            )->format('Y-m-d');
+            // PesaLink SMS carries the real transaction timestamp (date +
+            // time of day), so it doubles as both the cutoff-check anchor
+            // and the next-business-day fallback anchor — unlike the manual
+            // transfer form, there's no backdating concern here.
+            $transactionTime = Carbon::parse($parsed['date']);
+
+            $valueDate = KenyanBusinessDays::resolveEticaValueDate(
+                $transactionTime,
+                $transactionTime,
+            );
 
             $transfer = Transfer::create([
                 'user_id'         => $user->id,
@@ -409,9 +416,20 @@ class TransferRecorder
             $isInterestGated = $destinationAccount->type === 'savings'
                 && stripos($destinationAccount->name, 'etica') !== false;
 
-            $valueDate = $isInterestGated
-                ? KenyanBusinessDays::nextBusinessDay(Carbon::parse($parsed['date']))->format('Y-m-d')
-                : null;
+            $valueDate = null;
+
+            if ($isInterestGated) {
+                // Mirrors pesaLinkToSavings(): the M-Pesa confirmation SMS
+                // timestamp is the real transaction time, so it's used both
+                // as the cutoff-check anchor and the next-business-day
+                // fallback anchor.
+                $transactionTime = Carbon::parse($parsed['date']);
+
+                $valueDate = KenyanBusinessDays::resolveEticaValueDate(
+                    $transactionTime,
+                    $transactionTime,
+                );
+            }
 
             $transfer = Transfer::create([
                 'user_id'         => $user->id,

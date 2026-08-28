@@ -110,12 +110,7 @@ readonly class TransferService
             $isClientFund, $isLending, $clientFundId, $needsReconciliation,
             $outstandingFunds, $borrowShortfall,
         ) {
-            $isInterestGated = $to->type === 'savings'
-                && stripos($to->name, 'etica') !== false;
-
-            $valueDate = $isInterestGated
-                ? KenyanBusinessDays::nextBusinessDay(Carbon::parse($date))->format('Y-m-d')
-                : null;
+            $valueDate = $this->resolveEticaValueDate($from, $to, $date);
 
             $transfer = Transfer::create([
                 'from_account_id'       => $from->id,
@@ -163,6 +158,45 @@ readonly class TransferService
         }
 
         return $fee;
+    }
+
+    // ── Value date resolution ────────────────────────────────────────────────
+
+    /**
+     * Determine the value_date for a transfer into an Etica savings account.
+     * Delegates the actual cutoff/next-business-day math to the single
+     * canonical implementation in KenyanBusinessDays, shared with
+     * TransferRecorder — see that method's docblock for the full rule.
+     *
+     * Non-Etica transfers (or transfers not going into savings at all) are
+     * never gated — this returns null for those, same as before.
+     *
+     * IMPORTANT ASSUMPTION: the same-day cutoff is evaluated against the
+     * actual wall-clock moment the transfer is executed (now()), not the
+     * user-editable $date field. This is deliberate — if $date can be
+     * backdated via a date picker, checking it against a 5pm cutoff would
+     * be meaningless (a bare date parses to midnight, which is always
+     * "before 5pm", so every business-day transfer would wrongly qualify
+     * as same-day). $date is only used as the anchor for computing the
+     * *next* business day when the transfer doesn't qualify for same-day
+     * settlement.
+     *
+     * If your form guarantees $date always carries the real submission
+     * timestamp (no backdating), you can simplify this to pass Carbon::parse($date)
+     * as the anchor instead of now() — but confirm that before changing it,
+     * since getting it wrong in the other direction would make every
+     * historical/backdated Etica transfer settle same-day incorrectly.
+     */
+    private function resolveEticaValueDate(Account $from, Account $to, string $date): ?string
+    {
+        $isInterestGated = $to->type === 'savings'
+            && stripos($to->name, 'etica') !== false;
+
+        if (! $isInterestGated) {
+            return null;
+        }
+
+        return KenyanBusinessDays::resolveEticaValueDate(now(), Carbon::parse($date));
     }
 
     // ── Client fund safety check ────────────────────────────────────────────

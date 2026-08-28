@@ -101,8 +101,24 @@ class Account extends Model
         // once interest has been recorded for that day — not just at midnight.
         // We find the latest date on which interest was recorded for this account
         // and use that as the release threshold.
+        //
+        // Fallback when no interest has EVER been recorded: CURDATE(), not an
+        // arbitrary distant-past sentinel. Previously this fell back to
+        // '1970-01-01', which meant any deposit with a real value_date (i.e.
+        // every deposit, since value_date is always set to today or the next
+        // business day) was permanently excluded from current_balance for as
+        // long as the account had zero interest history — not just delayed
+        // until settlement, but locked out indefinitely, since nothing before
+        // 1970 could ever satisfy "value_date <= last_interest_date". A brand
+        // new savings account (or any account where interest recording simply
+        // hasn't started yet) would silently show KES 0 available no matter
+        // how much money had actually been deposited into it. Falling back to
+        // CURDATE() instead makes an account with no interest history behave
+        // like a normal account (deposits release once value_date <= today),
+        // matching StatementDataService::computeBalanceAt()'s simpler rule
+        // until the first real interest posting establishes the stricter gate.
         $lastInterestDateSql = $this->type === 'savings'
-            ? "(SELECT COALESCE(MAX(t2.date), '1970-01-01')
+            ? "(SELECT COALESCE(MAX(t2.date), CURDATE())
              FROM transactions t2
              JOIN categories c2 ON t2.category_id = c2.id
              WHERE t2.account_id = {$this->id}
