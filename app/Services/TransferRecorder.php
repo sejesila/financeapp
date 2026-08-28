@@ -43,7 +43,7 @@ class TransferRecorder
         }
 
         DB::transaction(function () use ($user, $parsed, $bankAccount, $mpesaAccount) {
-            Transfer::create([
+            $transfer = Transfer::create([
                 'user_id'         => $user->id,
                 'from_account_id' => $bankAccount->id,
                 'to_account_id'   => $mpesaAccount->id,
@@ -55,6 +55,14 @@ class TransferRecorder
 
             $bankAccount->updateBalance();
             $mpesaAccount->updateBalance();
+
+            app(BorrowedFundReturnService::class)->applyDepositAgainstBorrowed(
+                userId: $user->id,
+                accountId: $mpesaAccount->id,
+                depositAmount: $parsed['amount'],
+                date: now()->format('Y-m-d'),
+                transfer: $transfer,
+            );
         });
 
         Log::info('Webhook: bank → mpesa self transfer recorded', [
@@ -101,7 +109,7 @@ class TransferRecorder
         }
 
         DB::transaction(function () use ($user, $parsed, $bankAccount, $airtelAccount) {
-            Transfer::create([
+            $transfer = Transfer::create([
                 'user_id'         => $user->id,
                 'from_account_id' => $bankAccount->id,
                 'to_account_id'   => $airtelAccount->id,
@@ -113,6 +121,14 @@ class TransferRecorder
 
             $bankAccount->updateBalance();
             $airtelAccount->updateBalance();
+
+            app(BorrowedFundReturnService::class)->applyDepositAgainstBorrowed(
+                userId: $user->id,
+                accountId: $airtelAccount->id,
+                depositAmount: $parsed['amount'],
+                date: now()->format('Y-m-d'),
+                transfer: $transfer,
+            );
         });
 
         Log::info('Webhook: bank → airtel self transfer recorded', [
@@ -160,7 +176,7 @@ class TransferRecorder
         $atmFee = round(33 * 1.15, 2); // KES 37.95 (base KES 33 + 15% excise duty)
 
         DB::transaction(function () use ($user, $parsed, $bankAccount, $cashAccount, $atmFee) {
-            Transfer::create([
+            $transfer = Transfer::create([
                 'user_id'         => $user->id,
                 'from_account_id' => $bankAccount->id,
                 'to_account_id'   => $cashAccount->id,
@@ -185,6 +201,14 @@ class TransferRecorder
 
             $bankAccount->updateBalance();
             $cashAccount->updateBalance();
+
+            app(BorrowedFundReturnService::class)->applyDepositAgainstBorrowed(
+                userId: $user->id,
+                accountId: $cashAccount->id,
+                depositAmount: $parsed['amount'],
+                date: now()->format('Y-m-d'),
+                transfer: $transfer,
+            );
         });
 
         Log::info('Webhook: ATM withdrawal → bank→cash transfer', [
@@ -321,6 +345,19 @@ class TransferRecorder
 
             $bankAccount->updateBalance();
             $savingsAccount->updateBalance();
+
+            // Skip if this deposit was itself auto-matched as new client
+            // money in (attemptClientFundAutoMatch() above may have just
+            // set is_client_fund) — that's not a repayment of borrowing.
+            if (! $transfer->fresh()->is_client_fund) {
+                app(BorrowedFundReturnService::class)->applyDepositAgainstBorrowed(
+                    userId: $user->id,
+                    accountId: $savingsAccount->id,
+                    depositAmount: $parsed['amount'],
+                    date: $parsed['date'],
+                    transfer: $transfer,
+                );
+            }
         });
 
         Log::info('Webhook: PesaLink → savings transfer recorded', [
@@ -459,6 +496,18 @@ class TransferRecorder
 
             $mpesaAccount->updateBalance();
             $destinationAccount->updateBalance();
+
+            // Skip if this deposit was itself auto-matched as new client
+            // money in — that's not a repayment of borrowing.
+            if (! $transfer->fresh()->is_client_fund) {
+                app(BorrowedFundReturnService::class)->applyDepositAgainstBorrowed(
+                    userId: $user->id,
+                    accountId: $destinationAccount->id,
+                    depositAmount: $parsed['amount'],
+                    date: $parsed['date'],
+                    transfer: $transfer,
+                );
+            }
         });
 
         Log::info('Webhook: outgoing account transfer', [
@@ -509,11 +558,10 @@ class TransferRecorder
                 'hint'    => $hint,
             ]);
 
-            $category = $this->categories->findOrCreate($user, 'Side Income', 'income');
-            Transaction::withoutGlobalScopes()->create([
+            $transaction = Transaction::withoutGlobalScopes()->create([
                 'user_id'        => $user->id,
                 'account_id'     => $mpesaAccount->id,
-                'category_id'    => $category->id,
+                'category_id'    => $this->categories->findOrCreate($user, 'Side Income', 'income')->id,
                 'amount'         => $parsed['amount'],
                 'date'           => $parsed['date'],
                 'description'    => $parsed['description'] . ' [' . $parsed['reference'] . ']',
@@ -521,6 +569,14 @@ class TransferRecorder
             ]);
 
             $mpesaAccount->updateBalance();
+
+            app(BorrowedFundReturnService::class)->applyDepositAgainstBorrowed(
+                userId: $user->id,
+                accountId: $mpesaAccount->id,
+                depositAmount: $parsed['amount'],
+                date: $parsed['date'],
+                depositTransaction: $transaction,
+            );
 
             return response()->json([
                 'status'  => 'created',
@@ -532,7 +588,7 @@ class TransferRecorder
         }
 
         DB::transaction(function () use ($user, $parsed, $sourceAccount, $mpesaAccount) {
-            Transfer::create([
+            $transfer = Transfer::create([
                 'user_id'         => $user->id,
                 'from_account_id' => $sourceAccount->id,
                 'to_account_id'   => $mpesaAccount->id,
@@ -544,6 +600,14 @@ class TransferRecorder
 
             $sourceAccount->updateBalance();
             $mpesaAccount->updateBalance();
+
+            app(BorrowedFundReturnService::class)->applyDepositAgainstBorrowed(
+                userId: $user->id,
+                accountId: $mpesaAccount->id,
+                depositAmount: $parsed['amount'],
+                date: now()->format('Y-m-d'),
+                transfer: $transfer,
+            );
         });
 
         Log::info('Webhook: incoming account transfer', [

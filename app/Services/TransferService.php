@@ -140,6 +140,17 @@ readonly class TransferService
 
             $from->updateBalance();
             $to->updateBalance();
+
+            if (! $isClientFund) {
+                app(BorrowedFundReturnService::class)->applyDepositAgainstBorrowed(
+                    userId: Auth::id(),
+                    accountId: $to->id,
+                    depositAmount: $amount,
+                    date: $date,
+                    transfer: $transfer,
+                    description: $description,
+                );
+            }
         });
 
         if ($from->type !== 'savings' && $needsReconciliation) {

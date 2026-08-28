@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\ClientFund;
 use App\Models\Transaction;
 use App\Models\Transfer;
+use App\Services\BorrowedFundReturnService;
 use App\Services\InterestService;
 use App\Services\KenyanBusinessDays;
 use App\Services\TopUpService;
@@ -720,7 +721,7 @@ class AccountController extends Controller
             ? KenyanBusinessDays::nextBusinessDay($transactionDate)
             : $transactionDate;
 
-        $account->transactions()->create([
+        $transaction = $account->transactions()->create([
             'user_id'        => Auth::id(),
             'amount'         => $request->amount,
             'date'           => $request->date,
@@ -735,8 +736,15 @@ class AccountController extends Controller
             'payment_method' => $category->name,
         ]);
 
+        app(BorrowedFundReturnService::class)->applyDepositAgainstBorrowed(
+            userId: Auth::id(),
+            accountId: $account->id,
+            depositAmount: (float) $request->amount,
+            date: $request->date,
+            depositTransaction: $transaction,
+        );
 
-            //$account->updateBalance();
+//$account->updateBalance();
         $this->clearAccountCache($account->id);
 
         $verb = $account->type === 'savings' ? 'deposited to' : 'topped up';
