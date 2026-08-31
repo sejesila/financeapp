@@ -453,6 +453,27 @@ class MpesaSmsParser
                 'description' => 'Pochi - ' . trim($m[3]),
             ];
         }
+
+        // Airtel → Bundle purchase (data/SMS/voice bundles)
+        // "63QNB7UX8YL Confirmed. Bundle purchase successful of Ksh 250 via Airtel Networks Kenya Ltd on 31/08/26 at 07:46 AM. Bal: Ksh 446.0."
+        if (preg_match(
+            '/^(\w+)\s+Confirmed\.\s*Bundle purchase successful of\s+KES\s*([\d,]+\.?\d*)\s+via\s+(.+?)\s+on\s+([\d\/]+)\s+at\s+([\d:]+\s*(?:AM|PM))\.\s*Bal:\s*KES\s*([\d,]+\.?\d*)/si',
+            $sms, $m
+        )) {
+            return [
+                'bank' => 'airtel',
+                'type' => 'expense',
+                'subtype' => 'bundle_purchase',
+                'reference' => $m[1],
+                'amount' => self::parseAmount($m[2]),
+                'provider' => trim($m[3]),
+                'date' => self::parseAirtelDate($m[4], $m[5]),
+                'balance' => self::parseAmount($m[6]),
+                'fee' => 0,
+                'description' => 'Bundle Purchase via ' . trim($m[3]),
+            ];
+        }
+
         // Airtel → Cashback/Bonus moved to wallet
 // "Ref Q3PH3911CC5. Ksh 5  moved to your wallet  0731xxx277 on 01/08/26 at 08:13 AM Bal: Ksh 0.65. Airtel Money Wallet Bal: Ksh 14452.0"
         if (preg_match(
