@@ -636,14 +636,27 @@ class ReportDataService
             ->with('category')
             ->get();
 
-        // Income transactions AND "Client Funds" liability transactions both increase
-        // the account balance, so both must be reversed the same way.
+        // Income transactions, "Client Funds" liability transactions, AND
+        // "Loan Receipt" liability transactions all increase the account balance
+        // in Account::updateBalance() (loan_disbursements is added unconditionally
+        // there, not gated by category type), so all three must be reversed the
+        // same way here — matching updateBalance()'s forward logic exactly.
         $incomingAfter = $txAfter
-            ->filter(fn($t) => $t->category->type === 'income' || $t->category->name === 'Client Funds')
+            ->filter(fn($t) => $t->category->type === 'income'
+                || $t->category->name === 'Client Funds'
+                || $t->category->name === 'Loan Receipt')
             ->sum('amount');
 
         $outgoingAfter = $txAfter
             ->filter(fn($t) => $t->category->type === 'expense')
+            ->sum('amount');
+
+        // "Balance Adjustment" is added into current_balance unconditionally in
+        // updateBalance() (regardless of category type, via balance_adjustments),
+        // separate from the income/expense buckets above — so it needs its own
+        // reversal term with its own (possibly negative) signed amount.
+        $balanceAdjustmentsAfter = $txAfter
+            ->filter(fn($t) => $t->category->name === 'Balance Adjustment')
             ->sum('amount');
 
         // Transfers INTO savings accounts after period end (subtract to reverse)
@@ -664,7 +677,8 @@ class ReportDataService
             - $incomingAfter
             + $outgoingAfter
             - $transfersInAfter
-            + $transfersOutAfter;
+            + $transfersOutAfter
+            - $balanceAdjustmentsAfter;
 
         return max(0, $balanceAsAt);
     }
@@ -684,12 +698,25 @@ class ReportDataService
             ->with('category')
             ->get();
 
+        // See getSavingsBalanceAsAt() above — must mirror what
+        // Account::updateBalance() adds forward, including 'Loan Receipt'
+        // (liability type, previously missing here) so a loan disbursed after
+        // $asAtDate doesn't stay baked into the reconstructed historical balance.
         $incomingAfter = $txAfter
-            ->filter(fn($t) => $t->category->type === 'income' || $t->category->name === 'Client Funds')
+            ->filter(fn($t) => $t->category->type === 'income'
+                || $t->category->name === 'Client Funds'
+                || $t->category->name === 'Loan Receipt')
             ->sum('amount');
 
         $outgoingAfter = $txAfter
             ->filter(fn($t) => $t->category->type === 'expense')
+            ->sum('amount');
+
+        // See getSavingsBalanceAsAt() above — 'Balance Adjustment' is added
+        // unconditionally in updateBalance(), independent of category type,
+        // and needs the same unconditional reversal here (previously missing).
+        $balanceAdjustmentsAfter = $txAfter
+            ->filter(fn($t) => $t->category->name === 'Balance Adjustment')
             ->sum('amount');
 
         $transfersInAfter = Transfer::withoutGlobalScopes()
@@ -708,10 +735,12 @@ class ReportDataService
             - $incomingAfter
             + $outgoingAfter
             - $transfersInAfter
-            + $transfersOutAfter;
+            + $transfersOutAfter
+            - $balanceAdjustmentsAfter;
 
         return $balanceAsAt; // no max(0,...) here — non-savings accounts can legitimately be negative
     }
+
 
     /**
      * Get loan payment transactions in a period
