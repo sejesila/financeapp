@@ -249,17 +249,15 @@
     $netWorth    = $data['net_worth']           ?? 0;
     $totalLoans  = $data['total_loans']         ?? 0;
     $totalLoansGiven = $data['total_loans_given'] ?? 0;
-    // Net worth is computed net of any client-fund shortfall (money owed to a
-    // client that isn't backed by cash anywhere) coming out of Outstanding
-    // Loans Given — see ReportDataService::generateReport(). The banner
-    // breakdown must show that same netted figure, or the displayed
-    // Savings + OLG − Active Loans won't reconcile with the Net Worth amount
-    // above it.
-    $loansGivenNetOfShortfall = $data['loans_given_net_of_client_shortfall'] ?? $totalLoansGiven;
-    $totalClientFundShortfall = $data['total_client_fund_shortfall'] ?? 0;
-    // Portion of the shortfall that couldn't be absorbed by Outstanding Loans
-    // Given and has spilled over to reduce Net Worth directly below.
-    $unabsorbedClientFundShortfall = $data['unabsorbed_client_fund_shortfall'] ?? 0;
+    // Net worth is now computed directly from the ledger (see
+    // ReportDataService::generateReport()): pooled account cash + Outstanding
+    // Loans Given (gross, no longer netted against anything) - Active Loans -
+    // money borrowed from client funds and not yet returned. Outstanding
+    // Loans Given is therefore shown GROSS everywhere below, including the
+    // dedicated "Loans Given Activity" table further down, whose own "Total
+    // Outstanding" row must match the sum of the per-borrower rows shown
+    // directly under it anyway.
+    $totalUnreturnedBorrowed = $data['total_unreturned_borrowed'] ?? 0;
     $totalBal    = $data['total_balance']       ?? 0;
     $priorIncome = $data['prior_period_income'] ?? 0;
     $incomeTrend = $data['income_trend']        ?? null;
@@ -300,17 +298,16 @@
     </div>
     <div class="breakdown">
         Savings Accounts: {{ $currency }} {{ number_format($savingsBalance) }}
-        &bull; Outstanding Loans Given: {{ $currency }} {{ number_format($loansGivenNetOfShortfall) }}
+        &bull; Outstanding Loans Given: {{ $currency }} {{ number_format($totalLoansGiven) }}
         &bull; Active Loans: {{ $currency }} {{ number_format($totalLoans) }}
+        @if($totalUnreturnedBorrowed > 0)
+            &bull; Borrowed (Unreturned): {{ $currency }} {{ number_format($totalUnreturnedBorrowed) }}
+        @endif
     </div>
-    @if($totalClientFundShortfall > 0)
+    @if($totalUnreturnedBorrowed > 0)
         <p style="font-size: 8px; color: rgba(255,255,255,0.85); margin-top: 4px;">
-            Outstanding Loans Given above is net of {{ $currency }} {{ number_format(min($totalClientFundShortfall, $totalLoansGiven)) }}
-            in client funds owed but not currently backed by cash.
-            @if($unabsorbedClientFundShortfall > 0)
-                A further {{ $currency }} {{ number_format($unabsorbedClientFundShortfall) }} of that shortfall
-                exceeded Outstanding Loans Given and is subtracted directly from Net Worth above.
-            @endif
+            Net worth above is reduced by {{ $currency }} {{ number_format($totalUnreturnedBorrowed) }} in client
+            funds borrowed for personal use that has not yet been returned.
         </p>
     @endif
 </div>
@@ -626,10 +623,9 @@
             </tr>
         </table>
 
-        {{-- This table's "Total Outstanding" is deliberately the GROSS sum of
-             active loans given (unrelated to the net-worth banner's netted
-             figure above) so it always matches the sum of the rows shown
-             directly below it. --}}
+        {{-- This table's "Total Outstanding" is the same GROSS sum of active
+             loans given used in the net-worth banner above, so it always
+             matches the sum of the rows shown directly below it. --}}
         @if($activeLoansGiven->isNotEmpty())
             <table>
                 <thead>
