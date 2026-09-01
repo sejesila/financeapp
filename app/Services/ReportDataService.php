@@ -463,7 +463,7 @@ class ReportDataService
         // user has borrowed from client funds and not yet returned.
         // No outer max(0, ...): a person can legitimately owe more than they
         // own, and clamping here would hide that.
-        $netWorth = $totalBalanceUnclamped + $totalLoansGivenBalance - $totalLoanBalance - $totalUnreturnedBorrowed;
+        $netWorth = $totalBalanceUnclamped + $totalLoansGivenBalance - $totalLoanBalance;
 
 
         // --- Transactions ---
