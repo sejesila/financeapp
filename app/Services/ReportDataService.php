@@ -432,16 +432,18 @@ class ReportDataService
 
         $ownedSavings = max(0, $savingsBalance - $clientFundsInSavings);
 
-// Client money owed but not backed by cash anywhere (borrowed and not yet
-// returned, or moved without a tracked Transfer) is a real liability against
-// the user, not just against one account. It's already computed above as
-// $totalClientFundShortfall. Net worth can't just drop it the way
-// $ownedSavings' max(0,...) does for the savings-only slice — it has to come
-// out of an asset. Outstanding Loans Given is the right one: it's money the
-// user is due to collect, and the client-owed shortfall is a prior claim
-// against that before it can count as "the user's."
+// Client-owed shortfall (money owed to a client that isn't backed by cash
+// anywhere) is netted against Outstanding Loans Given first, since OLG is
+// the asset most directly related to it. If the shortfall is bigger than
+// OLG, the excess is a real liability against the user's overall position
+// and must reduce net worth further — not vanish at a max(0,...) clamp on
+// the intermediate OLG figure the way it did before.
         $loansGivenNetOfShortfall = max(0, $totalLoansGivenBalance - $totalClientFundShortfall);
-        $netWorth = max(0, $ownedSavings + $loansGivenNetOfShortfall - $totalLoanBalance);
+        $unabsorbedClientFundShortfall = max(0, $totalClientFundShortfall - $totalLoansGivenBalance);
+
+// Net worth can legitimately be negative now — a person can owe more than
+// they own. No outer max(0, ...): clamping here would hide genuine debt.
+        $netWorth = $ownedSavings + $loansGivenNetOfShortfall - $totalLoanBalance - $unabsorbedClientFundShortfall;
 
 
         // --- Transactions ---
