@@ -350,23 +350,36 @@ class ReportDataService
         $accountsAsAt = $accounts->map(function ($account) use ($user, $endDate) {
             $rawBalance = $this->getAccountBalanceAsAt($account, $endDate);
             $clientFundsInAccount = $this->getClientFundsBalanceAsAt($user, $endDate, $account->id);
-            if (($rawBalance - $clientFundsInAccount) < 0) {
+
+            // Positive only when this account's tagged client funds exceed what's
+            // actually sitting in it — i.e. client money was borrowed against
+            // without a tracked Transfer recording the movement (see
+            // ClientFundController::recordBorrowed / reconcileBorrowed, which are
+            // bookkeeping-only and don't create a Transfer). Previously this was
+            // only Log::warning()'d and the account's display balance silently
+            // clamped to 0 — invisible to the user, and if it clamped to exactly
+            // 0 the account also vanished entirely from the report's Account
+            // Overview table (see the blade templates' zero-balance filter).
+            // Recording it on the account lets the report surface it instead.
+            $shortfall = max(0, $clientFundsInAccount - $rawBalance);
+
+            if ($shortfall > 0) {
                 Log::warning('ReportDataService: client funds exceed reconstructed account balance', [
                     'account_id' => $account->id,
                     'account_name' => $account->name,
                     'as_at_date' => $endDate->toDateString(),
                     'raw_balance' => $rawBalance,
                     'client_funds' => $clientFundsInAccount,
-                    'shortfall' => $rawBalance - $clientFundsInAccount,
+                    'shortfall' => -$shortfall,
                 ]);
             }
+
             $account->raw_balance_as_at = $rawBalance;
             $account->client_funds_as_at = $clientFundsInAccount;
             $account->balance_as_at = max(0, $rawBalance - $clientFundsInAccount);
+            $account->client_fund_shortfall = $shortfall;
             return $account;
         });
-
-        $totalBalance = $accountsAsAt->sum('balance_as_at');
 
 // balance_as_at is clamped per-account for display (an account can't show
 // negative cash), which can silently drop money from a naive sum when one
@@ -378,6 +391,13 @@ class ReportDataService
 // by any single account's shortfall.
         $totalBalanceUnclamped = $accountsAsAt->sum('raw_balance_as_at') - $accountsAsAt->sum('client_funds_as_at');
         $totalBalance = max(0, $totalBalanceUnclamped);
+
+        // Which accounts (if any) are carrying a shortfall, and how much in
+        // total — surfaced to the report templates so the user can see WHERE
+        // the gap between "Total Assets" and the sum of listed accounts comes
+        // from, instead of it only ever reaching a server log.
+        $accountsWithShortfall = $accountsAsAt->where('client_fund_shortfall', '>', 0);
+        $totalClientFundShortfall = $accountsWithShortfall->sum('client_fund_shortfall');
 
         $activeLoans = Loan::where('user_id', $user->id)->where('status', 'active')->with('account')->get();
         $totalLoanBalance = $activeLoans->sum('balance');
@@ -529,6 +549,11 @@ class ReportDataService
             'total_loans' => $totalLoanBalance,
             'total_loans_given' => $totalLoansGivenBalance,
             'total_client_funds' => $totalClientFunds,
+            'account_client_fund_shortfalls' => $accountsWithShortfall->map(fn($a) => [
+                'name' => $a->name,
+                'shortfall' => (float)$a->client_fund_shortfall,
+            ])->values(),
+            'total_client_fund_shortfall' => (float)$totalClientFundShortfall,
             'net_worth' => $netWorth,
             'transactions' => match ($type) {
                 'annual' => $transactions->take(50),
