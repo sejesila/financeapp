@@ -621,7 +621,7 @@
                                                     </svg>
                                                     Reverse
                                                 </button>
-                                            @elseif(!$isLoanLinked && !($txn->is_grouped ?? false) && $txn->created_at->diffInMinutes(now()) <= 30)
+                                            @elseif(!$isLoanLinked && !($txn->is_grouped ?? false) && $txn->created_at->diffInMinutes(now()) <= 180)
                                                 <a href="{{ route('accounts.topup.reverse.form', ['account' => $account, 'transaction' => $txn]) }}"
                                                    title="Reverse this top-up"
                                                    class="inline-flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-700 dark:text-red-400 transition-colors">
@@ -745,7 +745,7 @@
                                             {{ $counterpart->name ?? '—' }}
                                         </td>
                                         <td class="px-4 py-3 text-right whitespace-nowrap">
-                                            @if($transfer->created_at->diffInMinutes(now()) <= 60)
+                                            @if($transfer->created_at->diffInMinutes(now()) <= 180)
                                                 <a href="{{ route('accounts.transfer.reverse.form', ['account' => $account, 'transfer' => $transfer]) }}"
                                                    title="Reverse this transfer"
                                                    class="inline-flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors">

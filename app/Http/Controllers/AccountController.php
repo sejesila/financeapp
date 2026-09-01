@@ -766,7 +766,7 @@ class AccountController extends Controller
     {
         if ($account->user_id !== Auth::id()) abort(403);
 
-        if ($transaction->created_at->diffInMinutes(now()) > 30) {
+        if ($transaction->created_at->diffInMinutes(now()) > 180) {
             return redirect()->route('accounts.show', ['account' => $account, 'tab' => 'topups'])
                 ->with('error', 'Top-ups can only be reversed within 30 minutes of being recorded.');
         }
@@ -785,7 +785,7 @@ class AccountController extends Controller
     {
         if ($account->user_id !== Auth::id()) abort(403);
 
-        if ($transaction->created_at->diffInMinutes(now()) > 30) {
+        if ($transaction->created_at->diffInMinutes(now()) > 180) {
             return redirect()->route('accounts.show', ['account' => $account, 'tab' => 'topups'])
                 ->with('error', 'Top-ups can only be reversed within 30 minutes of being recorded.');
         }
@@ -928,7 +928,7 @@ class AccountController extends Controller
             abort(403);
         }
 
-        if ($transfer->created_at->diffInMinutes(now()) > 60) {
+        if ($transfer->created_at->diffInMinutes(now()) > 180) {
             return redirect()->route('accounts.show', ['account' => $account, 'tab' => 'transfers'])
                 ->with('error', 'Transfers can only be reversed within 60 minutes of being made.');
         }
@@ -950,7 +950,7 @@ class AccountController extends Controller
             abort(403);
         }
 
-        if ($transfer->created_at->diffInMinutes(now()) > 60) {
+        if ($transfer->created_at->diffInMinutes(now()) > 180) {
             return redirect()->route('accounts.show', ['account' => $account, 'tab' => 'transfers'])
                 ->with('error', 'Transfers can only be reversed within 60 minutes of being made.');
         }
