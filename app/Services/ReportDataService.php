@@ -431,7 +431,17 @@ class ReportDataService
             : $savingsAccountIds->sum(fn($id) => $this->getClientFundsBalanceAsAt($user, $endDate, $id));
 
         $ownedSavings = max(0, $savingsBalance - $clientFundsInSavings);
-        $netWorth = max(0, $ownedSavings + $totalLoansGivenBalance - $totalLoanBalance);
+
+// Client money owed but not backed by cash anywhere (borrowed and not yet
+// returned, or moved without a tracked Transfer) is a real liability against
+// the user, not just against one account. It's already computed above as
+// $totalClientFundShortfall. Net worth can't just drop it the way
+// $ownedSavings' max(0,...) does for the savings-only slice — it has to come
+// out of an asset. Outstanding Loans Given is the right one: it's money the
+// user is due to collect, and the client-owed shortfall is a prior claim
+// against that before it can count as "the user's."
+        $loansGivenNetOfShortfall = max(0, $totalLoansGivenBalance - $totalClientFundShortfall);
+        $netWorth = max(0, $ownedSavings + $loansGivenNetOfShortfall - $totalLoanBalance);
 
 
         // --- Transactions ---
@@ -1036,6 +1046,30 @@ class ReportDataService
      * and doesn't change the total obligation, which is why this formula
      * doesn't need to reference 'return' transactions at all — it's the same
      * total whether any given borrowed amount has since been returned.
+     */
+    /**
+     * Calculate what a user's outstanding client funds balance was at a specific
+     * point in time — i.e. the true total still owed to the client, reconstructed
+     * directly from amount_received rather than off today's ClientFund::$balance.
+     *
+     * Why not just use $fund->balance (received - amount_spent - profit)?
+     * Because ClientFund::updateBalance() folds "borrowed for personal use"
+     * (recordBorrowed() / reconcileBorrowed()) into amount_spent exactly the
+     * same way it folds in a genuine business expense. Borrowing doesn't
+     * reduce what's owed to the client though — it converts part of the
+     * obligation into a personal debt that still has to be physically repaid
+     * (see ClientFundController::returnBorrowed()), and ClientFundController
+     * already tracks that separately as "Borrowed (Unreturned)" — it just
+     * never made it into this figure. Any caller that subtracts this from an
+     * account balance (net worth, "excludes KES X" footnotes, the per-account
+     * shortfall check) was silently treating unreturned borrowed money as if
+     * it already belonged to the user.
+     *
+     * Only REAL expenses (is_borrowed = false) and profit actually reduce
+     * what's owed; a 'return' transaction just moves cash back into place
+     * and doesn't change the total obligation, which is why this formula
+     * doesn't need to reference 'return' transactions at all — it's the same
+     * total whether or not any given borrowed amount has since been returned.
      */
     private function getClientFundsBalanceAsAt(User $user, Carbon $asAtDate, ?int $accountId = null): float
     {
