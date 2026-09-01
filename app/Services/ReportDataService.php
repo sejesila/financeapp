@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Account;
 use App\Models\Budget;
 use App\Models\ClientFund;
+use App\Models\ClientFundTransaction;
 use App\Models\Loan;
 use App\Models\LoanGiven;
 use App\Models\LoanGivenPayment;
@@ -361,6 +362,14 @@ class ReportDataService
             // 0 the account also vanished entirely from the report's Account
             // Overview table (see the blade templates' zero-balance filter).
             // Recording it on the account lets the report surface it instead.
+            //
+            // NOTE: this remains a per-account DISPLAY diagnostic only — it is
+            // no longer used in the net-worth calculation below. It's a proxy
+            // (raw balance vs. reconstructed "true owed"), and as such it's
+            // blind to any borrow recorded via recordBorrowed()/reconcileBorrowed()
+            // that was never corrected with an offsetting Balance Adjustment —
+            // those calls create no Transaction at all. Net worth now uses the
+            // direct ledger figure from getUnreturnedBorrowedAsAt() instead.
             $shortfall = max(0, $clientFundsInAccount - $rawBalance);
 
             if ($shortfall > 0) {
@@ -395,7 +404,9 @@ class ReportDataService
         // Which accounts (if any) are carrying a shortfall, and how much in
         // total — surfaced to the report templates so the user can see WHERE
         // the gap between "Total Assets" and the sum of listed accounts comes
-        // from, instead of it only ever reaching a server log.
+        // from, instead of it only ever reaching a server log. This is a
+        // per-account display diagnostic only — see the note above on why it
+        // no longer feeds into net worth.
         $accountsWithShortfall = $accountsAsAt->where('client_fund_shortfall', '>', 0);
         $totalClientFundShortfall = $accountsWithShortfall->sum('client_fund_shortfall');
 
@@ -421,6 +432,12 @@ class ReportDataService
         // was never there to begin with (e.g. client funds sitting in M-Pesa),
         // understating owned savings any time most client money lives outside
         // savings accounts.
+        //
+        // NOTE: $ownedSavings is now a DISPLAY-ONLY figure for the "Savings
+        // Accounts" line in the report banners. Savings accounts are already
+        // included in $totalBalanceUnclamped (which is used directly in net
+        // worth below), so $ownedSavings must never also be added into net
+        // worth separately — that would double-count savings-account cash.
         $savingsAccountIds = Account::where('user_id', $user->id)
             ->where('type', 'savings')
             ->where('is_active', true)
@@ -432,18 +449,21 @@ class ReportDataService
 
         $ownedSavings = max(0, $savingsBalance - $clientFundsInSavings);
 
-// Client-owed shortfall (money owed to a client that isn't backed by cash
-// anywhere) is netted against Outstanding Loans Given first, since OLG is
-// the asset most directly related to it. If the shortfall is bigger than
-// OLG, the excess is a real liability against the user's overall position
-// and must reduce net worth further — not vanish at a max(0,...) clamp on
-// the intermediate OLG figure the way it did before.
-        $loansGivenNetOfShortfall = max(0, $totalLoansGivenBalance - $totalClientFundShortfall);
-        $unabsorbedClientFundShortfall = max(0, $totalClientFundShortfall - $totalLoansGivenBalance);
+        // Real, direct ledger figure for money borrowed from client funds for
+        // personal use and not yet returned — mirrors
+        // ClientFundController::index()'s $summary['total_borrowed'], but
+        // as-at $endDate rather than live. This replaces the old per-account
+        // shortfall proxy for net-worth purposes (see notes above on why that
+        // proxy under-counts).
+        $totalUnreturnedBorrowed = $this->getUnreturnedBorrowedAsAt($user, $endDate);
 
-// Net worth can legitimately be negative now — a person can owe more than
-// they own. No outer max(0, ...): clamping here would hide genuine debt.
-        $netWorth = $ownedSavings + $loansGivenNetOfShortfall - $totalLoanBalance - $unabsorbedClientFundShortfall;
+        // Net worth = pooled account cash (unclamped, so a genuine deficit
+        // isn't hidden) + money owed back to the user (Outstanding Loans
+        // Given, gross) - money the user owes on active loans - money the
+        // user has borrowed from client funds and not yet returned.
+        // No outer max(0, ...): a person can legitimately owe more than they
+        // own, and clamping here would hide that.
+        $netWorth = $totalBalanceUnclamped + $totalLoansGivenBalance - $totalLoanBalance - $totalUnreturnedBorrowed;
 
 
         // --- Transactions ---
@@ -566,6 +586,7 @@ class ReportDataService
                 'shortfall' => (float)$a->client_fund_shortfall,
             ])->values(),
             'total_client_fund_shortfall' => (float)$totalClientFundShortfall,
+            'total_unreturned_borrowed' => (float)$totalUnreturnedBorrowed,
             'net_worth' => $netWorth,
             'transactions' => match ($type) {
                 'annual' => $transactions->take(50),
@@ -1022,35 +1043,6 @@ class ReportDataService
 
     /**
      * Calculate what a user's outstanding client funds balance was at a specific
-     * point in time, by taking each fund's current balance and adding back any
-     * expense/profit reductions recorded after $asAtDate.
-     */
-    /**
-     * Calculate what a user's outstanding client funds balance was at a specific
-     * point in time — i.e. the true total still owed to the client, reconstructed
-     * directly from amount_received rather than off today's ClientFund::$balance.
-     *
-     * Why not just use $fund->balance (received - amount_spent - profit)?
-     * Because ClientFund::updateBalance() folds "borrowed for personal use"
-     * (recordBorrowed() / reconcileBorrowed()) into amount_spent exactly the
-     * same way it folds in a genuine business expense. Borrowing doesn't
-     * reduce what's owed to the client though — it converts part of the
-     * obligation into a personal debt that still has to be physically repaid
-     * (see ClientFundController::returnBorrowed()), and ClientFundController
-     * already tracks that separately as "Borrowed (Unreturned)" — it just
-     * never made it into this figure. Any caller that subtracts this from an
-     * account balance (net worth, "excludes KES X" footnotes, the per-account
-     * shortfall check) was silently treating unreturned borrowed money as if
-     * it already belonged to the user.
-     *
-     * Only REAL expenses (is_borrowed = false) and profit actually reduce
-     * what's owed; a 'return' transaction just moves cash back into place
-     * and doesn't change the total obligation, which is why this formula
-     * doesn't need to reference 'return' transactions at all — it's the same
-     * total whether any given borrowed amount has since been returned.
-     */
-    /**
-     * Calculate what a user's outstanding client funds balance was at a specific
      * point in time — i.e. the true total still owed to the client, reconstructed
      * directly from amount_received rather than off today's ClientFund::$balance.
      *
@@ -1153,5 +1145,32 @@ class ReportDataService
                 'repaid_date' => Carbon::parse($l->repaid_date)->format('M d, Y'),
             ])->values()->toArray(),
         ];
+    }
+
+    /**
+     * Direct ledger figure — mirrors ClientFundController::index()'s
+     * $summary['total_borrowed'], but as-at a specific date rather than live.
+     * Unlike the old per-account shortfall proxy (raw balance vs. reconstructed
+     * "true owed"), this reads straight from ClientFundTransaction and isn't
+     * blinded by recordBorrowed()/reconcileBorrowed() never touching account
+     * balances — those calls create no Transaction, so a borrow that was never
+     * separately corrected with a Balance Adjustment was invisible to the old
+     * per-account method entirely.
+     */
+    private function getUnreturnedBorrowedAsAt(User $user, Carbon $asAtDate): float
+    {
+        $userFundIds = ClientFund::where('user_id', $user->id)->pluck('id');
+
+        $borrowedGross = ClientFundTransaction::whereIn('client_fund_id', $userFundIds)
+            ->where('is_borrowed', true)
+            ->where('date', '<=', $asAtDate)
+            ->sum('amount');
+
+        $returned = ClientFundTransaction::whereIn('client_fund_id', $userFundIds)
+            ->where('type', 'return')
+            ->where('date', '<=', $asAtDate)
+            ->sum('amount');
+
+        return max(0, $borrowedGross - $returned);
     }
 }

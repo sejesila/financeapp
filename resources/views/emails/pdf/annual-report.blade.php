@@ -292,6 +292,9 @@
     // of the per-borrower rows shown directly under it.
     $loansGivenNetOfShortfall = $data['loans_given_net_of_client_shortfall'] ?? $totalLoansGiven;
     $totalClientFundShortfall = $data['total_client_fund_shortfall'] ?? 0;
+    // Portion of the shortfall that couldn't be absorbed by Outstanding Loans
+    // Given and has spilled over to reduce Net Worth directly below.
+    $unabsorbedClientFundShortfall = $data['unabsorbed_client_fund_shortfall'] ?? 0;
     $totalBal        = $data['total_balance']   ?? 0;
     $txCount         = $data['transaction_count']  ?? 0;
     $profitMonths    = $data['profitable_months']  ?? 0;
@@ -325,7 +328,9 @@
 <!-- Net Worth Banner -->
 <div class="net-worth-banner">
     <h3>Year-End Net Worth</h3>
-    <div class="amount">{{ $currency }} {{ number_format($netWorth) }}</div>
+    <div class="amount"{{ $netWorth < 0 ? ' style="color:#FCA5A5;"' : '' }}>
+        {{ $netWorth < 0 ? '-' : '' }}{{ $currency }} {{ number_format(abs($netWorth)) }}
+    </div>
     <div class="breakdown">
         Savings Accounts: {{ $currency }} {{ number_format($savingsBalance) }}
         &bull; Outstanding Loans Given: {{ $currency }} {{ number_format($loansGivenNetOfShortfall) }}
@@ -333,8 +338,12 @@
     </div>
     @if($totalClientFundShortfall > 0)
         <p style="font-size: 8px; color: rgba(255,255,255,0.85); margin-top: 4px;">
-            Outstanding Loans Given above is net of {{ $currency }} {{ number_format($totalClientFundShortfall) }}
+            Outstanding Loans Given above is net of {{ $currency }} {{ number_format(min($totalClientFundShortfall, $totalLoansGiven)) }}
             in client funds owed but not currently backed by cash.
+            @if($unabsorbedClientFundShortfall > 0)
+                A further {{ $currency }} {{ number_format($unabsorbedClientFundShortfall) }} of that shortfall
+                exceeded Outstanding Loans Given and is subtracted directly from Net Worth above.
+            @endif
         </p>
     @endif
 </div>
