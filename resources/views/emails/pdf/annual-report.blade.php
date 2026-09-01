@@ -282,6 +282,16 @@
     $netWorth        = $data['net_worth']       ?? 0;
     $totalLoans      = $data['total_loans']     ?? 0;
     $totalLoansGiven = $data['total_loans_given'] ?? 0;
+    // Net worth is computed net of any client-fund shortfall (money owed to a
+    // client that isn't backed by cash anywhere) coming out of Outstanding
+    // Loans Given — see ReportDataService::generateReport(). Both the banner
+    // breakdown and the headline "Outstanding Loans Given" stat below use
+    // this netted figure so they stay consistent with the Net Worth amount;
+    // the dedicated "Loans Given Activity" table further down keeps the
+    // gross figure since its own "Total Outstanding" row must match the sum
+    // of the per-borrower rows shown directly under it.
+    $loansGivenNetOfShortfall = $data['loans_given_net_of_client_shortfall'] ?? $totalLoansGiven;
+    $totalClientFundShortfall = $data['total_client_fund_shortfall'] ?? 0;
     $totalBal        = $data['total_balance']   ?? 0;
     $txCount         = $data['transaction_count']  ?? 0;
     $profitMonths    = $data['profitable_months']  ?? 0;
@@ -318,9 +328,15 @@
     <div class="amount">{{ $currency }} {{ number_format($netWorth) }}</div>
     <div class="breakdown">
         Savings Accounts: {{ $currency }} {{ number_format($savingsBalance) }}
-        &bull; Outstanding Loans Given: {{ $currency }} {{ number_format($totalLoansGiven) }}
+        &bull; Outstanding Loans Given: {{ $currency }} {{ number_format($loansGivenNetOfShortfall) }}
         &bull; Active Loans: {{ $currency }} {{ number_format($totalLoans) }}
     </div>
+    @if($totalClientFundShortfall > 0)
+        <p style="font-size: 8px; color: rgba(255,255,255,0.85); margin-top: 4px;">
+            Outstanding Loans Given above is net of {{ $currency }} {{ number_format($totalClientFundShortfall) }}
+            in client funds owed but not currently backed by cash.
+        </p>
+    @endif
 </div>
 
 <!-- Key Metrics -->
@@ -388,7 +404,7 @@
         <td class="label">Investment Income</td>
         <td class="value" style="color: #059669;">{{ $currency }} {{ number_format($investmentIncome['total']) }}</td>
         <td class="label">Outstanding Loans Given</td>
-        <td class="value" style="color: #059669;">{{ $currency }} {{ number_format($totalLoansGiven) }}</td>
+        <td class="value" style="color: #059669;">{{ $currency }} {{ number_format($loansGivenNetOfShortfall) }}</td>
     </tr>
 </table>
 
@@ -509,6 +525,10 @@
             </tr>
         </table>
 
+        {{-- This table's "Total Outstanding" is deliberately the GROSS sum of
+             active loans given (unrelated to the net-worth banner's netted
+             figure above) so it always matches the sum of the rows shown
+             directly below it. --}}
         @if($activeLoansGiven->isNotEmpty())
             <table>
                 <thead>

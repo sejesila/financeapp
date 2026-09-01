@@ -249,6 +249,14 @@
     $netWorth    = $data['net_worth']           ?? 0;
     $totalLoans  = $data['total_loans']         ?? 0;
     $totalLoansGiven = $data['total_loans_given'] ?? 0;
+    // Net worth is computed net of any client-fund shortfall (money owed to a
+    // client that isn't backed by cash anywhere) coming out of Outstanding
+    // Loans Given — see ReportDataService::generateReport(). The banner
+    // breakdown must show that same netted figure, or the displayed
+    // Savings + OLG − Active Loans won't reconcile with the Net Worth amount
+    // above it.
+    $loansGivenNetOfShortfall = $data['loans_given_net_of_client_shortfall'] ?? $totalLoansGiven;
+    $totalClientFundShortfall = $data['total_client_fund_shortfall'] ?? 0;
     $totalBal    = $data['total_balance']       ?? 0;
     $priorIncome = $data['prior_period_income'] ?? 0;
     $incomeTrend = $data['income_trend']        ?? null;
@@ -287,9 +295,15 @@
     <div class="amount">{{ $currency }} {{ number_format($netWorth) }}</div>
     <div class="breakdown">
         Savings Accounts: {{ $currency }} {{ number_format($savingsBalance) }}
-        &bull; Outstanding Loans Given: {{ $currency }} {{ number_format($totalLoansGiven) }}
+        &bull; Outstanding Loans Given: {{ $currency }} {{ number_format($loansGivenNetOfShortfall) }}
         &bull; Active Loans: {{ $currency }} {{ number_format($totalLoans) }}
     </div>
+    @if($totalClientFundShortfall > 0)
+        <p style="font-size: 8px; color: rgba(255,255,255,0.85); margin-top: 4px;">
+            Outstanding Loans Given above is net of {{ $currency }} {{ number_format($totalClientFundShortfall) }}
+            in client funds owed but not currently backed by cash.
+        </p>
+    @endif
 </div>
 
 <!-- Key Metrics -->
@@ -603,6 +617,10 @@
             </tr>
         </table>
 
+        {{-- This table's "Total Outstanding" is deliberately the GROSS sum of
+             active loans given (unrelated to the net-worth banner's netted
+             figure above) so it always matches the sum of the rows shown
+             directly below it. --}}
         @if($activeLoansGiven->isNotEmpty())
             <table>
                 <thead>
