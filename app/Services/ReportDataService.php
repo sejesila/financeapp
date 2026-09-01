@@ -364,12 +364,14 @@ class ReportDataService
             // Recording it on the account lets the report surface it instead.
             //
             // NOTE: this remains a per-account DISPLAY diagnostic only — it is
-            // no longer used in the net-worth calculation below. It's a proxy
-            // (raw balance vs. reconstructed "true owed"), and as such it's
-            // blind to any borrow recorded via recordBorrowed()/reconcileBorrowed()
-            // that was never corrected with an offsetting Balance Adjustment —
-            // those calls create no Transaction at all. Net worth now uses the
-            // direct ledger figure from getUnreturnedBorrowedAsAt() instead.
+            // no longer used in the net-worth calculation below. $clientFundsInAccount
+            // (via getClientFundsBalanceAsAt()) already reconstructs the true amount
+            // still owed to the client — borrowed-but-unreturned money is never
+            // subtracted out of it as if it were a real expense — so the full
+            // liability is already baked into client_funds_as_at and therefore into
+            // $totalBalanceUnclamped below. No separate adjustment for unreturned
+            // borrowing is needed in net worth; getUnreturnedBorrowedAsAt() further
+            // down exists purely to surface that figure as its own report line item.
             $shortfall = max(0, $clientFundsInAccount - $rawBalance);
 
             if ($shortfall > 0) {
@@ -449,18 +451,23 @@ class ReportDataService
 
         $ownedSavings = max(0, $savingsBalance - $clientFundsInSavings);
 
-        // Real, direct ledger figure for money borrowed from client funds for
+        // Direct ledger figure for money borrowed from client funds for
         // personal use and not yet returned — mirrors
         // ClientFundController::index()'s $summary['total_borrowed'], but
-        // as-at $endDate rather than live. This replaces the old per-account
-        // shortfall proxy for net-worth purposes (see notes above on why that
-        // proxy under-counts).
+        // as-at $endDate rather than live. Surfaced to the report purely as
+        // its own "Borrowed (Unreturned)" line item — see the note on
+        // $shortfall above and on $netWorth below for why this figure is NOT
+        // subtracted again in net worth: that liability is already fully
+        // reflected in $totalClientFunds / client_funds_as_at.
         $totalUnreturnedBorrowed = $this->getUnreturnedBorrowedAsAt($user, $endDate);
 
         // Net worth = pooled account cash (unclamped, so a genuine deficit
-        // isn't hidden) + money owed back to the user (Outstanding Loans
-        // Given, gross) - money the user owes on active loans - money the
-        // user has borrowed from client funds and not yet returned.
+        // isn't hidden; already net of client funds via client_funds_as_at,
+        // which in turn already treats any unreturned borrowed money as
+        // still owed rather than as a real expense, so that liability is
+        // baked in here without needing a separate term)
+        // + money owed back to the user (Outstanding Loans Given, gross)
+        // - money the user owes on active loans.
         // No outer max(0, ...): a person can legitimately owe more than they
         // own, and clamping here would hide that.
         $netWorth = $totalBalanceUnclamped + $totalLoansGivenBalance - $totalLoanBalance;
@@ -1064,6 +1071,12 @@ class ReportDataService
      * and doesn't change the total obligation, which is why this formula
      * doesn't need to reference 'return' transactions at all — it's the same
      * total whether or not any given borrowed amount has since been returned.
+     *
+     * Because this method already treats unreturned borrowed money as still
+     * owed, every caller downstream (net worth, the per-account shortfall
+     * check, the "excludes KES X" footnotes) automatically gets the correct,
+     * non-double-counted figure without needing any separate adjustment for
+     * unreturned borrowing.
      */
     private function getClientFundsBalanceAsAt(User $user, Carbon $asAtDate, ?int $accountId = null): float
     {
@@ -1150,12 +1163,17 @@ class ReportDataService
     /**
      * Direct ledger figure — mirrors ClientFundController::index()'s
      * $summary['total_borrowed'], but as-at a specific date rather than live.
-     * Unlike the old per-account shortfall proxy (raw balance vs. reconstructed
-     * "true owed"), this reads straight from ClientFundTransaction and isn't
-     * blinded by recordBorrowed()/reconcileBorrowed() never touching account
-     * balances — those calls create no Transaction, so a borrow that was never
-     * separately corrected with a Balance Adjustment was invisible to the old
-     * per-account method entirely.
+     * Reads straight from ClientFundTransaction rather than reconstructing
+     * from account balances, so it's unaffected by recordBorrowed()/
+     * reconcileBorrowed() never touching Transaction/account balances.
+     *
+     * This is a display-only figure (the report's "Borrowed (Unreturned)"
+     * line item) — it does not feed net worth, and it isn't patching a blind
+     * spot in another calculation. getClientFundsBalanceAsAt() already
+     * reconstructs the true amount still owed to the client (treating
+     * unreturned borrowed money as still owed rather than as a real
+     * expense), so that liability is already correctly embedded in
+     * $totalClientFunds / client_funds_as_at independent of this method.
      */
     private function getUnreturnedBorrowedAsAt(User $user, Carbon $asAtDate): float
     {
