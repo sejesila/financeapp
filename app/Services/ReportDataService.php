@@ -1013,6 +1013,30 @@ class ReportDataService
      * point in time, by taking each fund's current balance and adding back any
      * expense/profit reductions recorded after $asAtDate.
      */
+    /**
+     * Calculate what a user's outstanding client funds balance was at a specific
+     * point in time — i.e. the true total still owed to the client, reconstructed
+     * directly from amount_received rather than off today's ClientFund::$balance.
+     *
+     * Why not just use $fund->balance (received - amount_spent - profit)?
+     * Because ClientFund::updateBalance() folds "borrowed for personal use"
+     * (recordBorrowed() / reconcileBorrowed()) into amount_spent exactly the
+     * same way it folds in a genuine business expense. Borrowing doesn't
+     * reduce what's owed to the client though — it converts part of the
+     * obligation into a personal debt that still has to be physically repaid
+     * (see ClientFundController::returnBorrowed()), and ClientFundController
+     * already tracks that separately as "Borrowed (Unreturned)" — it just
+     * never made it into this figure. Any caller that subtracts this from an
+     * account balance (net worth, "excludes KES X" footnotes, the per-account
+     * shortfall check) was silently treating unreturned borrowed money as if
+     * it already belonged to the user.
+     *
+     * Only REAL expenses (is_borrowed = false) and profit actually reduce
+     * what's owed; a 'return' transaction just moves cash back into place
+     * and doesn't change the total obligation, which is why this formula
+     * doesn't need to reference 'return' transactions at all — it's the same
+     * total whether any given borrowed amount has since been returned.
+     */
     private function getClientFundsBalanceAsAt(User $user, Carbon $asAtDate, ?int $accountId = null): float
     {
         $clientFunds = ClientFund::where('user_id', $user->id)
@@ -1020,13 +1044,21 @@ class ReportDataService
             ->whereNotIn('status', ['cancelled'])
             ->with(['transactions' => function ($q) use ($asAtDate) {
                 $q->whereIn('type', ['expense', 'profit'])
-                    ->where('date', '>', $asAtDate);
+                    ->where('date', '<=', $asAtDate);
             }])
             ->get();
 
         return $clientFunds->sum(function ($fund) use ($accountId, $asAtDate) {
-            $reductionsAfter = $fund->transactions->sum('amount');
-            $balanceAsAt = max(0, (float)$fund->balance + (float)$reductionsAfter);
+            $realExpenses = $fund->transactions
+                ->where('type', 'expense')
+                ->where('is_borrowed', false)
+                ->sum('amount');
+
+            $profitTaken = $fund->transactions
+                ->where('type', 'profit')
+                ->sum('amount');
+
+            $balanceAsAt = max(0, (float)$fund->amount_received - $realExpenses - $profitTaken);
 
             if ($accountId === null) {
                 return $balanceAsAt;
