@@ -102,6 +102,12 @@
                                 📈 Record Interest
                             </a>
                         @endif
+                        @if($account->type === 'savings' && $reversibleInterestBatch)
+                            <a href="{{ route('accounts.interest.reverse.form', ['account' => $account, 'batchId' => $reversibleInterestBatch]) }}"
+                               class="bg-amber-600 text-white px-6 py-2.5 rounded-lg hover:bg-amber-700 transition text-center font-medium shadow-md">
+                                ↩ Undo Interest
+                            </a>
+                        @endif
                         @if($account->type === 'savings')
                             <button id="openStatementBtn"
                                     class="bg-indigo-700 text-white px-6 py-2.5 rounded-lg hover:bg-indigo-800 transition text-center font-medium shadow-md">

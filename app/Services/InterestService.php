@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Account;
 use Carbon\Carbon;
+use Illuminate\Support\Str;
 
 class InterestService
 {
@@ -134,21 +135,19 @@ class InterestService
     // ════════════════════════════════════════════════════════════════════════════
 
     /**
-     * Splits a total interest amount evenly across all target dates and returns
-     * an array of ['date' => Carbon, 'amount' => float, 'description' => string].
-     *
-     * Any rounding remainder (due to cents) is added to the last entry so that
-     * the amounts always sum exactly to $totalAmount.
+     * Same as buildDailyEntries() but also returns the batch id used to tag
+     * every transaction created for this single recordInterest() call, so the
+     * whole recording can be reversed as one unit later.
      */
-    public function buildDailyEntries(Account $account, float $totalAmount): array
+    public function buildDailyEntries(Account $account, float $totalAmount, ?string $batchId = null): array
     {
-        $dates     = $this->getTargetDates($account);
-        $count     = count($dates);
-        $perDay    = round($totalAmount / $count, 2);
-        $entries   = [];
+        $batchId = $batchId ?? (string) Str::uuid();
+        $dates   = $this->getTargetDates($account);
+        $count   = count($dates);
+        $perDay  = round($totalAmount / $count, 2);
+        $entries = [];
 
         foreach ($dates as $i => $date) {
-            // Put rounding remainder on the last entry
             $amount = ($i === $count - 1)
                 ? round($totalAmount - ($perDay * ($count - 1)), 2)
                 : $perDay;
@@ -157,6 +156,7 @@ class InterestService
                 'date'        => $date,
                 'amount'      => $amount,
                 'description' => 'Interest earned – ' . $date->format('M d, Y'),
+                'batch_id'    => $batchId,
             ];
         }
 
@@ -244,8 +244,25 @@ class InterestService
     }
 
     /** @deprecated Not used in day-based logic */
-    public function getTargetMonth(): \Carbon\Carbon
+    public function getTargetMonth(): \Carbon\CarbonInterface
     {
         return now()->subMonthNoOverflow()->startOfMonth();
+    }
+    public function getReversibleInterestBatch(Account $account): ?string
+    {
+        $last = $account->transactions()
+            ->whereNull('deleted_at')
+            ->join('categories', 'transactions.category_id', '=', 'categories.id')
+            ->where('categories.name', 'Interest')
+            ->whereNotNull('transactions.batch_id')
+            ->orderByDesc('transactions.created_at')
+            ->select('transactions.batch_id', 'transactions.created_at')
+            ->first();
+
+        if (! $last || Carbon::parse($last->created_at)->diffInMinutes(now()) > 60) {
+            return null;
+        }
+
+        return $last->batch_id;
     }
 }

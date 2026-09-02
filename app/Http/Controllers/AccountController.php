@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
+
 class AccountController extends Controller
 {
     public function __construct(
@@ -427,9 +428,11 @@ class AccountController extends Controller
         }
 
         // ── "Record Interest" button guard (day-based) ────────────────────────
-        $interestRecordedToday = false;
+        $interestRecordedToday   = false;
+        $reversibleInterestBatch = null;
         if ($account->type === 'savings') {
-            $interestRecordedToday = ! $this->interestService->canRecordToday($account);
+            $interestRecordedToday   = ! $this->interestService->canRecordToday($account);
+            $reversibleInterestBatch = $this->interestService->getReversibleInterestBatch($account);
         }
 
         return view('accounts.show', [
@@ -457,7 +460,70 @@ class AccountController extends Controller
             'selectedYear'          => $selectedYear,
             'selectedPeriod'        => $selectedPeriod,
             'interestRecordedToday' => $interestRecordedToday,
+            'interestRecordedToday'   => $interestRecordedToday,
+            'reversibleInterestBatch' => $reversibleInterestBatch,
         ]);
+    }
+    // ── reverse interest form ─────────────────────────────────────────────────
+
+    public function reverseInterestForm(Account $account, string $batchId)
+    {
+        if ($account->user_id !== Auth::id()) abort(403);
+
+        $entries = $account->transactions()
+            ->whereNull('deleted_at')
+            ->where('batch_id', $batchId)
+            ->whereHas('category', fn($q) => $q->where('name', 'Interest'))
+            ->orderBy('date')
+            ->get();
+
+        if ($entries->isEmpty()) abort(404);
+
+        if ($entries->min('created_at')->diffInMinutes(now()) > 60) {
+            return redirect()->route('accounts.show', $account)
+                ->with('error', 'Interest can only be reversed within 1 hour of being recorded.');
+        }
+
+        return view('accounts.reverse-interest', compact('account', 'entries', 'batchId'));
+    }
+
+// ── reverse interest post ────────────────────────────────────────────────
+
+    public function reverseInterest(Request $request, Account $account, string $batchId)
+    {
+        if ($account->user_id !== Auth::id()) abort(403);
+
+        $entries = $account->transactions()
+            ->whereNull('deleted_at')
+            ->where('batch_id', $batchId)
+            ->whereHas('category', fn($q) => $q->where('name', 'Interest'))
+            ->get();
+
+        if ($entries->isEmpty()) abort(404);
+
+        if ($entries->min('created_at')->diffInMinutes(now()) > 60) {
+            return redirect()->route('accounts.show', $account)
+                ->with('error', 'Interest can only be reversed within 1 hour of being recorded.');
+        }
+
+        $request->validate(['reason' => 'nullable|string|max:500']);
+
+        $total = $entries->sum('amount');
+        $count = $entries->count();
+
+        DB::transaction(function () use ($entries) {
+            foreach ($entries as $entry) {
+                $entry->delete();
+            }
+        });
+
+        $this->clearAccountCache($account->id);
+
+        $message = $count === 1
+            ? 'Interest of KES ' . number_format($total, 0, '.', ',') . ' has been reversed.'
+            : 'Interest of KES ' . number_format($total, 0, '.', ',') . " across {$count} days has been reversed.";
+
+        return redirect()->route('accounts.show', $account)->with('success', $message);
     }
 
     // ── edit / update ─────────────────────────────────────────────────────────
@@ -902,6 +968,7 @@ class AccountController extends Controller
                 'category_id'    => $interestCategory->id,
                 'payment_method' => 'Interest',
                 'type'           => 'income',
+                'batch_id'       => $entry['batch_id'],
             ]);
         }
 

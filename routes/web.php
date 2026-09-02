@@ -99,6 +99,10 @@ Route::middleware('auth')->group(function () {
             ->name('interest.store');
         Route::get('{account}/statement', [StatementController::class, 'show'])
             ->name('statement');
+        Route::get('{account}/interest/{batchId}/reverse', [AccountController::class, 'reverseInterestForm'])
+            ->name('interest.reverse.form');
+        Route::delete('{account}/interest/{batchId}/reverse', [AccountController::class, 'reverseInterest'])
+            ->name('interest.reverse');
     });
 
     // Standard CRUD operations for accounts
