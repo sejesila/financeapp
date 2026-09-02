@@ -461,16 +461,21 @@ class ReportDataService
         // reflected in $totalClientFunds / client_funds_as_at.
         $totalUnreturnedBorrowed = $this->getUnreturnedBorrowedAsAt($user, $endDate);
 
-        // Net worth = pooled account cash (unclamped, so a genuine deficit
-        // isn't hidden; already net of client funds via client_funds_as_at,
-        // which in turn already treats any unreturned borrowed money as
-        // still owed rather than as a real expense, so that liability is
-        // baked in here without needing a separate term)
-        // + money owed back to the user (Outstanding Loans Given, gross)
-        // - money the user owes on active loans.
-        // No outer max(0, ...): a person can legitimately owe more than they
-        // own, and clamping here would hide that.
-        $netWorth = $totalBalanceUnclamped + $totalLoansGivenBalance - $totalLoanBalance;
+// Net worth = only the money you actually own in savings (Etica — savings
+// accounts, net of any client funds parked there) + money owed back to you
+// (Outstanding Loans Given, gross) - money you owe on active loans.
+//
+// Main/wallet accounts (M-Pesa, I&M Bank, Cash, Airtel Money, M-Shwari) are
+// deliberately EXCLUDED here — that cash is working capital / day-to-day
+// float, not something you're tracking as "wealth" for this figure. Only
+// Etica (type = 'savings') counts, and $ownedSavings already subtracts out
+// any client funds sitting in savings accounts specifically (see above),
+// so client money owed against Etica is correctly netted out without
+// touching the main-account balances at all.
+//
+// No outer max(0, ...): you can legitimately owe more than you own, and
+// clamping here would hide that.
+        $netWorth = $ownedSavings + $totalLoansGivenBalance - $totalLoanBalance;
 
 
         // --- Transactions ---
