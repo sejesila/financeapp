@@ -411,21 +411,29 @@
 <!-- Account Balances -->
 @if($data['accounts']->isNotEmpty())
     @php
-        // Filter on the SAME field we display (balance_as_at), not current_balance —
-        // an account that's since been drained to zero today but still had money
-        // in it as of the report's end date was previously vanishing from this
-        // table entirely (filtered on current_balance) while still being counted
-        // in totals elsewhere in the report, which is the kind of mismatch that
-        // makes "the numbers don't add up" bugs like this one hard to spot.
-        $adjustedAccounts = $data['accounts']->where('balance_as_at', '!=', 0)->map(function ($account) {
+        // Accounts where client funds tagged to them exceed the raw balance
+        // clamp to 0 in balance_as_at (see ReportDataService::generateReport()).
+        // Previously those accounts were filtered out of this table entirely
+        // (filtered on balance_as_at != 0), which silently hid where a large
+        // chunk of "missing" money actually went, while still leaving Total
+        // Assets and % of Total computed off the correct pooled totals — the
+        // kind of mismatch that makes "the numbers don't add up" hard to spot.
+        // We now keep any account with a shortfall in the table (flagged
+        // distinctly) even when its display balance clamped to 0.
+        $shortfallAccounts = collect($data['account_client_fund_shortfalls'] ?? []);
+        $totalShortfall    = $data['total_client_fund_shortfall'] ?? 0;
 
+        $adjustedAccounts = $data['accounts']
+            ->filter(fn($a) => $a->balance_as_at != 0 || ($a->client_fund_shortfall ?? 0) > 0)
+            ->map(function ($account) {
                 return (object) [
                     'id'              => $account->id,
                     'name'            => $account->name,
                     'display_balance' => $account->balance_as_at,
+                    'shortfall'       => $account->client_fund_shortfall ?? 0,
                 ];
             });
-            $adjustedTotal = $totalBal; // pooled figure from the service — see ReportDataService::generateReport()
+        $adjustedTotal = $totalBal; // pooled figure from the service — see ReportDataService::generateReport()
     @endphp
 
     <div class="section">
@@ -442,9 +450,14 @@
             <tbody>
             @foreach($adjustedAccounts as $account)
                 @php
-                    $pct         = $adjustedTotal > 0 ? ($account->display_balance / $adjustedTotal) * 100 : 0;
-                    $healthClass = $account->display_balance > 0 ? 'success' : ($account->display_balance < 0 ? 'danger' : 'neutral');
-                    $healthLabel = $account->display_balance > 0 ? 'Healthy' : ($account->display_balance < 0 ? 'Negative' : 'Zero');
+                    $pct = $adjustedTotal > 0 ? ($account->display_balance / $adjustedTotal) * 100 : 0;
+                    if ($account->shortfall > 0) {
+                        $healthClass = 'danger';
+                        $healthLabel = 'Funds Shortfall';
+                    } else {
+                        $healthClass = $account->display_balance > 0 ? 'success' : ($account->display_balance < 0 ? 'danger' : 'neutral');
+                        $healthLabel = $account->display_balance > 0 ? 'Healthy' : ($account->display_balance < 0 ? 'Negative' : 'Zero');
+                    }
                 @endphp
                 <tr>
                     <td style="font-weight: 600;">{{ $account->name }}</td>
@@ -461,6 +474,21 @@
             </tr>
             </tbody>
         </table>
+
+        @if($totalShortfall > 0)
+            <div class="alert warning">
+                <strong>&#9888; Client funds exceed tracked balance</strong> &mdash;
+                {{ $currency }} {{ number_format($totalShortfall) }} in client money is tagged to
+                account(s) below that don't currently hold enough cash to cover it. This usually
+                means money moved out of the account without a recorded transfer.
+                <ul style="margin: 6px 0 0 16px; padding: 0;">
+                    @foreach($shortfallAccounts as $sf)
+                        <li>{{ $sf['name'] }}: {{ $currency }} {{ number_format($sf['shortfall']) }} short</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
         @if(($data['total_client_funds'] ?? 0) > 0)
             <p style="font-size: 8px; color: #9CA3AF; margin-top: 4px;">
                 Balances above already exclude {{ $currency }} {{ number_format($data['total_client_funds']) }} in
