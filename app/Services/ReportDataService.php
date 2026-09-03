@@ -347,9 +347,28 @@ class ReportDataService
     {
         $accounts = Account::where('user_id', $user->id)->where('is_active', true)->get();
 
-        // Reconstruct each account's balance as of $endDate, not today
+        // Reconstruct each account's balance as of $endDate, not today.
+        //
+        // Client-fund netting (and the shortfall diagnostic below) is scoped
+        // to the dedicated SAVINGS account (Etica) only. Etica is the account
+        // client money is actually meant to be parked in; M-Pesa, I&M Bank,
+        // Cash, Airtel Money, and M-Shwari are day-to-day working float. Even
+        // if a ClientFund record happens to be tagged to one of those main/
+        // wallet accounts, we deliberately do NOT net client funds against
+        // them here and we never flag them as "short" — their balance is
+        // shown exactly as reconstructed from the ledger, untouched. Only
+        // Etica participates in the client_funds_as_at / shortfall logic.
         $accountsAsAt = $accounts->map(function ($account) use ($user, $endDate) {
             $rawBalance = $this->getAccountBalanceAsAt($account, $endDate);
+
+            if ($account->type !== 'savings') {
+                $account->raw_balance_as_at = $rawBalance;
+                $account->client_funds_as_at = 0.0;
+                $account->balance_as_at = $rawBalance;
+                $account->client_fund_shortfall = 0.0;
+                return $account;
+            }
+
             $clientFundsInAccount = $this->getClientFundsBalanceAsAt($user, $endDate, $account->id);
 
             // Positive only when this account's tagged client funds exceed what's
@@ -392,23 +411,20 @@ class ReportDataService
             return $account;
         });
 
-// balance_as_at is clamped per-account for display (an account can't show
-// negative cash), which can silently drop money from a naive sum when one
-// account's client funds exceed its own balance — exactly the Sanlam MMF
-// scenario (client funds tagged to an account whose real balance is now 0
-// because the underlying cash moved through an untracked path). total_balance
-// must therefore never be a sum of the clamped display values; it's the
-// pooled raw balance minus pooled client funds, computed once, unaffected
-// by any single account's shortfall.
+// balance_as_at is clamped for the savings account only (an account can't
+// show negative cash there), which can silently drop money from a naive sum
+// when Etica's client funds exceed its own balance — exactly the Sanlam MMF
+// scenario. total_balance must therefore never be a sum of the clamped
+// display values; it's the pooled raw balance minus pooled client funds
+// (client funds only ever being non-zero for the savings account now),
+// computed once, unaffected by any single account's shortfall.
         $totalBalanceUnclamped = $accountsAsAt->sum('raw_balance_as_at') - $accountsAsAt->sum('client_funds_as_at');
         $totalBalance = max(0, $totalBalanceUnclamped);
 
         // Which accounts (if any) are carrying a shortfall, and how much in
         // total — surfaced to the report templates so the user can see WHERE
-        // the gap between "Total Assets" and the sum of listed accounts comes
-        // from, instead of it only ever reaching a server log. This is a
-        // per-account display diagnostic only — see the note above on why it
-        // no longer feeds into net worth.
+        // the gap comes from. Since client-fund netting is now scoped to the
+        // savings account only, this will only ever contain Etica.
         $accountsWithShortfall = $accountsAsAt->where('client_fund_shortfall', '>', 0);
         $totalClientFundShortfall = $accountsWithShortfall->sum('client_fund_shortfall');
 
@@ -419,9 +435,9 @@ class ReportDataService
 
         // Historical client funds balance — what was still outstanding as of $endDate,
         // not what's outstanding today. This is the GLOBAL figure across every
-        // account (mpesa/bank/savings — see ClientFundController@store, client
-        // funds aren't savings-only) and is what the "excludes KES X" footnote
-        // in the report templates uses.
+        // ClientFund record (used only for the "excludes KES X" informational
+        // footnote) — it is intentionally NOT scoped to any one account, unlike
+        // the per-account netting above.
         $totalClientFunds = $this->getClientFundsBalanceAsAt($user, $endDate);
 
         // Historical savings balance — what was actually in savings at period end, not today
@@ -1082,6 +1098,13 @@ class ReportDataService
      * check, the "excludes KES X" footnotes) automatically gets the correct,
      * non-double-counted figure without needing any separate adjustment for
      * unreturned borrowing.
+     *
+     * NOTE: when called with an $accountId, this method is now only ever
+     * invoked by generateReport() for the savings account (Etica) — see the
+     * per-account loop above, which no longer calls this for main/wallet
+     * accounts at all. The account-tracing logic below is unchanged, but in
+     * practice $accountId will only ever be a savings account's id going
+     * forward.
      */
     private function getClientFundsBalanceAsAt(User $user, Carbon $asAtDate, ?int $accountId = null): float
     {
