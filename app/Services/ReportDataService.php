@@ -347,6 +347,22 @@ class ReportDataService
     {
         $accounts = Account::where('user_id', $user->id)->where('is_active', true)->get();
 
+        // Historical client funds balance — the TRUE total still owed to
+        // every client as of $endDate, across every account, reconstructed
+        // directly from amount_received (see getClientFundsBalanceAsAt()
+        // below). Computed once, up front, because it now feeds THREE things
+        // that must all agree with each other:
+        //   1. The per-account savings (Etica) shortfall check just below.
+        //   2. $ownedSavings / net worth further down.
+        //   3. The "excludes KES X" informational footnote.
+        // Previously (1) and (2) each called a scoped, per-account variant
+        // that only counted client funds specifically traceable into that
+        // one account — which understated the real liability whenever money
+        // moved between accounts without a tagged Transfer. Etica is now
+        // checked against the full amount owed to every client, not just the
+        // portion historically traced into it.
+        $totalClientFunds = $this->getClientFundsBalanceAsAt($user, $endDate);
+
         // Reconstruct each account's balance as of $endDate, not today.
         //
         // Client-fund netting (and the shortfall diagnostic below) is scoped
@@ -358,7 +374,16 @@ class ReportDataService
         // them here and we never flag them as "short" — their balance is
         // shown exactly as reconstructed from the ledger, untouched. Only
         // Etica participates in the client_funds_as_at / shortfall logic.
-        $accountsAsAt = $accounts->map(function ($account) use ($user, $endDate) {
+        //
+        // NOTE: Etica is netted against $totalClientFunds — the FULL global
+        // obligation, not just the slice of it traced specifically into
+        // Etica. If a user ever has more than one active savings account
+        // this would double-count the liability across them (each would
+        // independently subtract the same global total); the rest of this
+        // file already assumes a single savings account ("Etica") is the
+        // only one that exists, so this is safe for now but would need
+        // revisiting if that assumption ever changes.
+        $accountsAsAt = $accounts->map(function ($account) use ($endDate, $totalClientFunds) {
             $rawBalance = $this->getAccountBalanceAsAt($account, $endDate);
 
             if ($account->type !== 'savings') {
@@ -369,7 +394,9 @@ class ReportDataService
                 return $account;
             }
 
-            $clientFundsInAccount = $this->getClientFundsBalanceAsAt($user, $endDate, $account->id);
+            // Full obligation, not just what's traced into this account —
+            // see the note above $accountsAsAt.
+            $clientFundsInAccount = $totalClientFunds;
 
             // Positive only when this account's tagged client funds exceed what's
             // actually sitting in it — i.e. client money was borrowed against
@@ -384,13 +411,12 @@ class ReportDataService
             //
             // NOTE: this remains a per-account DISPLAY diagnostic only — it is
             // no longer used in the net-worth calculation below. $clientFundsInAccount
-            // (via getClientFundsBalanceAsAt()) already reconstructs the true amount
-            // still owed to the client — borrowed-but-unreturned money is never
-            // subtracted out of it as if it were a real expense — so the full
-            // liability is already baked into client_funds_as_at and therefore into
-            // $totalBalanceUnclamped below. No separate adjustment for unreturned
-            // borrowing is needed in net worth; getUnreturnedBorrowedAsAt() further
-            // down exists purely to surface that figure as its own report line item.
+            // is now the FULL amount still owed to every client (see above), so
+            // the entire liability is baked into client_funds_as_at and
+            // therefore into $totalBalanceUnclamped below. No separate
+            // adjustment for unreturned borrowing is needed in net worth;
+            // getUnreturnedBorrowedAsAt() further down exists purely to
+            // surface that figure as its own report line item.
             $shortfall = max(0, $clientFundsInAccount - $rawBalance);
 
             if ($shortfall > 0) {
@@ -433,39 +459,28 @@ class ReportDataService
         $activeLoansGiven = LoanGiven::where('user_id', $user->id)->where('status', 'active')->get();
         $totalLoansGivenBalance = $activeLoansGiven->sum('balance');
 
-        // Historical client funds balance — what was still outstanding as of $endDate,
-        // not what's outstanding today. This is the GLOBAL figure across every
-        // ClientFund record (used only for the "excludes KES X" informational
-        // footnote) — it is intentionally NOT scoped to any one account, unlike
-        // the per-account netting above.
-        $totalClientFunds = $this->getClientFundsBalanceAsAt($user, $endDate);
-
         // Historical savings balance — what was actually in savings at period end, not today
         $savingsBalance = $this->getSavingsBalanceAsAt($user, $endDate);
 
         // For working out how much of the SAVINGS balance is actually owned,
-        // we need client funds specifically parked in savings accounts — NOT
-        // $totalClientFunds above, which spans every account type. Subtracting
-        // the global figure here was wrongly pulling money out of savings that
-        // was never there to begin with (e.g. client funds sitting in M-Pesa),
-        // understating owned savings any time most client money lives outside
-        // savings accounts.
+        // net it against $totalClientFunds — the FULL amount owed to every
+        // client, not just the slice historically traced into savings
+        // accounts specifically. Etica is the only account this report nets
+        // client funds against (see above), so this is the same comparison
+        // being made there: "does Etica's cash cover everything owed to
+        // clients, full stop."
         //
-        // NOTE: $ownedSavings is now a DISPLAY-ONLY figure for the "Savings
-        // Accounts" line in the report banners. Savings accounts are already
-        // included in $totalBalanceUnclamped (which is used directly in net
-        // worth below), so $ownedSavings must never also be added into net
-        // worth separately — that would double-count savings-account cash.
-        $savingsAccountIds = Account::where('user_id', $user->id)
-            ->where('type', 'savings')
-            ->where('is_active', true)
-            ->pluck('id');
-
-        $clientFundsInSavings = $savingsAccountIds->isEmpty()
-            ? 0.0
-            : $savingsAccountIds->sum(fn($id) => $this->getClientFundsBalanceAsAt($user, $endDate, $id));
-
-        $ownedSavings = max(0, $savingsBalance - $clientFundsInSavings);
+        // NOTE: $ownedSavings is a DISPLAY figure for the "Savings Accounts"
+        // line in the report banners AND feeds net worth directly below (see
+        // $netWorth) — unlike $totalBalanceUnclamped, which pools ALL
+        // accounts, $ownedSavings is Etica-only by design (main/wallet
+        // accounts are intentionally excluded from net worth — see $netWorth
+        // below), so there's no double-counting to worry about here.
+        //
+        // No max(0, ...) clamp: if what's owed to clients exceeds what's
+        // actually sitting in Etica, that's a real deficit, and hiding it
+        // behind a floor of 0 would silently understate how much you owe.
+        $ownedSavings = $savingsBalance - $totalClientFunds;
 
         // Direct ledger figure for money borrowed from client funds for
         // personal use and not yet returned — mirrors
@@ -478,16 +493,19 @@ class ReportDataService
         $totalUnreturnedBorrowed = $this->getUnreturnedBorrowedAsAt($user, $endDate);
 
 // Net worth = only the money you actually own in savings (Etica — savings
-// accounts, net of any client funds parked there) + money owed back to you
-// (Outstanding Loans Given, gross) - money you owe on active loans.
+// accounts, net of the FULL amount owed to every client, not just what's
+// traced into Etica specifically) + money owed back to you (Outstanding
+// Loans Given, gross) - money you owe on active loans.
 //
 // Main/wallet accounts (M-Pesa, I&M Bank, Cash, Airtel Money, M-Shwari) are
 // deliberately EXCLUDED here — that cash is working capital / day-to-day
 // float, not something you're tracking as "wealth" for this figure. Only
-// Etica (type = 'savings') counts, and $ownedSavings already subtracts out
-// any client funds sitting in savings accounts specifically (see above),
-// so client money owed against Etica is correctly netted out without
-// touching the main-account balances at all.
+// Etica (type = 'savings') counts, and $ownedSavings now nets the ENTIRE
+// client-fund liability against it (see above) rather than just the portion
+// historically traced there — so if clients are collectively owed more than
+// Etica actually holds, that full shortfall shows up here as a negative
+// contribution, even though the missing money physically sits in (or was
+// spent from) other accounts.
 //
 // No outer max(0, ...): you can legitimately owe more than you own, and
 // clamping here would hide that.
@@ -1071,7 +1089,7 @@ class ReportDataService
 
     /**
      * Calculate what a user's outstanding client funds balance was at a specific
-     * point in time — i.e. the true total still owed to the client, reconstructed
+     * point in time — i.e. the true total still owed to every client, reconstructed
      * directly from amount_received rather than off today's ClientFund::$balance.
      *
      * Why not just use $fund->balance (received - amount_spent - profit)?
@@ -1099,14 +1117,20 @@ class ReportDataService
      * non-double-counted figure without needing any separate adjustment for
      * unreturned borrowing.
      *
-     * NOTE: when called with an $accountId, this method is now only ever
-     * invoked by generateReport() for the savings account (Etica) — see the
-     * per-account loop above, which no longer calls this for main/wallet
-     * accounts at all. The account-tracing logic below is unchanged, but in
-     * practice $accountId will only ever be a savings account's id going
-     * forward.
+     * This is now always the GLOBAL figure across every ClientFund record,
+     * regardless of which account each fund is tagged to or was last traced
+     * into. Previously this method accepted an optional $accountId and, when
+     * given one, replayed each fund's tagged Transfers to work out which
+     * account its cash currently sat in — used so Etica's shortfall check
+     * only compared against the client funds specifically traceable into
+     * Etica. That undercounted the real liability whenever client money had
+     * moved to (or been spent from) another account without a tagged
+     * Transfer recording it. Every caller now compares Etica (the only
+     * account this report nets client funds against) against the FULL
+     * amount owed to every client — see the $accountsAsAt loop and
+     * $ownedSavings in generateReport().
      */
-    private function getClientFundsBalanceAsAt(User $user, Carbon $asAtDate, ?int $accountId = null): float
+    private function getClientFundsBalanceAsAt(User $user, Carbon $asAtDate): float
     {
         $clientFunds = ClientFund::where('user_id', $user->id)
             ->where('received_date', '<=', $asAtDate)
@@ -1117,7 +1141,7 @@ class ReportDataService
             }])
             ->get();
 
-        return $clientFunds->sum(function ($fund) use ($accountId, $asAtDate) {
+        return $clientFunds->sum(function ($fund) {
             $realExpenses = $fund->transactions
                 ->where('type', 'expense')
                 ->where('is_borrowed', false)
@@ -1127,31 +1151,7 @@ class ReportDataService
                 ->where('type', 'profit')
                 ->sum('amount');
 
-            $balanceAsAt = max(0, (float)$fund->amount_received - $realExpenses - $profitTaken);
-
-            if ($accountId === null) {
-                return $balanceAsAt;
-            }
-
-            // Trace where this fund's cash actually sat as of $asAtDate by
-            // replaying any transfers explicitly tagged to it, rather than
-            // trusting the static account_id — which can go stale the moment
-            // the money moves without a tagged transfer recording it.
-            $currentAccountId = $fund->account_id;
-
-            $movements = Transfer::withoutGlobalScopes()
-                ->where('client_fund_id', $fund->id)
-                ->where('date', '<=', $asAtDate)
-                ->orderBy('date')
-                ->get();
-
-            foreach ($movements as $m) {
-                if ($m->from_account_id === $currentAccountId) {
-                    $currentAccountId = $m->to_account_id;
-                }
-            }
-
-            return $currentAccountId === $accountId ? $balanceAsAt : 0.0;
+            return max(0, (float)$fund->amount_received - $realExpenses - $profitTaken);
         });
     }
 
