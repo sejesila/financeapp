@@ -627,7 +627,7 @@
                                                     </svg>
                                                     Reverse
                                                 </button>
-                                            @elseif(!$isLoanLinked && !($txn->is_grouped ?? false) && $txn->created_at->diffInMinutes(now()) <= 180)
+                                            @elseif(!$isLoanLinked && !($txn->is_grouped ?? false) && $txn->created_at->diffInMinutes(now()) <= 720)
                                                 <a href="{{ route('accounts.topup.reverse.form', ['account' => $account, 'transaction' => $txn]) }}"
                                                    title="Reverse this top-up"
                                                    class="inline-flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-700 dark:text-red-400 transition-colors">
