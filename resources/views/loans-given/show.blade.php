@@ -176,12 +176,51 @@
                         @endif
                     </div>
 
-                    @if($loanGiven->notes)
-                        <div class="mt-6 pt-6 border-t border-gray-200">
-                            <h4 class="text-sm font-medium text-gray-500 mb-2">Notes</h4>
-                            <p class="text-sm text-gray-700">{{ $loanGiven->notes }}</p>
+                    <div class="mt-6 pt-6 border-t border-gray-200">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="text-sm font-medium text-gray-500">Notes</h4>
+                            <button type="button" onclick="document.getElementById('editNotesModal').showModal()"
+                                    class="text-xs font-medium text-indigo-600 hover:text-indigo-900">
+                                {{ $loanGiven->notes ? 'Edit' : 'Add note' }}
+                            </button>
                         </div>
-                    @endif
+                        @if($loanGiven->notes)
+                            <p class="text-sm text-gray-700 whitespace-pre-line">{{ $loanGiven->notes }}</p>
+                        @else
+                            <p class="text-sm text-gray-400 italic">No notes yet.</p>
+                        @endif
+                    </div>
+
+                    <dialog id="editNotesModal" class="rounded-lg shadow-xl w-full max-w-md">
+                        <div class="p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-medium text-gray-900">Edit Notes</h3>
+                                <button type="button" onclick="document.getElementById('editNotesModal').close()"
+                                        class="text-gray-400 hover:text-gray-500">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <form method="POST" action="{{ route('loans-given.notes.update', $loanGiven->id) }}">
+                                @csrf
+                                @method('PUT')
+                                <textarea name="notes" rows="4"
+                                          class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                                          placeholder="Add a note about this loan...">{{ old('notes', $loanGiven->notes) }}</textarea>
+                                <div class="flex justify-end space-x-3 mt-4">
+                                    <button type="button" onclick="document.getElementById('editNotesModal').close()"
+                                            class="px-4 py-2 bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-gray-800 uppercase tracking-widest hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                                        Cancel
+                                    </button>
+                                    <button type="submit"
+                                            class="px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 focus:bg-indigo-700 active:bg-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                                        Save
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </dialog>
 
                     <!-- Actions -->
                     <div class="mt-6 pt-6 border-t border-gray-200 flex flex-wrap gap-2">

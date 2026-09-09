@@ -657,6 +657,30 @@ class LoanGivenController extends Controller implements HasMiddleware
             return back()->with('error', 'Failed to update loan status: ' . $e->getMessage());
         }
     }
+    // ── update notes ─────────────────────────────────────────────────────────
+
+    public function updateNotes(Request $request, LoanGiven $loanGiven)
+    {
+        try {
+            $this->authorize('update', $loanGiven);
+
+            $validated = $request->validate([
+                'notes' => 'nullable|string',
+            ]);
+
+            $loanGiven->notes = $validated['notes'] ?? null;
+            $loanGiven->save();
+
+            return redirect()->route('loans-given.show', $loanGiven->id)
+                ->with('success', 'Notes updated.');
+
+        } catch (ValidationException|AuthorizationException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            Log::error('LoanGivenController@updateNotes failed', ['loan_given_id' => $loanGiven->id, 'error' => $e->getMessage()]);
+            return back()->with('error', 'Failed to update notes: ' . $e->getMessage());
+        }
+    }
 
     // ── destroy ───────────────────────────────────────────────────────────────
 
