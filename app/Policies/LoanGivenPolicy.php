@@ -16,6 +16,10 @@ class LoanGivenPolicy
     {
         return $user->id === $loanGiven->user_id;
     }
+    public function update(User $user, LoanGiven $loanGiven): bool
+    {
+        return $user->id === $loanGiven->user_id;
+    }
 
     public function create(User $user): bool
     {
