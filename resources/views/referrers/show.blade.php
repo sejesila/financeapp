@@ -39,21 +39,41 @@
                     @php
                         $referredLoans = $referrer->loans()->orderByDesc('disbursed_date')->get();
                         $paidLoans = $referredLoans->where('status', 'paid');
-                        $outstandingPayable = $paidLoans
+
+                        // Loans that are paid, not yet part of a payout batch,
+                        // and not retained upfront before deposit. This is the
+                        // single source of truth for "what's outstanding" —
+                        // both the raw interest and the referrer's cut of it
+                        // are derived from this same filtered set so they
+                        // never drift apart.
+                        $unpaidOutLoans = $paidLoans
                             ->whereNull('referrer_payout_id')
-                            ->where('referrer_deducted_before_deposit', false)
-                            ->sum(function ($loan) use ($referrer) {
-                                $sharePct = $loan->referrer_share_percentage ?? $referrer->default_share_percentage;
-                                return round($loan->interest_amount * ($sharePct / 100), 2);
-                            });
+                            ->where('referrer_deducted_before_deposit', false);
+
+                        // Total interest earned on loans referred by this
+                        // referrer that has not yet been paid out to them.
+                        $outstandingInterest = $unpaidOutLoans->sum('interest_amount');
+
+                        // The referrer's actual cut of that outstanding
+                        // interest, respecting any per-loan override of
+                        // referrer_share_percentage.
+                        $outstandingPayable = $unpaidOutLoans->sum(function ($loan) use ($referrer) {
+                            $sharePct = $loan->referrer_share_percentage ?? $referrer->default_share_percentage;
+                            return round($loan->interest_amount * ($sharePct / 100), 2);
+                        });
+
                         $retainedTotal = $paidLoans->where('referrer_deducted_before_deposit', true)->sum('referrer_retained_amount');
                         $paidOutTotal = ($referrer->payouts ?? collect())->sum('amount_paid');
                     @endphp
 
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
                         <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg border border-purple-200 p-4">
                             <p class="text-sm font-medium text-gray-500">Referred Loans</p>
                             <p class="text-lg font-semibold text-gray-900">{{ $referredLoans->count() }}</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg border border-slate-200 p-4">
+                            <p class="text-sm font-medium text-gray-500">Interest Not Yet Paid Out</p>
+                            <p class="text-lg font-semibold text-gray-900">KES {{ number_format($outstandingInterest, 0) }}</p>
                         </div>
                         <div class="bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg border border-amber-200 p-4">
                             <p class="text-sm font-medium text-gray-500">Owed Now</p>
