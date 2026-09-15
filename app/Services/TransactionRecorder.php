@@ -36,6 +36,12 @@ class TransactionRecorder
         }
 
         $categoryName = $this->categories->resolveName($parsed);
+
+        // Early-morning commute window — expenses only.
+        if ($this->isFareTime($parsed)) {
+            $categoryName = 'Fare';
+        }
+
         $category = $this->categories->findOrCreate($user, $categoryName, $parsed['type']);
 
         $paymentMethod = match ($parsed['bank']) {
@@ -216,5 +222,19 @@ class TransactionRecorder
             'cashback' => $cashback,
             'new_fee' => $newFee,
         ], 200);
+    }
+    private function isFareTime(array $parsed): bool
+    {
+        if (($parsed['type'] ?? null) !== 'expense') {
+            return false;
+        }
+
+        $date = $parsed['date'] ?? null;
+
+        if (!$date instanceof \Carbon\Carbon) {
+            return false;
+        }
+
+        return $date->hour >= 5 && $date->hour < 7;
     }
 }
