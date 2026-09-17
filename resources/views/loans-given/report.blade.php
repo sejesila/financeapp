@@ -87,7 +87,7 @@
                                         <tr>
                                             <td class="py-2 pr-4 font-medium text-gray-900">{{ $loan->borrower_name }}</td>
                                             <td class="py-2 pr-4">KES {{ number_format($loan->principal_amount, 0) }}</td>
-                                            <td class="py-2 pr-4">KES {{ number_format($loan->balance, 0) }}</td>
+                                            <td class="py-2 pr-4">KES {{ number_format($loan->display_outstanding, 0) }}</td>
                                             <td class="py-2 pr-4">
                                                 {{ $loan->due_date ? $loan->due_date->format('M d, Y') : 'Not set' }}
                                                 @if($loan->due_date && $loan->status === 'active' && $loan->due_date->isPast())
@@ -102,7 +102,7 @@
                                     <tr class="text-xs text-gray-500 border-t border-gray-200">
                                         <td class="py-2 pr-4 font-medium">Subtotal</td>
                                         <td class="py-2 pr-4 font-medium">KES {{ number_format($loans->sum('principal_amount'), 0) }}</td>
-                                        <td class="py-2 pr-4 font-medium">KES {{ number_format($loans->sum('balance'), 0) }}</td>
+                                        <td class="py-2 pr-4 font-medium">KES {{ number_format($loans->sum('display_outstanding'), 0) }}</td>
                                         <td class="py-2 pr-4"></td>
                                         <td class="py-2 pr-4"></td>
                                     </tr>

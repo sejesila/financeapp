@@ -759,6 +759,19 @@ class LoanGivenController extends Controller implements HasMiddleware
                 $loan->processOverdueRollover();
             }
 
+// Report-only display figure. For most referrers this is just the
+// remaining principal balance (same as everywhere else in the app).
+// Referrer #1 (Phides) is a special case for this report: her loans'
+// "Outstanding" is shown as principal + 15%, flat, regardless of
+// balance/payments already made — a business-specific override that
+// only affects what's rendered on this report, not the loan's real
+// balance/interest fields anywhere else in the system.
+            foreach ($loans as $loan) {
+                $loan->display_outstanding = (int)$loan->referrer_id === 1
+                    ? round($loan->principal_amount * 1.15, 2)
+                    : $loan->balance;
+            }
+
             $groupedLoans = $loans
                 ->groupBy(fn($loan) => $loan->referrer?->name ?? 'No Referrer')
                 ->sortKeys();
@@ -766,7 +779,7 @@ class LoanGivenController extends Controller implements HasMiddleware
             $referrers = Referrer::where('is_active', true)->orderBy('name')->get();
 
             $grandTotalPrincipal = $loans->sum('principal_amount');
-            $grandTotalOutstanding = $loans->sum('balance');
+            $grandTotalOutstanding = $loans->sum('display_outstanding');
 
             return view('loans-given.report', compact(
                 'groupedLoans', 'status', 'referrerId', 'referrers',
