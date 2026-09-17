@@ -124,6 +124,24 @@ class LoanGivenController extends Controller implements HasMiddleware
                 + $activeLoans->sum(fn ($loan) => $loan->payments->sum('interest_portion'));
             $totalOutstanding = $activeLoans->sum('balance');
 
+            // Transaction costs paid out to disburse these loans (M-Pesa/bank/etc
+            // fees), pulled from the linked fee transactions on each loan's
+            // disbursement — same relationship the show page uses for
+            // $disbursementFee. All-time, active + paid, same scope as
+            // totalPrincipal, so "Net Interest" below is a fair like-for-like figure.
+            $disbursementTransactionIds = $allLoans->pluck('disbursement_transaction_id')->filter()->values();
+
+            $totalTransactionCosts = $disbursementTransactionIds->isNotEmpty()
+                ? Transaction::where('is_transaction_fee', true)
+                    ->whereIn('fee_for_transaction_id', $disbursementTransactionIds)
+                    ->sum('amount')
+                : 0;
+
+            // What interest actually nets out to once the cost of disbursing the
+            // loans is backed out. Uses totalInterest (includes active rollovers),
+            // so this can move before a loan closes, same as Interest Earned does.
+            $netInterest = $totalInterest - $totalTransactionCosts;
+
             // "Total Repaid" above only counts closed loans, so partial repayments
             // sitting on still-active loans (e.g. Enock, Emmanuel HR) never show up
             // anywhere in the summary — they just quietly reduce `balance`. This
@@ -148,7 +166,7 @@ class LoanGivenController extends Controller implements HasMiddleware
                 'activeLoans', 'paidLoans', 'filter', 'period','sort', 'referrerId', 'referrers',
                 'startDate', 'endDate', 'minYear', 'maxYear', 'accounts',
                 'totalPrincipal', 'totalRepaid', 'totalInterest', 'avgInterestRate', 'repaymentRate',
-                'totalOutstanding', 'totalReceivedAllTime'
+                'totalOutstanding', 'totalReceivedAllTime', 'totalTransactionCosts', 'netInterest'
             ));
 
         } catch (ValidationException|AuthorizationException $e) {

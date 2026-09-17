@@ -147,6 +147,49 @@
                                 </div>
                             </div>
                         </div>
+                        <!-- Transaction Costs -->
+                        <div
+                            class="bg-gradient-to-br from-orange-50 to-orange-100 overflow-hidden shadow-sm rounded-lg border border-orange-200">
+                            <div class="p-4">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0 bg-orange-500 rounded-lg p-3">
+                                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor"
+                                             viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                  d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="ml-4 min-w-0">
+                                        <p class="text-sm font-medium text-gray-500 break-words">Transaction Costs</p>
+                                        <p class="text-lg font-semibold text-gray-900">
+                                            KES {{ number_format($totalTransactionCosts ?? 0, 0) }}</p>
+                                        <p class="text-xs text-gray-500">Fees on disbursement, all-time</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Net Interest -->
+                        <div
+                            class="bg-gradient-to-br from-emerald-50 to-emerald-100 overflow-hidden shadow-sm rounded-lg border border-emerald-200">
+                            <div class="p-4">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0 bg-emerald-600 rounded-lg p-3">
+                                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor"
+                                             viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                  d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="ml-4 min-w-0">
+                                        <p class="text-sm font-medium text-gray-500 break-words">Net Interest</p>
+                                        <p class="text-lg font-semibold text-gray-900">
+                                            KES {{ number_format($netInterest ?? 0, 0) }}</p>
+                                        <p class="text-xs text-gray-500">Interest earned minus transaction costs</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
                         <!-- Average Interest -->
                         <div
