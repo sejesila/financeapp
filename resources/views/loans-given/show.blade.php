@@ -122,6 +122,21 @@
                                         @else
                                             <span class="text-gray-400 text-sm">Calculated when loan is closed</span>
                                         @endif
+
+                                        {{-- Interest already recognized via rollover payments' interest_portion,
+                                             regardless of whether an expected_interest_rate was ever set — same
+                                             source LoanGivenController@index sums for the dashboard's "Interest
+                                             Earned" card and the referrer page's per-loan figure. Shown
+                                             separately from the "expected" line above since expected is a
+                                             projection and this is real, already-booked income. --}}
+                                        @if($loanGiven->status === 'active')
+                                            @php $interestSoFar = $loanGiven->payments->sum('interest_portion'); @endphp
+                                            @if($interestSoFar > 0)
+                                                <span class="block text-xs text-green-600 mt-1">
+                                                    KES {{ number_format($interestSoFar, 0) }} already recognized so far (from rollover payments).
+                                                </span>
+                                            @endif
+                                        @endif
                                     </dd>
                                 </div>
                                 @if($loanGiven->status === 'paid' && $loanGiven->referrer)
