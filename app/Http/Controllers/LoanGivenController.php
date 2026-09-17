@@ -567,6 +567,7 @@ class LoanGivenController extends Controller implements HasMiddleware
                 // principal remains, dated from this payment's date.
                 if (!$isClosing) {
                     $loanGiven->due_date = Carbon::parse($paymentDate)->addDays(30);
+                    $loanGiven->recalculateExpectedInterest();
                     $loanGiven->save();
                 }
 

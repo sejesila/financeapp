@@ -125,9 +125,26 @@ class LoanGiven extends Model
             return $this->balance;
         }
 
-        $totalExpected = (float)$this->principal_amount + (float)$this->expected_interest_amount;
+        return max(0, round((float)$this->balance + (float)$this->expected_interest_amount, 2));
+    }
+    /**
+     * Recomputes expected_interest_amount for the current remaining balance,
+     * at the loan's expected_interest_rate — called whenever a partial
+     * payment reduces principal, so the next period's projected interest
+     * reflects what's actually still owed, not what was owed at disbursement.
+     * No-op (zeroes out) if no expected_interest_rate is set.
+     */
+    public function recalculateExpectedInterest(): void
+    {
+        if ($this->expected_interest_rate === null) {
+            $this->expected_interest_amount = 0;
+            return;
+        }
 
-        return max(0, round($totalExpected - (float)$this->amount_paid, 2));
+        $this->expected_interest_amount = round(
+            (float) $this->balance * ((float) $this->expected_interest_rate / 100),
+            2
+        );
     }
 
     public function isOverdue()
