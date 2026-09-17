@@ -21,6 +21,7 @@ class LoanGiven extends Model
         'borrower_contact',
         'principal_amount',
         'amount_paid',
+        'principal_paid',
         'balance',
         'interest_amount',
         'interest_rate',
@@ -39,6 +40,7 @@ class LoanGiven extends Model
     protected $casts = [
         'principal_amount' => 'decimal:2',
         'amount_paid'      => 'decimal:2',
+        'principal_paid'   => 'decimal:2',
         'balance'          => 'decimal:2',
         'interest_amount'  => 'decimal:2',
         'interest_rate'    => 'decimal:2',
@@ -76,16 +78,23 @@ class LoanGiven extends Model
     }
 
     /**
-     * Outstanding principal still owed (ignores any surplus received as interest).
+     * Outstanding principal still owed. Driven by principal_paid, NOT amount_paid —
+     * amount_paid is the lifetime total of everything received (principal + any
+     * interest already split out per payment), while principal_paid is only the
+     * portion of that which actually reduced the debt. Before per-payment interest
+     * splitting existed, the two were identical for every payment, which is exactly
+     * what the principal_paid backfill preserves for old loans.
      */
     public function getRemainingPrincipalAttribute()
     {
-        return max(0, $this->principal_amount - $this->amount_paid);
+        return max(0, $this->principal_amount - $this->principal_paid);
     }
 
     /**
-     * Amount received so far beyond principal. Only meaningful/"final" once closed —
-     * before closure this is just a running preview, not a committed interest figure.
+     * Amount received so far beyond principal, across the loan's entire life —
+     * this is unaffected by per-payment interest splitting, since it's still just
+     * lifetime amount_paid minus the (fixed) principal_amount. Only meaningful/
+     * "final" once closed — before closure this is just a running preview.
      */
     public function getSurplusReceivedAttribute()
     {
@@ -111,21 +120,35 @@ class LoanGiven extends Model
     }
 
     /**
-     * Recompute amount_paid / balance from payments. Does NOT decide interest or
-     * close the loan — that only happens explicitly via closeAsRepaid(), since more
-     * installments might still be coming even after principal is recovered.
+     * Recompute amount_paid / principal_paid / balance from payments — the
+     * authoritative source, not manual increments, so this self-heals if a
+     * payment is ever edited or deleted. amount_paid is every shilling ever
+     * received (interest included); principal_paid excludes whatever each
+     * payment's interest_portion was. Does NOT decide final interest or close
+     * the loan — that only happens explicitly via closeAsRepaid(), since more
+     * installments (and more interest) might still be coming.
      */
     public function updateBalance()
     {
-        $this->amount_paid = $this->payments()->sum('amount');
-        $this->balance      = max(0, $this->principal_amount - $this->amount_paid);
+        $payments = $this->payments()->get(['amount', 'interest_portion']);
+
+        $this->amount_paid    = $payments->sum('amount');
+        $this->principal_paid = $payments->sum(fn ($p) => $p->amount - $p->interest_portion);
+        $this->balance         = max(0, $this->principal_amount - $this->principal_paid);
         $this->save();
     }
 
     /**
      * Close the loan as fully repaid. Interest is derived here, from whatever total
      * amount actually came back vs. principal — this is the "you calculate rate"
-     * step, since interest fluctuates and isn't known until this point.
+     * step, since interest fluctuates and isn't known for certain until this point.
+     *
+     * This deliberately still uses amount_paid (not principal_paid): amount_paid is
+     * the lifetime total of everything ever received, so amount_paid - principal_amount
+     * already nets out to the FULL interest earned across every rollover payment
+     * along the way, with no double-counting — even though some of that interest
+     * was already split into its own transaction earlier, at the time each rollover
+     * payment was recorded. This number is the final, authoritative one.
      */
     public function closeAsRepaid(?string $repaidDate = null)
     {

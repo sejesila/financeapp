@@ -88,10 +88,27 @@
                                 <label for="principal_amount" class="block text-sm font-medium text-gray-700">Principal Amount (KES) <span class="text-red-600">*</span></label>
                                 <input type="number" step="0.01" min="1" id="principal_amount" name="principal_amount" value="{{ old('principal_amount') }}"
                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 @error('principal_amount') border-red-500 @enderror" required>
+                                <p class="mt-1 text-xs text-gray-500">This is exactly what the borrower owes back — keep it clean of any sending fees.</p>
                                 @error('principal_amount')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                 @enderror
                             </div>
+
+                            <!-- Transaction Cost (e.g. M-Pesa charge) — separate from principal -->
+                            <div>
+                                <label for="transaction_cost" class="block text-sm font-medium text-gray-700">Transaction Cost (KES)</label>
+                                <input type="number" step="0.01" min="0" id="transaction_cost" name="transaction_cost" value="{{ old('transaction_cost', 0) }}"
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 @error('transaction_cost') border-red-500 @enderror">
+                                <p class="mt-1 text-xs text-gray-500">
+                                    e.g. the M-Pesa charge for sending the loan. Kept separate from principal —
+                                    recorded as its own expense so it never inflates what the borrower owes,
+                                    but still shows up in your expense totals.
+                                </p>
+                                @error('transaction_cost')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+
                             <!-- Referrer -->
                             <div>
                                 <label for="referrer_id" class="block text-sm font-medium text-gray-700">Referred By</label>
@@ -159,6 +176,10 @@
                                         Just record what you're lending out. When repayments come in and you
                                         close the loan out, the interest and rate are calculated automatically
                                         from whatever total amount you actually received.
+                                        <span class="block mt-1">
+                                            If sending the loan cost you a fee, add it above — it'll be tracked
+                                            as its own expense, separately from the principal.
+                                        </span>
                                     </p>
                                 </div>
                             </div>
@@ -185,6 +206,7 @@
         document.addEventListener('DOMContentLoaded', function () {
             const accountSelect = document.getElementById('account_id');
             const principalInput = document.getElementById('principal_amount');
+            const feeInput = document.getElementById('transaction_cost');
             const hint = document.getElementById('account_balance_hint');
 
             function checkBalance() {
@@ -192,9 +214,15 @@
                 if (!opt || !opt.value) return;
                 const balance = parseFloat(opt.getAttribute('data-balance')) || 0;
                 const amount = parseFloat(principalInput.value) || 0;
+                const fee = parseFloat(feeInput.value) || 0;
+                const total = amount + fee;
 
-                if (amount > balance) {
-                    hint.textContent = `⚠️ Amount exceeds available balance (KES ${balance.toLocaleString('en-US', {maximumFractionDigits: 0})})`;
+                if (total > balance) {
+                    const totalLabel = total.toLocaleString('en-US', {maximumFractionDigits: 0});
+                    const balanceLabel = balance.toLocaleString('en-US', {maximumFractionDigits: 0});
+                    hint.textContent = fee > 0
+                        ? `⚠️ Principal + fee (KES ${totalLabel}) exceeds available balance (KES ${balanceLabel})`
+                        : `⚠️ Amount exceeds available balance (KES ${balanceLabel})`;
                     hint.className = 'mt-1 text-xs text-red-600 font-medium';
                 } else {
                     hint.textContent = 'Funds are deducted from this account on disbursement.';
@@ -204,6 +232,7 @@
 
             accountSelect.addEventListener('change', checkBalance);
             principalInput.addEventListener('input', checkBalance);
+            feeInput.addEventListener('input', checkBalance);
 
             // Referrer share toggle
             const referrerSelect = document.getElementById('referrer_id');

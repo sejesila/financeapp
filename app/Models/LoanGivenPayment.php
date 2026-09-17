@@ -16,13 +16,15 @@ class LoanGivenPayment extends Model
         'account_id',
         'transaction_id',
         'amount',
+        'interest_portion',
         'payment_date',
         'notes',
     ];
 
     protected $casts = [
-        'amount'       => 'decimal:2',
-        'payment_date' => 'date',
+        'amount'            => 'decimal:2',
+        'interest_portion'  => 'decimal:2',
+        'payment_date'      => 'date',
     ];
 
     protected static function booted()
@@ -48,5 +50,14 @@ class LoanGivenPayment extends Model
     public function transaction()
     {
         return $this->belongsTo(Transaction::class);
+    }
+
+    /**
+     * The portion of this payment that reduced principal (everything not
+     * already accounted for as interest).
+     */
+    public function getPrincipalPortionAttribute()
+    {
+        return max(0, $this->amount - $this->interest_portion);
     }
 }

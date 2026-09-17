@@ -86,6 +86,15 @@
                                     <dd class="text-sm text-gray-900">
                                         KES {{ number_format($loanGiven->principal_amount, 0) }}</dd>
                                 </div>
+                                @if($disbursementFee)
+                                    <div class="flex justify-between py-2 border-b border-gray-100">
+                                        <dt class="text-sm font-medium text-gray-500">Transaction Cost</dt>
+                                        <dd class="text-sm text-gray-600">
+                                            KES {{ number_format($disbursementFee->amount, 0) }}
+                                            <span class="block text-xs text-gray-400">Recorded as an expense — not part of what's owed</span>
+                                        </dd>
+                                    </div>
+                                @endif
                                 <div class="flex justify-between py-2 border-b border-gray-100">
                                     <dt class="text-sm font-medium text-gray-500">Interest</dt>
                                     <dd class="text-sm text-gray-900">
@@ -425,12 +434,10 @@
                                 <input type="checkbox" name="referrer_deducted_before_deposit" value="1"
                                        class="mt-0.5 rounded border-gray-300 text-purple-600 shadow-sm focus:border-purple-300 focus:ring focus:ring-purple-200 focus:ring-opacity-50">
                                 <span class="ml-2 text-sm text-gray-800">
-+                                    {{ $loanGiven->referrer->name }} already deducted their share before depositing what's been received so far.
-+                                </span>
+                                    {{ $loanGiven->referrer->name }} already deducted their share before depositing what's been received so far.
+                                </span>
                             </label>
-
                         </div>
-
                     @endif
 
                     <div class="flex justify-end space-x-3">

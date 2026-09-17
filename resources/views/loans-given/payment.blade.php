@@ -125,6 +125,28 @@
                                 @enderror
                             </div>
 
+                            <!-- Interest portion of this payment — only relevant for a rollover
+                                 (partial) payment, not a final close, so it's hidden when
+                                 "close as fully repaid" is checked. See JS below. -->
+                            <div id="interestPortionWrapper">
+                                <label for="interest_portion" class="block text-sm font-medium text-gray-700">
+                                    Interest Portion of This Payment (KES)
+                                </label>
+                                <input type="number" step="0.01" min="0" id="interest_portion" name="interest_portion"
+                                       value="{{ old('interest_portion') }}"
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 @error('interest_portion') border-red-500 @enderror">
+                                <p class="mt-1 text-xs text-gray-500" id="principalPortionHint">
+                                    e.g. borrowed KES 4,000, they pay KES 2,500 with KES 600 as interest — KES 1,900
+                                    reduces the principal, leaving KES 2,100 outstanding. Leave blank if this
+                                    payment is pure principal (no interest recognized yet). Specifying interest
+                                    here also pushes the due date 30 days out from this payment's date, starting
+                                    a new interest period on the remaining principal.
+                                </p>
+                                @error('interest_portion')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+
                             <div>
                                 <label for="payment_date" class="block text-sm font-medium text-gray-700">Payment Date
                                     <span class="text-red-600">*</span></label>
@@ -246,6 +268,12 @@
             const wrapper = document.getElementById('interestAccountWrapper');
             const interestSelect = document.getElementById('interest_account_id');
 
+            const interestPortionWrapper = document.getElementById('interestPortionWrapper');
+            const interestPortionInput = document.getElementById('interest_portion');
+            const paymentAmountInput = document.getElementById('payment_amount');
+            const principalPortionHint = document.getElementById('principalPortionHint');
+            const defaultHintText = principalPortionHint.textContent;
+
             function isFloatSelected() {
                 const opt = paymentAccountSelect.options[paymentAccountSelect.selectedIndex];
                 return opt && opt.dataset.type === 'referrer_float';
@@ -264,9 +292,42 @@
                 }
             }
 
+            // The interest-portion field only makes sense for a rollover (partial)
+            // payment — a final close already computes total interest from the
+            // full surplus automatically, so specifying it separately here would
+            // double up. Hide and clear it whenever "close as final payment" is on.
+            function refreshInterestPortion() {
+                if (closeLoanCheckbox.checked) {
+                    interestPortionWrapper.style.display = 'none';
+                    interestPortionInput.value = '';
+                } else {
+                    interestPortionWrapper.style.display = 'block';
+                }
+                updatePrincipalPreview();
+            }
+
+            function updatePrincipalPreview() {
+                const amount = parseFloat(paymentAmountInput.value) || 0;
+                const interest = parseFloat(interestPortionInput.value) || 0;
+
+                if (!closeLoanCheckbox.checked && interest > 0 && amount > 0) {
+                    const principalPortion = Math.max(0, amount - interest);
+                    principalPortionHint.textContent =
+                        `KES ${principalPortion.toLocaleString('en-US', {maximumFractionDigits: 0})} of this payment reduces principal; ` +
+                        `KES ${interest.toLocaleString('en-US', {maximumFractionDigits: 0})} is recorded as interest. Due date moves 30 days out from the payment date above.`;
+                } else {
+                    principalPortionHint.textContent = defaultHintText;
+                }
+            }
+
             paymentAccountSelect.addEventListener('change', refresh);
             closeLoanCheckbox.addEventListener('change', refresh);
+            closeLoanCheckbox.addEventListener('change', refreshInterestPortion);
+            interestPortionInput.addEventListener('input', updatePrincipalPreview);
+            paymentAmountInput.addEventListener('input', updatePrincipalPreview);
+
             refresh();
+            refreshInterestPortion();
         })();
     </script>
 </x-app-layout>

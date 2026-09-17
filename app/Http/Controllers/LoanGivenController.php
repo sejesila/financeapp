@@ -8,6 +8,7 @@ use App\Models\LoanGiven;
 use App\Models\LoanGivenPayment;
 use App\Models\Referrer;
 use App\Models\Transaction;
+use App\Services\TransactionService;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -24,6 +25,10 @@ use Throwable;
 class LoanGivenController extends Controller implements HasMiddleware
 {
     use AuthorizesRequests;
+
+    public function __construct(protected TransactionService $transactionService)
+    {
+    }
 
     public static function middleware(): array
     {
@@ -58,16 +63,17 @@ class LoanGivenController extends Controller implements HasMiddleware
 
             match ($sort) {
                 'referrer' => $activeLoansQuery
-                    ->leftJoin('referrers', 'loan_givens.referrer_id', '=', 'referrers.id')
+                    ->leftJoin('referrers', 'loans_given.referrer_id', '=', 'referrers.id')
                     ->orderByRaw('referrers.name IS NULL')
                     ->orderBy('referrers.name')
-                    ->orderBy('loan_givens.disbursed_date', 'desc')
-                    ->orderBy('loan_givens.created_at', 'desc')
-                    ->select('loan_givens.*'),
+                    ->orderBy('loans_given.disbursed_date', 'desc')
+                    ->orderBy('loans_given.created_at', 'desc')
+                    ->select('loans_given.*'),
                 default => $activeLoansQuery
                     ->orderBy('disbursed_date', 'desc')
                     ->orderBy('created_at', 'desc'),
             };
+
 
             $activeLoans = $activeLoansQuery->get();
             $referrers = Referrer::where('is_active', true)->orderBy('name')->get();
@@ -98,8 +104,24 @@ class LoanGivenController extends Controller implements HasMiddleware
 
             $totalPrincipal = $allLoans->sum('principal_amount');
             $totalRepaid = $paidLoansCollection->sum('amount_paid');
-            $totalInterest = $paidLoansCollection->sum('interest_amount');
+            // A closed loan's interest_amount already captures ALL interest it
+            // ever earned (including any rollover payments before it closed),
+            // since closeAsRepaid() derives it from the lifetime amount_paid.
+            // But an active loan has no interest_amount yet — its recognized
+            // interest lives only in its payments' interest_portion, and that's
+            // real money already booked as income (see splitInterestFromRolloverPayment()),
+            // so it has to be added here or the dashboard undercounts actual
+            // interest income the moment a rollover payment happens on a loan
+            // that hasn't closed yet.
+            $totalInterest = $paidLoansCollection->sum('interest_amount')
+                + $activeLoans->sum(fn ($loan) => $loan->payments->sum('interest_portion'));
             $totalOutstanding = $activeLoans->sum('balance');
+
+            // "Total Repaid" above only counts closed loans, so partial repayments
+            // sitting on still-active loans (e.g. Enock, Emmanuel HR) never show up
+            // anywhere in the summary — they just quietly reduce `balance`. This
+            // figure is the actual all-time cash collected: partial + full.
+            $totalReceivedAllTime = $activeLoans->sum('amount_paid') + $paidLoansCollection->sum('amount_paid');
 
             $loansWithInterest = $paidLoansCollection->filter(fn($loan) => $loan->interest_amount > 0);
             $avgInterestRate = $loansWithInterest->isNotEmpty()
@@ -118,7 +140,8 @@ class LoanGivenController extends Controller implements HasMiddleware
             return view('loans-given.index', compact(
                 'activeLoans', 'paidLoans', 'filter', 'period','sort', 'referrerId', 'referrers',
                 'startDate', 'endDate', 'minYear', 'maxYear', 'accounts',
-                'totalPrincipal', 'totalRepaid', 'totalInterest', 'avgInterestRate', 'repaymentRate','totalOutstanding'
+                'totalPrincipal', 'totalRepaid', 'totalInterest', 'avgInterestRate', 'repaymentRate',
+                'totalOutstanding', 'totalReceivedAllTime'
             ));
 
         } catch (ValidationException|AuthorizationException $e) {
@@ -129,7 +152,6 @@ class LoanGivenController extends Controller implements HasMiddleware
             return back()->with('error', 'Failed to load loans: ' . $e->getMessage());
         }
     }
-
     // ── create ────────────────────────────────────────────────────────────────
 
     public function create()
@@ -168,6 +190,7 @@ class LoanGivenController extends Controller implements HasMiddleware
                 'borrower_contact' => 'nullable|string|max:255',
                 'account_id' => 'required|exists:accounts,id',
                 'principal_amount' => 'required|numeric|min:1',
+                'transaction_cost' => 'nullable|numeric|min:0',
                 'disbursed_date' => 'required|date',
                 'due_date' => 'nullable|date|after:disbursed_date',
                 'notes' => 'nullable|string',
@@ -186,17 +209,11 @@ class LoanGivenController extends Controller implements HasMiddleware
             $account = Account::withoutGlobalScopes()->findOrFail($validated['account_id']);
             $this->authorize('view', $account);
 
-            if ($account->current_balance < $validated['principal_amount']) {
-                return back()->with('error',
-                    "Insufficient balance in {$account->name}. Required: KES " . number_format($validated['principal_amount'], 0) .
-                    ", Available: KES " . number_format($account->current_balance, 0)
-                )->withInput();
-            }
+            $principalAmount = (float)$validated['principal_amount'];
 
             DB::beginTransaction();
 
             try {
-                $principalAmount = (float)$validated['principal_amount'];
                 $disbursedDate = Carbon::parse($validated['disbursed_date']);
                 $dueDate = ($validated['due_date'] ?? null)
                     ? Carbon::parse($validated['due_date'])
@@ -219,14 +236,26 @@ class LoanGivenController extends Controller implements HasMiddleware
 
                 $loanCategory = $this->firstOrCreateCategory('Friend Loan Given', 'expense');
 
-                $transaction = Transaction::create([
-                    'user_id' => Auth::id(),
+                // Routed through TransactionService instead of built by hand — this
+                // disbursement gets the exact same fee handling as every other
+                // transaction: auto-calculated from the real M-Pesa/Airtel tier
+                // tables when the account is mobile money, linked via
+                // is_transaction_fee/fee_for_transaction_id, and included in
+                // TransactionStatsService::feeTotals(). The balance check
+                // (principal + fee must be available) also happens inside here,
+                // same as it does for every other transaction.
+                $transaction = $this->transactionService->createTransaction([
                     'account_id' => $validated['account_id'],
                     'category_id' => $loanCategory->id,
-                    'type' => 'expense',
-                    'description' => "Loan disbursed to {$validated['borrower_name']}",
                     'amount' => $principalAmount,
                     'date' => $disbursedDate,
+                    'description' => "Loan disbursed to {$validated['borrower_name']}",
+                    // Lets the user type in the real fee (e.g. a bank transfer
+                    // charge, or an M-Pesa charge that differs from the tier
+                    // table) instead of relying purely on the auto-calculated
+                    // one. Leave blank to just use the auto-calculated fee (or
+                    // none, for cash/bank disbursements).
+                    'manual_fee' => $validated['transaction_cost'] ?? null,
                 ]);
 
                 // Direct link so destroy() never has to guess which transaction to remove.
@@ -234,12 +263,17 @@ class LoanGivenController extends Controller implements HasMiddleware
                 $loan->save();
 
                 DB::commit();
-                $account->updateBalance();
+                $account->refresh();
 
                 $message = "Loan of KES " . number_format($principalAmount, 0) . " to {$validated['borrower_name']} recorded. "
                     . "Interest isn't set upfront — when you record repayments and close the loan out, "
                     . "the rate is calculated automatically from what actually comes back. "
                     . "Due on " . $dueDate->format('M d, Y') . ".";
+
+                if ($transaction->feeTransaction) {
+                    $message .= " Transaction fee of KES " . number_format($transaction->feeTransaction->amount, 0)
+                        . " recorded separately as an expense — it won't count toward what {$validated['borrower_name']} owes.";
+                }
 
                 if (!empty($validated['referrer_id']) && $referrerSharePercentage !== null) {
                     $message .= " Referrer share on eventual interest: " . number_format($referrerSharePercentage, 1) . "%.";
@@ -272,6 +306,17 @@ class LoanGivenController extends Controller implements HasMiddleware
             $this->authorize('view', $loanGiven);
 
             $loanGiven->load(['account', 'payments', 'referrer']);
+
+            // Pull the fee off the disbursement transaction (if it had one), so
+            // the view can show what the disbursement actually cost. This lives
+            // wherever every other transaction fee lives — no extra column
+            // needed on loan_givens for it.
+            $disbursementFee = null;
+            if ($loanGiven->disbursement_transaction_id) {
+                $disbursementTransaction = Transaction::with('feeTransaction')
+                    ->find($loanGiven->disbursement_transaction_id);
+                $disbursementFee = $disbursementTransaction?->feeTransaction;
+            }
 
             $today = Carbon::today();
 
@@ -310,7 +355,10 @@ class LoanGivenController extends Controller implements HasMiddleware
                 $referrerPayout = round($loanGiven->interest_amount * ($loanGiven->referrer_share_percentage / 100), 2);
             }
 
-            return view('loans-given.show', compact('loanGiven', 'daysElapsed', 'daysRemaining', 'isOverdue', 'referrerPayout', 'closingLandsInFloat', 'interestDestinationAccounts'));
+            return view('loans-given.show', compact(
+                'loanGiven', 'daysElapsed', 'daysRemaining', 'isOverdue', 'referrerPayout',
+                'closingLandsInFloat', 'interestDestinationAccounts', 'disbursementFee'
+            ));
 
         } catch (ValidationException|AuthorizationException $e) {
             throw $e;
@@ -349,7 +397,7 @@ class LoanGivenController extends Controller implements HasMiddleware
         }
     }
 
-    // ── record payment ────────────────────────────────────────────────────────
+// ── record payment ────────────────────────────────────────────────────────
 
     public function recordPayment(Request $request, LoanGiven $loanGiven)
     {
@@ -363,6 +411,7 @@ class LoanGivenController extends Controller implements HasMiddleware
             $validated = $request->validate([
                 'payment_account_id' => 'required|exists:accounts,id',
                 'payment_amount' => 'required|numeric|min:0.01',
+                'interest_portion' => 'nullable|numeric|min:0|lte:payment_amount',
                 'payment_date' => 'required|date|before_or_equal:today',
                 'notes' => 'nullable|string',
                 'close_loan' => 'nullable|in:1',
@@ -376,6 +425,15 @@ class LoanGivenController extends Controller implements HasMiddleware
                 $paymentAmount = (float)$validated['payment_amount'];
                 $paymentDate = $validated['payment_date'];
                 $paymentAccount = Account::findOrFail($validated['payment_account_id']);
+                $isClosing = ($validated['close_loan'] ?? null) === '1';
+
+                // Interest is only recognized per-payment on a rollover (non-final)
+                // payment. A final close derives total interest from the full
+                // lifetime surplus instead (LoanGiven::closeAsRepaid()), which
+                // already correctly folds in every rollover's interest via
+                // amount_paid — so an interest_portion submitted alongside
+                // close_loan is ignored here rather than risking double counting.
+                $interestPortion = $isClosing ? 0.0 : (float)($validated['interest_portion'] ?? 0);
 
                 if ($paymentAccount->user_id !== Auth::id()) {
                     // Deliberately a plain Exception, not AuthorizationException — this
@@ -390,8 +448,9 @@ class LoanGivenController extends Controller implements HasMiddleware
 
                 // Money lands back in the account — income from the account's perspective.
                 // (Excluded from the Budget dashboard's income totals — this is principal
-                // returning, not new income. Only the interest portion, split out below
-                // if the loan closes, is real profit.)
+                // returning, not new income. Only the interest portion — split out below
+                // for a rollover, or by splitInterestOutOfFinalPayment() on closure — is
+                // real profit.)
                 $transaction = Transaction::create([
                     'user_id' => Auth::id(),
                     'account_id' => $paymentAccount->id,
@@ -402,26 +461,48 @@ class LoanGivenController extends Controller implements HasMiddleware
                     'date' => $paymentDate,
                 ]);
 
-                LoanGivenPayment::create([
+                $payment = LoanGivenPayment::create([
                     'user_id' => Auth::id(),
                     'loan_given_id' => $loanGiven->id,
                     'account_id' => $paymentAccount->id,
                     'amount' => $paymentAmount,
+                    'interest_portion' => $interestPortion,
                     'payment_date' => $paymentDate,
                     'transaction_id' => $transaction->id,
                     'notes' => $validated['notes'] ?? null,
                 ]);
 
-                // Just accumulate — no principal/interest split, since the split isn't
-                // knowable until the loan is closed out below.
-                $loanGiven->amount_paid += $paymentAmount;
-                $loanGiven->balance = max(0, $loanGiven->principal_amount - $loanGiven->amount_paid);
-                $loanGiven->save();
+                $affectedAccountIds = [$paymentAccount->id];
+
+                if ($interestPortion > 0) {
+                    // Real-time recognition: this interest is booked as income right
+                    // now, not deferred until the loan eventually closes. It's carved
+                    // out of the same transaction that just landed, exactly like
+                    // splitInterestOutOfFinalPayment() does at closure, just without
+                    // touching the loan's own interest_amount/interest_rate — those
+                    // stay reserved for the final, whole-loan figures computed once
+                    // in closeAsRepaid().
+                    $affectedAccountIds = array_merge(
+                        $affectedAccountIds,
+                        $this->splitInterestFromRolloverPayment($transaction, $interestPortion, $loanGiven)
+                    );
+                }
+
+                // Recompute amount_paid / principal_paid / balance straight from the
+                // payments table (now includes this one, with its interest_portion),
+                // rather than incrementing fields by hand.
+                $loanGiven->updateBalance();
+
+                // A rollover payment (interest specified, not closing) starts a fresh
+                // 30-day interest period on whatever principal remains.
+                if (!$isClosing && $interestPortion > 0) {
+                    $loanGiven->due_date = Carbon::parse($paymentDate)->addDays(30);
+                    $loanGiven->save();
+                }
 
                 $closedNow = false;
-                $affectedAccountIds = [];
 
-                if (($validated['close_loan'] ?? null) === '1') {
+                if ($isClosing) {
                     $interestAccount = null;
 
                     if ($loanGiven->surplus_received > 0 && $paymentAccount->type === 'referrer_float') {
@@ -441,7 +522,10 @@ class LoanGivenController extends Controller implements HasMiddleware
                     }
 
                     $loanGiven->closeAsRepaid($paymentDate);
-                    $affectedAccountIds = $this->splitInterestOutOfFinalPayment($loanGiven, $interestAccount);
+                    $affectedAccountIds = array_merge(
+                        $affectedAccountIds,
+                        $this->splitInterestOutOfFinalPayment($loanGiven, $interestAccount)
+                    );
                     $this->applyReferrerDeduction($loanGiven, ($validated['referrer_deducted_before_deposit'] ?? null) === '1');
                     $closedNow = true;
                 }
@@ -449,13 +533,21 @@ class LoanGivenController extends Controller implements HasMiddleware
                 DB::commit();
                 $paymentAccount->updateBalance();
 
-                foreach ($affectedAccountIds as $accId) {
+                foreach (array_unique($affectedAccountIds) as $accId) {
                     if ($accId !== $paymentAccount->id) {
                         Account::find($accId)?->updateBalance();
                     }
                 }
 
                 $successMessage = "Repayment of KES " . number_format($paymentAmount, 0) . " from {$loanGiven->borrower_name} recorded into {$paymentAccount->name}!";
+
+                if ($interestPortion > 0 && !$closedNow) {
+                    $principalPortion = $paymentAmount - $interestPortion;
+                    $successMessage .= " KES " . number_format($interestPortion, 0) . " recorded as interest now, "
+                        . "KES " . number_format($principalPortion, 0) . " reduced the principal — "
+                        . "KES " . number_format($loanGiven->balance, 0) . " remains outstanding. "
+                        . "Due date moved to " . $loanGiven->due_date->format('M d, Y') . ".";
+                }
 
                 if ($closedNow) {
                     $successMessage .= " Loan closed as fully repaid.";
@@ -495,6 +587,44 @@ class LoanGivenController extends Controller implements HasMiddleware
 
             return back()->with('error', 'Payment failed: ' . $e->getMessage())->withInput();
         }
+    }
+
+    // ── new private helper — add alongside splitInterestOutOfFinalPayment() ────
+
+    /**
+     * Carves the interest portion out of a rollover (non-final) payment's
+     * transaction, into its own income transaction, the moment the payment is
+     * recorded — rather than waiting for the loan to eventually close. Mirrors
+     * splitInterestOutOfFinalPayment() but is independent of it: it does NOT
+     * touch loan_given.interest_amount / interest_rate, since those remain the
+     * final, whole-loan figures that closeAsRepaid() computes once, at the end,
+     * from the lifetime total.
+     */
+    private function splitInterestFromRolloverPayment(Transaction $transaction, float $interestAmount, LoanGiven $loanGiven): array
+    {
+        $interestAmount = min($interestAmount, (float)$transaction->amount);
+        $remainder = round($transaction->amount - $interestAmount, 2);
+
+        if ($remainder <= 0) {
+            $transaction->delete();
+        } else {
+            $transaction->amount = $remainder;
+            $transaction->save();
+        }
+
+        $interestCategory = $this->firstOrCreateCategory('Loan Interest', 'income');
+
+        Transaction::create([
+            'user_id' => Auth::id(),
+            'account_id' => $transaction->account_id,
+            'category_id' => $interestCategory->id,
+            'type' => 'income',
+            'description' => "Interest earned from {$loanGiven->borrower_name}'s loan (rollover payment)",
+            'amount' => $interestAmount,
+            'date' => $transaction->date,
+        ]);
+
+        return [$transaction->account_id];
     }
     // ── report ────────────────────────────────────────────────────────────────
 
@@ -708,7 +838,17 @@ class LoanGivenController extends Controller implements HasMiddleware
                 }
 
                 if ($loanGiven->disbursement_transaction_id) {
-                    Transaction::where('id', $loanGiven->disbursement_transaction_id)->forceDelete();
+                    $disbursementTransaction = Transaction::find($loanGiven->disbursement_transaction_id);
+
+                    if ($disbursementTransaction) {
+                        // The fee transaction (if any) is linked, not automatic —
+                        // deleting the loan must clean it up too, or it's left
+                        // behind as an orphaned expense with a stale account balance.
+                        if ($disbursementTransaction->related_fee_transaction_id) {
+                            Transaction::where('id', $disbursementTransaction->related_fee_transaction_id)->forceDelete();
+                        }
+                        $disbursementTransaction->forceDelete();
+                    }
                 }
 
                 $loanGiven->delete();
@@ -964,26 +1104,38 @@ class LoanGivenController extends Controller implements HasMiddleware
                 $interestAccountId = $transaction->account_id;
                 $transaction->delete();
 
-                // The interest being reversed is no longer "paid" against the loan —
-                // it reverts to being an unallocated part of amount_paid, so pull it
-                // back out and recompute everything from that.
-                $loanGiven->amount_paid = max(0, $loanGiven->amount_paid - $interestAmount);
-                $loanGiven->balance = max(0, $loanGiven->principal_amount - $loanGiven->amount_paid);
-                $loanGiven->interest_amount = max(0, $loanGiven->amount_paid - $loanGiven->principal_amount);
+                // This interest is no longer recognized against this specific
+                // payment — whether it came from a rollover split or the final
+                // closing split, the payment row is the source of truth
+                // updateBalance() reads from. If it isn't corrected here,
+                // principal_paid/balance will desync from reality the moment
+                // updateBalance() runs below.
+                $payment->interest_portion = max(0, (float)$payment->interest_portion - $interestAmount);
+                $payment->save();
 
-                $loanGiven->interest_rate = ($loanGiven->principal_amount > 0 && $loanGiven->interest_amount > 0)
-                    ? round(($loanGiven->interest_amount / $loanGiven->principal_amount) * 100, 2)
-                    : 0;
-
-                // Interest only ever exists because closeAsRepaid() generated it. Reversing
-                // it is undoing that closure, not a question of whether principal still
-                // nets to zero — so a 'paid' loan always reopens here.
+                // Interest can now come from either closeAsRepaid() (the final,
+                // whole-loan figure) or a rollover payment's own interest_portion.
+                // Only a 'paid' loan needs reopening — a rollover reversal on an
+                // active loan never touched status in the first place.
                 if ($loanGiven->status === 'paid') {
+                    // interest_amount/interest_rate are closeAsRepaid()'s final
+                    // figures — reversing any interest that fed into them means
+                    // those numbers are stale until the loan is closed again, so
+                    // clear them rather than leave a wrong "final" figure sitting
+                    // on a loan that's now active again.
                     $loanGiven->status = 'active';
                     $loanGiven->repaid_date = null;
+                    $loanGiven->interest_amount = 0;
+                    $loanGiven->interest_rate = 0;
+                    $loanGiven->save();
                 }
 
-                $loanGiven->save();
+                // Rebuild amount_paid / principal_paid / balance from the payments
+                // table now that this payment's interest_portion changed — not
+                // hand-adjusted, since those three are only ever authoritative
+                // when derived straight from the payments themselves.
+                $loanGiven->updateBalance();
+
 
                 $interestAccount = Account::find($interestAccountId);
                 $interestAccount?->updateBalance();

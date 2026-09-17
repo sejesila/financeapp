@@ -34,9 +34,7 @@ class TransactionService
                 ? ($data['mobile_money_type'] ?? 'send_money')
                 : 'send_money';
 
-            $fee = $this->calculateTransactionCost(
-                $data['amount'], $account->type, $transactionType, $category
-            );
+            $fee = $this->resolveTransactionCost($data, $account, $transactionType, $category);
 
             if ($category->type === 'expense'
                 && (float) $account->current_balance < ($data['amount'] + $fee)) {
@@ -154,6 +152,23 @@ class TransactionService
                 ['min' => 2501,   'max' => 250000, 'cost' => 50],
             ],
         ];
+    }
+    /**
+     * Fee resolution for a transaction. If the caller supplied an explicit
+     * 'manual_fee' (e.g. loan disbursement letting the user type in the real
+     * M-Pesa charge, or a fee for an account type the tier tables don't cover),
+     * that wins outright — no tier lookup happens. Otherwise falls back to the
+     * normal auto-calculated cost, exactly as before. This keeps every other
+     * caller of createTransaction() (the regular transaction form) completely
+     * unaffected, since they never pass 'manual_fee'.
+     */
+    private function resolveTransactionCost(array $data, Account $account, string $transactionType, Category $category): float
+    {
+        if (array_key_exists('manual_fee', $data) && $data['manual_fee'] !== null && $data['manual_fee'] !== '') {
+            return max(0, (float) $data['manual_fee']);
+        }
+
+        return $this->calculateTransactionCost($data['amount'], $account->type, $transactionType, $category);
     }
 
     private function getAirtelMoneyTransactionCosts(): array
