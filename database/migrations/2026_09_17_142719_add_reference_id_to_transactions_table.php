@@ -11,7 +11,6 @@ return new class extends Migration
         Schema::table('transactions', function (Blueprint $table) {
             $table->unsignedBigInteger('reference_id')
                 ->nullable()
-                ->after('is_split')
                 ->comment('Generic pointer to the row that generated this transaction, e.g. a loan_given_payments.id for a split-out interest transaction');
 
             $table->index('reference_id');
