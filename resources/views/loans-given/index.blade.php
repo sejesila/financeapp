@@ -374,9 +374,14 @@
                                                         class="font-medium">KES {{ number_format($loan->principal_amount, 0) }}</span>
                                                 </div>
                                                 <div class="flex justify-between">
+                                                    <span class="text-gray-500">Remaining Principal:</span>
+                                                    <span
+                                                        class="font-medium">KES {{ number_format($loan->balance, 0) }}</span>
+                                                </div>
+                                                <div class="flex justify-between">
                                                     <span class="text-gray-500">Outstanding:</span>
                                                     <span
-                                                        class="font-bold text-indigo-600">KES {{ number_format($loan->balance, 0) }}</span>
+                                                        class="font-bold text-indigo-600">KES {{ number_format($loan->outstanding_amount, 0) }}</span>
                                                 </div>
                                                 @if($loan->amount_paid > 0)
                                                     <div class="flex justify-between">
