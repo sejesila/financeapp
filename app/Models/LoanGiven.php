@@ -107,6 +107,28 @@ class LoanGiven extends Model
     {
         return max(0, $this->amount_paid - $this->principal_amount);
     }
+    /**
+     * The full amount still expected back on this loan: principal plus any
+     * not-yet-collected expected interest, minus everything actually received
+     * so far (amount_paid already nets out principal + interest from every
+     * payment, however it was split). This is the "true" outstanding figure —
+     * it folds in expected interest, not just remaining principal — and
+     * replaces raw `balance` anywhere the app shows "Outstanding" to the user.
+     *
+     * Only meaningful for active loans. A paid loan has balance 0 anyway;
+     * a defaulted/written_off loan just reports whatever balance is sitting
+     * on it, since there's no more "expected" repayment to project forward.
+     */
+    public function getOutstandingAmountAttribute()
+    {
+        if ($this->status !== 'active') {
+            return $this->balance;
+        }
+
+        $totalExpected = (float)$this->principal_amount + (float)$this->expected_interest_amount;
+
+        return max(0, round($totalExpected - (float)$this->amount_paid, 2));
+    }
 
     public function isOverdue()
     {
