@@ -43,7 +43,10 @@
                     </div>
 
                     @php
-                        $referredLoans = $referrer->loans()->orderByDesc('disbursed_date')->get();
+                        // Eager-load payments so the "interest so far" figure on each
+                        // active loan below (payments->sum('interest_portion')) doesn't
+                        // run an extra query per row.
+                        $referredLoans = $referrer->loans()->with('payments')->orderByDesc('disbursed_date')->get();
                         $paidLoans = $referredLoans->where('status', 'paid');
 
                         // Loans that are paid, not yet part of a payout batch,
@@ -144,7 +147,24 @@
                                             @endif
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {{ $loan->interest_amount > 0 ? 'KES ' . number_format($loan->interest_amount, 0) : '-' }}
+                                            @php
+                                                // A closed loan's interest_amount is the final, whole-loan
+                                                // figure. An active loan has none yet — its only recognized
+                                                // interest lives in its rollover payments' interest_portion,
+                                                // same source LoanGivenController@index sums for the
+                                                // dashboard's "Interest Earned" card.
+                                                $interestSoFar = $loan->status === 'paid'
+                                                    ? $loan->interest_amount
+                                                    : $loan->payments->sum('interest_portion');
+                                            @endphp
+                                            @if($interestSoFar > 0)
+                                                KES {{ number_format($interestSoFar, 0) }}
+                                                @if($loan->status !== 'paid')
+                                                    <span class="text-xs text-gray-400">(so far)</span>
+                                                @endif
+                                            @else
+                                                -
+                                            @endif
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             @if($loan->status !== 'paid')

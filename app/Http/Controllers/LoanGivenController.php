@@ -403,6 +403,13 @@ class LoanGivenController extends Controller implements HasMiddleware
             $interestDestinationAccounts = $closingLandsInFloat
                 ? Account::where('user_id', Auth::id())->where('is_active', true)->whereIn('type', ['mpesa', 'bank', 'cash'])->orderBy('name')->get()
                 : collect();
+            // Real interest already recognized on an active loan, from rollover
+            // payments' interest_portion — same source as the referrer page and
+            // the index dashboard. Null once the loan is closed, since the
+            // "Interest" row already shows the final interest_amount then.
+            $interestSoFar = $loanGiven->status === 'active'
+                ? $loanGiven->payments->sum('interest_portion')
+                : null;
 
             // Referrer's cut is only meaningful once there's an actual interest
             // amount to split — before that (active loan) we just show the %.
@@ -414,7 +421,7 @@ class LoanGivenController extends Controller implements HasMiddleware
 
             return view('loans-given.show', compact(
                 'loanGiven', 'daysElapsed', 'daysRemaining', 'isOverdue', 'referrerPayout',
-                'closingLandsInFloat', 'interestDestinationAccounts', 'disbursementFee'
+                'closingLandsInFloat', 'interestDestinationAccounts', 'disbursementFee','interestSoFar'
             ));
 
         } catch (ValidationException|AuthorizationException $e) {
