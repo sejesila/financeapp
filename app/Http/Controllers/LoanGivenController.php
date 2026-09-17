@@ -521,9 +521,14 @@ class LoanGivenController extends Controller implements HasMiddleware
                     // touching the loan's own interest_amount/interest_rate — those
                     // stay reserved for the final, whole-loan figures computed once
                     // in closeAsRepaid().
+                    //
+                    // FIX: this call previously passed only 3 arguments, but
+                    // splitInterestFromRolloverPayment() requires a 4th ($paymentId,
+                    // no default) — that was a guaranteed ArgumentCountError on every
+                    // partial payment submitted with an interest portion.
                     $affectedAccountIds = array_merge(
                         $affectedAccountIds,
-                        $this->splitInterestFromRolloverPayment($transaction, $interestPortion, $loanGiven)
+                        $this->splitInterestFromRolloverPayment($transaction, $interestPortion, $loanGiven, $payment->id)
                     );
                 }
 
@@ -567,10 +572,33 @@ class LoanGivenController extends Controller implements HasMiddleware
                     }
 
                     $loanGiven->closeAsRepaid($paymentDate);
-                    $affectedAccountIds = array_merge(
-                        $affectedAccountIds,
-                        $this->splitInterestFromRolloverPayment($transaction, $interestPortion, $loanGiven, $payment->id)
-                    );
+
+                    // FIX: previously this always split out $interestPortion, which
+                    // is forced to 0.0 whenever $isClosing is true — so the real
+                    // interest closeAsRepaid() just computed (amount_paid minus
+                    // principal_amount, across the loan's whole life) was NEVER
+                    // actually carved into its own "Loan Interest" income
+                    // transaction. Instead a pointless KES 0 transaction was
+                    // created every time a loan was closed via this endpoint.
+                    //
+                    // The correct amount to split out of THIS payment's transaction
+                    // is the loan's final interest_amount minus whatever interest was
+                    // already recognized by earlier rollover payments (those already
+                    // got their own "Loan Interest" transaction at the time they were
+                    // recorded) — otherwise that portion would be double-counted.
+                    $alreadyRecognizedInterest = (float) $loanGiven->payments()
+                        ->where('id', '!=', $payment->id)
+                        ->sum('interest_portion');
+
+                    $newInterestToRecognize = max(0, (float) $loanGiven->interest_amount - $alreadyRecognizedInterest);
+
+                    if ($newInterestToRecognize > 0) {
+                        $affectedAccountIds = array_merge(
+                            $affectedAccountIds,
+                            $this->splitInterestFromRolloverPayment($transaction, $newInterestToRecognize, $loanGiven, $payment->id)
+                        );
+                    }
+
                     $this->applyReferrerDeduction($loanGiven, ($validated['referrer_deducted_before_deposit'] ?? null) === '1');
                     $closedNow = true;
                 }

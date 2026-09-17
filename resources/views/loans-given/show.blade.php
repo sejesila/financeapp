@@ -95,9 +95,13 @@
                                         </dd>
                                     </div>
                                 @endif
-                                <div class="flex justify-between py-2 border-b border-gray-100">
-                                    <dt class="text-sm font-medium text-gray-500">Interest</dt>
-                                    <dd class="text-sm text-gray-900">
+                                {{-- FIX: added items-start on the row, shrink-0 on the dt, and
+                                     text-right on the dd, so the long "Expected..." caption
+                                     doesn't force the KES value to sit jammed against the label
+                                     instead of flush right like every other row. --}}
+                                <div class="flex justify-between items-start py-2 border-b border-gray-100">
+                                    <dt class="text-sm font-medium text-gray-500 shrink-0">Interest</dt>
+                                    <dd class="text-sm text-gray-900 text-right">
                                         @if($loanGiven->status === 'paid')
                                             @if($loanGiven->interest_amount > 0)
                                                 KES {{ number_format($loanGiven->interest_amount, 0) }}

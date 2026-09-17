@@ -15,6 +15,18 @@
                         </a>
                     </div>
 
+                    {{-- FIX: this block was missing. The controller's recordPayment()
+                         catches any non-validation Throwable and does
+                         back()->with('error', ...)->withInput() — which redirects
+                         right back to THIS form. Without this block, that redirect
+                         looked exactly like "the page just reloads, nothing happens",
+                         because the actual error message had nowhere to render. --}}
+                    @if(session('error'))
+                        <div class="mb-4 bg-red-50 border-l-4 border-red-400 p-4">
+                            <p class="text-sm text-red-700">{{ session('error') }}</p>
+                        </div>
+                    @endif
+
                     @if ($errors->any())
                         <div class="mb-4 bg-red-50 border-l-4 border-red-400 p-4">
                             <p class="text-sm text-red-700 font-medium mb-1">Please fix the following:</p>
