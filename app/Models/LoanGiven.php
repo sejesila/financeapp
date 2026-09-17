@@ -35,6 +35,9 @@ class LoanGiven extends Model
         'referrer_payout_id',
         'referrer_deducted_before_deposit',
         'referrer_retained_amount',
+        'expected_interest_rate',
+        'expected_interest_amount',
+        'rollover_count',
     ];
 
     protected $casts = [
@@ -50,6 +53,10 @@ class LoanGiven extends Model
         'referrer_share_percentage' => 'decimal:2',
         'referrer_deducted_before_deposit' => 'boolean',
         'referrer_retained_amount' => 'decimal:2',
+        'expected_interest_rate'   => 'decimal:2',
+        'expected_interest_amount' => 'decimal:2',
+        'rollover_count'           => 'integer',
+
     ];
 
     protected static function booted()
@@ -161,6 +168,55 @@ class LoanGiven extends Model
         $this->balance      = 0;
         $this->repaid_date = $repaidDate ?? now()->toDateString();
         $this->save();
+    }
+    /**
+     * Auto-compounds an overdue loan: once due_date is more than $graceDays
+     * in the past, the currently expected interest is capitalized into
+     * principal_amount (the borrower now genuinely owes that much), a fresh
+     * expected_interest_amount is computed at the same expected_interest_rate
+     * against the new, larger principal, and due_date is pushed $rolloverDays
+     * past its OLD value (not from today) — starting a new interest period.
+     *
+     * Loops so a loan that's gone unchecked for multiple rollover periods
+     * catches up in one call, rather than needing to be visited once per
+     * period. Only acts on active loans that have both a due_date and an
+     * expected_interest_rate set — a loan with no referrer/rate (and no
+     * manual rate entered) is left alone entirely, matching "unless stated
+     * otherwise".
+     *
+     * Persists immediately and recomputes balance. Safe to call unconditionally
+     * on every page load — it's a no-op once due_date is within the grace
+     * period.
+     */
+    public function processOverdueRollover(int $graceDays = 5, int $rolloverDays = 30): bool
+    {
+        if ($this->status !== 'active' || !$this->due_date || $this->expected_interest_rate === null) {
+            return false;
+        }
+
+        $rolledOver = false;
+
+        while ($this->due_date->copy()->addDays($graceDays)->isPast()) {
+            $expectedInterest = (float) $this->expected_interest_amount;
+            $rate = (float) $this->expected_interest_rate;
+
+            $newPrincipal = round((float) $this->principal_amount + $expectedInterest, 2);
+            $newExpectedInterest = round($newPrincipal * ($rate / 100), 2);
+
+            $this->principal_amount = $newPrincipal;
+            $this->expected_interest_amount = $newExpectedInterest;
+            $this->due_date = $this->due_date->copy()->addDays($rolloverDays);
+            $this->rollover_count = ($this->rollover_count ?? 0) + 1;
+
+            $rolledOver = true;
+        }
+
+        if ($rolledOver) {
+            $this->save();
+            $this->updateBalance(); // principal_amount changed — balance must follow
+        }
+
+        return $rolledOver;
     }
 
     public function scopeActive($query)

@@ -138,9 +138,9 @@
                                 <p class="mt-1 text-xs text-gray-500" id="principalPortionHint">
                                     e.g. borrowed KES 4,000, they pay KES 2,500 with KES 600 as interest — KES 1,900
                                     reduces the principal, leaving KES 2,100 outstanding. Leave blank if this
-                                    payment is pure principal (no interest recognized yet). Specifying interest
-                                    here also pushes the due date 30 days out from this payment's date, starting
-                                    a new interest period on the remaining principal.
+                                    payment is pure principal (no interest recognized yet). Any partial payment —
+                                    with or without interest specified — pushes the due date 30 days out from
+                                    this payment's date, starting a new period on the remaining principal.
                                 </p>
                                 @error('interest_portion')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -160,14 +160,19 @@
                                 @enderror
                             </div>
 
-                            <!-- Interest Account Field - Now in the grid -->
+                            <!-- Interest Account Field — OPTIONAL. Only surfaced when this
+                                 closing payment lands in a referrer float account, as a way
+                                 to route the interest straight out immediately if you want
+                                 to. Leaving it blank keeps principal + interest together in
+                                 the float, which is fully trackable via the referrer's float
+                                 reconciliation page — not a dead end. -->
                             <div id="interestAccountWrapper">
                                 <label for="interest_account_id" class="block text-sm font-medium text-gray-700">
-                                    Deposit Interest Into <span class="text-red-600">*</span>
+                                    Deposit Interest Into <span class="text-gray-400 font-normal">(optional)</span>
                                 </label>
                                 <select id="interest_account_id" name="interest_account_id"
                                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 @error('interest_account_id') border-red-500 @enderror">
-                                    <option value="">Select Account</option>
+                                    <option value="">Keep it in the float with the principal</option>
                                     @foreach($accounts as $account)
                                         @if($account->type !== 'referrer_float')
                                             <option
@@ -179,8 +184,9 @@
                                     @endforeach
                                 </select>
                                 <p class="mt-1 text-xs text-gray-600">
-                                    This payment is landing in a referrer float — the referrer's cut comes out of there,
-                                    but your interest shouldn't. Pick where it lands.
+                                    This payment is landing in a referrer float. Pick an account here only if you
+                                    want the interest routed out right away — otherwise it's fine to leave it, and
+                                    it'll show as pending for this loan on the referrer's float reconciliation page.
                                 </p>
                                 @error('interest_account_id')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -279,15 +285,16 @@
                 return opt && opt.dataset.type === 'referrer_float';
             }
 
+            // Purely a visibility toggle — the field is never required. Leaving
+            // it blank when a closing payment lands in the float just means the
+            // interest stays there with the principal, which is fine.
             function refresh() {
                 const show = closeLoanCheckbox.checked && isFloatSelected();
 
                 if (show) {
                     wrapper.style.display = 'block';
-                    interestSelect.required = true;
                 } else {
                     wrapper.style.display = 'none';
-                    interestSelect.required = false;
                     interestSelect.value = ''; // Clear selection when hidden
                 }
             }
@@ -306,17 +313,27 @@
                 updatePrincipalPreview();
             }
 
+            // Any partial payment (close_loan unchecked) pushes the due date 30
+            // days out, whether or not an interest portion is specified. The
+            // interest/principal breakdown line only differs based on whether
+            // interest was entered.
             function updatePrincipalPreview() {
                 const amount = parseFloat(paymentAmountInput.value) || 0;
                 const interest = parseFloat(interestPortionInput.value) || 0;
 
-                if (!closeLoanCheckbox.checked && interest > 0 && amount > 0) {
+                if (closeLoanCheckbox.checked || amount <= 0) {
+                    principalPortionHint.textContent = defaultHintText;
+                    return;
+                }
+
+                if (interest > 0) {
                     const principalPortion = Math.max(0, amount - interest);
                     principalPortionHint.textContent =
                         `KES ${principalPortion.toLocaleString('en-US', {maximumFractionDigits: 0})} of this payment reduces principal; ` +
                         `KES ${interest.toLocaleString('en-US', {maximumFractionDigits: 0})} is recorded as interest. Due date moves 30 days out from the payment date above.`;
                 } else {
-                    principalPortionHint.textContent = defaultHintText;
+                    principalPortionHint.textContent =
+                        `This entire payment reduces principal. Due date moves 30 days out from the payment date above.`;
                 }
             }
 

@@ -14,6 +14,7 @@ use App\Http\Controllers\{AccountController,
     LoanGivenController,
     MpesaSmsController,
     ProfileController,
+    ReferrerFloatController,
     ReferrerPayoutController,
     ReportsController,
     RollingFundController,
@@ -165,6 +166,16 @@ Route::middleware('auth')->group(function () {
         ->name('referrer-payouts.create');
     Route::post('referrers/{referrer}/payouts', [ReferrerPayoutController::class, 'store'])
         ->name('referrer-payouts.store');
+
+    // Referrer float reconciliation — money she's collected on your behalf
+    // (principal + interest) and is holding, separate from referrer-payouts
+    // above (which pays out HER OWN commission on interest). Placed before
+    // the /{referrer} catch-all show route below so it doesn't get shadowed.
+    Route::get('referrers/{referrer}/float', [ReferrerFloatController::class, 'index'])
+        ->name('referrers.float.index');
+    Route::post('referrers/{referrer}/float/reconcile', [ReferrerFloatController::class, 'reconcile'])
+        ->name('referrers.float.reconcile');
+
     Route::get('referrers/{referrer}', [ReferrerPayoutController::class, 'show'])
         ->name('referrers.show');
 

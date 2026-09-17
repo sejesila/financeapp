@@ -25,6 +25,12 @@
                             </p>
                         </div>
                         <div class="flex items-center space-x-2">
+                            @if($referrer->floatAccount)
+                                <a href="{{ route('referrers.float.index', $referrer->id) }}"
+                                   class="inline-flex items-center px-4 py-2 bg-teal-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-teal-700 focus:bg-teal-700 active:bg-teal-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                                    Reconcile Float
+                                </a>
+                            @endif
                             <a href="{{ route('referrer-payouts.create', $referrer->id) }}"
                                class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 focus:bg-indigo-700 active:bg-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
                                 Pay Out Referrer
@@ -64,9 +70,14 @@
 
                         $retainedTotal = $paidLoans->where('referrer_deducted_before_deposit', true)->sum('referrer_retained_amount');
                         $paidOutTotal = ($referrer->payouts ?? collect())->sum('amount_paid');
+
+                        // Unrelated to the payout figures above — this is YOUR
+                        // money (principal + interest) she's collected on your
+                        // behalf and is still holding, not her own commission.
+                        $pendingFloatTotal = $referrer->pendingFloatInterestByLoan()->sum();
                     @endphp
 
-                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
                         <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg border border-purple-200 p-4">
                             <p class="text-sm font-medium text-gray-500">Referred Loans</p>
                             <p class="text-lg font-semibold text-gray-900">{{ $referredLoans->count() }}</p>
@@ -87,6 +98,13 @@
                             <p class="text-sm font-medium text-gray-500">Paid Out (Batches)</p>
                             <p class="text-lg font-semibold text-gray-900">KES {{ number_format($paidOutTotal, 0) }}</p>
                         </div>
+                        @if($referrer->floatAccount)
+                            <div class="bg-gradient-to-br from-teal-50 to-teal-100 rounded-lg border border-teal-200 p-4">
+                                <p class="text-sm font-medium text-gray-500">Pending in Float</p>
+                                <p class="text-lg font-semibold text-gray-900">KES {{ number_format($pendingFloatTotal, 0) }}</p>
+                                <p class="text-xs text-gray-500">Collected on your behalf, not yet reconciled</p>
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>

@@ -105,6 +105,16 @@
                                             @else
                                                 <span class="text-gray-500">None — repaid at principal only</span>
                                             @endif
+                                        @elseif($loanGiven->expected_interest_rate !== null)
+                                            KES {{ number_format($loanGiven->expected_interest_amount, 0) }}
+                                            ({{ number_format($loanGiven->expected_interest_rate, 1) }}%)
+                                            <span class="block text-xs text-gray-400">
+                                                Expected — total expected KES {{ number_format($loanGiven->principal_amount + $loanGiven->expected_interest_amount, 0) }}.
+                                                Actual is still calculated when the loan is closed.
+                                                @if($loanGiven->rollover_count > 0)
+                                                    Rolled over {{ $loanGiven->rollover_count }} time{{ $loanGiven->rollover_count > 1 ? 's' : '' }} so far.
+                                                @endif
+                                            </span>
                                         @else
                                             <span class="text-gray-400 text-sm">Calculated when loan is closed</span>
                                         @endif

@@ -16,6 +16,7 @@ class Account extends Model
         'name',
         'slug',
         'type',
+        'referrer_id',
         'initial_balance',
         'current_balance',
         'currency',
@@ -302,5 +303,9 @@ class Account extends Model
     public function transfersTo()
     {
         return $this->hasMany(Transfer::class, 'to_account_id');
+    }
+    public function referrer()
+    {
+        return $this->belongsTo(Referrer::class);
     }
 }
