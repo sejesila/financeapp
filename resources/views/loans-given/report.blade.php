@@ -100,9 +100,9 @@
                                         </th>
                                     </tr>
                                     </thead>
-                                    <tbody class="divide-y divide-gray-100">
+                                    <tbody>
                                     @foreach($loans as $loan)
-                                        <tr>
+                                        <tr class="odd:bg-white even:bg-gray-200">
                                             <td class="py-2 pr-4 font-medium text-gray-900">{{ $loan->borrower_name }}</td>
                                             <td class="py-2 pr-4">KES {{ number_format($loan->balance, 0) }}</td>
                                             <td class="py-2 pr-4">KES {{ number_format($loan->outstanding_amount, 0) }}</td>
@@ -152,6 +152,10 @@
         @media print {
             @page { margin: 1.5cm; }
             body { background: white; }
+            tr {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
         }
     </style>
 </x-app-layout>
