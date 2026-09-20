@@ -687,9 +687,9 @@ describe('Standard Top-up Functionality', function () {
     });
 });
 
-describe('Reverse Top-up — 30-Minute Window', function () {
+describe('Reverse Top-up — 6-Hour Window', function () {
 
-    it('shows the reverse top-up form within 30 minutes of creation', function () {
+    it('shows the reverse top-up form within 6 hours of creation', function () {
         $user = User::factory()->create();
         $account = Account::factory()->create([
             'user_id'         => $user->id,
@@ -711,7 +711,7 @@ describe('Reverse Top-up — 30-Minute Window', function () {
             'category_id' => $category->id,
             'amount'      => 500,
             'date'        => now()->toDateString(),
-            'created_at'  => now()->subMinutes(10),
+            'created_at'  => now()->subHours(2),
         ]);
 
         $this->actingAs($user)
@@ -720,7 +720,7 @@ describe('Reverse Top-up — 30-Minute Window', function () {
             ->assertViewIs('accounts.reverse-topup');
     });
 
-    it('blocks the reverse top-up form after 30 minutes', function () {
+    it('blocks the reverse top-up form after 6 hours', function () {
         $user = User::factory()->create();
         $account = Account::factory()->create([
             'user_id'         => $user->id,
@@ -742,7 +742,7 @@ describe('Reverse Top-up — 30-Minute Window', function () {
             'category_id' => $category->id,
             'amount'      => 500,
             'date'        => now()->toDateString(),
-            'created_at'  => now()->subMinutes(31),
+            'created_at'  => now()->subMinutes(361),
         ]);
 
         $this->actingAs($user)
@@ -751,7 +751,7 @@ describe('Reverse Top-up — 30-Minute Window', function () {
             ->assertSessionHas('error');
     });
 
-    it('blocks the reverse top-up form at exactly 31 minutes', function () {
+    it('blocks the reverse top-up form at exactly 361 minutes', function () {
         $user = User::factory()->create();
         $account = Account::factory()->create([
             'user_id'         => $user->id,
@@ -773,7 +773,7 @@ describe('Reverse Top-up — 30-Minute Window', function () {
             'category_id' => $category->id,
             'amount'      => 500,
             'date'        => now()->toDateString(),
-            'created_at'  => now()->subMinutes(31),
+            'created_at'  => now()->subMinutes(361),
         ]);
 
         $this->actingAs($user)
@@ -782,7 +782,7 @@ describe('Reverse Top-up — 30-Minute Window', function () {
             ->assertSessionHas('error');
     });
 
-    it('allows reversal at exactly 30 minutes (boundary)', function () {
+    it('allows reversal at exactly 360 minutes (boundary)', function () {
         $user = User::factory()->create();
         $account = Account::factory()->create([
             'user_id'         => $user->id,
@@ -804,7 +804,7 @@ describe('Reverse Top-up — 30-Minute Window', function () {
             'category_id' => $category->id,
             'amount'      => 500,
             'date'        => now()->toDateString(),
-            'created_at'  => now()->subMinutes(29),
+            'created_at'  => now()->subMinutes(359),
         ]);
 
         $this->actingAs($user)
@@ -813,7 +813,7 @@ describe('Reverse Top-up — 30-Minute Window', function () {
             ->assertViewIs('accounts.reverse-topup');
     });
 
-    it('executes reversal within 30 minutes and soft-deletes the transaction', function () {
+    it('executes reversal within 6 hours and soft-deletes the transaction', function () {
         $user = User::factory()->create();
         $account = Account::factory()->create([
             'user_id'         => $user->id,
@@ -882,7 +882,7 @@ describe('Reverse Top-up — 30-Minute Window', function () {
         expect((float)$account->current_balance)->toEqual(1000.0);
     });
 
-    it('blocks post reversal after 30 minutes even if form was somehow reached', function () {
+    it('blocks post reversal after 6 hours even if form was somehow reached', function () {
         $user = User::factory()->create();
         $account = Account::factory()->create([
             'user_id'         => $user->id,
@@ -904,7 +904,7 @@ describe('Reverse Top-up — 30-Minute Window', function () {
             'category_id' => $category->id,
             'amount'      => 500,
             'date'        => now()->toDateString(),
-            'created_at'  => now()->subMinutes(45),
+            'created_at'  => now()->subHours(7),
         ]);
 
         $this->actingAs($user)
@@ -937,7 +937,7 @@ describe('Reverse Top-up — 30-Minute Window', function () {
             'category_id' => $category->id,
             'amount'      => 500,
             'date'        => now()->toDateString(),
-            'created_at'  => now()->subHour(),
+            'created_at'  => now()->subHours(8),
         ]);
 
         $this->actingAs($user)
@@ -1011,7 +1011,7 @@ describe('Reverse Top-up — 30-Minute Window', function () {
             ->assertSessionHas('error', 'Only top-up transactions can be reversed.');
     });
 
-    it('the 30-minute window is based on created_at not the transaction date', function () {
+    it('the 6-hour window is based on created_at not the transaction date', function () {
         $user = User::factory()->create();
         $account = Account::factory()->create([
             'user_id'         => $user->id,
@@ -1033,7 +1033,7 @@ describe('Reverse Top-up — 30-Minute Window', function () {
             'category_id' => $category->id,
             'amount'      => 500,
             'date'        => now()->toDateString(),
-            'created_at'  => now()->subHours(2),
+            'created_at'  => now()->subHours(9),
         ]);
 
         $this->actingAs($user)

@@ -499,6 +499,17 @@ class ReportDataServiceTest extends TestCase
     // max(0, ...), so net_worth can never be negative.
     // ────────────────────────────────────────────────────────────────────────
 
+      // ────────────────────────────────────────────────────────────────────────
+        // NET WORTH TESTS
+        //
+        // NOTE: net_worth is derived from getSavingsBalanceAsAt(), which only
+        // sums accounts where type === 'savings'. $this->account (created in
+        // setUp) is a plain factory account, NOT type 'savings', so it never
+        // contributes to net_worth. The service does NOT clamp net_worth at
+        // zero — it's ownedSavings + loans given - active loans, and it's
+        // allowed to go negative (you can legitimately owe more than you own).
+        // ────────────────────────────────────────────────────────────────────────
+
     #[\PHPUnit\Framework\Attributes\Test]
     public function it_calculates_net_worth_correctly()
     {
@@ -516,9 +527,10 @@ class ReportDataServiceTest extends TestCase
         $this->assertEquals(100000, $report['total_balance']);
         $this->assertEquals(30000, $report['total_loans']);
 
-        // net_worth comes from the savings balance, not total_balance.
-        // No savings-type account exists here, so it resolves to 0.
-        $this->assertEquals(0, $report['net_worth']);
+        // net_worth comes from the savings balance (0, no savings-type
+        // account exists) minus the active loan balance — not clamped,
+        // so it's negative here: 0 - 30000 = -30000.
+        $this->assertEquals(-30000, $report['net_worth']);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
@@ -548,12 +560,13 @@ class ReportDataServiceTest extends TestCase
         // Only the active loan should count towards total_loans
         $this->assertEquals(30000, $report['total_loans']);
 
-        // net_worth still resolves to 0 — no savings-type account exists.
-        $this->assertEquals(0, $report['net_worth']);
+        // net_worth: 0 owned savings - 30000 active loan = -30000. The paid
+        // loan contributes nothing either way.
+        $this->assertEquals(-30000, $report['net_worth']);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function it_clamps_net_worth_at_zero_when_loans_exceed_savings()
+    public function it_allows_negative_net_worth_when_loans_exceed_savings()
     {
         // Create a loan larger than the account balance
         Loan::factory()
@@ -569,9 +582,10 @@ class ReportDataServiceTest extends TestCase
         $this->assertEquals(100000, $report['total_balance']);
         $this->assertEquals(150000, $report['total_loans']);
 
-        // The service clamps net_worth with max(0, ...), so it can never
-        // go negative — it resolves to 0 here, not -50000.
-        $this->assertEquals(0, $report['net_worth']);
+        // net_worth is NOT clamped: 0 owned savings - 150000 active loan
+        // legitimately resolves to -150000, since owing more than you own
+        // is a real state the report shouldn't hide.
+        $this->assertEquals(-150000, $report['net_worth']);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

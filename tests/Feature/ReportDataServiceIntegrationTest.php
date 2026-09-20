@@ -198,9 +198,10 @@ class ReportDataServiceIntegrationTest extends TestCase
         // accounts with type === 'savings'. Neither $account nor
         // $savingsAccount here is created with type 'savings' (both are
         // plain factory accounts, and 'savingsAccount' is just a variable
-        // name — it doesn't set the type column). So the savings balance is
-        // 0, and net_worth clamps to 0 regardless of loans/client funds.
-        $this->assertEquals(0, $report['net_worth']);
+        // name — it doesn't set the type column). So owned savings is 0,
+        // and net_worth is NOT clamped — it resolves to 0 - 50000 = -50000,
+        // reflecting the real active loan balance with no savings to offset it.
+        $this->assertEquals(-50000, $report['net_worth']);
 
         // Loans repaid during the year — only the standalone 'paid' loan
         // counts here; $repaymentLoan is left 'active' so it doesn't

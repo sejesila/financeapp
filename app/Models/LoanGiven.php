@@ -227,7 +227,69 @@ class LoanGiven extends Model
      * on every page load — it's a no-op once due_date is within the grace
      * period.
      */
-    public function processOverdueRollover(int $graceDays = 5, int $rolloverDays = 30): bool
+    /**
+     * True if this loan has been overdue long enough (>$graceDays past due_date)
+     * to be offered a rollover, and has an expected_interest_rate set to roll
+     * over against. Read-only — does not mutate or save anything. Used to decide
+     * whether to surface the "roll this over?" confirmation to the user.
+     */
+    public function isEligibleForRollover(int $graceDays = 7): bool
+    {
+        if ($this->status !== 'active' || !$this->due_date || $this->expected_interest_rate === null) {
+            return false;
+        }
+
+        return $this->due_date->copy()->addDays($graceDays)->isPast();
+    }
+
+    /**
+     * Read-only preview of what processOverdueRollover() would do right now,
+     * without saving. Mirrors its loop exactly (including catching up multiple
+     * missed periods at once) so the confirmation modal shows the true result.
+     */
+    public function rolloverPreview(int $graceDays = 7, int $rolloverDays = 30): array
+    {
+        $principal = (float) $this->principal_amount;
+        $expectedInterest = (float) $this->expected_interest_amount;
+        $rate = (float) $this->expected_interest_rate;
+        $dueDate = $this->due_date->copy();
+        $periods = 0;
+
+        while ($dueDate->copy()->addDays($graceDays)->isPast()) {
+            $principal = round($principal + $expectedInterest, 2);
+            $expectedInterest = round($principal * ($rate / 100), 2);
+            $dueDate = $dueDate->copy()->addDays($rolloverDays);
+            $periods++;
+        }
+
+        return [
+            'periods' => $periods,
+            'new_principal' => $principal,
+            'new_expected_interest' => $expectedInterest,
+            'new_due_date' => $dueDate,
+        ];
+    }
+
+    /**
+     * Rolls over an overdue loan: once due_date is more than $graceDays in the
+     * past, the currently expected interest is capitalized into principal_amount
+     * (the borrower now genuinely owes that much), a fresh expected_interest_amount
+     * is computed at the same expected_interest_rate against the new, larger
+     * principal, and due_date is pushed $rolloverDays past its OLD value (not from
+     * today) — starting a new interest period.
+     *
+     * Loops so a loan that's gone unchecked for multiple rollover periods catches
+     * up in one call. Only acts on active loans that have both a due_date and an
+     * expected_interest_rate set.
+     *
+     * NOTE: this is no longer called automatically on page load. It only runs
+     * when the user explicitly confirms via the rollover modal (see
+     * LoanGivenController@confirmRollover) — see isEligibleForRollover() /
+     * rolloverPreview() for the read-only checks that drive that modal.
+     *
+     * Persists immediately and recomputes balance.
+     */
+    public function processOverdueRollover(int $graceDays = 7, int $rolloverDays = 30): bool
     {
         if ($this->status !== 'active' || !$this->due_date || $this->expected_interest_rate === null) {
             return false;
@@ -252,7 +314,7 @@ class LoanGiven extends Model
 
         if ($rolledOver) {
             $this->save();
-            $this->updateBalance(); // principal_amount changed — balance must follow
+            $this->updateBalance();
         }
 
         return $rolledOver;

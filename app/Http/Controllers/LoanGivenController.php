@@ -76,13 +76,7 @@ class LoanGivenController extends Controller implements HasMiddleware
 
 
             $activeLoans = $activeLoansQuery->get();
-            // Catch up any loan that's now more than 5 days past due: capitalizes
-// expected interest into principal, recomputes expected interest on the
-// new principal, and pushes the due date forward. No-op for loans not
-// overdue enough, or with no expected_interest_rate set.
-            foreach ($activeLoans as $loan) {
-                $loan->processOverdueRollover();
-            }
+
             $referrers = Referrer::where('is_active', true)->orderBy('name')->get();
             $paidLoansQuery = LoanGiven::with(['account', 'payments', 'referrer'])
                 ->where('user_id', Auth::id())
@@ -121,7 +115,7 @@ class LoanGivenController extends Controller implements HasMiddleware
             // interest income the moment a rollover payment happens on a loan
             // that hasn't closed yet.
             $totalInterest = $paidLoansCollection->sum('interest_amount')
-                + $activeLoans->sum(fn ($loan) => $loan->payments->sum('interest_portion'));
+                + $activeLoans->sum(fn($loan) => $loan->payments->sum('interest_portion'));
             $totalOutstanding = $activeLoans->sum('outstanding_amount');
 
             // Transaction costs paid out to disburse these loans (M-Pesa/bank/etc
@@ -163,7 +157,7 @@ class LoanGivenController extends Controller implements HasMiddleware
                 ->get();
 
             return view('loans-given.index', compact(
-                'activeLoans', 'paidLoans', 'filter', 'period','sort', 'referrerId', 'referrers',
+                'activeLoans', 'paidLoans', 'filter', 'period', 'sort', 'referrerId', 'referrers',
                 'startDate', 'endDate', 'minYear', 'maxYear', 'accounts',
                 'totalPrincipal', 'totalRepaid', 'totalInterest', 'avgInterestRate', 'repaymentRate',
                 'totalOutstanding', 'totalReceivedAllTime', 'totalTransactionCosts', 'netInterest'
@@ -177,33 +171,8 @@ class LoanGivenController extends Controller implements HasMiddleware
             return back()->with('error', 'Failed to load loans: ' . $e->getMessage());
         }
     }
+
     // ── create ────────────────────────────────────────────────────────────────
-
-    public function create()
-    {
-        try {
-            $this->authorize('create', LoanGiven::class);
-
-            $accounts = Account::where('user_id', Auth::id())
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get();
-
-            $referrers = Referrer::where('is_active', true)
-                ->orderBy('name')
-                ->get();
-
-            return view('loans-given.create', compact('accounts', 'referrers'));
-
-        } catch (ValidationException|AuthorizationException $e) {
-            throw $e;
-        } catch (Throwable $e) {
-            Log::error('LoanGivenController@create failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
-            return redirect()->route('loans-given.index')->with('error', 'Could not open the new loan form: ' . $e->getMessage());
-        }
-    }
-
-    // ── store ─────────────────────────────────────────────────────────────────
 
     public function store(Request $request)
     {
@@ -343,7 +312,74 @@ class LoanGivenController extends Controller implements HasMiddleware
         }
     }
 
+    // ── store ─────────────────────────────────────────────────────────────────
+
+    public function create()
+    {
+        try {
+            $this->authorize('create', LoanGiven::class);
+
+            $accounts = Account::where('user_id', Auth::id())
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get();
+
+            $referrers = Referrer::where('is_active', true)
+                ->orderBy('name')
+                ->get();
+
+            return view('loans-given.create', compact('accounts', 'referrers'));
+
+        } catch (ValidationException|AuthorizationException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            Log::error('LoanGivenController@create failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return redirect()->route('loans-given.index')->with('error', 'Could not open the new loan form: ' . $e->getMessage());
+        }
+    }
+
     // ── show ──────────────────────────────────────────────────────────────────
+
+    private function firstOrCreateCategory(string $name, string $type): Category
+    {
+        $validTypes = ['income', 'expense', 'liability'];
+
+        if (!in_array($type, $validTypes)) {
+            $type = 'expense';
+        }
+
+        // Special handling for interest - try multiple variations
+        if ($name === 'Loan Interest') {
+            // Check for existing interest categories
+            $existing = Category::where('user_id', Auth::id())
+                ->whereIn('name', ['Interest', 'Loan Interest', 'Interest Income'])
+                ->where('type', 'income')
+                ->first();
+
+            if ($existing) {
+                return $existing;
+            }
+        }
+
+        // Look up by name/user only (not parent_id)
+        $existing = Category::where('user_id', Auth::id())
+            ->where('name', $name)
+            ->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
+        return Category::create([
+            'user_id' => Auth::id(),
+            'parent_id' => null,
+            'name' => $name,
+            'type' => $type,
+            'is_active' => true,
+        ]);
+    }
+
+    // ── payment form ──────────────────────────────────────────────────────────
 
     public function show(LoanGiven $loanGiven)
     {
@@ -351,15 +387,6 @@ class LoanGivenController extends Controller implements HasMiddleware
             $this->authorize('view', $loanGiven);
 
             $loanGiven->load(['account', 'payments', 'referrer']);
-            if ($loanGiven->processOverdueRollover()) {
-                session()->flash('success',
-                    "This loan was more than 5 days overdue and has been automatically rolled over. "
-                    . "New principal: KES " . number_format($loanGiven->principal_amount, 0)
-                    . ", new expected interest: KES " . number_format($loanGiven->expected_interest_amount, 0)
-                    . ", new due date: " . $loanGiven->due_date->format('M d, Y') . "."
-                );
-            }
-
             // Pull the fee off the disbursement transaction (if it had one), so
             // the view can show what the disbursement actually cost. This lives
             // wherever every other transaction fee lives — no extra column
@@ -421,7 +448,7 @@ class LoanGivenController extends Controller implements HasMiddleware
 
             return view('loans-given.show', compact(
                 'loanGiven', 'daysElapsed', 'daysRemaining', 'isOverdue', 'referrerPayout',
-                'closingLandsInFloat', 'interestDestinationAccounts', 'disbursementFee','interestSoFar'
+                'closingLandsInFloat', 'interestDestinationAccounts', 'disbursementFee', 'interestSoFar'
             ));
 
         } catch (ValidationException|AuthorizationException $e) {
@@ -432,7 +459,7 @@ class LoanGivenController extends Controller implements HasMiddleware
         }
     }
 
-    // ── payment form ──────────────────────────────────────────────────────────
+// ── record payment ────────────────────────────────────────────────────────
 
     public function paymentForm(LoanGiven $loanGiven)
     {
@@ -461,7 +488,7 @@ class LoanGivenController extends Controller implements HasMiddleware
         }
     }
 
-// ── record payment ────────────────────────────────────────────────────────
+    // ── new private helper — add alongside splitInterestOutOfFinalPayment() ────
 
     public function recordPayment(Request $request, LoanGiven $loanGiven)
     {
@@ -612,11 +639,11 @@ class LoanGivenController extends Controller implements HasMiddleware
                     // already recognized by earlier rollover payments (those already
                     // got their own "Loan Interest" transaction at the time they were
                     // recorded) — otherwise that portion would be double-counted.
-                    $alreadyRecognizedInterest = (float) $loanGiven->payments()
+                    $alreadyRecognizedInterest = (float)$loanGiven->payments()
                         ->where('id', '!=', $payment->id)
                         ->sum('interest_portion');
 
-                    $newInterestToRecognize = max(0, (float) $loanGiven->interest_amount - $alreadyRecognizedInterest);
+                    $newInterestToRecognize = max(0, (float)$loanGiven->interest_amount - $alreadyRecognizedInterest);
 
                     if ($newInterestToRecognize > 0) {
                         $affectedAccountIds = array_merge(
@@ -693,7 +720,7 @@ class LoanGivenController extends Controller implements HasMiddleware
         }
     }
 
-    // ── new private helper — add alongside splitInterestOutOfFinalPayment() ────
+    // ── report ────────────────────────────────────────────────────────────────
 
     /**
      * Carves the interest portion out of a rollover (non-final) payment's
@@ -731,7 +758,35 @@ class LoanGivenController extends Controller implements HasMiddleware
 
         return [$transaction->account_id];
     }
-    // ── report ────────────────────────────────────────────────────────────────
+
+    // ── close as repaid (standalone action, e.g. from the loan page) ───────────
+
+    private function applyReferrerDeduction(LoanGiven $loanGiven, bool $deductedBeforeDeposit): void
+    {
+        if (!$deductedBeforeDeposit || !$loanGiven->referrer_id || $loanGiven->referrer_share_percentage === null) {
+            return;
+        }
+
+        $share = (float)$loanGiven->referrer_share_percentage;
+
+        if ($share <= 0 || $share >= 100) {
+            return;
+        }
+
+        $interest = (float)$loanGiven->interest_amount;
+
+        if ($interest <= 0) {
+            return;
+        }
+
+        $retained = round($interest * ($share / (100 - $share)), 2);
+
+        $loanGiven->referrer_deducted_before_deposit = true;
+        $loanGiven->referrer_retained_amount = $retained;
+        $loanGiven->save();
+    }
+
+    // ── mark defaulted / written off ─────────────────────────────────────────
 
     public function report(Request $request)
     {
@@ -756,9 +811,6 @@ class LoanGivenController extends Controller implements HasMiddleware
             }
 
             $loans = $query->orderBy('due_date')->get();
-            foreach ($loans->where('status', 'active') as $loan) {
-                $loan->processOverdueRollover();
-            }
 
             $groupedLoans = $loans
                 ->groupBy(fn($loan) => $loan->referrer?->name ?? 'No Referrer')
@@ -782,7 +834,7 @@ class LoanGivenController extends Controller implements HasMiddleware
         }
     }
 
-    // ── close as repaid (standalone action, e.g. from the loan page) ───────────
+    // ── update notes ─────────────────────────────────────────────────────────
 
     public function close(Request $request, LoanGiven $loanGiven)
     {
@@ -861,8 +913,100 @@ class LoanGivenController extends Controller implements HasMiddleware
             return back()->with('error', 'Failed to close loan: ' . $e->getMessage());
         }
     }
+    // ── confirm rollover (from popup on index or show page) ────────────────────
 
-    // ── mark defaulted / written off ─────────────────────────────────────────
+    public function confirmRollover(LoanGiven $loanGiven)
+    {
+        try {
+            $this->authorize('makePayment', $loanGiven);
+
+            if (!$loanGiven->isEligibleForRollover()) {
+                return back()->with('error', 'This loan is not currently eligible for rollover.');
+            }
+
+            $rolledOver = $loanGiven->processOverdueRollover();
+
+            if (!$rolledOver) {
+                return back()->with('error', 'Nothing to roll over.');
+            }
+
+            return back()->with('success',
+                "Loan for {$loanGiven->borrower_name} rolled over. "
+                . "New principal: KES " . number_format($loanGiven->principal_amount, 0)
+                . ", new expected interest: KES " . number_format($loanGiven->expected_interest_amount, 0)
+                . ", new due date: " . $loanGiven->due_date->format('M d, Y') . "."
+            );
+
+        } catch (ValidationException|AuthorizationException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            Log::error('LoanGivenController@confirmRollover failed', [
+                'loan_given_id' => $loanGiven->id,
+                'error' => $e->getMessage(),
+            ]);
+            return back()->with('error', 'Failed to roll over loan: ' . $e->getMessage());
+        }
+    }
+
+    // ── destroy ───────────────────────────────────────────────────────────────
+
+    private function splitInterestOutOfFinalPayment(LoanGiven $loanGiven, ?Account $interestAccount = null): array
+    {
+        $interestAmount = (float)$loanGiven->interest_amount;
+
+        if ($interestAmount <= 0) {
+            return [];
+        }
+
+        $lastPayment = $loanGiven->payments()
+            ->with('account')
+            ->orderByDesc('payment_date')
+            ->orderByDesc('id')
+            ->first();
+
+        if (!$lastPayment || !$lastPayment->transaction_id) {
+            return [];
+        }
+
+        $transaction = Transaction::find($lastPayment->transaction_id);
+        if (!$transaction) {
+            return [];
+        }
+
+        $affectedAccountIds = [$lastPayment->account_id];
+
+        $interestAmount = min($interestAmount, (float)$transaction->amount);
+        $remainder = round($transaction->amount - $interestAmount, 2);
+
+        if ($remainder <= 0) {
+            $transaction->delete();
+        } else {
+            $transaction->amount = $remainder;
+            $transaction->save();
+        }
+
+        // Get the interest category - this will now use the existing "Interest" category if available
+        $interestCategory = $this->firstOrCreateCategory('Loan Interest', 'income');
+        $destinationAccountId = $interestAccount->id ?? $lastPayment->account_id;
+
+        Transaction::create([
+            'user_id' => Auth::id(),
+            'account_id' => $destinationAccountId,
+            'category_id' => $interestCategory->id,
+            'type' => 'income',
+            'description' => "Interest earned from {$loanGiven->borrower_name}'s loan"
+                . ($interestAccount ? " (routed out of {$lastPayment->account->name})" : ''),
+            'amount' => $interestAmount,
+            'date' => $lastPayment->payment_date,
+            'reference_id' => $lastPayment->id,
+        ]);
+
+        $affectedAccountIds[] = $destinationAccountId;
+
+        return array_unique($affectedAccountIds);
+    }
+
+    // ── private helpers ───────────────────────────────────────────────────────
 
     public function markStatus(Request $request, LoanGiven $loanGiven)
     {
@@ -890,7 +1034,6 @@ class LoanGivenController extends Controller implements HasMiddleware
             return back()->with('error', 'Failed to update loan status: ' . $e->getMessage());
         }
     }
-    // ── update notes ─────────────────────────────────────────────────────────
 
     public function updateNotes(Request $request, LoanGiven $loanGiven)
     {
@@ -914,8 +1057,6 @@ class LoanGivenController extends Controller implements HasMiddleware
             return back()->with('error', 'Failed to update notes: ' . $e->getMessage());
         }
     }
-
-    // ── destroy ───────────────────────────────────────────────────────────────
 
     public function destroy(LoanGiven $loanGiven)
     {
@@ -974,129 +1115,8 @@ class LoanGivenController extends Controller implements HasMiddleware
         }
     }
 
-    // ── private helpers ───────────────────────────────────────────────────────
-
-    private function firstOrCreateCategory(string $name, string $type): Category
-    {
-        $validTypes = ['income', 'expense', 'liability'];
-
-        if (!in_array($type, $validTypes)) {
-            $type = 'expense';
-        }
-
-        // Special handling for interest - try multiple variations
-        if ($name === 'Loan Interest') {
-            // Check for existing interest categories
-            $existing = Category::where('user_id', Auth::id())
-                ->whereIn('name', ['Interest', 'Loan Interest', 'Interest Income'])
-                ->where('type', 'income')
-                ->first();
-
-            if ($existing) {
-                return $existing;
-            }
-        }
-
-        // Look up by name/user only (not parent_id)
-        $existing = Category::where('user_id', Auth::id())
-            ->where('name', $name)
-            ->first();
-
-        if ($existing) {
-            return $existing;
-        }
-
-        return Category::create([
-            'user_id' => Auth::id(),
-            'parent_id' => null,
-            'name' => $name,
-            'type' => $type,
-            'is_active' => true,
-        ]);
-    }
-
-    private function splitInterestOutOfFinalPayment(LoanGiven $loanGiven, ?Account $interestAccount = null): array
-    {
-        $interestAmount = (float)$loanGiven->interest_amount;
-
-        if ($interestAmount <= 0) {
-            return [];
-        }
-
-        $lastPayment = $loanGiven->payments()
-            ->with('account')
-            ->orderByDesc('payment_date')
-            ->orderByDesc('id')
-            ->first();
-
-        if (!$lastPayment || !$lastPayment->transaction_id) {
-            return [];
-        }
-
-        $transaction = Transaction::find($lastPayment->transaction_id);
-        if (!$transaction) {
-            return [];
-        }
-
-        $affectedAccountIds = [$lastPayment->account_id];
-
-        $interestAmount = min($interestAmount, (float)$transaction->amount);
-        $remainder = round($transaction->amount - $interestAmount, 2);
-
-        if ($remainder <= 0) {
-            $transaction->delete();
-        } else {
-            $transaction->amount = $remainder;
-            $transaction->save();
-        }
-
-        // Get the interest category - this will now use the existing "Interest" category if available
-        $interestCategory = $this->firstOrCreateCategory('Loan Interest', 'income');
-        $destinationAccountId = $interestAccount->id ?? $lastPayment->account_id;
-
-        Transaction::create([
-            'user_id' => Auth::id(),
-            'account_id' => $destinationAccountId,
-            'category_id' => $interestCategory->id,
-            'type' => 'income',
-            'description' => "Interest earned from {$loanGiven->borrower_name}'s loan"
-                . ($interestAccount ? " (routed out of {$lastPayment->account->name})" : ''),
-            'amount' => $interestAmount,
-            'date' => $lastPayment->payment_date,
-            'reference_id' => $lastPayment->id,
-        ]);
-
-        $affectedAccountIds[] = $destinationAccountId;
-
-        return array_unique($affectedAccountIds);
-    }
-
-    private function applyReferrerDeduction(LoanGiven $loanGiven, bool $deductedBeforeDeposit): void
-    {
-        if (!$deductedBeforeDeposit || !$loanGiven->referrer_id || $loanGiven->referrer_share_percentage === null) {
-            return;
-        }
-
-        $share = (float)$loanGiven->referrer_share_percentage;
-
-        if ($share <= 0 || $share >= 100) {
-            return;
-        }
-
-        $interest = (float)$loanGiven->interest_amount;
-
-        if ($interest <= 0) {
-            return;
-        }
-
-        $retained = round($interest * ($share / (100 - $share)), 2);
-
-        $loanGiven->referrer_deducted_before_deposit = true;
-        $loanGiven->referrer_retained_amount = $retained;
-        $loanGiven->save();
-    }
-
 // ── reverse interest transaction ──────────────────────────────────────────────
+
     public function reverseInterest(Transaction $transaction)
     {
         try {

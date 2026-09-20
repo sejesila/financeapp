@@ -422,6 +422,22 @@
                                                     {{ Str::limit($loan->notes, 50) }}
                                                 </div>
                                             @endif
+
+                                            <!-- Rollover prompt: shown instead of the old automatic
+                                                 rollover. Eligible once the loan is >7 days past its
+                                                 due date and has an expected_interest_rate set. -->
+                                            @if($loan->isEligibleForRollover())
+                                                <div class="mt-3 bg-amber-50 border-l-4 border-amber-400 p-3 rounded">
+                                                    <p class="text-xs text-amber-800">
+                                                        More than 7 days overdue and not yet rolled over.
+                                                    </p>
+                                                    <button type="button"
+                                                            onclick="document.getElementById('rolloverModal{{ $loan->id }}').showModal()"
+                                                            class="mt-2 inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2">
+                                                        Review Rollover
+                                                    </button>
+                                                </div>
+                                            @endif
                                         </div>
                                         <div class="bg-gray-50 px-5 py-3 rounded-b-lg border-t border-gray-200 mt-auto">
                                             <div class="flex space-x-2">
@@ -451,6 +467,48 @@
                                             </div>
                                         </div>
                                     </div>
+
+                                    <!-- Rollover confirmation modal for this loan -->
+                                    @if($loan->isEligibleForRollover())
+                                        @php $preview = $loan->rolloverPreview(); @endphp
+                                        <dialog id="rolloverModal{{ $loan->id }}" class="rounded-lg shadow-xl w-full max-w-md">
+                                            <div class="p-6">
+                                                <div class="flex items-center justify-between mb-4">
+                                                    <h3 class="text-lg font-medium text-gray-900">Roll Over Loan — {{ $loan->borrower_name }}</h3>
+                                                    <button type="button" onclick="document.getElementById('rolloverModal{{ $loan->id }}').close()"
+                                                            class="text-gray-400 hover:text-gray-500">
+                                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                                <div class="text-sm text-gray-600 space-y-2 mb-4">
+                                                    <p>
+                                                        This loan is {{ $preview['periods'] }} period{{ $preview['periods'] > 1 ? 's' : '' }}
+                                                        overdue (7+ days past due, uncollected). Rolling over capitalizes the expected
+                                                        interest into principal and starts a fresh 30-day period.
+                                                    </p>
+                                                    <p>Current principal: <span class="font-medium text-gray-900">KES {{ number_format($loan->principal_amount, 0) }}</span></p>
+                                                    <p>New principal: <span class="font-medium text-gray-900">KES {{ number_format($preview['new_principal'], 0) }}</span></p>
+                                                    <p>New expected interest: <span class="font-medium text-gray-900">KES {{ number_format($preview['new_expected_interest'], 0) }}</span></p>
+                                                    <p>New due date: <span class="font-medium text-gray-900">{{ $preview['new_due_date']->format('M d, Y') }}</span></p>
+                                                </div>
+                                                <form method="POST" action="{{ route('loans-given.rollover', $loan->id) }}">
+                                                    @csrf
+                                                    <div class="flex justify-end space-x-3">
+                                                        <button type="button" onclick="document.getElementById('rolloverModal{{ $loan->id }}').close()"
+                                                                class="px-4 py-2 bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-gray-800 uppercase tracking-widest hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
+                                                            Not Yet
+                                                        </button>
+                                                        <button type="submit"
+                                                                class="px-4 py-2 bg-amber-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2">
+                                                            Confirm Rollover
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </dialog>
+                                    @endif
                                 @endforeach
                             </div>
                         @endif

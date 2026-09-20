@@ -12,6 +12,62 @@
                 </div>
             @endif
 
+            <!-- Rollover prompt: replaces the old automatic rollover. Eligible
+                 once the loan is >7 days past its due date and has an
+                 expected_interest_rate set. See LoanGiven::isEligibleForRollover()
+                 and rolloverPreview() — both read-only, nothing is saved until
+                 the user confirms via the form below. -->
+            @if($loanGiven->status === 'active' && $loanGiven->isEligibleForRollover())
+                @php $rolloverPreview = $loanGiven->rolloverPreview(); @endphp
+                <div class="mb-6 bg-amber-50 border-l-4 border-amber-400 p-4 flex items-center justify-between flex-wrap gap-3">
+                    <p class="text-sm text-amber-800">
+                        This loan is more than 7 days overdue and hasn't been rolled over yet.
+                    </p>
+                    <button type="button" onclick="document.getElementById('rolloverModal').showModal()"
+                            class="inline-flex items-center px-4 py-2 bg-amber-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2">
+                        Review Rollover
+                    </button>
+                </div>
+
+                <dialog id="rolloverModal" class="rounded-lg shadow-xl w-full max-w-md">
+                    <div class="p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-medium text-gray-900">Roll Over Loan</h3>
+                            <button type="button" onclick="document.getElementById('rolloverModal').close()"
+                                    class="text-gray-400 hover:text-gray-500">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="text-sm text-gray-600 space-y-2 mb-4">
+                            <p>
+                                This loan is {{ $rolloverPreview['periods'] }} period{{ $rolloverPreview['periods'] > 1 ? 's' : '' }}
+                                overdue (7+ days past due, uncollected). Rolling over capitalizes the expected
+                                interest into principal and starts a fresh 30-day period.
+                            </p>
+                            <p>Current principal: <span class="font-medium text-gray-900">KES {{ number_format($loanGiven->principal_amount, 0) }}</span></p>
+                            <p>New principal: <span class="font-medium text-gray-900">KES {{ number_format($rolloverPreview['new_principal'], 0) }}</span></p>
+                            <p>New expected interest: <span class="font-medium text-gray-900">KES {{ number_format($rolloverPreview['new_expected_interest'], 0) }}</span></p>
+                            <p>New due date: <span class="font-medium text-gray-900">{{ $rolloverPreview['new_due_date']->format('M d, Y') }}</span></p>
+                        </div>
+                        <form method="POST" action="{{ route('loans-given.rollover', $loanGiven->id) }}">
+                            @csrf
+                            <div class="flex justify-end space-x-3">
+                                <button type="button" onclick="document.getElementById('rolloverModal').close()"
+                                        class="px-4 py-2 bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-gray-800 uppercase tracking-widest hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
+                                    Not Yet
+                                </button>
+                                <button type="submit"
+                                        class="px-4 py-2 bg-amber-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2">
+                                    Confirm Rollover
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </dialog>
+            @endif
+
             <!-- Loan Details Card -->
             <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg mb-6">
                 <div class="p-6">

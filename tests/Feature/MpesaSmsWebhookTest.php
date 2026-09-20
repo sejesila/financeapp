@@ -1082,9 +1082,13 @@ describe('mpesa pochi la biashara', function () {
         $user = makeWebhookUser();
         makeMpesaAccount($user);
 
+        // Timestamp moved outside the 5–7 AM "Fare" commute window (see
+        // TransactionRecorder::isFareTime()) — that window force-overrides
+        // category to 'Fare' for any expense regardless of recipient, which
+        // would otherwise mask what this test is actually checking.
         webhookPost([
             'user_id' => $user->id,
-            'sms'     => 'UDU882J1IZ Confirmed. KES50.00 sent to MAGDALENE WAMBUI on 30/4/26 at 6:34 AM. New M-PESA balance is KES19,425.30. Transaction cost, KES0.00.',
+            'sms'     => 'UDU882J1IZ Confirmed. KES50.00 sent to MAGDALENE WAMBUI on 30/4/26 at 9:34 AM. New M-PESA balance is KES19,425.30. Transaction cost, KES0.00.',
         ]);
 
         $tx = Transaction::withoutGlobalScopes()

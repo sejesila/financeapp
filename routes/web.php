@@ -160,6 +160,8 @@ Route::middleware('auth')->group(function () {
         Route::delete('/{loanGiven}', [LoanGivenController::class, 'destroy'])->name('destroy');
         Route::put('/{loanGiven}/notes', [LoanGivenController::class, 'updateNotes'])
             ->name('notes.update');
+        Route::post('/{loanGiven}/rollover', [LoanGivenController::class, 'confirmRollover'])
+            ->name('rollover');
     });
 
     Route::get('referrers/{referrer}/payouts/create', [ReferrerPayoutController::class, 'create'])
