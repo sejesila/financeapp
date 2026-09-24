@@ -46,10 +46,29 @@ class BudgetController extends Controller
         'Rolling Funds',
     ];
 
+    /**
+     * Expense categories that count as "Wants" under the 50/30/20 rule. Any
+     * expense category NOT listed here defaults to "Needs" — see
+     * calculate503020Breakdown() below. This is intentionally a hardcoded
+     * list for now (same pattern as EXCLUDED_LOAN_CATEGORIES above) rather
+     * than a categories.budget_group column, so the buckets can be tuned
+     * here without a migration while the numbers get validated against real
+     * data. Matched case-insensitively against the category's actual name.
+     */
+    private const WANTS_CATEGORY_NAMES = [
+        'Entertainment',
+        'Dining Out',
+        'Shopping',
+        'Subscriptions',
+        'Travel',
+        'Hobbies',
+        'Gifts',
+    ];
+
     public function index(Request $request, $year = null)
     {
         $year = $year ?? date('Y');
-        $currentMonth = date('n');
+        $currentMonth = (int) date('n');
 
         // Calculate dynamic year range based on actual data
         $minYear = Transaction::where('user_id', Auth::id())
@@ -191,6 +210,10 @@ class BudgetController extends Controller
         // any withdrawal reversed back into savings within the window.
         $savingsWithdrawals = $this->calculateNetSavingsWithdrawals($year);
 
+        // 50/30/20 rule breakdown per month — see calculate503020Breakdown()
+        // for how each bucket is derived.
+        $budgetRule = $this->calculate503020Breakdown($year);
+
         // Get accounts for the FAB component
         $accounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
@@ -210,7 +233,8 @@ class BudgetController extends Controller
             'savingsWithdrawals',
             'minYear',
             'maxYear',
-            'accounts'
+            'accounts',
+            'budgetRule'
         ));
     }
 
@@ -395,5 +419,141 @@ class BudgetController extends Controller
                 'total' => $total,
             ])
             ->keyBy('month');
+    }
+
+    /**
+     * 50/30/20 breakdown per month for the given year: Needs (expense
+     * categories not in WANTS_CATEGORY_NAMES), Wants (expense categories in
+     * WANTS_CATEGORY_NAMES), and Savings.
+     *
+     * Savings is NOT a category sum — this app tracks savings as transfers
+     * into a savings-type account (see ReportDataService::getSalarySavingsRate()
+     * and calculateNetSavingsWithdrawals() above), so "Savings" here is net
+     * money that actually moved into a savings-type account this month
+     * (deposits minus genuine withdrawals), with client-fund and lending
+     * transfers excluded — same rules as calculateNetSavingsWithdrawals().
+     *
+     * Uses the same exclusion constants and payment_method/Client Commission
+     * handling as index()'s $actualsQuery, so figures here always agree with
+     * the main budget table's TOTAL INCOME / TOTAL EXPENSES rows.
+     *
+     * Returns a collection keyed by month (1-12), each value an object with
+     * income, needs, wants, savings (amounts) and needs_pct/wants_pct/
+     * savings_pct (share of that month's income) plus needs_target/
+     * wants_target/savings_target (50/30/20 of that month's income).
+     */
+    private function calculate503020Breakdown(int $year): Collection
+    {
+        $wantsSet = collect(self::WANTS_CATEGORY_NAMES)
+            ->map(fn($n) => strtolower($n))
+            ->flip();
+
+        $expenseCategoryGroup = Category::where('user_id', Auth::id())
+            ->where('type', 'expense')
+            ->whereNotIn('name', array_merge(self::EXCLUDED_LOAN_CATEGORIES, self::EXCLUDED_ROLLING_FUND_CATEGORIES))
+            ->get()
+            ->mapWithKeys(fn($c) => [$c->id => $wantsSet->has(strtolower($c->name)) ? 'wants' : 'needs']);
+
+        $expenseActuals = Transaction::query()
+            ->selectRaw('category_id, MONTH(COALESCE(period_date, date)) as month, SUM(amount) as total')
+            ->where('user_id', Auth::id())
+            ->whereYear(DB::raw('COALESCE(period_date, date)'), $year)
+            ->where(function ($q) {
+                $q->where('payment_method', '!=', 'Client Fund')
+                    ->where('payment_method', '!=', 'Client Commission')
+                    ->orWhereNull('payment_method');
+            })
+            ->whereHas('category', function ($q) {
+                $q->where('type', 'expense')
+                    ->whereNotIn('name', array_merge(
+                        self::EXCLUDED_LOAN_CATEGORIES,
+                        self::EXCLUDED_ROLLING_FUND_CATEGORIES,
+                        ['Client Funds']
+                    ));
+            })
+            ->groupBy('category_id', DB::raw('MONTH(COALESCE(period_date, date))'))
+            ->get();
+
+        $needsByMonth = array_fill(1, 12, 0.0);
+        $wantsByMonth = array_fill(1, 12, 0.0);
+
+        foreach ($expenseActuals as $row) {
+            $group = $expenseCategoryGroup[$row->category_id] ?? 'needs';
+            if ($group === 'wants') {
+                $wantsByMonth[$row->month] += (float)$row->total;
+            } else {
+                $needsByMonth[$row->month] += (float)$row->total;
+            }
+        }
+
+        $incomeByMonth = Transaction::query()
+            ->selectRaw('MONTH(COALESCE(period_date, date)) as month, SUM(amount) as total')
+            ->where('user_id', Auth::id())
+            ->whereYear(DB::raw('COALESCE(period_date, date)'), $year)
+            ->where(function ($q) {
+                $q->where(function ($q2) {
+                    $q2->where('payment_method', '!=', 'Client Fund')
+                        ->where('payment_method', '!=', 'Client Commission')
+                        ->orWhereNull('payment_method');
+                })
+                    ->orWhereExists(function ($query) {
+                        $query->select(DB::raw(1))
+                            ->from('categories')
+                            ->whereColumn('categories.id', 'transactions.category_id')
+                            ->where('categories.type', 'income')
+                            ->where('transactions.payment_method', 'Client Commission');
+                    });
+            })
+            ->whereHas('category', function ($q) {
+                $q->where('type', 'income')
+                    ->whereNotIn('name', array_merge(self::EXCLUDED_LOAN_CATEGORIES, self::EXCLUDED_ROLLING_FUND_CATEGORIES));
+            })
+            ->groupBy(DB::raw('MONTH(COALESCE(period_date, date))'))
+            ->pluck('total', 'month');
+
+        $savingsIn = DB::table('transfers')
+            ->join('accounts as to_acc', 'transfers.to_account_id', '=', 'to_acc.id')
+            ->where('transfers.user_id', Auth::id())
+            ->whereYear('transfers.date', $year)
+            ->where('to_acc.type', 'savings')
+            ->where('transfers.is_client_fund', false)
+            ->selectRaw('MONTH(transfers.date) as month, SUM(transfers.amount) as total')
+            ->groupBy(DB::raw('MONTH(transfers.date)'))
+            ->pluck('total', 'month');
+
+        $savingsOut = DB::table('transfers')
+            ->join('accounts as from_acc', 'transfers.from_account_id', '=', 'from_acc.id')
+            ->where('transfers.user_id', Auth::id())
+            ->whereYear('transfers.date', $year)
+            ->where('from_acc.type', 'savings')
+            ->where('transfers.is_client_fund', false)
+            ->where('transfers.is_lending', false)
+            ->selectRaw('MONTH(transfers.date) as month, SUM(transfers.amount) as total')
+            ->groupBy(DB::raw('MONTH(transfers.date)'))
+            ->pluck('total', 'month');
+
+        $breakdown = collect();
+
+        for ($m = 1; $m <= 12; $m++) {
+            $income  = (float)($incomeByMonth[$m] ?? 0);
+            $needs   = $needsByMonth[$m];
+            $wants   = $wantsByMonth[$m];
+            $savings = max(0, (float)($savingsIn[$m] ?? 0) - (float)($savingsOut[$m] ?? 0));
+
+            $breakdown->put($m, (object)[
+                'income'         => $income,
+                'needs'          => $needs,
+                'wants'          => $wants,
+                'savings'        => $savings,
+                'needs_pct'      => $income > 0 ? round(($needs / $income) * 100, 1) : 0,
+                'wants_pct'      => $income > 0 ? round(($wants / $income) * 100, 1) : 0,
+                'savings_pct'    => $income > 0 ? round(($savings / $income) * 100, 1) : 0,
+                'needs_target'   => round($income * 0.50, 0),
+                'wants_target'   => round($income * 0.30, 0),
+                'savings_target' => round($income * 0.20, 0),
+            ]);
+        }
+
+        return $breakdown;
     }
 }

@@ -38,16 +38,16 @@
                                 $recentYears = range($currentYear, max($minYear, $currentYear - 3));
                             @endphp
                             @foreach($recentYears as $y)
-                                <a
-                                    href="{{ url('budgets/' . $y) }}"
-                                    class="block px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition {{ $y == $year ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-gray-700 dark:text-gray-300' }}"
+
+                                href="{{ url('budgets/' . $y) }}"
+                                class="block px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition {{ $y == $year ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-gray-700 dark:text-gray-300' }}"
                                 >
-                                    {{ $y }}
-                                    @if($y == $currentYear)
-                                        <span class="text-xs text-gray-500 dark:text-gray-400">(Current)</span>
+                                {{ $y }}
+                                @if($y == $currentYear)
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">(Current)</span>
                                     @endif
-                                </a>
-                            @endforeach
+                                    </a>
+                                    @endforeach
                         </div>
 
                         {{-- All Years Option --}}
@@ -273,6 +273,38 @@
                                 </div>
                             </div>
                         @endif
+
+                        {{-- 50/30/20 Rule (Mobile) --}}
+                        @php $ruleM = $budgetRule[$m]; @endphp
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 space-y-3">
+                            <h4 class="font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                                <span class="text-lg">📐</span>
+                                50/30/20 Rule
+                            </h4>
+                            @foreach([
+                                ['label' => 'Needs', 'target' => 50, 'actual' => $ruleM->needs_pct, 'amount' => $ruleM->needs, 'color' => 'blue', 'bad_if' => 'over'],
+                                ['label' => 'Wants', 'target' => 30, 'actual' => $ruleM->wants_pct, 'amount' => $ruleM->wants, 'color' => 'amber', 'bad_if' => 'over'],
+                                ['label' => 'Savings', 'target' => 20, 'actual' => $ruleM->savings_pct, 'amount' => $ruleM->savings, 'color' => 'green', 'bad_if' => 'under'],
+                            ] as $row)
+                                @php
+                                    $isBad = $row['bad_if'] === 'over' ? $row['actual'] > $row['target'] : $row['actual'] < $row['target'];
+                                @endphp
+                                <div>
+                                    <div class="flex items-center justify-between text-xs mb-1">
+                                        <span class="text-gray-600 dark:text-gray-400">{{ $row['label'] }} <span class="text-gray-400">({{ $row['target'] }}% target)</span></span>
+                                        <span class="font-medium {{ $isBad ? 'text-red-500' : 'text-gray-700 dark:text-gray-300' }}">
+                                            {{ number_format($row['amount'], 0) }} ({{ $row['actual'] }}%)
+                                        </span>
+                                    </div>
+                                    <div class="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5">
+                                        <div class="bg-{{ $row['color'] }}-500 h-1.5 rounded-full" style="width: {{ min(100, $row['actual']) }}%"></div>
+                                    </div>
+                                </div>
+                            @endforeach
+                            @if($ruleM->income == 0)
+                                <p class="text-xs text-amber-600">No income recorded for {{ \Carbon\Carbon::create()->month($m)->format('F') }} yet.</p>
+                            @endif
+                        </div>
                     </div>
                 @endfor
             </div>
@@ -679,6 +711,48 @@
 
         </div>
 
+        {{-- 50/30/20 Rule --}}
+        <section class="rounded-lg bg-white dark:bg-gray-800 p-4 sm:p-6 shadow-sm space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200">
+                        50/30/20 Rule
+                    </h3>
+                    <p class="text-xs text-gray-500">
+                        {{ \Carbon\Carbon::create()->month($currentMonth)->format('F') }} {{ $year }} vs. target
+                    </p>
+                </div>
+            </div>
+
+            @php $rule = $budgetRule[$currentMonth]; @endphp
+
+            @foreach([
+                ['label' => 'Needs', 'target' => 50, 'actual' => $rule->needs_pct, 'amount' => $rule->needs, 'target_amount' => $rule->needs_target, 'color' => 'blue', 'bad_if' => 'over'],
+                ['label' => 'Wants', 'target' => 30, 'actual' => $rule->wants_pct, 'amount' => $rule->wants, 'target_amount' => $rule->wants_target, 'color' => 'amber', 'bad_if' => 'over'],
+                ['label' => 'Savings', 'target' => 20, 'actual' => $rule->savings_pct, 'amount' => $rule->savings, 'target_amount' => $rule->savings_target, 'color' => 'green', 'bad_if' => 'under'],
+            ] as $row)
+                @php
+                    $isBad = $row['bad_if'] === 'over' ? $row['actual'] > $row['target'] : $row['actual'] < $row['target'];
+                @endphp
+                <div>
+                    <div class="flex items-center justify-between text-sm mb-1">
+                        <span class="font-medium text-gray-700 dark:text-gray-300">{{ $row['label'] }} <span class="text-gray-400">({{ $row['target'] }}% target)</span></span>
+                        <span class="font-semibold {{ $isBad ? 'text-red-500' : 'text-gray-700 dark:text-gray-300' }}">
+                            {{ number_format($row['amount'], 0) }} ({{ $row['actual'] }}%)
+                        </span>
+                    </div>
+                    <div class="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2">
+                        <div class="bg-{{ $row['color'] }}-500 h-2 rounded-full" style="width: {{ min(100, $row['actual']) }}%"></div>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-0.5">Target: {{ number_format($row['target_amount'], 0) }}</p>
+                </div>
+            @endforeach
+
+            @if($rule->income == 0)
+                <p class="text-xs text-amber-600">No income recorded for {{ \Carbon\Carbon::create()->month($currentMonth)->format('F') }} yet — percentages will show once income lands.</p>
+            @endif
+        </section>
+
         {{-- Liabilities --}}
         <section class="rounded-lg bg-white dark:bg-gray-800 p-4 sm:p-6 shadow-sm space-y-4">
             <div class="flex items-center justify-between">
@@ -766,11 +840,11 @@
 
                     <div class="grid grid-cols-3 gap-2 max-h-96 overflow-y-auto">
                         @for($y = $maxYear; $y >= $minYear; $y--)
-                            <a
-                                href="{{ url('budgets/' . $y) }}"
-                                class="flex items-center justify-center px-4 py-3 text-sm font-medium rounded-lg border transition {{ $y == $year ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600' }}"
+
+                            href="{{ url('budgets/' . $y) }}"
+                            class="flex items-center justify-center px-4 py-3 text-sm font-medium rounded-lg border transition {{ $y == $year ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600' }}"
                             >
-                                {{ $y }}
+                            {{ $y }}
                             </a>
                         @endfor
                     </div>
