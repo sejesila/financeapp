@@ -25,6 +25,18 @@ class BudgetController extends Controller
     private const SAVINGS_REVERSAL_WINDOW_DAYS = 8;
 
     /**
+     * For the 50/30/20 card's Savings figure specifically: a transfer into
+     * the Etica savings account only counts as "savings" if it lands within
+     * this many hours of a salary transaction. This is a narrower, simpler
+     * definition than ReportDataService::getSalarySavingsRate()'s own
+     * SALARY_TO_SAVINGS_WINDOW_HOURS (72 hours, plus an 8-day reversal-
+     * netting check) — that method feeds the monthly/annual PDF report and
+     * is deliberately stricter; this one is a lighter at-a-glance check for
+     * the budget page and intentionally does not net out later withdrawals.
+     */
+    private const SALARY_TO_SAVINGS_WINDOW_HOURS = 48;
+
+    /**
      * Loan principal movements are never real income/expense — lending money
      * converts cash into a receivable, and getting it back converts the
      * receivable back into cash. Only interest (a separate, dedicated
@@ -49,13 +61,14 @@ class BudgetController extends Controller
     /**
      * Expense categories that count as "Wants" under the 50/30/20 rule. Any
      * expense category NOT listed here defaults to "Needs" — see
-     * calculate503020Breakdown() below. Fare, Airtime & Data, Rent, Groceries,
-     * School Fees & Supplies, Electricity, Cooking Gas, and Transaction Fees
-     * are deliberately NOT here (they're Needs, via the default). This is
-     * intentionally a hardcoded list for now (same pattern as
-     * EXCLUDED_LOAN_CATEGORIES above) rather than a categories.budget_group
-     * column, so the buckets can be tuned here without a migration while the
-     * numbers get validated against real data.
+     * calculate503020Breakdown() below. Fare, Airtime & Data, Rent,
+     * Groceries, School Fees & Supplies, Electricity, Cooking Gas, and
+     * Transaction Fees are deliberately NOT here (they're Needs, via the
+     * default). This is intentionally a hardcoded list for now (same
+     * pattern as EXCLUDED_LOAN_CATEGORIES above) rather than a
+     * categories.budget_group column, so the buckets can be tuned here
+     * without a migration while the numbers get validated against real
+     * data.
      */
     private const WANTS_CATEGORY_NAMES = [
         'Family',
@@ -151,24 +164,6 @@ class BudgetController extends Controller
             ->filter(fn($c) => $c->yearly_total > 0)
             ->sortByDesc('yearly_total');
 
-        // Calculate yearly totals for expense categories
-        $expenseCategories = $expenseCategories->map(function ($category) use ($actuals, $budgets) {
-            $yearlyTotal = 0;
-            $yearlyBudget = 0;
-            for ($m = 1; $m <= 12; $m++) {
-                $yearlyTotal += $actuals[$category->id][$m] ?? 0;
-                $key = $category->id . '-' . $m;
-                $yearlyBudget += $budgets->get($key)->amount ?? 0;
-            }
-            $category->yearly_total = $yearlyTotal;
-            $category->yearly_budget = $yearlyBudget;
-            $category->budget_percentage = $yearlyBudget > 0
-                ? round(($yearlyTotal / $yearlyBudget) * 100, 1)
-                : 0;
-            return $category;
-        })
-            ->filter(fn($c) => $c->yearly_total > 0)
-            ->sortByDesc('yearly_total');
         // Calculate yearly totals for expense categories
         $wantsSet = $this->wantsCategoryNameSet();
 
@@ -445,20 +440,30 @@ class BudgetController extends Controller
     }
 
     /**
+     * Lowercased set of WANTS_CATEGORY_NAMES for fast lookup. Shared by
+     * calculate503020Breakdown() and index()'s category-group tagging, so
+     * the table's color-coding and the 50/30/20 card's totals are always
+     * based on the exact same classification.
+     */
+    private function wantsCategoryNameSet(): Collection
+    {
+        return collect(self::WANTS_CATEGORY_NAMES)
+            ->map(fn($n) => strtolower($n))
+            ->flip();
+    }
+
+    /**
      * 50/30/20 breakdown per month for the given year: Needs (expense
      * categories not in WANTS_CATEGORY_NAMES), Wants (expense categories in
      * WANTS_CATEGORY_NAMES), and Savings.
      *
-     * Savings is NOT a category sum — this app tracks savings as transfers
-     * into the dedicated Etica savings account specifically (see
-     * ReportDataService::isEticaAccount() / getSalarySavingsRate() and
-     * calculateNetSavingsWithdrawals() above), so "Savings" here is net money
-     * that actually moved into Etica this month (deposits minus genuine
-     * withdrawals), with client-fund and lending transfers excluded — same
-     * rules as calculateNetSavingsWithdrawals(). Deliberately scoped to Etica
-     * by name, NOT to every account of type 'savings' — a second savings-type
-     * account (e.g. Sanlam MMF) must never be counted here, or "Savings Used"
-     * ends up inflated by money that never actually left for genuine savings.
+     * Savings is NOT a category sum, and it is NOT "any net deposit into
+     * Etica this month" either — see calculateSalaryTriggeredSavingsByMonth()
+     * below. Only transfers into Etica that land within
+     * SALARY_TO_SAVINGS_WINDOW_HOURS of a salary transaction count, since
+     * the point of the 20% target is to measure salary discipline
+     * specifically, not general movement of money into savings for
+     * unrelated reasons (e.g. topping up Etica from a business payout).
      *
      * Uses the same exclusion constants and payment_method/Client Commission
      * handling as index()'s $actualsQuery, so figures here always agree with
@@ -536,30 +541,7 @@ class BudgetController extends Controller
             ->groupBy(DB::raw('MONTH(COALESCE(period_date, date))'))
             ->pluck('total', 'month');
 
-        // Scoped to Etica specifically — see the method docblock above. A second
-        // savings-type account (e.g. Sanlam MMF) must never contribute here.
-        $savingsIn = DB::table('transfers')
-            ->join('accounts as to_acc', 'transfers.to_account_id', '=', 'to_acc.id')
-            ->where('transfers.user_id', Auth::id())
-            ->whereYear('transfers.date', $year)
-            ->where('to_acc.type', 'savings')
-            ->whereRaw("LOWER(to_acc.name) LIKE '%etica%'")
-            ->where('transfers.is_client_fund', false)
-            ->selectRaw('MONTH(transfers.date) as month, SUM(transfers.amount) as total')
-            ->groupBy(DB::raw('MONTH(transfers.date)'))
-            ->pluck('total', 'month');
-
-        $savingsOut = DB::table('transfers')
-            ->join('accounts as from_acc', 'transfers.from_account_id', '=', 'from_acc.id')
-            ->where('transfers.user_id', Auth::id())
-            ->whereYear('transfers.date', $year)
-            ->where('from_acc.type', 'savings')
-            ->whereRaw("LOWER(from_acc.name) LIKE '%etica%'")
-            ->where('transfers.is_client_fund', false)
-            ->where('transfers.is_lending', false)
-            ->selectRaw('MONTH(transfers.date) as month, SUM(transfers.amount) as total')
-            ->groupBy(DB::raw('MONTH(transfers.date)'))
-            ->pluck('total', 'month');
+        $savingsByMonth = $this->calculateSalaryTriggeredSavingsByMonth($year);
 
         $breakdown = collect();
 
@@ -567,7 +549,7 @@ class BudgetController extends Controller
             $income  = (float)($incomeByMonth[$m] ?? 0);
             $needs   = $needsByMonth[$m];
             $wants   = $wantsByMonth[$m];
-            $savings = max(0, (float)($savingsIn[$m] ?? 0) - (float)($savingsOut[$m] ?? 0));
+            $savings = $savingsByMonth[$m] ?? 0.0;
 
             $breakdown->put($m, (object)[
                 'income'         => $income,
@@ -585,16 +567,71 @@ class BudgetController extends Controller
 
         return $breakdown;
     }
+
     /**
-     * Lowercased set of WANTS_CATEGORY_NAMES for fast lookup. Shared by
-     * calculate503020Breakdown() and index()'s category-group tagging, so the
-     * table's color-coding and the 50/30/20 card's totals are always based on
-     * the exact same classification.
+     * For every salary transaction (category name LIKE '%salary%') in the
+     * year, sums transfers into the dedicated Etica savings account that
+     * land within SALARY_TO_SAVINGS_WINDOW_HOURS hours of that salary's
+     * date. A transfer is matched to the EARLIEST salary transaction whose
+     * window it falls into and is never counted twice, so two salary
+     * payments close together can't both claim credit for the same
+     * transfer.
+     *
+     * Amounts are attributed to the month the TRANSFER happened in (not the
+     * month the salary landed), since that's when the saving actually
+     * occurred — matters near a month boundary, e.g. salary on Jan 31,
+     * transfer on Feb 1.
+     *
+     * Deliberately scoped to Etica by name (not every account of type
+     * 'savings') — see the note on isEticaAccount()-style scoping elsewhere
+     * in this app (ReportDataService). A second savings-type account (e.g.
+     * Sanlam MMF) must never count here.
+     *
+     * Returns [month => total], months with nothing matched omitted.
      */
-    private function wantsCategoryNameSet(): Collection
+    private function calculateSalaryTriggeredSavingsByMonth(int $year): array
     {
-        return collect(self::WANTS_CATEGORY_NAMES)
-            ->map(fn($n) => strtolower($n))
-            ->flip();
+        $salaryTransactions = Transaction::where('user_id', Auth::id())
+            ->whereYear('date', $year)
+            ->whereHas('category', fn($q) => $q->where('name', 'like', '%salary%'))
+            ->orderBy('date')
+            ->get(['id', 'date', 'amount']);
+
+        if ($salaryTransactions->isEmpty()) {
+            return [];
+        }
+
+        $matchedTransferIds = [];
+        $byMonth = [];
+
+        foreach ($salaryTransactions as $salary) {
+            $salaryDate = Carbon::parse($salary->date);
+            $windowEnd = $salaryDate->copy()->addHours(self::SALARY_TO_SAVINGS_WINDOW_HOURS);
+
+            $transfers = DB::table('transfers')
+                ->join('accounts as to_acc', 'transfers.to_account_id', '=', 'to_acc.id')
+                ->where('transfers.user_id', Auth::id())
+                ->where('to_acc.type', 'savings')
+                ->whereRaw("LOWER(to_acc.name) LIKE '%etica%'")
+                ->where('transfers.is_client_fund', false)
+                ->whereBetween('transfers.date', [
+                    $salaryDate->toDateTimeString(),
+                    $windowEnd->toDateTimeString(),
+                ])
+                ->select('transfers.id', 'transfers.amount', 'transfers.date')
+                ->orderBy('transfers.date')
+                ->get();
+
+            foreach ($transfers as $t) {
+                if (in_array($t->id, $matchedTransferIds, true)) {
+                    continue; // already credited to an earlier salary's window
+                }
+                $matchedTransferIds[] = $t->id;
+                $month = Carbon::parse($t->date)->month;
+                $byMonth[$month] = ($byMonth[$month] ?? 0) + (float)$t->amount;
+            }
+        }
+
+        return $byMonth;
     }
 }
