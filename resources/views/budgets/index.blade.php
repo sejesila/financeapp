@@ -206,7 +206,10 @@
                                     @if($actualAmount > 0 || $budgetAmount > 0)
                                         <div class="text-sm">
                                             <div class="flex items-center justify-between">
-                                                <span class="text-gray-700 dark:text-gray-300">{{ $category->name }}</span>
+                                                <span class="text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                                                    <span class="inline-block w-2 h-2 rounded-full {{ ($category->rule_group ?? 'needs') === 'wants' ? 'bg-amber-500' : 'bg-blue-500' }}"></span>
+                                                    {{ $category->name }}
+                                                </span>
                                                 <div class="flex items-center gap-2">
                                                     @if($actualAmount > 0)
                                                         <span class="text-xs text-gray-400 dark:text-gray-500">{{ $monthSharePercent }}%</span>
@@ -399,6 +402,23 @@
                 </span>
             </div>
 
+            {{-- 50/30/20 category legend (always visible, not tied to the budget-comparison toggle) --}}
+            <div class="flex items-center gap-5 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 rounded-lg px-4 py-2">
+                <span class="font-semibold text-gray-600 dark:text-gray-300">50/30/20:</span>
+                <span class="flex items-center gap-1.5">
+                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                    Needs
+                </span>
+                <span class="flex items-center gap-1.5">
+                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                    Wants
+                </span>
+                <span class="flex items-center gap-1.5">
+                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+                    Savings (tracked separately, see row below)
+                </span>
+            </div>
+
             <div class="overflow-x-auto rounded-lg border bg-white dark:bg-gray-800 shadow-sm">
                 <table class="min-w-full text-sm">
                     <thead class="bg-gray-100 dark:bg-gray-700">
@@ -528,6 +548,7 @@
                     @foreach($expenseCategoriesDisplay as $category)
                         <tr class="border-b hover:bg-gray-50 dark:hover:bg-gray-700/50">
                             <td class="px-3 py-1.5 font-medium text-gray-700 dark:text-gray-300">
+                                <span class="inline-block w-2 h-2 rounded-full mr-1.5 align-middle {{ ($category->rule_group ?? 'needs') === 'wants' ? 'bg-amber-500' : 'bg-blue-500' }}"></span>
                                 {{ $category->name }}
                             </td>
                             @for($m = 1; $m <= 12; $m++)

@@ -164,6 +164,29 @@ class BudgetController extends Controller
         })
             ->filter(fn($c) => $c->yearly_total > 0)
             ->sortByDesc('yearly_total');
+        // Calculate yearly totals for expense categories
+        $wantsSet = $this->wantsCategoryNameSet();
+
+        $expenseCategories = $expenseCategories->map(function ($category) use ($actuals, $budgets, $wantsSet) {
+            $yearlyTotal = 0;
+            $yearlyBudget = 0;
+            for ($m = 1; $m <= 12; $m++) {
+                $yearlyTotal += $actuals[$category->id][$m] ?? 0;
+                $key = $category->id . '-' . $m;
+                $yearlyBudget += $budgets->get($key)->amount ?? 0;
+            }
+            $category->yearly_total = $yearlyTotal;
+            $category->yearly_budget = $yearlyBudget;
+            $category->budget_percentage = $yearlyBudget > 0
+                ? round(($yearlyTotal / $yearlyBudget) * 100, 1)
+                : 0;
+            // Tags this category for the 50/30/20 color-coding in the table —
+            // see wantsCategoryNameSet() / WANTS_CATEGORY_NAMES above.
+            $category->rule_group = $wantsSet->has(strtolower($category->name)) ? 'wants' : 'needs';
+            return $category;
+        })
+            ->filter(fn($c) => $c->yearly_total > 0)
+            ->sortByDesc('yearly_total');
 
         // Each category's share of its own type's yearly total — income
         // categories are compared against total yearly income, expense
@@ -443,9 +466,7 @@ class BudgetController extends Controller
      */
     private function calculate503020Breakdown(int $year): Collection
     {
-        $wantsSet = collect(self::WANTS_CATEGORY_NAMES)
-            ->map(fn($n) => strtolower($n))
-            ->flip();
+        $wantsSet = $this->wantsCategoryNameSet();
 
         $expenseCategoryGroup = Category::where('user_id', Auth::id())
             ->where('type', 'expense')
@@ -558,5 +579,17 @@ class BudgetController extends Controller
         }
 
         return $breakdown;
+    }
+    /**
+     * Lowercased set of WANTS_CATEGORY_NAMES for fast lookup. Shared by
+     * calculate503020Breakdown() and index()'s category-group tagging, so the
+     * table's color-coding and the 50/30/20 card's totals are always based on
+     * the exact same classification.
+     */
+    private function wantsCategoryNameSet(): Collection
+    {
+        return collect(self::WANTS_CATEGORY_NAMES)
+            ->map(fn($n) => strtolower($n))
+            ->flip();
     }
 }
