@@ -49,8 +49,9 @@ class BudgetController extends Controller
     /**
      * Expense categories that count as "Wants" under the 50/30/20 rule. Any
      * expense category NOT listed here defaults to "Needs" — see
-     * calculate503020Breakdown() below. Fare and Airtime & Data are
-     * deliberately NOT here (they're Needs, via the default). This is
+     * calculate503020Breakdown() below. Fare, Airtime & Data, Rent, Groceries,
+     * School Fees & Supplies, Electricity, Cooking Gas, and Transaction Fees
+     * are deliberately NOT here (they're Needs, via the default). This is
      * intentionally a hardcoded list for now (same pattern as
      * EXCLUDED_LOAN_CATEGORIES above) rather than a categories.budget_group
      * column, so the buckets can be tuned here without a migration while the
@@ -58,6 +59,10 @@ class BudgetController extends Controller
      */
     private const WANTS_CATEGORY_NAMES = [
         'Family',
+        'Other Expenses',
+        'Better Half',
+        'Clothing',
+        'Loan Repayment',
     ];
 
     public function index(Request $request, $year = null)
