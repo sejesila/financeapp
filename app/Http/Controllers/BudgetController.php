@@ -49,20 +49,15 @@ class BudgetController extends Controller
     /**
      * Expense categories that count as "Wants" under the 50/30/20 rule. Any
      * expense category NOT listed here defaults to "Needs" — see
-     * calculate503020Breakdown() below. This is intentionally a hardcoded
-     * list for now (same pattern as EXCLUDED_LOAN_CATEGORIES above) rather
-     * than a categories.budget_group column, so the buckets can be tuned
-     * here without a migration while the numbers get validated against real
-     * data. Matched case-insensitively against the category's actual name.
+     * calculate503020Breakdown() below. Fare and Airtime & Data are
+     * deliberately NOT here (they're Needs, via the default). This is
+     * intentionally a hardcoded list for now (same pattern as
+     * EXCLUDED_LOAN_CATEGORIES above) rather than a categories.budget_group
+     * column, so the buckets can be tuned here without a migration while the
+     * numbers get validated against real data.
      */
     private const WANTS_CATEGORY_NAMES = [
-        'Entertainment',
-        'Dining Out',
-        'Shopping',
-        'Subscriptions',
-        'Travel',
-        'Hobbies',
-        'Gifts',
+        'Family',
     ];
 
     public function index(Request $request, $year = null)
@@ -427,11 +422,15 @@ class BudgetController extends Controller
      * WANTS_CATEGORY_NAMES), and Savings.
      *
      * Savings is NOT a category sum — this app tracks savings as transfers
-     * into a savings-type account (see ReportDataService::getSalarySavingsRate()
-     * and calculateNetSavingsWithdrawals() above), so "Savings" here is net
-     * money that actually moved into a savings-type account this month
-     * (deposits minus genuine withdrawals), with client-fund and lending
-     * transfers excluded — same rules as calculateNetSavingsWithdrawals().
+     * into the dedicated Etica savings account specifically (see
+     * ReportDataService::isEticaAccount() / getSalarySavingsRate() and
+     * calculateNetSavingsWithdrawals() above), so "Savings" here is net money
+     * that actually moved into Etica this month (deposits minus genuine
+     * withdrawals), with client-fund and lending transfers excluded — same
+     * rules as calculateNetSavingsWithdrawals(). Deliberately scoped to Etica
+     * by name, NOT to every account of type 'savings' — a second savings-type
+     * account (e.g. Sanlam MMF) must never be counted here, or "Savings Used"
+     * ends up inflated by money that never actually left for genuine savings.
      *
      * Uses the same exclusion constants and payment_method/Client Commission
      * handling as index()'s $actualsQuery, so figures here always agree with
@@ -511,11 +510,14 @@ class BudgetController extends Controller
             ->groupBy(DB::raw('MONTH(COALESCE(period_date, date))'))
             ->pluck('total', 'month');
 
+        // Scoped to Etica specifically — see the method docblock above. A second
+        // savings-type account (e.g. Sanlam MMF) must never contribute here.
         $savingsIn = DB::table('transfers')
             ->join('accounts as to_acc', 'transfers.to_account_id', '=', 'to_acc.id')
             ->where('transfers.user_id', Auth::id())
             ->whereYear('transfers.date', $year)
             ->where('to_acc.type', 'savings')
+            ->whereRaw("LOWER(to_acc.name) LIKE '%etica%'")
             ->where('transfers.is_client_fund', false)
             ->selectRaw('MONTH(transfers.date) as month, SUM(transfers.amount) as total')
             ->groupBy(DB::raw('MONTH(transfers.date)'))
@@ -526,6 +528,7 @@ class BudgetController extends Controller
             ->where('transfers.user_id', Auth::id())
             ->whereYear('transfers.date', $year)
             ->where('from_acc.type', 'savings')
+            ->whereRaw("LOWER(from_acc.name) LIKE '%etica%'")
             ->where('transfers.is_client_fund', false)
             ->where('transfers.is_lending', false)
             ->selectRaw('MONTH(transfers.date) as month, SUM(transfers.amount) as total')
