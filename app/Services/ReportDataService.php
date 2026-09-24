@@ -457,7 +457,7 @@ class ReportDataService
         $activeLoans = Loan::where('user_id', $user->id)->where('status', 'active')->with('account')->get();
         $totalLoanBalance = $activeLoans->sum('balance');
         $activeLoansGiven = LoanGiven::where('user_id', $user->id)->where('status', 'active')->get();
-        $totalLoansGivenBalance = $activeLoansGiven->sum('balance');
+        $totalLoansGivenBalance = $activeLoansGiven->sum('outstanding_amount'); // was: sum('balance')
 
         // Historical savings balance — what was actually in savings at period end, not today
         $savingsBalance = $this->getSavingsBalanceAsAt($user, $endDate);

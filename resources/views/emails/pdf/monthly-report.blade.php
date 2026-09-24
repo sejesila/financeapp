@@ -669,7 +669,7 @@
                     <tr>
                         <td style="font-weight: 600;">{{ $loan->borrower_name }}</td>
                         <td style="text-align: right;">{{ $currency }} {{ number_format($loan->principal_amount) }}</td>
-                        <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($loan->balance) }}</td>
+                        <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($loan->outstanding_amount) }}</td>
                         <td style="text-align: center; color: #6B7280;">
                             {{ $loan->due_date ? Carbon::parse($loan->due_date)->format('M j, Y') : '—' }}
                         </td>
