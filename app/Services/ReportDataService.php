@@ -386,7 +386,7 @@ class ReportDataService
         $accountsAsAt = $accounts->map(function ($account) use ($endDate, $totalClientFunds) {
             $rawBalance = $this->getAccountBalanceAsAt($account, $endDate);
 
-            if ($account->type !== 'savings') {
+            if (! $this->isEticaAccount($account)) {   // was: $account->type !== 'savings'
                 $account->raw_balance_as_at = $rawBalance;
                 $account->client_funds_as_at = 0.0;
                 $account->balance_as_at = $rawBalance;
@@ -394,8 +394,6 @@ class ReportDataService
                 return $account;
             }
 
-            // Full obligation, not just what's traced into this account —
-            // see the note above $accountsAsAt.
             $clientFundsInAccount = $totalClientFunds;
 
             // Positive only when this account's tagged client funds exceed what's
@@ -724,6 +722,7 @@ class ReportDataService
         $savingsAccounts = Account::where('user_id', $user->id)
             ->where('type', 'savings')
             ->where('is_active', true)
+            ->whereRaw("LOWER(name) LIKE '%etica%'")
             ->get();
 
         if ($savingsAccounts->isEmpty()) {
@@ -785,6 +784,19 @@ class ReportDataService
             - $balanceAdjustmentsAfter;
 
         return max(0, $balanceAsAt);
+    }
+    /**
+     * True for the dedicated Etica savings account only. Client-fund netting
+     * and the shortfall diagnostic are scoped to Etica specifically, NOT to
+     * every account of type 'savings' — a second savings-type account (e.g.
+     * a separate MMF/investment account) must never be netted against the
+     * same global client-fund obligation, or that liability gets subtracted
+     * once per matching account instead of once, total.
+     */
+    private function isEticaAccount(Account $account): bool
+    {
+        return $account->type === 'savings'
+            && str_contains(strtolower($account->name), 'etica');
     }
 
     /**
