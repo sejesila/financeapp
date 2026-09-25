@@ -1073,6 +1073,44 @@ class ReportDataService
 
         return $results;
     }
+    /**
+     * Public: the amount of savings actually OWNED right now — i.e. the
+     * Etica savings account's current balance, net of the FULL amount
+     * currently owed to every client. This is the live/"as of now" version
+     * of $ownedSavings inside generateReport(), which feeds that report's
+     * "Savings Accounts" line and its net worth figure. It reuses the exact
+     * same two private helpers (getSavingsBalanceAsAt / getClientFundsBalanceAsAt),
+     * evaluated as-at right now, so there is only one calculation of "what
+     * savings are actually mine" in the codebase.
+     *
+     * Any screen showing a savings total OUTSIDE of a generated report (e.g.
+     * DashboardController) must call this rather than summing accounts'
+     * current_balance directly. Summing current_balance for type='savings'
+     * counts money sitting in Etica that is actually owed to clients as if
+     * it were the user's own — the same category of bug documented at
+     * length on getClientFundsBalanceAsAt() and $ownedSavings above.
+     *
+     * No max(0, ...) clamp on the final result, matching $ownedSavings in
+     * generateReport(): getSavingsBalanceAsAt() itself is already floored at
+     * 0, but if what's owed to clients exceeds that, the shortfall is a real
+     * deficit and should show as negative rather than being hidden.
+     *
+     * Same single-Etica-account assumption as the rest of this file (see
+     * isEticaAccount()): only the Etica-named savings account is netted
+     * against the client-fund total. A second, non-Etica savings-type
+     * account would not be included in this figure at all — consistent with
+     * getSavingsBalanceAsAt(), which only ever queries accounts whose name
+     * contains "etica".
+     */
+    public function getOwnedSavingsBalance(User $user): float
+    {
+        $now = Carbon::now();
+
+        $savingsBalance   = $this->getSavingsBalanceAsAt($user, $now);
+        $totalClientFunds = $this->getClientFundsBalanceAsAt($user, $now);
+
+        return $savingsBalance - $totalClientFunds;
+    }
 
     /**
      * Public summary of interest income for an arbitrary period — savings

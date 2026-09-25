@@ -13,6 +13,10 @@ use App\Services\ReportDataService;
 
 class DashboardController extends Controller
 {
+    public function __construct(
+        private readonly ReportDataService $reportDataService
+    ) {
+    }
     /**
      * Category names that never represent real income or spending
      * (loan mechanics / balance adjustments / client passthrough),
@@ -56,8 +60,13 @@ class DashboardController extends Controller
         // is new.
         $totalAssets = $totalCash + $totalWallets;
 
-        $totalSavings = $savingsAccounts->sum('current_balance');
 
+        // Net of the full amount owed to every client — mirrors
+        // ReportDataService::generateReport()'s $ownedSavings, so this
+        // card agrees with the Reports page's "Savings Accounts" line
+        // instead of showing the raw stored balance (which can include
+        // money sitting in Etica that is actually owed to clients).
+        $totalSavings = $this->reportDataService->getOwnedSavingsBalance(Auth::user());
         $totalLiabilities = Loan::where('status', 'active')
             ->where('user_id', $userId)
             ->sum('balance');
