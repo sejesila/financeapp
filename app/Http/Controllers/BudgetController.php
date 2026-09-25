@@ -128,6 +128,11 @@ class BudgetController extends Controller
                             ->where('transactions.payment_method', 'Client Commission');
                     });
             })
+            // NEW: an 'Interest' transaction only counts if it's on an active savings account
+            ->where(function ($q) {
+                $q->whereDoesntHave('category', fn($c) => $c->where('name', 'Interest'))
+                    ->orWhereHas('account', fn($a) => $a->where('type', 'savings')->where('is_active', true));
+            })
             ->whereHas('category', function ($q) {
                 $q->whereIn('type', ['income', 'expense'])
                     ->whereNotIn('name', array_merge(
