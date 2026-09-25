@@ -877,32 +877,65 @@ class ClientFundController extends Controller
     }
 
     /**
-     * If Etica's balance is lower than the FULL total of what ClientFund
-     * records say is still outstanding — across every client fund the user
-     * has, regardless of which account_id it happens to be tagged to — the
-     * difference is money that's been spent/withdrawn against client funds
-     * without ever being logged as "borrowed" (before this feature existed,
-     * or via a transfer that wasn't flagged as a client fund movement).
+     * Reconstructs the TRUE current total still owed to every client,
+     * mirroring ReportDataService::getClientFundsBalanceAsAt() (see that
+     * method's docblock for the full reasoning) rather than trusting
+     * ClientFund::balance / amount_spent.
      *
-     * Deliberately NOT scoped to `where('account_id', $account->id)`: a
-     * client fund is very often received into M-Pesa (see store()'s allowed
-     * account types) and only later, if at all, moved into Etica. Filtering
-     * by account_id here would only ever find funds specifically tagged to
-     * Etica and silently miss the money actually owed — the same
-     * understatement bug ReportDataService::getClientFundsBalanceAsAt()
-     * already fixed for net worth/report figures (see its docblock). This
-     * mirrors that fix: Etica is checked against the FULL global obligation,
-     * not just whatever slice was historically traced into it specifically.
+     * Why not just sum(ClientFund::balance)? Because ClientFund::updateBalance()
+     * folds a borrowed-for-personal-use amount into amount_spent exactly the
+     * same way it folds in a genuine business expense — see recordBorrowed()
+     * and reconcileBorrowed() above. Borrowing does NOT reduce what's owed to
+     * the client, it converts part of the obligation into a personal debt
+     * that still has to be physically repaid (see returnBorrowed()). Summing
+     * ClientFund::balance therefore silently treats every already-recorded
+     * borrow as if it were no longer owed, understating the true total by
+     * exactly the "Borrowed (Unreturned)" figure — which is precisely what
+     * caused the unrecorded-borrow shortfall check to under-flag Etica by
+     * that same amount.
+     *
+     * Only REAL expenses (is_borrowed = false) and profit actually reduce
+     * what's owed; a 'return' transaction just moves cash back into place
+     * and doesn't change the total obligation, so this doesn't need to
+     * reference 'return' transactions at all.
+     */
+    private function getTrueOutstandingClientFundsTotal(): float
+    {
+        $clientFunds = ClientFund::where('user_id', Auth::id())
+            ->whereNotIn('status', ['cancelled'])
+            ->with(['transactions' => fn($q) => $q->whereIn('type', ['expense', 'profit'])])
+            ->get();
+
+        return $clientFunds->sum(function ($fund) {
+            $realExpenses = $fund->transactions
+                ->where('type', 'expense')
+                ->where('is_borrowed', false)
+                ->sum('amount');
+
+            $profitTaken = $fund->transactions
+                ->where('type', 'profit')
+                ->sum('amount');
+
+            return max(0, (float) $fund->amount_received - $realExpenses - $profitTaken);
+        });
+    }
+
+    /**
+     * If Etica's balance is lower than the TRUE total still owed to every
+     * client (see getTrueOutstandingClientFundsTotal() — this already
+     * counts unreturned borrowed money as still owed, so it is NOT ignoring
+     * the "Borrowed (Unreturned)" figure the way a naive sum(ClientFund::balance)
+     * would), the difference is money that's been spent/withdrawn against
+     * client funds without ever being logged as "borrowed" at all — before
+     * this feature existed, or via a transfer that wasn't flagged as a
+     * client fund movement.
      *
      * Callers should only invoke this for the Etica account (see
      * isEticaAccount()); index() filters to that scope before calling here.
      */
     private function getUnrecordedBorrowShortfall(Account $account): float
     {
-        $outstandingTotal = ClientFund::where('user_id', Auth::id())
-            ->where('balance', '>', 0)
-            ->whereNotIn('status', ['cancelled'])
-            ->sum('balance');
+        $outstandingTotal = $this->getTrueOutstandingClientFundsTotal();
 
         $shortfall = $outstandingTotal - (float)$account->current_balance;
 
