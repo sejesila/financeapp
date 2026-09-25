@@ -38,16 +38,16 @@
                                 $recentYears = range($currentYear, max($minYear, $currentYear - 3));
                             @endphp
                             @foreach($recentYears as $y)
-
-                                href="{{ url('budgets/' . $y) }}"
-                                class="block px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition {{ $y == $year ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-gray-700 dark:text-gray-300' }}"
+                                <a
+                                    href="{{ url('budgets/' . $y) }}"
+                                    class="block px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition {{ $y == $year ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-gray-700 dark:text-gray-300' }}"
                                 >
-                                {{ $y }}
-                                @if($y == $currentYear)
-                                    <span class="text-xs text-gray-500 dark:text-gray-400">(Current)</span>
+                                    {{ $y }}
+                                    @if($y == $currentYear)
+                                        <span class="text-xs text-gray-500 dark:text-gray-400">(Current)</span>
                                     @endif
-                                    </a>
-                                    @endforeach
+                                </a>
+                            @endforeach
                         </div>
 
                         {{-- All Years Option --}}
@@ -732,8 +732,12 @@
 
         </div>
 
-        {{-- 50/30/20 Rule --}}
-        <section class="rounded-lg bg-white dark:bg-gray-800 p-4 sm:p-6 shadow-sm space-y-4">
+        {{-- 50/30/20 Rule (Desktop only — the mobile card view above already
+             renders this per-month inside each month's card, tied to
+             `selectedMonth`. Without the `hidden lg:block` here, this
+             duplicate block would also render on mobile, always pinned to
+             $currentMonth regardless of which month tab is selected. --}}
+        <section class="hidden lg:block rounded-lg bg-white dark:bg-gray-800 p-4 sm:p-6 shadow-sm space-y-4">
             <div class="flex items-center justify-between">
                 <div>
                     <h3 class="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200">
@@ -861,11 +865,11 @@
 
                     <div class="grid grid-cols-3 gap-2 max-h-96 overflow-y-auto">
                         @for($y = $maxYear; $y >= $minYear; $y--)
-
-                            href="{{ url('budgets/' . $y) }}"
-                            class="flex items-center justify-center px-4 py-3 text-sm font-medium rounded-lg border transition {{ $y == $year ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600' }}"
+                            <a
+                                href="{{ url('budgets/' . $y) }}"
+                                class="flex items-center justify-center px-4 py-3 text-sm font-medium rounded-lg border transition {{ $y == $year ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600' }}"
                             >
-                            {{ $y }}
+                                {{ $y }}
                             </a>
                         @endfor
                     </div>
