@@ -867,7 +867,12 @@ class LoanGivenController extends Controller implements HasMiddleware
             DB::beginTransaction();
 
             try {
-                $loanGiven->closeAsRepaid();
+                $lastPayment = $loanGiven->payments()
+                    ->orderByDesc('payment_date')
+                    ->orderByDesc('id')
+                    ->first();
+
+                $loanGiven->closeAsRepaid($lastPayment?->payment_date);
                 $affectedAccountIds = $this->splitInterestOutOfFinalPayment($loanGiven, $interestAccount);
                 $this->applyReferrerDeduction($loanGiven, $request->boolean('referrer_deducted_before_deposit'));
 
