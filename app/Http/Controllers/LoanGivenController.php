@@ -348,20 +348,15 @@ class LoanGivenController extends Controller implements HasMiddleware
             $type = 'expense';
         }
 
-        // Special handling for interest - try multiple variations
-        if ($name === 'Loan Interest') {
-            // Check for existing interest categories
-            $existing = Category::where('user_id', Auth::id())
-                ->whereIn('name', ['Interest', 'Loan Interest', 'Interest Income'])
-                ->where('type', 'income')
-                ->first();
-
-            if ($existing) {
-                return $existing;
-            }
-        }
-
-        // Look up by name/user only (not parent_id)
+        // Look up by exact name only. 'Loan Interest' must never be conflated
+        // with 'Interest'/'Interest Income' — every downstream aggregate
+        // (BudgetController::EXCLUDED_LOAN_CATEGORIES, which deliberately does
+        // NOT exclude 'Loan Interest' so it shows as its own row; ReportDataService
+        // ::NON_SPENDING_CATEGORY_NAMES, which DOES exclude it so it isn't
+        // double-counted alongside getLoanGivenInterestIncome()) depends on this
+        // category being distinct from savings interest. Falling back to an
+        // existing 'Interest' category here silently merges loan-given interest
+        // into savings interest everywhere, which is exactly what happened.
         $existing = Category::where('user_id', Auth::id())
             ->where('name', $name)
             ->first();
@@ -371,10 +366,10 @@ class LoanGivenController extends Controller implements HasMiddleware
         }
 
         return Category::create([
-            'user_id' => Auth::id(),
+            'user_id'   => Auth::id(),
             'parent_id' => null,
-            'name' => $name,
-            'type' => $type,
+            'name'      => $name,
+            'type'      => $type,
             'is_active' => true,
         ]);
     }
