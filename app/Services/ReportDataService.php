@@ -659,10 +659,19 @@ class ReportDataService
 
     private function getLoanGivenInterestIncome(User $user, Carbon $startDate, Carbon $endDate): float
     {
-        return (float)LoanGiven::where('user_id', $user->id)
+        // Closed loans: whole-loan interest, attributed to the month they closed.
+        $closedInterest = (float)LoanGiven::where('user_id', $user->id)
             ->where('status', 'paid')
             ->whereBetween('repaid_date', [$startDate, $endDate])
             ->sum('interest_amount');
+
+        // Active loans: interest already recognized via rollover payments this period.
+        $rolloverInterest = (float)LoanGivenPayment::where('user_id', $user->id)
+            ->whereHas('loanGiven', fn($q) => $q->where('status', 'active'))
+            ->whereBetween('payment_date', [$startDate->toDateString(), $endDate->toDateString()])
+            ->sum('interest_portion');
+
+        return $closedInterest + $rolloverInterest;
     }
 
     /**
