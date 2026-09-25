@@ -14,14 +14,12 @@ use Illuminate\Support\Facades\DB;
 
 class ReportsController extends Controller
 {
-    /**
-     * Mirrors ReportDataService::NON_SPENDING_CATEGORY_NAMES.
-     */
     private const NON_SPENDING_CATEGORY_NAMES = [
         'Loan Disbursement',
         'Loan Receipt',
         'Balance Adjustment',
         'Client Funds',
+        'Rolling Funds',   // add this — mirrors BudgetController::EXCLUDED_ROLLING_FUND_CATEGORIES
     ];
 
     /**
