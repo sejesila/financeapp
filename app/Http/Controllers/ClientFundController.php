@@ -73,8 +73,14 @@ class ClientFundController extends Controller
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
-        // Diagnostic: per pooled account, how much borrowing is currently unrecorded
+
+        // Diagnostic: unrecorded borrowing shortfall, scoped to the Etica
+        // account only (see isEticaAccount()). M-Pesa, Bank, and other pooled
+        // accounts are working float — a client fund can be received into
+        // them, but they are never checked against the full client-fund
+        // obligation the way Etica is, matching ReportDataService's scoping.
         $unrecordedShortfalls = $allAccounts
+            ->filter(fn($account) => $this->isEticaAccount($account))
             ->mapWithKeys(fn($account) => [$account->id => $this->getUnrecordedBorrowShortfall($account)])
             ->filter(fn($amount) => $amount > 0);
 
@@ -855,11 +861,30 @@ class ClientFundController extends Controller
     // ── diagnostic: how much is currently unrecorded as borrowed ───────────────
 
     /**
+     * True for the dedicated Etica savings account only. Mirrors
+     * ReportDataService::isEticaAccount() — client-fund netting and the
+     * unrecorded-borrow shortfall diagnostic below are scoped to Etica
+     * specifically, NOT to every account that happens to hold client money.
+     * M-Pesa, Bank, and other pooled/working-float accounts can receive a
+     * client fund, but they are never flagged as "short" against the full
+     * client-fund obligation the way Etica is — that check only makes sense
+     * for the one account client money is actually meant to be parked in.
+     */
+    private function isEticaAccount(Account $account): bool
+    {
+        return $account->type === 'savings'
+            && str_contains(strtolower($account->name), 'etica');
+    }
+
+    /**
      * If the account holding pooled client money has a balance lower than the
      * sum of what ClientFund records say is still outstanding, the difference
      * is money that's been spent/withdrawn against client funds without ever
      * being logged as "borrowed" — either from before this feature existed,
      * or from a transfer that wasn't flagged as a client fund movement.
+     *
+     * Callers should only invoke this for the Etica account (see
+     * isEticaAccount()); index() filters to that scope before calling here.
      */
     private function getUnrecordedBorrowShortfall(Account $account): float
     {
