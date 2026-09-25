@@ -42,7 +42,7 @@ class ReportDataService
         'Client Funds',
         'Friend Loan Given',   // disbursement — not a real expense
         'Loan Recovery',       // principal returning — not real income
-        'Loan Interest',       // handled as its own Interest Income section
+        'Rolling Funds',
     ];
 
     /**

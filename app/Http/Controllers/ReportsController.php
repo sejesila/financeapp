@@ -30,7 +30,6 @@ class ReportsController extends Controller
     private const NON_INCOME_ONLY_CATEGORY_NAMES = [
         'Friend Loan Given',
         'Loan Recovery',
-        'Loan Interest',
     ];
 
     public function index(Request $request)
