@@ -877,11 +877,22 @@ class ClientFundController extends Controller
     }
 
     /**
-     * If the account holding pooled client money has a balance lower than the
-     * sum of what ClientFund records say is still outstanding, the difference
-     * is money that's been spent/withdrawn against client funds without ever
-     * being logged as "borrowed" — either from before this feature existed,
-     * or from a transfer that wasn't flagged as a client fund movement.
+     * If Etica's balance is lower than the FULL total of what ClientFund
+     * records say is still outstanding — across every client fund the user
+     * has, regardless of which account_id it happens to be tagged to — the
+     * difference is money that's been spent/withdrawn against client funds
+     * without ever being logged as "borrowed" (before this feature existed,
+     * or via a transfer that wasn't flagged as a client fund movement).
+     *
+     * Deliberately NOT scoped to `where('account_id', $account->id)`: a
+     * client fund is very often received into M-Pesa (see store()'s allowed
+     * account types) and only later, if at all, moved into Etica. Filtering
+     * by account_id here would only ever find funds specifically tagged to
+     * Etica and silently miss the money actually owed — the same
+     * understatement bug ReportDataService::getClientFundsBalanceAsAt()
+     * already fixed for net worth/report figures (see its docblock). This
+     * mirrors that fix: Etica is checked against the FULL global obligation,
+     * not just whatever slice was historically traced into it specifically.
      *
      * Callers should only invoke this for the Etica account (see
      * isEticaAccount()); index() filters to that scope before calling here.
@@ -889,7 +900,6 @@ class ClientFundController extends Controller
     private function getUnrecordedBorrowShortfall(Account $account): float
     {
         $outstandingTotal = ClientFund::where('user_id', Auth::id())
-            ->where('account_id', $account->id)
             ->where('balance', '>', 0)
             ->whereNotIn('status', ['cancelled'])
             ->sum('balance');
