@@ -72,6 +72,23 @@ class TransactionController extends Controller
 
         TransactionFilter::applyDateFilter($query, $filter, $startDate, $endDate);
 
+        // Aggregate total across the FULL filtered result set, before pagination
+        // truncates it to one page — computed from a clone of the query at this
+        // point, i.e. with every filter above applied but before the sort/join
+        // logic below (which selects 'transactions.*' and joins accounts/categories
+        // purely for ordering, not filtering) and before ->paginate() runs.
+        //
+        // Matches what each row's "Total:" annotation shows in the view
+        // ($t->total_amount = amount + feeTransaction.amount): a plain sum('amount')
+        // would silently exclude fees, since fee rows themselves are filtered out
+        // of the result set whenever $showFees is false.
+        $filteredTransactionIds = (clone $query)->pluck('transactions.id');
+
+        $filteredTotal = Transaction::whereIn('id', $filteredTransactionIds)->sum('amount')
+            + Transaction::where('is_transaction_fee', true)
+                ->whereIn('fee_for_transaction_id', $filteredTransactionIds)
+                ->sum('amount');
+
         match ($sortColumn) {
             'account' => $query->leftJoin('accounts', 'transactions.account_id', '=', 'accounts.id')
                 ->orderBy('accounts.name', $sortDirection)
@@ -94,7 +111,8 @@ class TransactionController extends Controller
             compact(
                 'transactions', 'filter', 'minYear', 'maxYear',
                 'categories', 'accounts', 'search', 'categoryId', 'accountId',
-                'startDate', 'endDate', 'showFees', 'sortColumn', 'sortDirection'
+                'startDate', 'endDate', 'showFees', 'sortColumn', 'sortDirection',
+                'filteredTotal'
             ),
             $this->stats->totals(),
             $this->stats->feeTotals(),
