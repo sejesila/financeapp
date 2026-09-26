@@ -592,10 +592,11 @@ class ReportDataServiceTest extends TestCase
     public function it_calculates_positive_net_worth_from_a_savings_account()
     {
         // Exercises the intended positive path: only accounts with
-        // type 'savings' feed into net_worth.
+        // type 'savings' AND name containing "Etica" feed into net_worth
+        // (see ReportDataService::isEticaAccount()).
         $savingsAccount = Account::factory()
             ->for($this->user)
-            ->create(['type' => 'savings', 'current_balance' => 100000]);
+            ->create(['type' => 'savings', 'name' => 'Etica', 'current_balance' => 100000]);
 
         Loan::factory()
             ->for($this->user)
@@ -751,7 +752,7 @@ class ReportDataServiceTest extends TestCase
     {
         $savingsAccount = Account::factory()
             ->for($this->user)
-            ->create(['type' => 'savings', 'current_balance' => 50000]);
+            ->create(['type' => 'savings', 'name' => 'Etica', 'current_balance' => 50000]);
 
         LoanGiven::factory()
             ->for($this->user)
@@ -799,7 +800,7 @@ class ReportDataServiceTest extends TestCase
     {
         $savingsAccount = Account::factory()
             ->for($this->user)
-            ->create(['type' => 'savings', 'current_balance' => 50000]);
+            ->create(['type' => 'savings', 'name' => 'Etica', 'current_balance' => 50000]);
 
         LoanGiven::factory()
             ->for($this->user)
@@ -1073,7 +1074,7 @@ class ReportDataServiceTest extends TestCase
     {
         $savingsAccount = Account::factory()
             ->for($this->user)
-            ->create(['type' => 'savings', 'current_balance' => 50000]);
+            ->create(['type' => 'savings', 'name' => 'Etica', 'current_balance' => 50000]);
 
         ClientFund::create([
             'user_id'         => $this->user->id,

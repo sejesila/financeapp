@@ -298,6 +298,22 @@ class TransactionService
         $budget->amount += $transaction->amount;
         $budget->save();
     }
+    private function reverseBudgetContribution(int $userId, int $categoryId, string $date, float $amount): void
+    {
+        $parsed = Carbon::parse($date);
+
+        $budget = Budget::where([
+            'category_id' => $categoryId,
+            'year'        => $parsed->year,
+            'month'       => $parsed->month,
+            'user_id'     => $userId,
+        ])->first();
+
+        if ($budget) {
+            $budget->amount -= $amount;
+            $budget->save();
+        }
+    }
 
     public function updateTransaction(Transaction $transaction, array $data): Transaction
     {
@@ -316,15 +332,20 @@ class TransactionService
                 throw new Exception('Unauthorized access to this category.');
             }
 
+            // Capture pre-update state so its budget contribution can be reversed.
+            $oldAmount      = (float) $transaction->amount;
+            $oldCategoryId  = $transaction->category_id;
+            $oldBudgetDate  = $transaction->period_date ?? $transaction->date;
+
             $oldAccount     = $transaction->account;
             $accountChanged = $oldAccount->id !== $newAccount->id;
 
             $isMobileMoney   = in_array($newAccount->type, ['mpesa', 'airtel_money']);
             $transactionType = $isMobileMoney ? ($data['mobile_money_type'] ?? 'send_money') : null;
 
-            $newTransactionCost = $this->calculateTransactionCost(
-                $data['amount'],
-                $newAccount->type,
+            $newTransactionCost = $this->resolveTransactionCost(
+                $data,
+                $newAccount,
                 $transactionType ?? 'send_money',
                 $category
             );
@@ -351,6 +372,7 @@ class TransactionService
                 $this->clearAccountCache($newAccount->id);
             }
 
+            $this->reverseBudgetContribution($transaction->user_id, $oldCategoryId, $oldBudgetDate, $oldAmount);
             $this->updateBudgetFromTransaction($transaction);
 
             return $transaction->fresh(['account', 'category', 'feeTransaction']);
@@ -405,6 +427,13 @@ class TransactionService
                     ->find($transaction->related_fee_transaction_id);
                 $feeTransaction?->delete();
             }
+
+            $this->reverseBudgetContribution(
+                $transaction->user_id,
+                $transaction->category_id,
+                $transaction->period_date ?? $transaction->date,
+                (float) $transaction->amount
+            );
 
             $transaction->delete();
             $this->recalculateAccountBalance($account);

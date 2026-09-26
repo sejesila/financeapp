@@ -224,9 +224,11 @@ class ReportDataServiceIntegrationTest extends TestCase
         // Companion to it_handles_complex_financial_scenario: exercises the
         // intended positive-net-worth path by actually setting type =>
         // 'savings' on the account, so it is picked up by
-        // getSavingsBalanceAsAt().
+        // getSavingsBalanceAsAt(). name must contain "etica" too — see
+        // ReportDataService::isEticaAccount().
         $savingsAccount = Account::factory()->for($this->user)->create([
             'type'            => 'savings',
+            'name'            => 'Etica',
             'current_balance' => 150000,
         ]);
 
@@ -245,6 +247,7 @@ class ReportDataServiceIntegrationTest extends TestCase
     {
         $savingsAccount = Account::factory()->for($this->user)->create([
             'type'            => 'savings',
+            'name'            => 'Etica',
             'current_balance' => 200000,
         ]);
         $mpesaAccount = Account::factory()->for($this->user)->create([
@@ -313,16 +316,21 @@ class ReportDataServiceIntegrationTest extends TestCase
 
         $report = $this->service->generateAnnualReport($this->user);
 
-        // Only the ordinary salary/food transactions should count —
-        // none of the loan-given cash flows leak into these totals.
-        $this->assertEquals(100000, $report['income']);
+        // Ordinary salary (100,000) plus the 5,000 Loan Interest transaction —
+        // interest on a loan given counts as real income and is included here,
+        // in addition to being broken out separately via
+        // loan_given_interest_income. Only the disbursement/recovery legs of
+        // the loan-given lifecycle (Friend Loan Given, Loan Recovery) are
+        // excluded from income/expenses, since those are principal moving,
+        // not profit.
+        $this->assertEquals(105000, $report['income']);
         $this->assertEquals(20000, $report['expenses']);
 
         // Loan is fully closed by year end, so total_loans_given (active
         // only) is 0 — the balance already came back as cash in savings.
         $this->assertEquals(0, $report['total_loans_given']);
 
-        // Interest earned is tracked on its own line.
+        // Interest earned is also tracked on its own dedicated line.
         $this->assertEquals(5000, $report['loan_given_interest_income']);
 
         // Activity summary reflects the full lifecycle.

@@ -211,24 +211,18 @@ class TransactionController extends Controller
             return redirect()->back()->with('error', 'System-generated transaction fees cannot be deleted directly. Delete the main transaction instead.');
         }
 
-        DB::beginTransaction();
-
         try {
-            Transaction::find($transaction->related_fee_transaction_id)?->delete();
-            $transaction->delete();
-            //$transaction->account->updateBalance();
-
-            DB::commit();
+            $this->transactionService->deleteTransaction($transaction);
 
             return redirect()->route('transactions.index')
                 ->with('success', 'Transaction deleted successfully. Account balance has been updated.');
 
         } catch (Exception $e) {
-            DB::rollBack();
             Log::error('Transaction deletion failed: ' . $e->getMessage());
             return back()->with('error', 'Failed to delete transaction: ' . $e->getMessage());
         }
     }
+
 
     public function restore($id)
     {

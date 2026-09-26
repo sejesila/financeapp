@@ -645,6 +645,18 @@ class LoanGivenController extends Controller implements HasMiddleware
                             $affectedAccountIds,
                             $this->splitInterestFromRolloverPayment($transaction, $newInterestToRecognize, $loanGiven, $payment->id)
                         );
+
+                        // FIX: without this, $payment->interest_portion stays 0 even
+                        // though real money was just carved out of its transaction
+                        // as interest. LoanGiven::updateBalance() computes
+                        // principal_paid = sum(amount - interest_portion) across all
+                        // payments — leaving this at 0 silently overstates
+                        // principal_paid (and therefore understates what's still
+                        // owed) by exactly this amount the moment updateBalance()
+                        // is ever recalculated for this loan again, e.g. when
+                        // LoanGivenController::reverseInterest() reopens it.
+                        $payment->interest_portion = round($newInterestToRecognize, 2);
+                        $payment->save();
                     }
 
                     $this->applyReferrerDeduction($loanGiven, ($validated['referrer_deducted_before_deposit'] ?? null) === '1');
@@ -952,12 +964,6 @@ class LoanGivenController extends Controller implements HasMiddleware
 
     private function splitInterestOutOfFinalPayment(LoanGiven $loanGiven, ?Account $interestAccount = null): array
     {
-        $interestAmount = (float)$loanGiven->interest_amount;
-
-        if ($interestAmount <= 0) {
-            return [];
-        }
-
         $lastPayment = $loanGiven->payments()
             ->with('account')
             ->orderByDesc('payment_date')
@@ -965,6 +971,23 @@ class LoanGivenController extends Controller implements HasMiddleware
             ->first();
 
         if (!$lastPayment || !$lastPayment->transaction_id) {
+            return [];
+        }
+
+        // Same fix already applied in recordPayment()'s closing branch:
+        // interest_amount here is the FULL lifetime interest (closeAsRepaid()
+        // derives it from lifetime amount_paid), but earlier rollover payments
+        // may have already had their own interest_portion split out into their
+        // own "Loan Interest" transactions via splitInterestFromRolloverPayment().
+        // Only interest NOT already recognized should be carved out here, or it
+        // gets double-counted as income.
+        $alreadyRecognizedInterest = (float)$loanGiven->payments()
+            ->where('id', '!=', $lastPayment->id)
+            ->sum('interest_portion');
+
+        $interestAmount = max(0, (float)$loanGiven->interest_amount - $alreadyRecognizedInterest);
+
+        if ($interestAmount <= 0) {
             return [];
         }
 
@@ -985,7 +1008,6 @@ class LoanGivenController extends Controller implements HasMiddleware
             $transaction->save();
         }
 
-        // Get the interest category - this will now use the existing "Interest" category if available
         $interestCategory = $this->firstOrCreateCategory('Loan Interest', 'income');
         $destinationAccountId = $interestAccount->id ?? $lastPayment->account_id;
 
@@ -1000,6 +1022,12 @@ class LoanGivenController extends Controller implements HasMiddleware
             'date' => $lastPayment->payment_date,
             'reference_id' => $lastPayment->id,
         ]);
+
+        // Keep the payment's own interest_portion in sync with what was actually
+        // carved out of it — see the note below on why this also matters for
+        // updateBalance() and reverseInterest().
+        $lastPayment->interest_portion = round((float)$lastPayment->interest_portion + $interestAmount, 2);
+        $lastPayment->save();
 
         $affectedAccountIds[] = $destinationAccountId;
 

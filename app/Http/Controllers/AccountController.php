@@ -1019,7 +1019,7 @@ class AccountController extends Controller
 
         if ($transfer->created_at->diffInMinutes(now()) > 180) {
             return redirect()->route('accounts.show', ['account' => $account, 'tab' => 'transfers'])
-                ->with('error', 'Transfers can only be reversed within 60 minutes of being made.');
+                ->with('error', 'Transfers can only be reversed within 180 minutes of being made.');
         }
 
         $request->validate([
@@ -1033,7 +1033,7 @@ class AccountController extends Controller
         $feeAmount      = $feeTransaction?->amount ?? 0;
 
         DB::transaction(function () use ($transfer, $feeTransaction) {
-            //$feeTransaction?->delete();
+            $feeTransaction?->delete();
             $transfer->delete();
         });
 
