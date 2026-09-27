@@ -1152,6 +1152,11 @@ class LoanGivenController extends Controller implements HasMiddleware
                 return back()->with('error', 'This transaction is not an interest transaction.');
             }
 
+            // Reversal window: interest can only be undone within 6 hours of being recorded.
+            if ($transaction->created_at->diffInMinutes(now()) > 360) {
+                return back()->with('error', 'Interest can only be reversed within 6 hours of being recorded.');
+            }
+
             $loanGiven = null;
 
             if ($transaction->reference_id) {

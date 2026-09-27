@@ -610,7 +610,7 @@
                                         @endphp
 
                                         <td class="px-4 py-3 text-right whitespace-nowrap">
-                                            @if($txn->category->name === 'Loan Interest')
+                                            @if($txn->category->name === 'Loan Interest' && $txn->created_at->diffInMinutes(now()) <= 360)
                                                 {{-- Route through the loan-aware reversal, not the generic top-up one --}}
                                                 <form id="reverse-interest-form-{{ $txn->id }}"
                                                       action="{{ route('transactions.reverse-interest', $txn) }}"
@@ -627,7 +627,7 @@
                                                     </svg>
                                                     Reverse
                                                 </button>
-                                            @elseif(!$isLoanLinked && !($txn->is_grouped ?? false) && $txn->created_at->diffInMinutes(now()) <= 360)
+                                            @elseif(!$isLoanLinked && !($txn->is_grouped ?? false) && $txn->created_at->diffInMinutes(now()) <= 720)
                                                 <a href="{{ route('accounts.topup.reverse.form', ['account' => $account, 'transaction' => $txn]) }}"
                                                    title="Reverse this top-up"
                                                    class="inline-flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-700 dark:text-red-400 transition-colors">

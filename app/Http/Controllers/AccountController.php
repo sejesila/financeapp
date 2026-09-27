@@ -832,9 +832,9 @@ class AccountController extends Controller
     {
         if ($account->user_id !== Auth::id()) abort(403);
 
-        if ($transaction->created_at->diffInMinutes(now()) > 360) {
+        if ($transaction->created_at->diffInMinutes(now()) > 720) {
             return redirect()->route('accounts.show', ['account' => $account, 'tab' => 'topups'])
-                ->with('error', 'Top-ups can only be reversed within 30 minutes of being recorded.');
+                ->with('error', 'Top-ups can only be reversed within 12 hours of being recorded.');
         }
 
         if (! in_array($transaction->category->type, ['income', 'liability'])) {
@@ -851,15 +851,16 @@ class AccountController extends Controller
     {
         if ($account->user_id !== Auth::id()) abort(403);
 
-        if ($transaction->created_at->diffInMinutes(now()) > 360) {
+        if ($transaction->created_at->diffInMinutes(now()) > 720) {
             return redirect()->route('accounts.show', ['account' => $account, 'tab' => 'topups'])
-                ->with('error', 'Top-ups can only be reversed within 30 minutes of being recorded.');
+                ->with('error', 'Top-ups can only be reversed within 12 hours of being recorded.');
         }
 
         if (! in_array($transaction->category->type, ['income', 'liability'])) {
             return redirect()->route('accounts.show', $account)
                 ->with('error', 'Only top-up transactions can be reversed.');
         }
+
 
         $request->validate([
             'reason' => 'nullable|string|max:500',
