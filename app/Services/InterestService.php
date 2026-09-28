@@ -211,42 +211,4 @@ class InterestService
         return ! $this->canRecordToday($account);
     }
 
-    // ════════════════════════════════════════════════════════════════════════════
-    // SECTION 5: Deprecated / Legacy shims
-    // ════════════════════════════════════════════════════════════════════════════
-
-    /** @deprecated Use canRecordToday() */
-    public function canRecordTodayKey(Account $account): bool
-    {
-        return $this->canRecordToday($account);
-    }
-
-    /** @deprecated Use getSkippedDaysCount() */
-    public function getSkippedMonthsCount(Account $account): ?int
-    {
-        return $this->getSkippedDaysCount($account);
-    }
-
-    /** @deprecated Use getSkippedDaysCount() */
-    public function getSkippedMonthsMessage(Account $account): ?string
-    {
-        $skipped = $this->getSkippedDaysCount($account);
-
-        if ($skipped === null || $skipped === 0) {
-            return null;
-        }
-
-        $totalDays = $skipped + 1;
-        $dayWord   = $skipped === 1 ? 'day' : 'days';
-
-        return "You skipped {$skipped} {$dayWord}. "
-            . "Is the interest being recorded for the last {$totalDays} days?";
-    }
-
-    /** @deprecated Not used in day-based logic */
-    public function getTargetMonth(): \Carbon\CarbonInterface
-    {
-        return now()->subMonthNoOverflow()->startOfMonth();
-    }
-
 }
