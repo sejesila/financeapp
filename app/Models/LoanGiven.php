@@ -38,6 +38,7 @@ class LoanGiven extends Model
         'expected_interest_rate',
         'expected_interest_amount',
         'rollover_count',
+        'capitalized_interest',
     ];
 
     protected $casts = [
@@ -56,6 +57,7 @@ class LoanGiven extends Model
         'expected_interest_rate'   => 'decimal:2',
         'expected_interest_amount' => 'decimal:2',
         'rollover_count'           => 'integer',
+        'capitalized_interest' => 'decimal:2',
 
     ];
 
@@ -105,7 +107,7 @@ class LoanGiven extends Model
      */
     public function getSurplusReceivedAttribute()
     {
-        return max(0, $this->amount_paid - $this->principal_amount);
+        return max(0, $this->amount_paid - $this->original_principal);
     }
     /**
      * The full amount still expected back on this loan: principal plus any
@@ -145,6 +147,11 @@ class LoanGiven extends Model
             (float) $this->balance * ((float) $this->expected_interest_rate / 100),
             2
         );
+    }
+    /** What was actually handed to the borrower, before any rollover capitalization. */
+    public function getOriginalPrincipalAttribute()
+    {
+        return (float) $this->principal_amount - (float) $this->capitalized_interest;
     }
 
     public function isOverdue()
@@ -198,13 +205,17 @@ class LoanGiven extends Model
      */
     public function closeAsRepaid(?string $repaidDate = null)
     {
-        $this->interest_amount = max(0, $this->amount_paid - $this->principal_amount);
-        $this->interest_rate   = $this->principal_amount > 0
-            ? round(($this->interest_amount / $this->principal_amount) * 100, 2)
+        // Measure interest against what was actually handed out, not the
+        // rolled-over (capitalized) principal.
+        $original = $this->original_principal;
+
+        $this->interest_amount = max(0, $this->amount_paid - $original);
+        $this->interest_rate   = $original > 0
+            ? round(($this->interest_amount / $original) * 100, 2)
             : 0;
 
         $this->status      = 'paid';
-        $this->balance      = 0;
+        $this->balance     = 0;
         $this->repaid_date = $repaidDate ?? now()->toDateString();
         $this->save();
     }
@@ -305,6 +316,9 @@ class LoanGiven extends Model
             $newExpectedInterest = round($newPrincipal * ($rate / 100), 2);
 
             $this->principal_amount = $newPrincipal;
+            // Track how much of principal_amount is rolled-in interest, so the
+            // original disbursed amount is always recoverable.
+            $this->capitalized_interest = round((float) $this->capitalized_interest + $expectedInterest, 2);
             $this->expected_interest_amount = $newExpectedInterest;
             $this->due_date = $this->due_date->copy()->addDays($rolloverDays);
             $this->rollover_count = ($this->rollover_count ?? 0) + 1;

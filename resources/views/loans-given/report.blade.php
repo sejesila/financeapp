@@ -79,11 +79,11 @@
                                         {{-- Distinct from Principal (disbursed) at the far right: this is
                                              what's actually still owed on the loan right now
                                              (principal_amount - principal_paid), which can be lower than
-                                             the original disbursed amount once partial payments have come
-                                             in — Principal itself never changes, since amount_paid/
-                                             interest_amount at closure are both derived against it across
-                                             the loan's whole life (see LoanGiven::closeAsRepaid()/
-                                             updateBalance()). --}}
+                                             the disbursed amount once partial payments have come in, or
+                                             higher once interest has been rolled into principal.
+                                             Principal (disbursed) uses original_principal, i.e.
+                                             principal_amount minus capitalized_interest, so it never
+                                             changes across rollovers (see LoanGiven::closeAsRepaid()). --}}
                                         <th class="py-2 pr-4">
                                             Remaining Principal
                                             <span class="block normal-case font-normal text-gray-400">(still owed)</span>
@@ -113,7 +113,7 @@
                                                 @endif
                                             </td>
                                             <td class="py-2 pr-4 capitalize">{{ str_replace('_', ' ', $loan->status) }}</td>
-                                            <td class="py-2 pr-4">KES {{ number_format($loan->principal_amount, 0) }}</td>
+                                            <td class="py-2 pr-4">KES {{ number_format($loan->original_principal, 0) }}</td>
                                         </tr>
                                     @endforeach
                                     </tbody>
@@ -124,7 +124,7 @@
                                         <td class="py-2 pr-4 font-medium">KES {{ number_format($loans->sum('outstanding_amount'), 0) }}</td>
                                         <td class="py-2 pr-4"></td>
                                         <td class="py-2 pr-4"></td>
-                                        <td class="py-2 pr-4 font-medium">KES {{ number_format($loans->sum('principal_amount'), 0) }}</td>
+                                        <td class="py-2 pr-4 font-medium">KES {{ number_format($loans->sum(fn ($l) => $l->original_principal), 0) }}</td>
                                     </tr>
                                     </tfoot>
                                 </table>

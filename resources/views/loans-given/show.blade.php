@@ -137,11 +137,25 @@
                         <div>
                             <h3 class="text-lg font-medium text-gray-900 mb-3">Loan Details</h3>
                             <dl class="space-y-2">
+                                {{-- Principal is what was actually disbursed. principal_amount
+                                     itself grows with every rollover (capitalized interest is
+                                     folded into it), so it's shown separately below. --}}
                                 <div class="flex justify-between py-2 border-b border-gray-100">
                                     <dt class="text-sm font-medium text-gray-500">Principal</dt>
                                     <dd class="text-sm text-gray-900">
-                                        KES {{ number_format($loanGiven->principal_amount, 0) }}</dd>
+                                        KES {{ number_format($loanGiven->original_principal, 0) }}</dd>
                                 </div>
+                                @if($loanGiven->capitalized_interest > 0)
+                                    <div class="flex justify-between items-start py-2 border-b border-gray-100">
+                                        <dt class="text-sm font-medium text-gray-500 shrink-0">Capitalized Interest</dt>
+                                        <dd class="text-sm text-gray-600 text-right">
+                                            KES {{ number_format($loanGiven->capitalized_interest, 0) }}
+                                            <span class="block text-xs text-gray-400">
+                                                Rolled into principal — current principal KES {{ number_format($loanGiven->principal_amount, 0) }}
+                                            </span>
+                                        </dd>
+                                    </div>
+                                @endif
                                 @if($disbursementFee)
                                     <div class="flex justify-between py-2 border-b border-gray-100">
                                         <dt class="text-sm font-medium text-gray-500">Transaction Cost</dt>
@@ -460,7 +474,7 @@
                 </div>
                 <div class="text-sm text-gray-600 space-y-2 mb-4">
                     <p>Principal: <span
-                            class="font-medium text-gray-900">KES {{ number_format($loanGiven->principal_amount, 0) }}</span>
+                            class="font-medium text-gray-900">KES {{ number_format($loanGiven->original_principal, 0) }}</span>
                     </p>
                     <p>Total received so far: <span
                             class="font-medium text-gray-900">KES {{ number_format($loanGiven->amount_paid, 0) }}</span>
@@ -469,7 +483,7 @@
                         Closing now will mark this loan as paid and calculate interest as
                         <span
                             class="font-medium text-gray-900">KES {{ number_format($loanGiven->surplus_received, 0) }}</span>
-                        ({{ $loanGiven->principal_amount > 0 ? number_format(($loanGiven->surplus_received / $loanGiven->principal_amount) * 100, 1) : 0 }}
+                        ({{ $loanGiven->original_principal > 0 ? number_format(($loanGiven->surplus_received / $loanGiven->original_principal) * 100, 1) : 0 }}
                         %).
                     </p>
                     @if($loanGiven->referrer)

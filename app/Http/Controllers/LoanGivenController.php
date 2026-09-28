@@ -103,7 +103,7 @@ class LoanGivenController extends Controller implements HasMiddleware
             $allLoans = LoanGiven::where('user_id', Auth::id())->get();
             $paidLoansCollection = $allLoans->where('status', 'paid');
 
-            $totalPrincipal = $allLoans->sum('principal_amount');
+            $totalPrincipal = $allLoans->sum(fn ($l) => $l->original_principal);
             $totalRepaid = $paidLoansCollection->sum('amount_paid');
             // A closed loan's interest_amount already captures ALL interest it
             // ever earned (including any rollover payments before it closed),
@@ -825,7 +825,7 @@ class LoanGivenController extends Controller implements HasMiddleware
 
             $referrers = Referrer::where('is_active', true)->orderBy('name')->get();
 
-            $grandTotalPrincipal = $loans->sum('principal_amount');
+            $grandTotalPrincipal = $loans->sum(fn ($l) => $l->original_principal);
             $grandTotalOutstanding = $loans->sum('outstanding_amount');
 
             return view('loans-given.report', compact(

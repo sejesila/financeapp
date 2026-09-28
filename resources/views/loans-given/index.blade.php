@@ -371,8 +371,15 @@
                                                 <div class="flex justify-between">
                                                     <span class="text-gray-500">Principal:</span>
                                                     <span
-                                                        class="font-medium">KES {{ number_format($loan->principal_amount, 0) }}</span>
+                                                        class="font-medium">KES {{ number_format($loan->original_principal, 0) }}</span>
                                                 </div>
+                                                @if($loan->capitalized_interest > 0)
+                                                    <div class="flex justify-between">
+                                                        <span class="text-gray-500">Capitalized Interest:</span>
+                                                        <span
+                                                            class="font-medium">KES {{ number_format($loan->capitalized_interest, 0) }}</span>
+                                                    </div>
+                                                @endif
                                                 <div class="flex justify-between">
                                                     <span class="text-gray-500">Remaining Principal:</span>
                                                     <span
@@ -642,7 +649,7 @@
                                             <tr>
                                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $loan->borrower_name }}</td>
                                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                    KES {{ number_format($loan->principal_amount, 0) }}</td>
+                                                    KES {{ number_format($loan->original_principal, 0) }}</td>
                                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                     @if($loan->interest_amount > 0)
                                                         KES {{ number_format($loan->interest_amount, 0) }}
