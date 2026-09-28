@@ -248,21 +248,5 @@ class InterestService
     {
         return now()->subMonthNoOverflow()->startOfMonth();
     }
-    public function getReversibleInterestBatch(Account $account): ?string
-    {
-        $last = $account->transactions()
-            ->whereNull('deleted_at')
-            ->join('categories', 'transactions.category_id', '=', 'categories.id')
-            ->where('categories.name', 'Interest')
-            ->whereNotNull('transactions.batch_id')
-            ->orderByDesc('transactions.created_at')
-            ->select('transactions.batch_id', 'transactions.created_at')
-            ->first();
 
-        if (! $last || Carbon::parse($last->created_at)->diffInMinutes(now()) > 60) {
-            return null;
-        }
-
-        return $last->batch_id;
-    }
 }

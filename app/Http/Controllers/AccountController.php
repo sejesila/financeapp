@@ -428,11 +428,9 @@ class AccountController extends Controller
         }
 
         // ── "Record Interest" button guard (day-based) ────────────────────────
-        $interestRecordedToday   = false;
-        $reversibleInterestBatch = null;
+        $interestRecordedToday = false;
         if ($account->type === 'savings') {
-            $interestRecordedToday   = ! $this->interestService->canRecordToday($account);
-            $reversibleInterestBatch = $this->interestService->getReversibleInterestBatch($account);
+            $interestRecordedToday = ! $this->interestService->canRecordToday($account);
         }
 
         return view('accounts.show', [
@@ -460,71 +458,10 @@ class AccountController extends Controller
             'selectedYear'          => $selectedYear,
             'selectedPeriod'        => $selectedPeriod,
             'interestRecordedToday' => $interestRecordedToday,
-            'interestRecordedToday'   => $interestRecordedToday,
-            'reversibleInterestBatch' => $reversibleInterestBatch,
         ]);
     }
-    // ── reverse interest form ─────────────────────────────────────────────────
 
-    public function reverseInterestForm(Account $account, string $batchId)
-    {
-        if ($account->user_id !== Auth::id()) abort(403);
 
-        $entries = $account->transactions()
-            ->whereNull('deleted_at')
-            ->where('batch_id', $batchId)
-            ->whereHas('category', fn($q) => $q->where('name', 'Interest'))
-            ->orderBy('date')
-            ->get();
-
-        if ($entries->isEmpty()) abort(404);
-
-        if ($entries->min('created_at')->diffInMinutes(now()) > 60) {
-            return redirect()->route('accounts.show', $account)
-                ->with('error', 'Interest can only be reversed within 1 hour of being recorded.');
-        }
-
-        return view('accounts.reverse-interest', compact('account', 'entries', 'batchId'));
-    }
-
-// ── reverse interest post ────────────────────────────────────────────────
-
-    public function reverseInterest(Request $request, Account $account, string $batchId)
-    {
-        if ($account->user_id !== Auth::id()) abort(403);
-
-        $entries = $account->transactions()
-            ->whereNull('deleted_at')
-            ->where('batch_id', $batchId)
-            ->whereHas('category', fn($q) => $q->where('name', 'Interest'))
-            ->get();
-
-        if ($entries->isEmpty()) abort(404);
-
-        if ($entries->min('created_at')->diffInMinutes(now()) > 60) {
-            return redirect()->route('accounts.show', $account)
-                ->with('error', 'Interest can only be reversed within 1 hour of being recorded.');
-        }
-
-        $request->validate(['reason' => 'nullable|string|max:500']);
-
-        $total = $entries->sum('amount');
-        $count = $entries->count();
-
-        DB::transaction(function () use ($entries) {
-            foreach ($entries as $entry) {
-                $entry->delete();
-            }
-        });
-
-        $this->clearAccountCache($account->id);
-
-        $message = $count === 1
-            ? 'Interest of KES ' . number_format($total, 0, '.', ',') . ' has been reversed.'
-            : 'Interest of KES ' . number_format($total, 0, '.', ',') . " across {$count} days has been reversed.";
-
-        return redirect()->route('accounts.show', $account)->with('success', $message);
-    }
 
     // ── edit / update ─────────────────────────────────────────────────────────
 
@@ -703,8 +640,7 @@ class AccountController extends Controller
             abort(403);
         }
 
-        $isEtica = $account->type === 'savings' && strtolower($account->name) === 'etica';
-        if ($account->type === 'wallet' || ($account->type === 'savings' && !$isEtica)) {
+        if (in_array($account->type, ['wallet', 'savings'])) {
             return redirect()->route('accounts.index')
                 ->with('error', 'This account can only receive money via transfers.');
         }
@@ -724,8 +660,7 @@ class AccountController extends Controller
             abort(403);
         }
 
-        $isEtica = $account->type === 'savings' && strtolower($account->name) === 'etica';
-        if ($account->type === 'wallet' || ($account->type === 'savings' && ! $isEtica)) {
+        if (in_array($account->type, ['wallet', 'savings'])) {
             return redirect()->route('accounts.index')
                 ->with('error', 'This account can only receive money via transfers.');
         }

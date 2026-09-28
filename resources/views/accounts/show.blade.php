@@ -92,20 +92,16 @@
                         @endif
                     </div>
                     <div class="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                        <a href="{{ route('accounts.topup', $account) }}"
-                           class="bg-green-600 text-white px-6 py-2.5 rounded-lg hover:bg-green-700 transition text-center font-medium shadow-md">
-                            + Top Up Account
-                        </a>
+                        @unless($account->type === 'savings' && strtolower($account->name) === 'etica')
+                            <a href="{{ route('accounts.topup', $account) }}"
+                               class="bg-green-600 text-white px-6 py-2.5 rounded-lg hover:bg-green-700 transition text-center font-medium shadow-md">
+                                + Top Up Account
+                            </a>
+                        @endunless
                         @if($account->type === 'savings' && !$interestRecordedToday)
                             <a href="{{ route('accounts.interest.form', $account) }}"
                                class="bg-emerald-600 text-white px-6 py-2.5 rounded-lg hover:bg-emerald-700 transition text-center font-medium shadow-md">
                                 📈 Record Interest
-                            </a>
-                        @endif
-                        @if($account->type === 'savings' && $reversibleInterestBatch)
-                            <a href="{{ route('accounts.interest.reverse.form', ['account' => $account, 'batchId' => $reversibleInterestBatch]) }}"
-                               class="bg-amber-600 text-white px-6 py-2.5 rounded-lg hover:bg-amber-700 transition text-center font-medium shadow-md">
-                                ↩ Undo Interest
                             </a>
                         @endif
                         @if($account->type === 'savings')
@@ -661,10 +657,12 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                 </svg>
                                 <p class="text-gray-500 font-medium mb-1">No top-ups yet</p>
-                                <a href="{{ route('accounts.topup', $account) }}"
-                                   class="inline-block mt-2 bg-green-600 text-white px-5 py-2 rounded-lg hover:bg-green-700 transition text-sm">
-                                    Top Up Now
-                                </a>
+                                @unless($account->type === 'savings' && strtolower($account->name) === 'etica')
+                                    <a href="{{ route('accounts.topup', $account) }}"
+                                       class="inline-block mt-2 bg-green-600 text-white px-5 py-2 rounded-lg hover:bg-green-700 transition text-sm">
+                                        Top Up Now
+                                    </a>
+                                @endunless
                             @endif
                         </div>
                     @endif
