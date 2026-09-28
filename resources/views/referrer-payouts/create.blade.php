@@ -115,22 +115,35 @@
                                 </div>
 
 
-                                <div>
+                                <div x-data="{ accountId: '{{ old('account_id') }}', floatId: '{{ $floatAccount?->id }}' }">
                                     <label for="account_id" class="block text-sm font-medium text-gray-700">Pay From
                                         Account <span class="text-red-600">*</span></label>
-                                    <select id="account_id" name="account_id"
+                                    <select id="account_id" name="account_id" x-model="accountId"
                                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 @error('account_id') border-red-500 @enderror"
                                             required>
                                         <option value="">Select Account</option>
                                         @foreach($accounts as $account)
-                                            <option
-                                                value="{{ $account->id }}" {{ old('account_id') == $account->id ? 'selected' : '' }}>
+                                            <option value="{{ $account->id }}" {{ old('account_id') == $account->id ? 'selected' : '' }}>
                                                 {{ $account->name }}
                                                 (KES {{ number_format($account->current_balance, 0) }})
+                                                @if($floatAccount && $floatAccount->id === $account->id) — her float @endif
                                             </option>
                                         @endforeach
                                     </select>
                                     @error('account_id')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+
+                                    @if($floatAccount)
+                                        <template x-if="accountId === floatId">
+                                            <div class="mt-2 bg-teal-50 border-l-4 border-teal-400 p-3">
+                                                <p class="text-xs text-teal-800">
+                                                    Paying from {{ $referrer->name }}'s float (currently
+                                                    KES {{ number_format($floatAccount->current_balance, 0) }}). Her commission comes out of
+                                                    money she's holding for you, so each loan's cut is also marked as settled on the
+                                                    Reconcile Float page. What she still owes you drops by the same amount.
+                                                </p>
+                                            </div>
+                                        </template>
+                                    @endif
                                 </div>
 
                                 <div>

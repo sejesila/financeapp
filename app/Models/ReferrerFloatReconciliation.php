@@ -15,6 +15,7 @@ class ReferrerFloatReconciliation extends Model
         'loan_given_id',
         'transfer_id',
         'amount',
+        'referrer_payout_id',
     ];
 
     protected $casts = [
@@ -38,5 +39,9 @@ class ReferrerFloatReconciliation extends Model
     public function transfer()
     {
         return $this->belongsTo(Transfer::class);
+    }
+    public function payout()
+    {
+        return $this->belongsTo(ReferrerPayout::class, 'referrer_payout_id');
     }
 }

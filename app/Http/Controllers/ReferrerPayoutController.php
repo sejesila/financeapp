@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Account;
 use App\Models\Category;
 use App\Models\Referrer;
+use App\Models\ReferrerFloatReconciliation;
 use App\Models\ReferrerPayout;
 use App\Models\Transaction;
 use Exception;
@@ -45,7 +46,11 @@ class ReferrerPayoutController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('referrer-payouts.create', compact('referrer', 'unpaidLoans', 'totalInterest', 'totalCut', 'accounts'));
+        $floatAccount = $referrer->floatAccount;
+
+        return view('referrer-payouts.create', compact(
+            'referrer', 'unpaidLoans', 'totalInterest', 'totalCut', 'accounts', 'floatAccount'
+        ));
     }
 
     public function store(Request $request, Referrer $referrer)
@@ -95,6 +100,12 @@ class ReferrerPayoutController extends Controller
         if ($account->current_balance < $amountPaid) {
             return back()->with('error', "Insufficient balance in {$account->name} to pay out KES " . number_format($amountPaid, 0));
         }
+        // Paying out of HER OWN float account: the commission leaves money she's
+// holding for us, so the same amount must be marked settled in float
+// reconciliation, or the pending figure would still count her cut as owed
+// back to us.
+        $paidFromFloat = $referrer->floatAccount && $referrer->floatAccount->id === $account->id;
+        $pendingByLoan = $paidFromFloat ? $referrer->pendingFloatInterestByLoan() : collect();
 
         DB::beginTransaction();
 
@@ -134,12 +145,41 @@ class ReferrerPayoutController extends Controller
                 $loan->referrer_payout_id = $payout->id;
                 $loan->save();
             });
+            $settledInFloat = 0;
+
+            if ($paidFromFloat) {
+                foreach ($loans as $loan) {
+                    $sharePct = $loan->referrer_share_percentage ?? $referrer->default_share_percentage;
+                    $cut = round($loan->interest_amount * ($sharePct / 100), 2);
+
+                    // Never settle more than is actually pending for that loan: if some of
+                    // the interest was routed elsewhere on closing, only the part that
+                    // really sat in the float can be reconciled here.
+                    $settle = min($cut, (float) ($pendingByLoan[$loan->id] ?? 0));
+
+                    if ($settle > 0.01) {
+                        ReferrerFloatReconciliation::create([
+                            'user_id' => Auth::id(),
+                            'loan_given_id' => $loan->id,
+                            'transfer_id' => null,
+                            'referrer_payout_id' => $payout->id,
+                            'amount' => $settle,
+                        ]);
+                        $settledInFloat += $settle;
+                    }
+                }
+            }
 
             DB::commit();
             $account->updateBalance();
 
-            return redirect()->route('referrers.show', $referrer)
-                ->with('success', "Paid KES " . number_format($amountPaid, 0) . " to {$referrer->name} for {$loans->count()} loan(s).");
+            $msg = "Paid KES " . number_format($amountPaid, 0) . " to {$referrer->name} for {$loans->count()} loan(s).";
+            if ($paidFromFloat) {
+                $msg .= " Taken from her float; KES " . number_format($settledInFloat, 0)
+                    . " marked as settled in float reconciliation.";
+            }
+
+            return redirect()->route('referrers.show', $referrer)->with('success', $msg);
 
         } catch (Exception $e) {
             DB::rollBack();
