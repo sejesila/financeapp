@@ -100,7 +100,7 @@ class LoanGivenController extends Controller implements HasMiddleware
             $paidLoans = $paidLoansQuery->orderBy('repaid_date', 'desc')->orderBy('updated_at', 'desc')->paginate(15)->withQueryString();
 
             // ── Stats period (independent of the paid-list "period" filter) ───
-            $statsPeriod = $request->get('stats_period', 'all');
+            $statsPeriod = $request->get('stats_period', 'this_month');
 
             [$statsStart, $statsEnd] = match ($statsPeriod) {
                 'this_month' => [now()->startOfMonth(), now()->endOfMonth()],
