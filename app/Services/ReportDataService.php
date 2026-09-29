@@ -612,6 +612,7 @@ class ReportDataService
         $investmentIncome = $this->getInvestmentIncome($user, $startDate, $endDate);
         $loansGivenActivity = $this->getLoansGivenActivityInPeriod($user, $startDate, $endDate);
         $loanGivenInterestIncome = $this->getLoanGivenInterestIncome($user, $startDate, $endDate);
+        $loansGivenStats = $this->getLoansGivenStats($user, $startDate, $endDate);
         $totalInterestIncome = (float)$investmentIncome['total'] + $loanGivenInterestIncome;
 
         return [
@@ -653,6 +654,7 @@ class ReportDataService
             'investment_income' => $investmentIncome,
             'total_interest_income' => $totalInterestIncome,
             'loan_given_interest_income' => $loanGivenInterestIncome,
+            'loans_given_stats' => $loansGivenStats,
 
         ];
     }
@@ -672,6 +674,71 @@ class ReportDataService
             ->sum('interest_portion');
 
         return $closedInterest + $rolloverInterest;
+    }
+    /**
+     * Loans-given dashboard stats for an arbitrary period. Same bucketing as
+     * LoanGivenController@index: each stat is tied to the date it naturally
+     * belongs to (disbursed_date, payment_date, repaid_date). Outstanding is
+     * always the current snapshot, not period-based.
+     */
+    private function getLoansGivenStats(User $user, Carbon $startDate, Carbon $endDate): array
+    {
+        $inRange = fn($date) => $date !== null
+            && Carbon::parse($date)->between($startDate, $endDate);
+
+        $allLoans    = LoanGiven::where('user_id', $user->id)->get();
+        $activeLoans = $allLoans->where('status', 'active');
+        $paidLoans   = $allLoans->where('status', 'paid');
+
+        $disbursedInRange = $allLoans->filter(fn($l) => $inRange($l->disbursed_date));
+        $paidInRange      = $paidLoans->filter(fn($l) => $inRange($l->repaid_date));
+
+        $principalDisbursed = $disbursedInRange->sum(fn($l) => $l->original_principal);
+        $repaidClosed       = $paidInRange->sum('amount_paid');
+
+        // Same figure the "Interest Income" section already uses (closed loans by
+        // repaid_date + active-loan rollover interest by payment_date).
+        $interestEarned = $this->getLoanGivenInterestIncome($user, $startDate, $endDate);
+
+        $disbursementTxIds = $disbursedInRange->pluck('disbursement_transaction_id')->filter()->values();
+        $transactionCosts  = $disbursementTxIds->isNotEmpty()
+            ? (float)Transaction::where('is_transaction_fee', true)
+                ->whereIn('fee_for_transaction_id', $disbursementTxIds)
+                ->sum('amount')
+            : 0.0;
+
+        $referrerCut = $paidInRange
+            ->filter(fn($l) => $l->referrer_id
+                && $l->referrer_share_percentage !== null
+                && !$l->referrer_payout_id
+                && !$l->referrer_deducted_before_deposit)
+            ->sum(fn($l) => round($l->interest_amount * ($l->referrer_share_percentage / 100), 2));
+
+        $cashCollected = (float)LoanGivenPayment::where('user_id', $user->id)
+            ->whereBetween('payment_date', [$startDate->toDateString(), $endDate->toDateString()])
+            ->sum('amount');
+
+        $withInterest = $paidInRange->filter(fn($l) => $l->interest_amount > 0);
+        $avgRate      = $withInterest->isNotEmpty() ? (float)$withInterest->avg('interest_rate') : 0.0;
+
+        $disbursedCount = $disbursedInRange->count();
+        $repaidCount    = $disbursedInRange->where('status', 'paid')->count();
+
+        return [
+            'principal_disbursed' => (float)$principalDisbursed,
+            'cash_collected'      => $cashCollected,
+            'repaid_closed'       => (float)$repaidClosed,
+            'closed_count'        => $paidInRange->count(),
+            'interest_earned'     => $interestEarned,
+            'transaction_costs'   => $transactionCosts,
+            'referrer_cut'        => (float)$referrerCut,
+            'net_interest'        => $interestEarned - $transactionCosts - $referrerCut,
+            'avg_interest_rate'   => $avgRate,
+            'disbursed_count'     => $disbursedCount,
+            'repaid_count'        => $repaidCount,
+            'repayment_rate'      => $disbursedCount > 0 ? ($repaidCount / $disbursedCount) * 100 : 0.0,
+            'outstanding'         => (float)$activeLoans->sum('outstanding_amount'),
+        ];
     }
 
     /**

@@ -508,26 +508,55 @@
         'items' => [],
    ];
     $activeLoansGiven = $data['active_loans_given'] ?? collect();
-    $loanGivenInterest = $data['loan_given_interest_income'] ?? 0;
+    $ls = $data['loans_given_stats'] ?? null;
 @endphp
-@if($loansGiven['disbursed_count'] > 0 || $loansGiven['repayments_count'] > 0 || $activeLoansGiven->isNotEmpty())
+@if($loansGiven['disbursed_count'] > 0 || $loansGiven['repayments_count'] > 0 || $activeLoansGiven->isNotEmpty() || ($ls && ($ls['closed_count'] > 0 || $ls['cash_collected'] > 0)))
     <div class="section">
         <div class="section-title">Loans Given Activity — {{ $year }}</div>
-        <table class="stat-table">
-            <tr>
-                <td class="label">Disbursed</td>
-                <td class="value">{{ $currency }} {{ number_format($loansGiven['disbursed_total']) }}</td>
-                <td class="label">Repayments Received</td>
-                <td class="value"
-                    style="color: #059669;">{{ $currency }} {{ number_format($loansGiven['repayments_total']) }}</td>
-            </tr>
-            <tr>
-                <td class="label">Loans Closed</td>
-                <td class="value">{{ $loansGiven['closed_count'] }}</td>
-                <td class="label">Interest Earned</td>
-                <td class="value" style="color: #059669;">{{ $currency }} {{ number_format($loanGivenInterest) }}</td>
-            </tr>
-        </table>
+        @if($ls)
+            <table class="stat-table">
+                <tr>
+                    <td class="label">Principal Disbursed</td>
+                    <td class="value">{{ $currency }} {{ number_format($ls['principal_disbursed']) }}</td>
+                    <td class="label">Cash Collected</td>
+                    <td class="value" style="color: #059669;">{{ $currency }} {{ number_format($ls['cash_collected']) }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Repaid (Closed Loans)</td>
+                    <td class="value">{{ $currency }} {{ number_format($ls['repaid_closed']) }}</td>
+                    <td class="label">Interest Earned</td>
+                    <td class="value" style="color: #059669;">{{ $currency }} {{ number_format($ls['interest_earned']) }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Transaction Costs</td>
+                    <td class="value" style="color: #DC2626;">{{ $currency }} {{ number_format($ls['transaction_costs']) }}</td>
+                    <td class="label">Net Interest</td>
+                    <td class="value" style="color: {{ $ls['net_interest'] >= 0 ? '#059669' : '#DC2626' }};">
+                        {{ $ls['net_interest'] < 0 ? '-' : '' }}{{ $currency }} {{ number_format(abs($ls['net_interest'])) }}
+                        <span style="display:block; font-size:8px; font-weight:normal; color:#9CA3AF;">
+                    after referrer share owed ({{ $currency }} {{ number_format($ls['referrer_cut']) }})
+                </span>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="label">Avg Interest Rate</td>
+                    <td class="value">{{ number_format($ls['avg_interest_rate'], 1) }}%</td>
+                    <td class="label">Repayment Rate</td>
+                    <td class="value">
+                        {{ number_format($ls['repayment_rate'], 1) }}%
+                        <span style="font-weight:normal; color:#9CA3AF; font-size:8px;">
+                    ({{ $ls['repaid_count'] }} of {{ $ls['disbursed_count'] }} disbursed)
+                </span>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="label">Loans Closed</td>
+                    <td class="value">{{ $ls['closed_count'] }}</td>
+                    <td class="label">Outstanding (Now)</td>
+                    <td class="value">{{ $currency }} {{ number_format($ls['outstanding']) }}</td>
+                </tr>
+            </table>
+        @endif
 
         {{-- This table's "Total Outstanding" is the same GROSS sum of active
              loans given used in the net-worth banner above, so it always
@@ -547,7 +576,7 @@
                     <tr>
                         <td style="font-weight: 600;">{{ $loan->borrower_name }}</td>
                         <td style="text-align: right;">{{ $currency }} {{ number_format($loan->principal_amount) }}</td>
-                        <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($loan->balance) }}</td>
+                        <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($loan->outstanding_amount) }}</td>
                         <td style="text-align: center; color: #6B7280;">
                             {{ $loan->due_date ? \Carbon\Carbon::parse($loan->due_date)->format('M j, Y') : '—' }}
                         </td>
@@ -800,7 +829,7 @@
                 <tr>
                     <td style="font-weight: 600;">{{ $loan->source }}</td>
                     <td style="text-align: right;">{{ $currency }} {{ number_format($loan->principal_amount) }}</td>
-                    <td style="text-align: right; color: #DC2626; font-weight: bold;">{{ $currency }} {{ number_format($loan->balance) }}</td>
+                    <td style="text-align: right; color: #DC2626; font-weight: bold;">{{ $currency }} {{ number_format($loan->outstanding_amount) }}</td>
                     <td style="text-align: center; color: #6B7280;">{{ \Carbon\Carbon::parse($loan->due_date)->format('M j, Y') }}</td>
                     <td style="text-align: center;"><span class="badge warning">{{ ucfirst($loan->status) }}</span></td>
                 </tr>
