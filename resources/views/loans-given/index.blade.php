@@ -278,8 +278,24 @@
                             </div>
                         </div>
                     </div>
+                    <!-- Monthly Trend -->
+                    <div class="mb-6 border border-gray-200 rounded-lg" x-data="{ open: true }">
+                        <button type="button" @click="open = !open"
+                                class="w-full flex items-center justify-between px-4 py-3 text-left">
+                            <span class="text-sm font-medium text-gray-700">Monthly trend — last 12 months</span>
+                            <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-180': open }"
+                                 fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </button>
+                        <div x-show="open" x-cloak class="px-4 pb-4">
+                            <div style="height: 280px;">
+                                <canvas id="loansTrendChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
 
-                    <!-- Filter Tabs -->
+                                        <!-- Filter Tabs -->
                     <div class="border-b border-gray-200 mb-6">
                         <nav class="-mb-px flex space-x-8">
                             <a href="{{ route('loans-given.index', ['filter' => 'active', 'stats_period' => $statsPeriod, 'stats_start' => $statsStart?->format('Y-m-d'), 'stats_end' => $statsEnd?->format('Y-m-d')]) }}"
@@ -766,4 +782,43 @@
             </div>
         </div>
     </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const t = @json($monthlyTrend);
+            const short = v => v >= 1000000 ? (v / 1000000) + 'M' : (v >= 1000 ? (v / 1000) + 'k' : v);
+
+            new Chart(document.getElementById('loansTrendChart'), {
+                data: {
+                    labels: t.labels,
+                    datasets: [
+                        { type: 'bar', label: 'Disbursed', data: t.disbursed,
+                            backgroundColor: 'rgba(59,130,246,0.6)', borderRadius: 4 },
+                        { type: 'bar', label: 'Collected', data: t.collected,
+                            backgroundColor: 'rgba(20,184,166,0.6)', borderRadius: 4 },
+                        { type: 'line', label: 'Interest earned', data: t.interest,
+                            borderColor: '#7c3aed', backgroundColor: '#7c3aed',
+                            tension: 0.3, yAxisID: 'y1' },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        y:  { beginAtZero: true, ticks: { callback: short } },
+                        y1: { beginAtZero: true, position: 'right',
+                            grid: { drawOnChartArea: false }, ticks: { callback: short } },
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: c => c.dataset.label + ': KES ' + Math.round(c.parsed.y).toLocaleString(),
+                            },
+                        },
+                    },
+                },
+            });
+        });
+    </script>
 </x-app-layout>

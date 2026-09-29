@@ -190,6 +190,47 @@ class LoanGivenController extends Controller implements HasMiddleware
             $disbursedCount = $disbursedInRange->count();
             $repaidCount    = $disbursedInRange->where('status', 'paid')->count();
             $repaymentRate  = $disbursedCount > 0 ? ($repaidCount / $disbursedCount) * 100 : 0;
+            // ── Monthly trend (trailing 12 months, independent of stats period) ───
+            $trendStart = now()->startOfMonth()->subMonths(11);
+            $monthKey   = fn($date) => Carbon::parse($date)->format('Y-m');
+
+            $disbursedByMonth = $allLoans
+                ->filter(fn($l) => $l->disbursed_date && Carbon::parse($l->disbursed_date)->gte($trendStart))
+                ->groupBy(fn($l) => $monthKey($l->disbursed_date))
+                ->map(fn($g) => $g->sum(fn($l) => $l->original_principal));
+
+// Closed loans: whole-loan interest in the month they closed.
+            $closedInterestByMonth = $paidLoansCollection
+                ->filter(fn($l) => $l->repaid_date && Carbon::parse($l->repaid_date)->gte($trendStart))
+                ->groupBy(fn($l) => $monthKey($l->repaid_date))
+                ->map(fn($g) => $g->sum('interest_amount'));
+
+            $trendPayments = LoanGivenPayment::where('user_id', Auth::id())
+                ->whereDate('payment_date', '>=', $trendStart)
+                ->with('loanGiven:id,status')
+                ->get();
+
+            $collectedByMonth = $trendPayments
+                ->groupBy(fn($p) => $monthKey($p->payment_date))
+                ->map(fn($g) => $g->sum('amount'));
+
+// Active loans: rollover interest in the month the payment was recorded.
+            $rolloverInterestByMonth = $trendPayments
+                ->filter(fn($p) => $p->loanGiven?->status === 'active')
+                ->groupBy(fn($p) => $monthKey($p->payment_date))
+                ->map(fn($g) => $g->sum('interest_portion'));
+
+            $monthlyTrend = ['labels' => [], 'disbursed' => [], 'collected' => [], 'interest' => []];
+
+            foreach (range(0, 11) as $i) {
+                $m   = $trendStart->copy()->addMonths($i);
+                $key = $m->format('Y-m');
+
+                $monthlyTrend['labels'][]    = $m->format('M y');
+                $monthlyTrend['disbursed'][] = round((float) ($disbursedByMonth[$key] ?? 0), 2);
+                $monthlyTrend['collected'][] = round((float) ($collectedByMonth[$key] ?? 0), 2);
+                $monthlyTrend['interest'][]  = round((float) (($closedInterestByMonth[$key] ?? 0) + ($rolloverInterestByMonth[$key] ?? 0)), 2);
+            }
 
             $accounts = Account::where('user_id', Auth::id())
                 ->where('is_active', true)
@@ -201,7 +242,7 @@ class LoanGivenController extends Controller implements HasMiddleware
                 'startDate', 'endDate', 'minYear', 'maxYear', 'accounts',
                 'totalPrincipal', 'totalRepaid', 'totalInterest', 'avgInterestRate', 'repaymentRate',
                 'totalOutstanding', 'totalReceivedAllTime', 'totalTransactionCosts', 'netInterest', 'referrerCut',
-                'statsPeriod', 'statsStart', 'statsEnd', 'statsLabel', 'repaidCount', 'disbursedCount'
+                'statsPeriod', 'statsStart', 'statsEnd', 'statsLabel', 'repaidCount', 'disbursedCount','monthlyTrend'
             ));
 
         } catch (ValidationException|AuthorizationException $e) {
