@@ -131,10 +131,16 @@ class LoanGivenController extends Controller implements HasMiddleware
                     ->sum('amount')
                 : 0;
 
-            // What interest actually nets out to once the cost of disbursing the
-            // loans is backed out. Uses totalInterest (includes active rollovers),
-            // so this can move before a loan closes, same as Interest Earned does.
-            $netInterest = $totalInterest - $totalTransactionCosts;
+            // Referrer share still OWED: closed loans only, not yet included in a
+// payout, and not already kept by the referrer before depositing.
+            $referrerCut = $paidLoansCollection
+                ->filter(fn($l) => $l->referrer_id
+                    && $l->referrer_share_percentage !== null
+                    && !$l->referrer_payout_id
+                    && !$l->referrer_deducted_before_deposit)
+                ->sum(fn($l) => round($l->interest_amount * ($l->referrer_share_percentage / 100), 2));
+
+            $netInterest = $totalInterest - $totalTransactionCosts - $referrerCut;
 
             // "Total Repaid" above only counts closed loans, so partial repayments
             // sitting on still-active loans (e.g. Enock, Emmanuel HR) never show up
@@ -160,7 +166,7 @@ class LoanGivenController extends Controller implements HasMiddleware
                 'activeLoans', 'paidLoans', 'filter', 'period', 'sort', 'referrerId', 'referrers',
                 'startDate', 'endDate', 'minYear', 'maxYear', 'accounts',
                 'totalPrincipal', 'totalRepaid', 'totalInterest', 'avgInterestRate', 'repaymentRate',
-                'totalOutstanding', 'totalReceivedAllTime', 'totalTransactionCosts', 'netInterest'
+                'totalOutstanding', 'totalReceivedAllTime', 'totalTransactionCosts', 'netInterest','referrerCut'
             ));
 
         } catch (ValidationException|AuthorizationException $e) {

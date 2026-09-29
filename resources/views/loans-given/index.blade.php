@@ -183,9 +183,9 @@
                                     </div>
                                     <div class="ml-4 min-w-0">
                                         <p class="text-sm font-medium text-gray-500 break-words">Net Interest</p>
-                                        <p class="text-lg font-semibold text-gray-900">
-                                            KES {{ number_format($netInterest ?? 0, 0) }}</p>
-                                        <p class="text-xs text-gray-500">Interest earned minus transaction costs</p>
+                                        <p class="text-xs text-gray-500">
+                                            Interest − costs − referrer share owed (KES {{ number_format($referrerCut ?? 0, 0) }})
+                                        </p>
                                     </div>
                                 </div>
                             </div>

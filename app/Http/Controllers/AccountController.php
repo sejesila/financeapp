@@ -11,7 +11,6 @@ use App\Services\BorrowedFundReturnService;
 use App\Services\InterestService;
 use App\Services\KenyanBusinessDays;
 use App\Services\TopUpService;
-use App\Services\TransferFeeCalculator;
 use App\Services\TransferService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -26,7 +25,6 @@ class AccountController extends Controller
 {
     public function __construct(
         private readonly TransferService       $transferService,
-        private readonly TransferFeeCalculator $feeCalculator,
         private readonly TopUpService          $topUpService,
         private readonly InterestService       $interestService,
     ) {}
