@@ -282,7 +282,8 @@
                     $clientOutstanding = $clientTotals->firstWhere('client_name', $clientFilter)->pending_balance
                         ?? $clientFunds->sum('balance');
                 @endphp
-                @if(($clientOutstanding ?? 0) > 0)
+                @if(($clientOutstanding ?? 0) > 0
+     && (($summary['client_unreturned_borrowed'] ?? 0) > 0 || ($unrecordedShortfalls ?? collect())->isNotEmpty()))
                     <div class="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-3 sm:p-4">
                         <h4 class="text-sm font-semibold text-red-800 dark:text-red-300 mb-1">
                             Record Borrowed Amount for {{ $clientFilter }}

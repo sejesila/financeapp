@@ -23,19 +23,28 @@ class TransferFeeCalculator
         $isMobileMoney = in_array($from->type, ['mpesa', 'airtel_money']);
         $isBankToCash  = $from->type === 'bank' && $to->type === 'cash';
 
+        // Referrer float remittances: M-Pesa send-money rates, borne by the float
+        if ($from->type === 'referrer_float' && in_array($to->type, ['cash', 'mpesa'])) {
+            $fee  = $this->sendMoneyFee($amount);
+            $desc = "M-Pesa send money fee: Transfer to {$to->name}";
+            return new TransferFee($fee, 'send_money', $desc);
+        }
+
+        // M-Pesa / Airtel Money → Cash: withdrawal fee
         if ($isMobileMoney && $to->type === 'cash') {
             $fee  = $this->withdrawalFee($amount, $from->type);
             $desc = $this->feeDescription($from, $to, 'withdrawal');
             return new TransferFee($fee, 'withdrawal', $desc);
         }
 
-        // ↓ Add 'savings' alongside 'bank' as a PayBill destination
+        // M-Pesa / Airtel Money → Bank or Savings: PayBill fee
         if ($isMobileMoney && in_array($to->type, ['bank', 'savings'])) {
             $fee  = $this->payBillFee($amount, $from->type);
             $desc = $this->feeDescription($from, $to, 'paybill');
             return new TransferFee($fee, 'paybill', $desc);
         }
 
+        // Bank → Cash: flat ATM fee
         if ($isBankToCash) {
             $fee  = $this->atmFee();
             $desc = $this->feeDescription($from, $to, 'atm');
@@ -137,5 +146,24 @@ class TransferFeeCalculator
         };
 
         return "{$prefix}: Transfer to {$to->name}";
+    }
+    private function sendMoneyFee(float $amount): float
+    {
+        $tiers = [
+            ['min' => 1,     'max' => 100,    'cost' => 0],
+            ['min' => 101,   'max' => 500,    'cost' => 7],
+            ['min' => 501,   'max' => 1000,   'cost' => 13],
+            ['min' => 1001,  'max' => 1500,   'cost' => 23],
+            ['min' => 1501,  'max' => 2500,   'cost' => 33],
+            ['min' => 2501,  'max' => 3500,   'cost' => 53],
+            ['min' => 3501,  'max' => 5000,   'cost' => 57],
+            ['min' => 5001,  'max' => 7500,   'cost' => 78],
+            ['min' => 7501,  'max' => 10000,  'cost' => 90],
+            ['min' => 10001, 'max' => 15000,  'cost' => 100],
+            ['min' => 15001, 'max' => 20000,  'cost' => 105],
+            ['min' => 20001, 'max' => 250000, 'cost' => 108],
+        ];
+
+        return $this->lookupTier($tiers, $amount);
     }
 }

@@ -158,6 +158,7 @@
                         — head to Loans Given afterward to record who it's going to.
                     </p>
                 </div>
+
                 <!-- Client Fund Selector -->
                 <div x-show="purpose === 'client_fund'" x-transition class="mb-4">
                     <label for="client_fund_id" class="block text-gray-700 dark:text-gray-200 font-semibold mb-2">
@@ -186,9 +187,6 @@
                 <input type="hidden" name="is_client_fund" :value="purpose === 'client_fund' ? '1' : '0'">
                 <input type="hidden" name="is_lending" :value="purpose === 'lending' ? '1' : '0'">
 
-                <input type="hidden" name="is_client_fund" :value="purpose === 'client_fund' ? '1' : '0'">
-                <input type="hidden" name="is_lending" :value="purpose === 'lending' ? '1' : '0'">
-
                 <!-- Editable Transaction Fee -->
                 <div x-show="showFee" x-transition class="mb-4">
                     <label class="block font-semibold mb-2"
@@ -196,15 +194,17 @@
                             'text-orange-700 dark:text-orange-300': feeType === 'atm',
                             'text-yellow-700 dark:text-yellow-300': feeType === 'withdrawal',
                             'text-blue-700 dark:text-blue-300': feeType === 'paybill',
-                            'text-purple-700 dark:text-purple-300': feeType === 'savings'
+                            'text-purple-700 dark:text-purple-300': feeType === 'savings' || feeType === 'float'
                         }">
                         <span x-text="
                             feeType === 'atm'        ? '🏧 ATM Withdrawal Fee' :
                             feeType === 'savings'    ? '💰 Savings Withdrawal Fee' :
+                            feeType === 'float'      ? '🤝 Referrer Float Fee' :
                             feeType === 'withdrawal' ? '📱 ' + (fromAccountType === 'mpesa' ? 'M-Pesa' : 'Airtel Money') + ' Withdrawal Fee' :
                                                        '📱 ' + (fromAccountType === 'mpesa' ? 'M-Pesa' : 'Airtel Money') + ' PayBill Fee'
                         "></span>
-                        <span class="text-xs font-normal text-gray-500 dark:text-gray-400 ml-1">(auto-calculated, editable)</span>
+                        <span class="text-xs font-normal text-gray-500 dark:text-gray-400 ml-1"
+                              x-text="(feeType === 'savings' || feeType === 'float') ? '(enter manually)' : '(auto-calculated, editable)'"></span>
                     </label>
 
                     <div class="flex items-center gap-2">
@@ -219,7 +219,7 @@
                         >
                         <button
                             type="button"
-                            x-show="feeManuallyEdited"
+                            x-show="feeManuallyEdited && feeType !== 'float' && feeType !== 'savings'"
                             @click="feeManuallyEdited = false; calculateFee()"
                             class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
                         >
@@ -231,9 +231,13 @@
                        class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         Default: KES 33.00 flat + 15% excise duty = KES 37.95
                     </p>
-                    <p x-show="feeType === 'savings' && !feeManuallyEdited"
+                    <p x-show="feeType === 'savings'"
                        class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         Enter the withdrawal fee charged by your savings provider.
+                    </p>
+                    <p x-show="feeType === 'float'"
+                       class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Enter the fee for this remittance (e.g. the M-Pesa send-money charge). It is deducted from the float account.
                     </p>
                 </div>
 
@@ -303,6 +307,7 @@
                 date: '{{ old('date', now()->format('Y-m-d\TH:i')) }}',
                 description: '{{ old('description') }}',
                 transactionFee: {{ old('transaction_fee', 0) }},
+                clientFundId: '{{ old('client_fund_id') }}',
                 showFee: false,
                 feeType: null,
                 fromAccountType: '',
@@ -314,6 +319,7 @@
                 // driving the two hidden is_client_fund/is_lending inputs so they
                 // can never both end up true.
                 purpose: '{{ old('is_lending') ? "lending" : (old('is_client_fund') ? "client_fund" : "personal") }}',
+
                 updateFundOptions() {
                     const fundSelect = document.getElementById('client_fund_id');
                     if (!fundSelect) return;
@@ -342,15 +348,15 @@
                 },
 
                 calculateFee() {
-                    if (this.feeManuallyEdited) return;
-
                     const fromAccount = this.getAccount(this.fromAccountId);
                     const toAccount   = this.getAccount(this.toAccountId);
 
-                    if (!fromAccount || !toAccount || !this.amount || this.amount <= 0) {
-                        this.showFee = false;
-                        this.transactionFee = 0;
-                        this.feeType = null;
+                    if (!fromAccount || !toAccount) {
+                        if (!this.feeManuallyEdited) {
+                            this.showFee = false;
+                            this.transactionFee = 0;
+                            this.feeType = null;
+                        }
                         return;
                     }
 
@@ -358,42 +364,44 @@
                     this.fromAccountName = fromAccount.name;
                     this.toAccountType   = toAccount.type;
 
-                    // Savings → anywhere: show fee field at 0 for manual entry
-                    if (fromAccount.type === 'savings') {
-                        this.feeType        = 'savings';
-                        this.transactionFee = 0;
-                        this.showFee        = true;
+                    // Savings / Referrer float → anywhere: manual fee entry, shown
+                    // immediately (no amount needed)
+                    if (fromAccount.type === 'savings' || fromAccount.type === 'referrer_float') {
+                        this.feeType = fromAccount.type === 'savings' ? 'savings' : 'float';
+                        this.showFee = true;
+                        if (!this.feeManuallyEdited) this.transactionFee = 0;
                         return;
                     }
 
-                    const mobileMoneyTypes = ['mpesa', 'airtel_money'];
-                    const isMobileMoney    = mobileMoneyTypes.includes(fromAccount.type);
+                    // Auto-calculated fees need an amount
+                    if (!this.amount || this.amount <= 0) {
+                        if (!this.feeManuallyEdited) {
+                            this.showFee = false;
+                            this.transactionFee = 0;
+                            this.feeType = null;
+                        }
+                        return;
+                    }
 
-                    // M-Pesa/Airtel → Cash = Withdrawal fee
+                    if (this.feeManuallyEdited) return;
+
+                    const isMobileMoney = ['mpesa', 'airtel_money'].includes(fromAccount.type);
+
                     if (isMobileMoney && toAccount.type === 'cash') {
                         this.feeType        = 'withdrawal';
                         this.transactionFee = this.getWithdrawalFee(parseFloat(this.amount), fromAccount.type);
                         this.showFee        = this.transactionFee > 0;
                     }
-                    // M-Pesa/Airtel → Bank or Savings = PayBill fee
                     else if (isMobileMoney && (toAccount.type === 'bank' || toAccount.type === 'savings')) {
                         this.feeType        = 'paybill';
                         this.transactionFee = this.getPayBillFee(parseFloat(this.amount), fromAccount.type);
                         this.showFee        = this.transactionFee > 0;
                     }
-                    // Bank → Cash = ATM fee
                     else if (fromAccount.type === 'bank' && toAccount.type === 'cash') {
                         this.feeType        = 'atm';
                         this.transactionFee = this.ATM_FEE;
                         this.showFee        = true;
                     }
-                    // Bank → Savings = no fee
-                    else if (fromAccount.type === 'bank' && toAccount.type === 'savings') {
-                        this.feeType        = null;
-                        this.transactionFee = 0;
-                        this.showFee        = false;
-                    }
-                    // All other transfers = no fee
                     else {
                         this.feeType        = null;
                         this.transactionFee = 0;
@@ -489,7 +497,6 @@
                             option.disabled = !allowed.includes(optionType);
                             option.hidden = !allowed.includes(optionType);
                         }
-
                         else {
                             option.disabled = false;
                             option.hidden   = false;

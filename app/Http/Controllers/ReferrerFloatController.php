@@ -7,6 +7,7 @@ use App\Models\LoanGiven;
 use App\Models\Referrer;
 use App\Models\ReferrerFloatReconciliation;
 use App\Models\Transfer;
+use App\Services\TransferFeeCalculator;
 use App\Services\TransferService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,9 +18,10 @@ use Throwable;
 
 class ReferrerFloatController extends Controller
 {
-    public function __construct(protected TransferService $transferService)
-    {
-    }
+    public function __construct(
+        protected TransferService $transferService,
+        protected TransferFeeCalculator $feeCalculator,
+    ) {}
 
     // ── index: the reconciliation screen ────────────────────────────────────
 
