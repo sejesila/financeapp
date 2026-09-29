@@ -1,336 +1,336 @@
-<?php
+    <?php
 
-use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Http\Request;
-use App\Http\Controllers\{AccountController,
-    BudgetController,
-    CafeteriaController,
-    CategoryController,
-    ClientFundController,
-    DashboardController,
-    EmailPreferenceController,
-    LoanController,
-    LoanGivenController,
-    MpesaSmsController,
-    ProfileController,
-    ReferrerFloatController,
-    ReferrerPayoutController,
-    ReportsController,
-    RollingFundController,
-    StatementController,
-    TransactionController};
-use App\Http\Controllers\Auth\{AuthenticatedSessionController,
-    EmailVerificationNotificationController,
-    EmailVerificationPromptController,
-    NewPasswordController,
-    PasswordController,
-    PasswordResetLinkController,
-    RegisteredUserController,
-    VerifyEmailController};
+    use Illuminate\Support\Facades\Route;
+    use Illuminate\Support\Facades\Auth;
+    use Illuminate\Http\Request;
+    use App\Http\Controllers\{AccountController,
+        BudgetController,
+        CafeteriaController,
+        CategoryController,
+        ClientFundController,
+        DashboardController,
+        EmailPreferenceController,
+        LoanController,
+        LoanGivenController,
+        MpesaSmsController,
+        ProfileController,
+        ReferrerFloatController,
+        ReferrerPayoutController,
+        ReportsController,
+        RollingFundController,
+        StatementController,
+        TransactionController};
+    use App\Http\Controllers\Auth\{AuthenticatedSessionController,
+        EmailVerificationNotificationController,
+        EmailVerificationPromptController,
+        NewPasswordController,
+        PasswordController,
+        PasswordResetLinkController,
+        RegisteredUserController,
+        VerifyEmailController};
 
-/*
-|--------------------------------------------------------------------------
-| Guest Routes
-|--------------------------------------------------------------------------
-| Routes accessible only to unauthenticated users
-*/
+    /*
+    |--------------------------------------------------------------------------
+    | Guest Routes
+    |--------------------------------------------------------------------------
+    | Routes accessible only to unauthenticated users
+    */
 
-Route::middleware('guest')->group(function () {
-    // Registration
-    Route::get('/register', [RegisteredUserController::class, 'create'])->name('register');
-    Route::post('/register', [RegisteredUserController::class, 'store']);
+    Route::middleware('guest')->group(function () {
+        // Registration
+        Route::get('/register', [RegisteredUserController::class, 'create'])->name('register');
+        Route::post('/register', [RegisteredUserController::class, 'store']);
 
-    // Login
-    Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
-    Route::post('/login', [AuthenticatedSessionController::class, 'store']);
-});
-
-/*
-|--------------------------------------------------------------------------
-| Authenticated Routes
-|--------------------------------------------------------------------------
-| Routes accessible only to authenticated users
-*/
-
-Route::middleware('auth')->group(function () {
-
-    // ======================================================================
-    // Authentication & Session Management
-    // ======================================================================
-
-    Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
-
-    // ======================================================================
-    // Main Application Routes
-    // ======================================================================
-
-    // Dashboard & Reports
-    Route::get('/', fn() => redirect()->route('dashboard'));
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    Route::get('/reports', [ReportsController::class, 'index'])->name('reports.index');
-
-    // ======================================================================
-    // Accounts Management
-    // ======================================================================
-
-    Route::prefix('accounts')->name('accounts.')->group(function () {
-        // Transfer between accounts
-        Route::get('transfer/form', [AccountController::class, 'transferForm'])->name('transfer');
-        Route::post('transfer', [AccountController::class, 'transfer'])->name('transferPost');
-
-        // Top-up account
-        Route::get('{account}/topup', [AccountController::class, 'topUpForm'])->name('topup');
-        Route::post('{account}/topup', [AccountController::class, 'topUp'])->name('topup.store');
-
-        Route::get('{account}/topups/{transaction}/reverse', [AccountController::class, 'reverseTopUpForm'])
-            ->name('topup.reverse.form');
-
-        Route::delete('{account}/topups/{transaction}/reverse', [AccountController::class, 'reverseTopUp'])
-            ->name('topup.reverse');
-        Route::get('{account}/transfers/{transfer}/reverse', [AccountController::class, 'reverseTransferForm'])
-            ->name('transfer.reverse.form');
-
-        Route::post('{account}/transfers/{transfer}/reverse', [AccountController::class, 'reverseTransfer'])
-            ->name('transfer.reverse');
-        // Interest recording (savings accounts only)
-        Route::get('{account}/record-interest', [AccountController::class, 'recordInterestForm'])
-            ->name('interest.form');
-        Route::post('{account}/record-interest', [AccountController::class, 'recordInterest'])
-            ->name('interest.store');
-        Route::get('{account}/statement', [StatementController::class, 'show'])
-            ->name('statement');
-
+        // Login
+        Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
+        Route::post('/login', [AuthenticatedSessionController::class, 'store']);
     });
 
-    // Standard CRUD operations for accounts
-    Route::resource('accounts', AccountController::class);
+    /*
+    |--------------------------------------------------------------------------
+    | Authenticated Routes
+    |--------------------------------------------------------------------------
+    | Routes accessible only to authenticated users
+    */
 
-    // ======================================================================
-    // Transactions Management
-    // ======================================================================
+    Route::middleware('auth')->group(function () {
 
-    Route::resource('transactions', TransactionController::class);
+        // ======================================================================
+        // Authentication & Session Management
+        // ======================================================================
 
-    Route::prefix('transactions')->name('transactions.')->group(function () {
-        Route::post('{id}/restore', [TransactionController::class, 'restore'])->name('restore');
-        Route::delete('{id}/force', [TransactionController::class, 'forceDestroy'])->name('force-destroy');
-        Route::delete('{transaction}/reverse-interest', [LoanGivenController::class, 'reverseInterest'])
-            ->name('reverse-interest');
+        Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
+
+        // ======================================================================
+        // Main Application Routes
+        // ======================================================================
+
+        // Dashboard & Reports
+        Route::get('/', fn() => redirect()->route('dashboard'));
+        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/reports', [ReportsController::class, 'index'])->name('reports.index');
+
+        // ======================================================================
+        // Accounts Management
+        // ======================================================================
+
+        Route::prefix('accounts')->name('accounts.')->group(function () {
+            // Transfer between accounts
+            Route::get('transfer/form', [AccountController::class, 'transferForm'])->name('transfer');
+            Route::post('transfer', [AccountController::class, 'transfer'])->name('transferPost');
+
+            // Top-up account
+            Route::get('{account}/topup', [AccountController::class, 'topUpForm'])->name('topup');
+            Route::post('{account}/topup', [AccountController::class, 'topUp'])->name('topup.store');
+
+            Route::get('{account}/topups/{transaction}/reverse', [AccountController::class, 'reverseTopUpForm'])
+                ->name('topup.reverse.form');
+
+            Route::delete('{account}/topups/{transaction}/reverse', [AccountController::class, 'reverseTopUp'])
+                ->name('topup.reverse');
+            Route::get('{account}/transfers/{transfer}/reverse', [AccountController::class, 'reverseTransferForm'])
+                ->name('transfer.reverse.form');
+
+            Route::post('{account}/transfers/{transfer}/reverse', [AccountController::class, 'reverseTransfer'])
+                ->name('transfer.reverse');
+            // Interest recording (savings accounts only)
+            Route::get('{account}/record-interest', [AccountController::class, 'recordInterestForm'])
+                ->name('interest.form');
+            Route::post('{account}/record-interest', [AccountController::class, 'recordInterest'])
+                ->name('interest.store');
+            Route::get('{account}/statement', [StatementController::class, 'show'])
+                ->name('statement');
+
+        });
+
+        // Standard CRUD operations for accounts
+        Route::resource('accounts', AccountController::class);
+
+        // ======================================================================
+        // Transactions Management
+        // ======================================================================
+
+        Route::resource('transactions', TransactionController::class);
+
+        Route::prefix('transactions')->name('transactions.')->group(function () {
+            Route::post('{id}/restore', [TransactionController::class, 'restore'])->name('restore');
+            Route::delete('{id}/force', [TransactionController::class, 'forceDestroy'])->name('force-destroy');
+            Route::delete('{transaction}/reverse-interest', [LoanGivenController::class, 'reverseInterest'])
+                ->name('reverse-interest');
+        });
+
+        // ======================================================================
+        // Categories Management
+        // ======================================================================
+
+        Route::resource('categories', CategoryController::class);
+
+        // ======================================================================
+        // Budgets
+        // ======================================================================
+
+        Route::get('/budgets/{year?}', [BudgetController::class, 'index'])->name('budgets.index');
+        Route::post('/budgets/save-cell', [BudgetController::class, 'saveCell'])->name('budgets.save-cell');
+
+        // ======================================================================
+        // Loans Management
+        // ======================================================================
+
+        Route::resource('loans', LoanController::class)->except(['edit', 'update']);
+
+        Route::prefix('loans')->name('loans.')->group(function () {
+            // Loan payment routes
+            Route::get('{loan}/payment', [LoanController::class, 'paymentForm'])->name('payment');
+            Route::post('{loan}/payment', [LoanController::class, 'recordPayment'])->name('payment.store');
+        });
+
+        Route::prefix('loans-given')->name('loans-given.')->group(function () {
+            Route::get('/', [LoanGivenController::class, 'index'])->name('index');
+            Route::get('/create', [LoanGivenController::class, 'create'])->name('create');
+            Route::get('/report', [LoanGivenController::class, 'report'])->name('report'); // moved up here
+            Route::post('/', [LoanGivenController::class, 'store'])->name('store');
+            Route::get('/{loanGiven}', [LoanGivenController::class, 'show'])->name('show');
+            Route::get('/{loanGiven}/payment', [LoanGivenController::class, 'paymentForm'])->name('payment-form');
+            Route::post('/{loanGiven}/payment', [LoanGivenController::class, 'recordPayment'])->name('payment');
+            Route::post('/{loanGiven}/close', [LoanGivenController::class, 'close'])->name('close');
+            Route::put('/{loanGiven}/status', [LoanGivenController::class, 'markStatus'])->name('status');
+            Route::delete('/{loanGiven}', [LoanGivenController::class, 'destroy'])->name('destroy');
+            Route::put('/{loanGiven}/notes', [LoanGivenController::class, 'updateNotes'])
+                ->name('notes.update');
+            Route::post('/{loanGiven}/rollover', [LoanGivenController::class, 'confirmRollover'])
+                ->name('rollover');
+        });
+
+        Route::get('referrers/{referrer}/payouts/create', [ReferrerPayoutController::class, 'create'])
+            ->name('referrer-payouts.create');
+        Route::post('referrers/{referrer}/payouts', [ReferrerPayoutController::class, 'store'])
+            ->name('referrer-payouts.store');
+
+        // Referrer float reconciliation — money she's collected on your behalf
+        // (principal + interest) and is holding, separate from referrer-payouts
+        // above (which pays out HER OWN commission on interest). Placed before
+        // the /{referrer} catch-all show route below so it doesn't get shadowed.
+        Route::get('referrers/{referrer}/float', [ReferrerFloatController::class, 'index'])
+            ->name('referrers.float.index');
+        Route::post('referrers/{referrer}/float/reconcile', [ReferrerFloatController::class, 'reconcile'])
+            ->name('referrers.float.reconcile');
+
+        Route::get('referrers/{referrer}', [ReferrerPayoutController::class, 'show'])
+            ->name('referrers.show');
+
+        // ======================================================================
+        // Client Funds Management
+        // ======================================================================
+
+        Route::resource('client-funds', ClientFundController::class);
+
+        Route::prefix('client-funds')->name('client-funds.')->group(function () {
+            // Record transactions
+            Route::post('{clientFund}/expense', [ClientFundController::class, 'recordExpense'])->name('expense');
+            Route::post('{clientFund}/profit', [ClientFundController::class, 'recordProfit'])->name('profit');
+
+            // Complete project
+            Route::post('{clientFund}/complete', [ClientFundController::class, 'complete'])->name('complete');
+
+            // Delete transactions
+            Route::delete('{clientFund}/expense/{transaction}', [ClientFundController::class, 'deleteExpense'])->name('expense.delete');
+            Route::delete('{clientFund}/profit/{transaction}', [ClientFundController::class, 'deleteProfit'])->name('profit.delete');
+            Route::post('{clientFund}/record-borrowed', [ClientFundController::class, 'recordBorrowed'])
+                ->name('record-borrowed');
+
+            Route::post('reconcile-borrowed', [ClientFundController::class, 'reconcileBorrowed'])
+                ->name('reconcile-borrowed');
+            Route::post('return-borrowed', [ClientFundController::class, 'returnBorrowed'])
+                ->name('return-borrowed');
+        });
+
+        Route::get('/rolling-funds', [RollingFundController::class, 'index'])->name('rolling-funds.index');
+        Route::get('/rolling-funds/create', [RollingFundController::class, 'create'])->name('rolling-funds.create');
+        Route::post('/rolling-funds', [RollingFundController::class, 'store'])->name('rolling-funds.store');
+        Route::post('/rolling-funds/save-limits', [RollingFundController::class, 'saveLimits'])->name('rolling-funds.save-limits');
+        Route::get('/rolling-funds/{rollingFund}', [RollingFundController::class, 'show'])->name('rolling-funds.show');
+        Route::post('/rolling-funds/{rollingFund}/record-outcome', [RollingFundController::class, 'recordOutcome'])->name('rolling-funds.record-outcome');
+        Route::delete('/rolling-funds/{rollingFund}', [RollingFundController::class, 'destroy'])->name('rolling-funds.destroy');
+
+        // ======================================================================
+        // Cafeteria
+        // ======================================================================
+
+        Route::prefix('cafeteria')->name('cafeteria.')->group(function () {
+            // Menu management
+            Route::get('menu', [CafeteriaController::class, 'menu'])->name('menu');
+            Route::post('menu', [CafeteriaController::class, 'storeMenuItem'])->name('menu.store');
+            Route::put('menu/{menuItem}', [CafeteriaController::class, 'updateMenuItem'])->name('menu.update');
+            Route::delete('menu/{menuItem}', [CafeteriaController::class, 'hideMenuItem'])->name('menu.destroy');
+            //Route::post('seed-menu', [CafeteriaController::class, 'seedMenu'])->name('seed-menu');
+        });
+
+        Route::resource('cafeteria', CafeteriaController::class)
+            ->parameters(['cafeteria' => 'order']);
+        Route::patch('cafeteria/budget/limit', [CafeteriaController::class, 'updateBudgetLimit'])
+            ->name('cafeteria.budget.update');
+
+        // ======================================================================
+        // User Settings
+        // ======================================================================
+
+        // Profile Management
+        Route::prefix('profile')->name('profile.')->group(function () {
+            Route::get('/', [ProfileController::class, 'edit'])->name('edit');
+            Route::patch('/', [ProfileController::class, 'update'])->name('update');
+            Route::delete('/', [ProfileController::class, 'destroy'])->name('destroy');
+        });
+
+        // Password Management
+        Route::put('/password', [PasswordController::class, 'update'])->name('password.update');
+
+        // Email Report Preferences
+        Route::prefix('email-preferences')->name('email-preferences.')->group(function () {
+            Route::get('/', [EmailPreferenceController::class, 'edit'])->name('edit');
+            Route::put('/', [EmailPreferenceController::class, 'update'])->name('update');
+
+            // Test email reports
+            Route::post('test-monthly', [EmailPreferenceController::class, 'sendTestMonthly'])->name('test-monthly');
+            Route::post('test-annual', [EmailPreferenceController::class, 'sendTestAnnual'])->name('test-annual');
+            Route::post('test-etica', [EmailPreferenceController::class, 'sendTestEtica'])
+                ->name('test-etica');
+            Route::post('send-custom', [EmailPreferenceController::class, 'sendCustom'])->name('send-custom');
+
+            Route::get('preview-monthly', [EmailPreferenceController::class, 'previewMonthly'])
+                ->name('preview-monthly');
+            Route::get('preview-annual', [EmailPreferenceController::class, 'previewAnnual'])
+                ->name('preview-annual');
+            Route::get('preview-custom', [EmailPreferenceController::class, 'previewCustom'])
+                ->name('preview-custom');
+        });
+
+        // ======================================================================
+        // Email Verification Routes
+        // ======================================================================
+        Route::get('/verify-email', EmailVerificationPromptController::class)
+            ->name('verification.notice');
+        Route::get('/verify-email/{id}/{hash}', VerifyEmailController::class)
+            ->middleware(['signed', 'throttle:6,1'])
+            ->name('verification.verify');
+        Route::post('/email/verification-notification', [EmailVerificationNotificationController::class, 'store'])
+            ->middleware('throttle:6,1')
+            ->name('verification.send');
+
+        // ======================================================================
+        // Password Confirmation Routes
+        // ======================================================================
+
+        Route::get('/confirm-password', function () {
+            return view('auth.confirm-password');
+        })->name('password.confirm');
+
+        Route::post('/confirm-password', function (Request $request) {
+            if (!Auth::guard('web')->validate([
+                'email' => $request->user()->email,
+                'password' => $request->password,
+            ])) {
+                return back()->withErrors(['password' => 'Invalid password']);
+            }
+
+            $request->session()->passwordConfirmed();
+            return redirect()->intended();
+        })->middleware('throttle:6,1');
     });
 
-    // ======================================================================
-    // Categories Management
-    // ======================================================================
+    /*
+    |--------------------------------------------------------------------------
+    | Password Reset Routes (Guest Only)
+    |--------------------------------------------------------------------------
+    */
 
-    Route::resource('categories', CategoryController::class);
-
-    // ======================================================================
-    // Budgets
-    // ======================================================================
-
-    Route::get('/budgets/{year?}', [BudgetController::class, 'index'])->name('budgets.index');
-    Route::post('/budgets/save-cell', [BudgetController::class, 'saveCell'])->name('budgets.save-cell');
-
-    // ======================================================================
-    // Loans Management
-    // ======================================================================
-
-    Route::resource('loans', LoanController::class)->except(['edit', 'update']);
-
-    Route::prefix('loans')->name('loans.')->group(function () {
-        // Loan payment routes
-        Route::get('{loan}/payment', [LoanController::class, 'paymentForm'])->name('payment');
-        Route::post('{loan}/payment', [LoanController::class, 'recordPayment'])->name('payment.store');
+    Route::middleware('guest')->group(function () {
+        Route::get('/forgot-password', [PasswordResetLinkController::class, 'create'])
+            ->name('password.request');
+        Route::post('/forgot-password', [PasswordResetLinkController::class, 'store'])
+            ->name('password.email');
+        Route::get('/reset-password/{token}', [NewPasswordController::class, 'create'])
+            ->name('password.reset');
+        Route::post('/reset-password', [NewPasswordController::class, 'store'])
+            ->name('password.store');
     });
 
-    Route::prefix('loans-given')->name('loans-given.')->group(function () {
-        Route::get('/', [LoanGivenController::class, 'index'])->name('index');
-        Route::get('/create', [LoanGivenController::class, 'create'])->name('create');
-        Route::get('/report', [LoanGivenController::class, 'report'])->name('report'); // moved up here
-        Route::post('/', [LoanGivenController::class, 'store'])->name('store');
-        Route::get('/{loanGiven}', [LoanGivenController::class, 'show'])->name('show');
-        Route::get('/{loanGiven}/payment', [LoanGivenController::class, 'paymentForm'])->name('payment-form');
-        Route::post('/{loanGiven}/payment', [LoanGivenController::class, 'recordPayment'])->name('payment');
-        Route::post('/{loanGiven}/close', [LoanGivenController::class, 'close'])->name('close');
-        Route::put('/{loanGiven}/status', [LoanGivenController::class, 'markStatus'])->name('status');
-        Route::delete('/{loanGiven}', [LoanGivenController::class, 'destroy'])->name('destroy');
-        Route::put('/{loanGiven}/notes', [LoanGivenController::class, 'updateNotes'])
-            ->name('notes.update');
-        Route::post('/{loanGiven}/rollover', [LoanGivenController::class, 'confirmRollover'])
-            ->name('rollover');
-    });
-
-    Route::get('referrers/{referrer}/payouts/create', [ReferrerPayoutController::class, 'create'])
-        ->name('referrer-payouts.create');
-    Route::post('referrers/{referrer}/payouts', [ReferrerPayoutController::class, 'store'])
-        ->name('referrer-payouts.store');
-
-    // Referrer float reconciliation — money she's collected on your behalf
-    // (principal + interest) and is holding, separate from referrer-payouts
-    // above (which pays out HER OWN commission on interest). Placed before
-    // the /{referrer} catch-all show route below so it doesn't get shadowed.
-    Route::get('referrers/{referrer}/float', [ReferrerFloatController::class, 'index'])
-        ->name('referrers.float.index');
-    Route::post('referrers/{referrer}/float/reconcile', [ReferrerFloatController::class, 'reconcile'])
-        ->name('referrers.float.reconcile');
-
-    Route::get('referrers/{referrer}', [ReferrerPayoutController::class, 'show'])
-        ->name('referrers.show');
-
-    // ======================================================================
-    // Client Funds Management
-    // ======================================================================
-
-    Route::resource('client-funds', ClientFundController::class);
-
-    Route::prefix('client-funds')->name('client-funds.')->group(function () {
-        // Record transactions
-        Route::post('{clientFund}/expense', [ClientFundController::class, 'recordExpense'])->name('expense');
-        Route::post('{clientFund}/profit', [ClientFundController::class, 'recordProfit'])->name('profit');
-
-        // Complete project
-        Route::post('{clientFund}/complete', [ClientFundController::class, 'complete'])->name('complete');
-
-        // Delete transactions
-        Route::delete('{clientFund}/expense/{transaction}', [ClientFundController::class, 'deleteExpense'])->name('expense.delete');
-        Route::delete('{clientFund}/profit/{transaction}', [ClientFundController::class, 'deleteProfit'])->name('profit.delete');
-        Route::post('{clientFund}/record-borrowed', [ClientFundController::class, 'recordBorrowed'])
-            ->name('record-borrowed');
-
-        Route::post('reconcile-borrowed', [ClientFundController::class, 'reconcileBorrowed'])
-            ->name('reconcile-borrowed');
-        Route::post('return-borrowed', [ClientFundController::class, 'returnBorrowed'])
-            ->name('return-borrowed');
-    });
-
-    Route::get('/rolling-funds', [RollingFundController::class, 'index'])->name('rolling-funds.index');
-    Route::get('/rolling-funds/create', [RollingFundController::class, 'create'])->name('rolling-funds.create');
-    Route::post('/rolling-funds', [RollingFundController::class, 'store'])->name('rolling-funds.store');
-    Route::post('/rolling-funds/save-limits', [RollingFundController::class, 'saveLimits'])->name('rolling-funds.save-limits');
-    Route::get('/rolling-funds/{rollingFund}', [RollingFundController::class, 'show'])->name('rolling-funds.show');
-    Route::post('/rolling-funds/{rollingFund}/record-outcome', [RollingFundController::class, 'recordOutcome'])->name('rolling-funds.record-outcome');
-    Route::delete('/rolling-funds/{rollingFund}', [RollingFundController::class, 'destroy'])->name('rolling-funds.destroy');
-
-    // ======================================================================
-    // Cafeteria
-    // ======================================================================
-
-    Route::prefix('cafeteria')->name('cafeteria.')->group(function () {
-        // Menu management
-        Route::get('menu', [CafeteriaController::class, 'menu'])->name('menu');
-        Route::post('menu', [CafeteriaController::class, 'storeMenuItem'])->name('menu.store');
-        Route::put('menu/{menuItem}', [CafeteriaController::class, 'updateMenuItem'])->name('menu.update');
-        Route::delete('menu/{menuItem}', [CafeteriaController::class, 'hideMenuItem'])->name('menu.destroy');
-        //Route::post('seed-menu', [CafeteriaController::class, 'seedMenu'])->name('seed-menu');
-    });
-
-    Route::resource('cafeteria', CafeteriaController::class)
-        ->parameters(['cafeteria' => 'order']);
-    Route::patch('cafeteria/budget/limit', [CafeteriaController::class, 'updateBudgetLimit'])
-        ->name('cafeteria.budget.update');
-
-    // ======================================================================
-    // User Settings
-    // ======================================================================
-
-    // Profile Management
-    Route::prefix('profile')->name('profile.')->group(function () {
-        Route::get('/', [ProfileController::class, 'edit'])->name('edit');
-        Route::patch('/', [ProfileController::class, 'update'])->name('update');
-        Route::delete('/', [ProfileController::class, 'destroy'])->name('destroy');
-    });
-
-    // Password Management
-    Route::put('/password', [PasswordController::class, 'update'])->name('password.update');
-
-    // Email Report Preferences
-    Route::prefix('email-preferences')->name('email-preferences.')->group(function () {
-        Route::get('/', [EmailPreferenceController::class, 'edit'])->name('edit');
-        Route::put('/', [EmailPreferenceController::class, 'update'])->name('update');
-
-        // Test email reports
-        Route::post('test-monthly', [EmailPreferenceController::class, 'sendTestMonthly'])->name('test-monthly');
-        Route::post('test-annual', [EmailPreferenceController::class, 'sendTestAnnual'])->name('test-annual');
-        Route::post('test-etica', [EmailPreferenceController::class, 'sendTestEtica'])
-            ->name('test-etica');
-        Route::post('send-custom', [EmailPreferenceController::class, 'sendCustom'])->name('send-custom');
-
-        Route::get('preview-monthly', [EmailPreferenceController::class, 'previewMonthly'])
-            ->name('preview-monthly');
-        Route::get('preview-annual', [EmailPreferenceController::class, 'previewAnnual'])
-            ->name('preview-annual');
-        Route::get('preview-custom', [EmailPreferenceController::class, 'previewCustom'])
-            ->name('preview-custom');
-    });
-
-    // ======================================================================
-    // Email Verification Routes
-    // ======================================================================
-    Route::get('/verify-email', EmailVerificationPromptController::class)
-        ->name('verification.notice');
-    Route::get('/verify-email/{id}/{hash}', VerifyEmailController::class)
-        ->middleware(['signed', 'throttle:6,1'])
-        ->name('verification.verify');
-    Route::post('/email/verification-notification', [EmailVerificationNotificationController::class, 'store'])
-        ->middleware('throttle:6,1')
-        ->name('verification.send');
-
-    // ======================================================================
-    // Password Confirmation Routes
-    // ======================================================================
-
-    Route::get('/confirm-password', function () {
-        return view('auth.confirm-password');
-    })->name('password.confirm');
-
-    Route::post('/confirm-password', function (Request $request) {
-        if (!Auth::guard('web')->validate([
-            'email' => $request->user()->email,
-            'password' => $request->password,
-        ])) {
-            return back()->withErrors(['password' => 'Invalid password']);
+    /*
+    |--------------------------------------------------------------------------
+    | CSRF Token Refresh (no auth required — used by login page keep-alive)
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/csrf-token', function () {
+        // Only regenerate if there's an active session — don't create one
+        if (session()->isStarted()) {
+            session()->regenerateToken();
         }
+        return response()->json(['token' => csrf_token()]);
+    })->middleware('web')->name('csrf.refresh');
 
-        $request->session()->passwordConfirmed();
-        return redirect()->intended();
-    })->middleware('throttle:6,1')->name('password.confirm');
-});
-
-/*
-|--------------------------------------------------------------------------
-| Password Reset Routes (Guest Only)
-|--------------------------------------------------------------------------
-*/
-
-Route::middleware('guest')->group(function () {
-    Route::get('/forgot-password', [PasswordResetLinkController::class, 'create'])
-        ->name('password.request');
-    Route::post('/forgot-password', [PasswordResetLinkController::class, 'store'])
-        ->name('password.email');
-    Route::get('/reset-password/{token}', [NewPasswordController::class, 'create'])
-        ->name('password.reset');
-    Route::post('/reset-password', [NewPasswordController::class, 'store'])
-        ->name('password.store');
-});
-
-/*
-|--------------------------------------------------------------------------
-| CSRF Token Refresh (no auth required — used by login page keep-alive)
-|--------------------------------------------------------------------------
-*/
-Route::get('/csrf-token', function () {
-    // Only regenerate if there's an active session — don't create one
-    if (session()->isStarted()) {
-        session()->regenerateToken();
-    }
-    return response()->json(['token' => csrf_token()]);
-})->middleware('web')->name('csrf.refresh');
-
-/*
-|--------------------------------------------------------------------------
-| Mpesa SMS Webhook (from Android/Tasker — no session auth)
-|--------------------------------------------------------------------------
-*/
-Route::match('POST', '/webhook/mpesa-sms', [MpesaSmsController::class, 'handle'])
-    ->name('webhook.mpesa-sms');
+    /*
+    |--------------------------------------------------------------------------
+    | Mpesa SMS Webhook (from Android/Tasker — no session auth)
+    |--------------------------------------------------------------------------
+    */
+    Route::match('POST', '/webhook/mpesa-sms', [MpesaSmsController::class, 'handle'])
+        ->name('webhook.mpesa-sms');

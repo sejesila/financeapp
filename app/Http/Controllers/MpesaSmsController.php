@@ -22,13 +22,16 @@ class MpesaSmsController extends Controller
 
     public function handle(Request $request): JsonResponse
     {
-
         // ── 1. Authenticate ───────────────────────────────────────────────
-        $secret = $request->header('X-Webhook-Secret')
-            ?? $request->input('secret');
+        // Header first, then the request BODY (not the query string, which
+        // can end up in server logs). If no secret is configured on the
+        // server, reject everything rather than letting null === null pass.
+        $expected = (string) config('services.mpesa_webhook.secret');
+        $provided = (string) ($request->header('X-Webhook-Secret')
+            ?? $request->post('secret', ''));
 
-        if ($secret !== config('services.mpesa_webhook.secret')) {
-            Log::warning('Webhook: invalid secret', ['ip' => $request->ip()]);
+        if ($expected === '' || ! hash_equals($expected, $provided)) {
+            Log::warning('Webhook: invalid or unconfigured secret', ['ip' => $request->ip()]);
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
@@ -109,6 +112,7 @@ class MpesaSmsController extends Controller
             if ($parsed['subtype'] === 'pesalink_to_savings') {
                 return $this->transfers->pesaLinkToSavings($user, $parsed);
             }
+
             if ($parsed['subtype'] === 'airtelcashback') {
                 return $this->transactions->applyCashback($user, $parsed);
             }
