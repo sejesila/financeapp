@@ -39,6 +39,46 @@
                         </div>
                     </div>
 
+                    <!-- Stats period selector (independent of the paid-list "period" filter) -->
+                    @php
+                        $statsPeriods = [
+                            'all' => 'All Time', 'this_month' => 'This Month', 'last_month' => 'Last Month',
+                            'this_year' => 'This Year', 'last_year' => 'Last Year', 'custom' => 'Custom',
+                        ];
+                    @endphp
+                    <div class="mb-4" x-data="{ custom: {{ $statsPeriod === 'custom' ? 'true' : 'false' }} }">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="text-xs font-medium text-gray-500 uppercase tracking-wider mr-1">Stats period</span>
+                            @foreach($statsPeriods as $key => $label)
+                                @if($key === 'custom')
+                                    <button type="button" @click="custom = !custom"
+                                            class="px-3 py-1.5 rounded-full text-xs font-medium border {{ $statsPeriod === 'custom' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50' }}">
+                                        {{ $label }}
+                                    </button>
+                                @else
+                                    <a href="{{ request()->fullUrlWithQuery(['stats_period' => $key, 'stats_start' => null, 'stats_end' => null, 'page' => null]) }}"
+                                       class="px-3 py-1.5 rounded-full text-xs font-medium border {{ $statsPeriod === $key ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50' }}">
+                                        {{ $label }}
+                                    </a>
+                                @endif
+                            @endforeach
+                        </div>
+
+                        <form x-show="custom" x-cloak method="GET" action="{{ route('loans-given.index') }}"
+                              class="mt-3 flex flex-wrap items-center gap-2">
+                            <input type="hidden" name="filter" value="{{ $filter }}">
+                            <input type="hidden" name="stats_period" value="custom">
+                            <input type="date" name="stats_start" value="{{ $statsStart?->format('Y-m-d') }}"
+                                   class="rounded-md border-gray-300 shadow-sm text-sm">
+                            <input type="date" name="stats_end" value="{{ $statsEnd?->format('Y-m-d') }}"
+                                   class="rounded-md border-gray-300 shadow-sm text-sm">
+                            <button type="submit"
+                                    class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                                Apply
+                            </button>
+                        </form>
+                    </div>
+
                     <!-- Statistics Dashboard -->
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                         <!-- Total Outstanding -->
@@ -76,13 +116,13 @@
                                         <p class="text-sm font-medium text-gray-500 break-words">Principal Disbursed</p>
                                         <p class="text-lg font-semibold text-gray-900">
                                             KES {{ number_format($totalPrincipal ?? 0, 0) }}</p>
-                                        <p class="text-xs text-gray-500">All-time, active + paid</p>
+                                        <p class="text-xs text-gray-500">{{ $statsLabel }}, active + paid</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Total Cash Collected (all-time, active partials + paid loans) -->
+                        <!-- Total Cash Collected (active partials + paid loans) -->
                         <div
                             class="bg-gradient-to-br from-teal-50 to-teal-100 overflow-hidden shadow-sm rounded-lg border border-teal-200">
                             <div class="p-4">
@@ -98,7 +138,7 @@
                                         <p class="text-sm font-medium text-gray-500 break-words">Cash Collected</p>
                                         <p class="text-lg font-semibold text-gray-900">
                                             KES {{ number_format($totalReceivedAllTime ?? 0, 0) }}</p>
-                                        <p class="text-xs text-gray-500">All-time, incl. partial payments</p>
+                                        <p class="text-xs text-gray-500">{{ $statsLabel }}, incl. partial payments</p>
                                     </div>
                                 </div>
                             </div>
@@ -120,7 +160,7 @@
                                         <p class="text-sm font-medium text-gray-500 break-words">Repaid (Closed Loans)</p>
                                         <p class="text-lg font-semibold text-gray-900">
                                             KES {{ number_format($totalRepaid ?? 0, 0) }}</p>
-                                        <p class="text-xs text-gray-500">Principal + interest, closed only</p>
+                                        <p class="text-xs text-gray-500">{{ $statsLabel }}, principal + interest, closed only</p>
                                     </div>
                                 </div>
                             </div>
@@ -142,7 +182,7 @@
                                         <p class="text-sm font-medium text-gray-500 break-words">Interest Earned</p>
                                         <p class="text-lg font-semibold text-gray-900">
                                             KES {{ number_format($totalInterest ?? 0, 0) }}</p>
-                                        <p class="text-xs text-gray-500">All-time, incl. active rollovers</p>
+                                        <p class="text-xs text-gray-500">{{ $statsLabel }}, incl. active rollovers</p>
                                     </div>
                                 </div>
                             </div>
@@ -163,7 +203,7 @@
                                         <p class="text-sm font-medium text-gray-500 break-words">Transaction Costs</p>
                                         <p class="text-lg font-semibold text-gray-900">
                                             KES {{ number_format($totalTransactionCosts ?? 0, 0) }}</p>
-                                        <p class="text-xs text-gray-500">Fees on disbursement, all-time</p>
+                                        <p class="text-xs text-gray-500">Fees on disbursement, {{ strtolower($statsLabel) }}</p>
                                     </div>
                                 </div>
                             </div>
@@ -209,7 +249,7 @@
                                         <p class="text-sm font-medium text-gray-500 break-words">Avg Interest Rate</p>
                                         <p class="text-lg font-semibold text-gray-900">{{ number_format($avgInterestRate ?? 0, 1) }}
                                             %</p>
-                                        <p class="text-xs text-gray-500">Across closed loans</p>
+                                        <p class="text-xs text-gray-500">Closed loans, {{ strtolower($statsLabel) }}</p>
                                     </div>
                                 </div>
                             </div>
@@ -231,8 +271,8 @@
                                         <p class="text-sm font-medium text-gray-500 break-words">Repayment Rate</p>
                                         <p class="text-lg font-semibold text-gray-900">{{ number_format($repaymentRate ?? 0, 1) }}
                                             %</p>
-                                        <p class="text-xs text-gray-500">{{ $paidLoans->total() }}
-                                            of {{ $activeLoans->count() + $paidLoans->total() }} loans</p>
+                                        <p class="text-xs text-gray-500">{{ $repaidCount ?? 0 }}
+                                            of {{ $disbursedCount ?? 0 }} loans</p>
                                     </div>
                                 </div>
                             </div>
@@ -242,7 +282,7 @@
                     <!-- Filter Tabs -->
                     <div class="border-b border-gray-200 mb-6">
                         <nav class="-mb-px flex space-x-8">
-                            <a href="{{ route('loans-given.index', ['filter' => 'active']) }}"
+                            <a href="{{ route('loans-given.index', ['filter' => 'active', 'stats_period' => $statsPeriod, 'stats_start' => $statsStart?->format('Y-m-d'), 'stats_end' => $statsEnd?->format('Y-m-d')]) }}"
                                class="{{ $filter === 'active' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
                                 Active Loans
                                 <span
@@ -250,7 +290,7 @@
                                     {{ $activeLoans->count() }}
                                 </span>
                             </a>
-                            <a href="{{ route('loans-given.index', ['filter' => 'paid']) }}"
+                            <a href="{{ route('loans-given.index', ['filter' => 'paid', 'stats_period' => $statsPeriod, 'stats_start' => $statsStart?->format('Y-m-d'), 'stats_end' => $statsEnd?->format('Y-m-d')]) }}"
                                class="{{ $filter === 'paid' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
                                 Paid Loans
                                 <span
@@ -261,7 +301,15 @@
                         </nav>
                     </div>
 
-                    <!-- Active Loans Section -->
+                    @php
+                        // Carried through the dropdowns' JS redirects below so the
+                        // stats period isn't lost when filtering/sorting the lists.
+                        $statsQs = '&stats_period=' . urlencode($statsPeriod)
+                            . ($statsStart ? '&stats_start=' . $statsStart->format('Y-m-d') : '')
+                            . ($statsEnd ? '&stats_end=' . $statsEnd->format('Y-m-d') : '');
+                    @endphp
+
+                        <!-- Active Loans Section -->
                     @if($filter === 'active')
                         <div class="flex justify-end gap-3 mb-4">
                             <!-- Referrer filter -->
@@ -277,7 +325,7 @@
                                      select(value) {
                                          this.referrerId = value;
                                          this.open = false;
-                                         window.location = '{{ route('loans-given.index') }}?filter=active&sort={{ $sort ?? 'date_desc' }}&referrer_id=' + value;
+                                         window.location = '{{ route('loans-given.index') }}?filter=active&sort={{ $sort ?? 'date_desc' }}&referrer_id=' + value + '{{ $statsQs }}';
                                      }
                                  }"
                                  @mouseenter="open = true" @mouseleave="open = false" @click.outside="open = false"
@@ -308,7 +356,7 @@
                                      select(value) {
                                          this.sort = value;
                                          this.open = false;
-                                         window.location = '{{ route('loans-given.index') }}?filter=active&sort=' + value + '&referrer_id={{ $referrerId ?? '' }}';
+                                         window.location = '{{ route('loans-given.index') }}?filter=active&sort=' + value + '&referrer_id={{ $referrerId ?? '' }}{{ $statsQs }}';
                                      }
                                  }"
                                  @mouseenter="open = true" @mouseleave="open = false" @click.outside="open = false"
@@ -546,7 +594,7 @@
                                                   this.period = value;
                                                   this.open = false;
                                                   if (value !== 'custom') {
-                                                      window.location = '{{ route('loans-given.index') }}?filter=paid&period=' + value;
+                                                      window.location = '{{ route('loans-given.index') }}?filter=paid&period=' + value + '{{ $statsQs }}';
                                                   }
                                               }
                                           }"
@@ -554,6 +602,13 @@
 
                                         <input type="hidden" name="filter" value="paid">
                                         <input type="hidden" name="period" :value="period">
+                                        <input type="hidden" name="stats_period" value="{{ $statsPeriod }}">
+                                        @if($statsStart)
+                                            <input type="hidden" name="stats_start" value="{{ $statsStart->format('Y-m-d') }}">
+                                        @endif
+                                        @if($statsEnd)
+                                            <input type="hidden" name="stats_end" value="{{ $statsEnd->format('Y-m-d') }}">
+                                        @endif
 
                                         <div @mouseenter="open = true"
                                              @mouseleave="open = false"

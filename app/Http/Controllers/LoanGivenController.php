@@ -99,31 +99,63 @@ class LoanGivenController extends Controller implements HasMiddleware
 
             $paidLoans = $paidLoansQuery->orderBy('repaid_date', 'desc')->orderBy('updated_at', 'desc')->paginate(15)->withQueryString();
 
-            // Stats (computed off actual rows, not accessors that assume upfront interest)
+            // ── Stats period (independent of the paid-list "period" filter) ───
+            $statsPeriod = $request->get('stats_period', 'all');
+
+            [$statsStart, $statsEnd] = match ($statsPeriod) {
+                'this_month' => [now()->startOfMonth(), now()->endOfMonth()],
+                'last_month' => [now()->subMonthNoOverflow()->startOfMonth(), now()->subMonthNoOverflow()->endOfMonth()],
+                'this_year'  => [now()->startOfYear(), now()->endOfYear()],
+                'last_year'  => [now()->subYear()->startOfYear(), now()->subYear()->endOfYear()],
+                'custom'     => [
+                    $request->filled('stats_start') ? Carbon::parse($request->stats_start)->startOfDay() : null,
+                    $request->filled('stats_end')   ? Carbon::parse($request->stats_end)->endOfDay()     : null,
+                ],
+                default      => [null, null],
+            };
+
+            $statsLabel = match ($statsPeriod) {
+                'this_month' => 'This month',
+                'last_month' => 'Last month',
+                'this_year'  => 'This year',
+                'last_year'  => 'Last year',
+                'custom'     => 'Custom range',
+                default      => 'All-time',
+            };
+
+            $inRange = fn($date) => $date !== null
+                && (!$statsStart || Carbon::parse($date)->gte($statsStart))
+                && (!$statsEnd   || Carbon::parse($date)->lte($statsEnd));
+
             $allLoans = LoanGiven::where('user_id', Auth::id())->get();
             $paidLoansCollection = $allLoans->where('status', 'paid');
 
-            $totalPrincipal = $allLoans->sum(fn ($l) => $l->original_principal);
-            $totalRepaid = $paidLoansCollection->sum('amount_paid');
+            // Loans disbursed in the period / closed in the period
+            $disbursedInRange = $allLoans->filter(fn($l) => $inRange($l->disbursed_date));
+            $paidInRange      = $paidLoansCollection->filter(fn($l) => $inRange($l->repaid_date));
+
+            $totalPrincipal = $disbursedInRange->sum(fn($l) => $l->original_principal);
+            $totalRepaid    = $paidInRange->sum('amount_paid');
+
             // A closed loan's interest_amount already captures ALL interest it
             // ever earned (including any rollover payments before it closed),
             // since closeAsRepaid() derives it from the lifetime amount_paid.
-            // But an active loan has no interest_amount yet — its recognized
+            // An active loan has no interest_amount yet — its recognized
             // interest lives only in its payments' interest_portion, and that's
             // real money already booked as income (see splitInterestFromRolloverPayment()),
-            // so it has to be added here or the dashboard undercounts actual
-            // interest income the moment a rollover payment happens on a loan
-            // that hasn't closed yet.
-            $totalInterest = $paidLoansCollection->sum('interest_amount')
-                + $activeLoans->sum(fn($loan) => $loan->payments->sum('interest_portion'));
+            // so it's added here by the date each payment was recorded.
+            $totalInterest = $paidInRange->sum('interest_amount')
+                + $activeLoans->sum(fn($loan) => $loan->payments
+                    ->filter(fn($p) => $inRange($p->payment_date))
+                    ->sum('interest_portion'));
+
+            // Snapshot, not period-based
             $totalOutstanding = $activeLoans->sum('outstanding_amount');
 
-            // Transaction costs paid out to disburse these loans (M-Pesa/bank/etc
-            // fees), pulled from the linked fee transactions on each loan's
-            // disbursement — same relationship the show page uses for
-            // $disbursementFee. All-time, active + paid, same scope as
-            // totalPrincipal, so "Net Interest" below is a fair like-for-like figure.
-            $disbursementTransactionIds = $allLoans->pluck('disbursement_transaction_id')->filter()->values();
+            // Transaction costs paid out to disburse the loans disbursed in the
+            // period (M-Pesa/bank/etc fees), pulled from the linked fee
+            // transactions on each loan's disbursement.
+            $disbursementTransactionIds = $disbursedInRange->pluck('disbursement_transaction_id')->filter()->values();
 
             $totalTransactionCosts = $disbursementTransactionIds->isNotEmpty()
                 ? Transaction::where('is_transaction_fee', true)
@@ -131,9 +163,10 @@ class LoanGivenController extends Controller implements HasMiddleware
                     ->sum('amount')
                 : 0;
 
-            // Referrer share still OWED: closed loans only, not yet included in a
-// payout, and not already kept by the referrer before depositing.
-            $referrerCut = $paidLoansCollection
+            // Referrer share still OWED on loans closed in the period: not yet
+            // included in a payout, and not already kept by the referrer before
+            // depositing.
+            $referrerCut = $paidInRange
                 ->filter(fn($l) => $l->referrer_id
                     && $l->referrer_share_percentage !== null
                     && !$l->referrer_payout_id
@@ -142,20 +175,21 @@ class LoanGivenController extends Controller implements HasMiddleware
 
             $netInterest = $totalInterest - $totalTransactionCosts - $referrerCut;
 
-            // "Total Repaid" above only counts closed loans, so partial repayments
-            // sitting on still-active loans (e.g. Enock, Emmanuel HR) never show up
-            // anywhere in the summary — they just quietly reduce `balance`. This
-            // figure is the actual all-time cash collected: partial + full.
-            $totalReceivedAllTime = $activeLoans->sum('amount_paid') + $paidLoansCollection->sum('amount_paid');
+            // Actual cash collected in the period: partial + full payments.
+            $totalReceivedAllTime = LoanGivenPayment::where('user_id', Auth::id())
+                ->when($statsStart, fn($q) => $q->whereDate('payment_date', '>=', $statsStart))
+                ->when($statsEnd, fn($q) => $q->whereDate('payment_date', '<=', $statsEnd))
+                ->sum('amount');
 
-            $loansWithInterest = $paidLoansCollection->filter(fn($loan) => $loan->interest_amount > 0);
+            $loansWithInterest = $paidInRange->filter(fn($loan) => $loan->interest_amount > 0);
             $avgInterestRate = $loansWithInterest->isNotEmpty()
                 ? $loansWithInterest->avg('interest_rate')
                 : 0;
 
-            $repaymentRate = $allLoans->isNotEmpty()
-                ? ($paidLoansCollection->count() / $allLoans->count()) * 100
-                : 0;
+            // Of the loans disbursed in the period, how many are now paid.
+            $disbursedCount = $disbursedInRange->count();
+            $repaidCount    = $disbursedInRange->where('status', 'paid')->count();
+            $repaymentRate  = $disbursedCount > 0 ? ($repaidCount / $disbursedCount) * 100 : 0;
 
             $accounts = Account::where('user_id', Auth::id())
                 ->where('is_active', true)
@@ -166,7 +200,8 @@ class LoanGivenController extends Controller implements HasMiddleware
                 'activeLoans', 'paidLoans', 'filter', 'period', 'sort', 'referrerId', 'referrers',
                 'startDate', 'endDate', 'minYear', 'maxYear', 'accounts',
                 'totalPrincipal', 'totalRepaid', 'totalInterest', 'avgInterestRate', 'repaymentRate',
-                'totalOutstanding', 'totalReceivedAllTime', 'totalTransactionCosts', 'netInterest','referrerCut'
+                'totalOutstanding', 'totalReceivedAllTime', 'totalTransactionCosts', 'netInterest', 'referrerCut',
+                'statsPeriod', 'statsStart', 'statsEnd', 'statsLabel', 'repaidCount', 'disbursedCount'
             ));
 
         } catch (ValidationException|AuthorizationException $e) {
