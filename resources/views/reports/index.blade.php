@@ -155,6 +155,14 @@
                 @endif
             </x-report-card>
         </div>
+        @if($referrerShareOwed > 0)
+            <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                Referrer share still owed on loans closed this period:
+                <strong>KES {{ number_format($referrerShareOwed) }}</strong>.
+                Net cash flow after it:
+                <strong>KES {{ number_format($netCashFlow - $referrerShareOwed) }}</strong>
+            </div>
+        @endif
         {{-- Salary → Savings Rate --}}
         @if(!empty($salarySavingsRate))
             <div class="rounded-lg border bg-white p-4 md:p-6 shadow-sm">

@@ -242,6 +242,8 @@ class BudgetController extends Controller
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
+        $referrerOwedByMonth = app(\App\Services\ReportDataService::class)
+            ->getReferrerShareOwedByMonth(Auth::user(), (int) $year);
 
         return view('budgets.index', compact(
             'incomeCategories',
@@ -257,7 +259,8 @@ class BudgetController extends Controller
             'minYear',
             'maxYear',
             'accounts',
-            'budgetRule'
+            'budgetRule',
+            'referrerOwedByMonth'
         ));
     }
 

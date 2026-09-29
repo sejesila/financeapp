@@ -251,6 +251,17 @@
                                 </span>
                             </div>
                         </div>
+                        {{-- Referrer share owed (Mobile) --}}
+                        @if(($referrerOwedByMonth[$m] ?? 0) > 0)
+                            <div class="bg-amber-50 dark:bg-amber-900/20 rounded-lg shadow-sm p-3 border border-amber-200 dark:border-amber-800">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs font-semibold text-amber-800 dark:text-amber-200">Referrer share owed</span>
+                                    <span class="font-bold text-amber-700 dark:text-amber-300">
+                −{{ number_format($referrerOwedByMonth[$m], 0) }}
+            </span>
+                                </div>
+                            </div>
+                        @endif
 
                         {{-- Savings Withdrawal Context (Mobile) --}}
                         @php
@@ -336,6 +347,14 @@
                         <span class="font-bold text-purple-600 dark:text-purple-400">
                             {{ number_format($savingsWithdrawals->sum('total'), 0) }}
                         </span>
+                    </div>
+                @endif
+                @if(array_sum($referrerOwedByMonth) > 0)
+                    <div class="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-gray-700">
+                        <span class="text-sm text-amber-600 dark:text-amber-400">Referrer share owed</span>
+                        <span class="font-bold text-amber-600 dark:text-amber-400">
+            −{{ number_format(array_sum($referrerOwedByMonth), 0) }}
+        </span>
                     </div>
                 @endif
 
@@ -697,6 +716,23 @@
                             </div>
                         </td>
                     </tr>
+                    @if(array_sum($referrerOwedByMonth) > 0)
+                        <tr class="bg-amber-50 dark:bg-amber-900/20 border-t border-amber-200">
+                            <td class="px-3 py-2 text-sm italic text-amber-700 dark:text-amber-300">Referrer share owed</td>
+                            @for($m = 1; $m <= 12; $m++)
+                                <td class="px-2 py-2 text-center text-sm">
+                                    @if(($referrerOwedByMonth[$m] ?? 0) > 0)
+                                        <span class="text-amber-700 font-medium">−{{ number_format($referrerOwedByMonth[$m], 0) }}</span>
+                                    @else
+                                        <span class="text-gray-400">—</span>
+                                    @endif
+                                </td>
+                            @endfor
+                            <td class="px-3 py-2 text-center text-sm font-semibold bg-amber-100 text-amber-700">
+                                −{{ number_format(array_sum($referrerOwedByMonth), 0) }}
+                            </td>
+                        </tr>
+                    @endif
 
                     {{-- SAVINGS WITHDRAWALS (Context Row) --}}
                     @if($savingsWithdrawals->count() > 0)

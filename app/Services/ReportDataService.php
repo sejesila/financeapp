@@ -788,6 +788,44 @@ class ReportDataService
             'accounts' => $accounts,
         ];
     }
+    private function referrerOwedLoans(User $user)
+    {
+        return LoanGiven::with('referrer')
+            ->where('user_id', $user->id)
+            ->where('status', 'paid')
+            ->whereNotNull('referrer_id')
+            ->whereNull('referrer_payout_id')
+            ->where(fn($q) => $q->where('referrer_deducted_before_deposit', false)
+                ->orWhereNull('referrer_deducted_before_deposit'));
+    }
+
+// Same rule as ReferrerPayoutController: per-loan % first, referrer default as fallback.
+    private function referrerCutFor(LoanGiven $loan): float
+    {
+        $pct = $loan->referrer_share_percentage ?? $loan->referrer?->default_share_percentage;
+
+        return $pct === null ? 0.0 : round($loan->interest_amount * ($pct / 100), 2);
+    }
+
+    public function getReferrerShareOwed(User $user, Carbon $startDate, Carbon $endDate): float
+    {
+        return (float) $this->referrerOwedLoans($user)
+            ->whereBetween('repaid_date', [$startDate, $endDate])
+            ->get()
+            ->sum(fn($l) => $this->referrerCutFor($l));
+    }
+
+    public function getReferrerShareOwedByMonth(User $user, int $year): array
+    {
+        $byMonth = array_fill(1, 12, 0.0);
+
+        $this->referrerOwedLoans($user)->whereYear('repaid_date', $year)->get()
+            ->each(function ($l) use (&$byMonth) {
+                $byMonth[Carbon::parse($l->repaid_date)->month] += $this->referrerCutFor($l);
+            });
+
+        return $byMonth;
+    }
 
     /**
      * Calculate what a savings account's balance was at a specific point in time

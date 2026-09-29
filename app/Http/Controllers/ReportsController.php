@@ -141,6 +141,7 @@ class ReportsController extends Controller
         $interestIncome = $reportDataService->getInterestIncomeSummary(
             auth()->user(), $startDate, $endDate
         );
+        $referrerShareOwed = $reportDataService->getReferrerShareOwed(auth()->user(), $startDate, $endDate);
 
         return view('reports.index', compact(
             'filter',
@@ -156,7 +157,8 @@ class ReportsController extends Controller
             'expenseChange',
             'accounts',
             'salarySavingsRate',
-            'interestIncome'
+            'interestIncome',
+            'referrerShareOwed'
         ));
     }
 
