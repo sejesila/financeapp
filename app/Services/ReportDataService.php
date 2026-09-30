@@ -876,18 +876,16 @@ class ReportDataService
             ->filter(fn($t) => $t->category->name === 'Balance Adjustment')
             ->sum('amount');
 
-        // Transfers INTO savings accounts after period end (subtract to reverse)
         $transfersInAfter = Transfer::withoutGlobalScopes()
             ->where('user_id', $user->id)
             ->whereIn('to_account_id', $savingsAccountIds)
-            ->where('date', '>', $asAtDate->toDateString())
+            ->whereDate('date', '>', $asAtDate->toDateString())   // was ->where(
             ->sum('amount');
 
-        // Transfers OUT OF savings accounts after period end (add back to reverse)
         $transfersOutAfter = Transfer::withoutGlobalScopes()
             ->where('user_id', $user->id)
             ->whereIn('from_account_id', $savingsAccountIds)
-            ->where('date', '>', $asAtDate->toDateString())
+            ->whereDate('date', '>', $asAtDate->toDateString())   // was ->where(
             ->sum('amount');
 
         $balanceAsAt = $currentSavingsTotal
@@ -952,13 +950,13 @@ class ReportDataService
         $transfersInAfter = Transfer::withoutGlobalScopes()
             ->where('user_id', $account->user_id)
             ->where('to_account_id', $account->id)
-            ->where('date', '>', $asAtDate->toDateString())
+            ->whereDate('date', '>', $asAtDate->toDateString())   // was ->where(
             ->sum('amount');
 
         $transfersOutAfter = Transfer::withoutGlobalScopes()
             ->where('user_id', $account->user_id)
             ->where('from_account_id', $account->id)
-            ->where('date', '>', $asAtDate->toDateString())
+            ->whereDate('date', '>', $asAtDate->toDateString())   // was ->where(
             ->sum('amount');
 
         $balanceAsAt = $currentBalance
