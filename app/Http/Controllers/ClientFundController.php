@@ -958,18 +958,13 @@ class ClientFundController extends Controller
         $fundsById = $funds->keyBy('id');
 
         $query = ClientFundTransaction::whereIn('client_fund_id', $funds->pluck('id'))
-            ->where('type', 'expense');
-
+            ->where('type', 'expense')
+            ->where('is_borrowed', false);
         if ($request->filled('from')) {
             $query->whereDate('date', '>=', $request->query('from'));
         }
         if ($request->filled('to')) {
             $query->whereDate('date', '<=', $request->query('to'));
-        }
-        if ($request->query('filter') === 'real') {
-            $query->where('is_borrowed', false);
-        } elseif ($request->query('filter') === 'borrowed') {
-            $query->where('is_borrowed', true);
         }
 
         $expenses = $query->orderByDesc('date')->orderByDesc('id')->get();
@@ -981,9 +976,8 @@ class ClientFundController extends Controller
             ->keyBy('id');
 
         $totals = [
-            'real'     => $expenses->where('is_borrowed', false)->sum('amount'),
-            'borrowed' => $expenses->where('is_borrowed', true)->sum('amount'),
-            'count'    => $expenses->count(),
+            'real'  => $expenses->sum('amount'),
+            'count' => $expenses->count(),
         ];
 
         $byCategory = $expenses->where('is_borrowed', false)

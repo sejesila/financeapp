@@ -18,14 +18,10 @@
         <div class="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 space-y-4">
 
             {{-- Totals --}}
-            <div class="grid grid-cols-3 gap-2 sm:gap-4">
+            <div class="grid grid-cols-2 gap-2 sm:gap-4">
                 <div class="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-lg shadow">
                     <p class="text-xs text-gray-600 dark:text-gray-400 mb-1">Real Expenses</p>
                     <p class="text-lg sm:text-2xl font-bold text-orange-600">{{ number_format($totals['real'], 0) }}</p>
-                </div>
-                <div class="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-lg shadow">
-                    <p class="text-xs text-gray-600 dark:text-gray-400 mb-1">Borrowed</p>
-                    <p class="text-lg sm:text-2xl font-bold text-red-600">{{ number_format($totals['borrowed'], 0) }}</p>
                 </div>
                 <div class="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-lg shadow">
                     <p class="text-xs text-gray-600 dark:text-gray-400 mb-1">Entries</p>
@@ -45,15 +41,7 @@
                     <input type="date" name="to" value="{{ request('to') }}"
                            class="w-full border rounded px-3 py-2 text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
                 </div>
-                <div class="flex-1">
-                    <label class="block text-xs mb-1">Show</label>
-                    <select name="filter"
-                            class="w-full border rounded px-3 py-2 text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
-                        <option value="">All</option>
-                        <option value="real" {{ request('filter') === 'real' ? 'selected' : '' }}>Real expenses</option>
-                        <option value="borrowed" {{ request('filter') === 'borrowed' ? 'selected' : '' }}>Borrowed only</option>
-                    </select>
-                </div>
+
                 <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm font-medium">
                     Apply
                 </button>
