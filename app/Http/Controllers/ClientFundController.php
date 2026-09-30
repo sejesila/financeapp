@@ -57,9 +57,10 @@ class ClientFundController extends Controller
         $clientTotals = ClientFund::where('user_id', Auth::id())
             ->when(!$showCompleted, fn($q) => $q->where('status', '!=', 'completed')) // add this
             ->selectRaw('
-        client_name,
-        COUNT(*) as total_entries,
-        SUM(amount_received) as total_received,
+    client_name,
+    MIN(id) as any_fund_id,
+    COUNT(*) as total_entries,
+    SUM(amount_received) as total_received,
         SUM(amount_spent) as total_spent,
         SUM(profit_amount) as total_profit,
         SUM(balance) as total_balance,
@@ -940,5 +941,58 @@ class ClientFundController extends Controller
         $shortfall = $outstandingTotal - (float)$account->current_balance;
 
         return max(0, round($shortfall, 2));
+    }
+    public function clientExpenses(Request $request, ClientFund $clientFund)
+    {
+        if ($clientFund->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        $clientName = $clientFund->client_name;
+
+        $funds = ClientFund::where('user_id', Auth::id())
+            ->where('client_name', $clientName)
+            ->whereNotIn('status', ['cancelled'])
+            ->get();
+
+        $fundsById = $funds->keyBy('id');
+
+        $query = ClientFundTransaction::whereIn('client_fund_id', $funds->pluck('id'))
+            ->where('type', 'expense');
+
+        if ($request->filled('from')) {
+            $query->whereDate('date', '>=', $request->query('from'));
+        }
+        if ($request->filled('to')) {
+            $query->whereDate('date', '<=', $request->query('to'));
+        }
+        if ($request->query('filter') === 'real') {
+            $query->where('is_borrowed', false);
+        } elseif ($request->query('filter') === 'borrowed') {
+            $query->where('is_borrowed', true);
+        }
+
+        $expenses = $query->orderByDesc('date')->orderByDesc('id')->get();
+
+        // Borrowed entries have no linked Transaction (transaction_id is null)
+        $linkedTransactions = Transaction::with(['category', 'account'])
+            ->whereIn('id', $expenses->pluck('transaction_id')->filter())
+            ->get()
+            ->keyBy('id');
+
+        $totals = [
+            'real'     => $expenses->where('is_borrowed', false)->sum('amount'),
+            'borrowed' => $expenses->where('is_borrowed', true)->sum('amount'),
+            'count'    => $expenses->count(),
+        ];
+
+        $byCategory = $expenses->where('is_borrowed', false)
+            ->groupBy(fn($e) => optional(optional($linkedTransactions->get($e->transaction_id))->category)->name ?? 'Uncategorised')
+            ->map(fn($group) => $group->sum('amount'))
+            ->sortDesc();
+
+        return view('client-funds.client-expenses', compact(
+            'clientName', 'expenses', 'fundsById', 'linkedTransactions', 'totals', 'byCategory'
+        ));
     }
 }

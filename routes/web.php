@@ -202,6 +202,8 @@
                 ->name('reconcile-borrowed');
             Route::post('return-borrowed', [ClientFundController::class, 'returnBorrowed'])
                 ->name('return-borrowed');
+            Route::get('{clientFund}/client-expenses', [ClientFundController::class, 'clientExpenses'])
+                ->name('client-expenses');
         });
 
         Route::get('/rolling-funds', [RollingFundController::class, 'index'])->name('rolling-funds.index');

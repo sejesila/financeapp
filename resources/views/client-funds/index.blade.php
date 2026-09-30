@@ -142,6 +142,10 @@
                                                class="font-semibold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-200 hover:underline">
                                                 {{ $client->client_name }}
                                             </a>
+                                            <a href="{{ route('client-funds.client-expenses', $client->any_fund_id) }}"
+                                               class="ml-2 text-xs text-gray-500 hover:text-indigo-600 dark:text-gray-400">
+                                                📄 Expenses
+                                            </a>
                                             {{-- Mobile: show spent/profit inline --}}
                                             <div class="md:hidden text-xs text-gray-500 mt-0.5">
                                                 Spent: <span class="text-orange-600 font-medium">{{ number_format($client->total_spent, 0) }}</span>
@@ -250,6 +254,13 @@
                         <span class="ml-2 text-indigo-500">({{ $clientFunds->total() }} {{ Str::plural('entry', $clientFunds->total()) }})</span>
                     </p>
                     <div class="flex items-center gap-4">
+                        @php $expensesFundId = $clientTotals->firstWhere('client_name', $clientFilter)->any_fund_id ?? null; @endphp
+                        @if($expensesFundId)
+                            <a href="{{ route('client-funds.client-expenses', $expensesFundId) }}"
+                               class="text-xs text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 font-medium">
+                                📄 Expense history
+                            </a>
+                        @endif
                         {{-- Toggle for filtered view --}}
                         <a href="{{ request()->fullUrlWithQuery(['show_completed' => $showCompleted ? '0' : '1']) }}"
                            class="text-xs text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 flex items-center gap-1 transition-colors">

@@ -3,7 +3,11 @@
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div class="flex-1 min-w-0">
                 <h2 class="font-semibold text-base sm:text-lg md:text-xl text-gray-800 dark:text-gray-200 leading-tight truncate">
-                    {{ $clientFund->client_name }}
+                    <a href="{{ route('client-funds.client-expenses', $clientFund) }}"
+                       class="hover:underline"
+                       title="View all expenses for this client">
+                        {{ $clientFund->client_name }}
+                    </a>
                 </h2>
                 <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">
                     {{ $clientFund->purpose }}
