@@ -47,21 +47,6 @@
                 </button>
             </form>
 
-            {{-- By category --}}
-            @if($byCategory->isNotEmpty())
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3 sm:p-4">
-                    <h3 class="text-sm sm:text-base font-semibold mb-2">By Category</h3>
-                    <div class="space-y-1">
-                        @foreach($byCategory as $name => $amount)
-                            <div class="flex justify-between text-xs sm:text-sm">
-                                <span class="text-gray-600 dark:text-gray-400">{{ $name }}</span>
-                                <span class="font-medium">{{ number_format($amount, 0) }}</span>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
-            @endif
-
             {{-- History --}}
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
                 <div class="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700">
@@ -79,13 +64,6 @@
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-center gap-2 flex-wrap mb-1">
                                         <span class="text-xs text-gray-500">{{ $expense->date->format('M d, Y') }}</span>
-                                        @if($expense->is_borrowed)
-                                            <span class="px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">🚩 Borrowed</span>
-                                        @elseif($linked?->category)
-                                            <span class="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
-                                                {{ $linked->category->name }}
-                                            </span>
-                                        @endif
                                     </div>
                                     <p class="text-sm text-gray-800 dark:text-gray-200 break-words">{{ $expense->description }}</p>
                                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">

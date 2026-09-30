@@ -970,7 +970,7 @@ class ClientFundController extends Controller
         $expenses = $query->orderByDesc('date')->orderByDesc('id')->get();
 
         // Borrowed entries have no linked Transaction (transaction_id is null)
-        $linkedTransactions = Transaction::with(['category', 'account'])
+        $linkedTransactions = Transaction::with('account')
             ->whereIn('id', $expenses->pluck('transaction_id')->filter())
             ->get()
             ->keyBy('id');
@@ -979,14 +979,8 @@ class ClientFundController extends Controller
             'real'  => $expenses->sum('amount'),
             'count' => $expenses->count(),
         ];
-
-        $byCategory = $expenses->where('is_borrowed', false)
-            ->groupBy(fn($e) => optional(optional($linkedTransactions->get($e->transaction_id))->category)->name ?? 'Uncategorised')
-            ->map(fn($group) => $group->sum('amount'))
-            ->sortDesc();
-
         return view('client-funds.client-expenses', compact(
-            'clientName', 'expenses', 'fundsById', 'linkedTransactions', 'totals', 'byCategory'
+            'clientName', 'expenses', 'fundsById', 'linkedTransactions', 'totals'
         ));
     }
 }
