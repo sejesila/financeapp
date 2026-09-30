@@ -56,7 +56,6 @@
                 <div class="divide-y divide-gray-100 dark:divide-gray-700">
                     @forelse($expenses as $expense)
                         @php
-                            $fund = $fundsById->get($expense->client_fund_id);
                             $linked = $linkedTransactions->get($expense->transaction_id);
                         @endphp
                         <div class="p-3 sm:p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50">
@@ -66,14 +65,9 @@
                                         <span class="text-xs text-gray-500">{{ $expense->date->format('M d, Y') }}</span>
                                     </div>
                                     <p class="text-sm text-gray-800 dark:text-gray-200 break-words">{{ $expense->description }}</p>
-                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                        @if($fund)
-                                            <a href="{{ route('client-funds.show', $fund) }}" class="text-indigo-600 hover:text-indigo-800">
-                                                {{ \Illuminate\Support\Str::limit($fund->purpose, 40) }}
-                                            </a>
-                                        @endif
-                                        @if($linked?->account) · Paid from {{ $linked->account->name }} @endif
-                                    </p>
+                                    @if($linked?->account)
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Paid from {{ $linked->account->name }}</p>
+                                    @endif
                                 </div>
                                 <p class="font-bold text-base sm:text-lg flex-shrink-0 {{ $expense->is_borrowed ? 'text-red-600' : 'text-orange-600' }}">
                                     - {{ number_format($expense->amount, 0) }}

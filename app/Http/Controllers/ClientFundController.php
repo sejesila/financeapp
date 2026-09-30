@@ -955,8 +955,6 @@ class ClientFundController extends Controller
             ->whereNotIn('status', ['cancelled'])
             ->get();
 
-        $fundsById = $funds->keyBy('id');
-
         $query = ClientFundTransaction::whereIn('client_fund_id', $funds->pluck('id'))
             ->where('type', 'expense')
             ->where('is_borrowed', false);
@@ -980,7 +978,7 @@ class ClientFundController extends Controller
             'count' => $expenses->count(),
         ];
         return view('client-funds.client-expenses', compact(
-            'clientName', 'expenses', 'fundsById', 'linkedTransactions', 'totals'
+            'clientName', 'expenses', 'linkedTransactions', 'totals'
         ));
     }
 }
