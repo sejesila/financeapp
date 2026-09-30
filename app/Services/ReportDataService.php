@@ -263,10 +263,7 @@ class ReportDataService
     {
         return Transaction::query()
             ->where('user_id', $user->id)
-            ->whereBetween('date', [
-                $startDate->toDateString(),
-                $endDate->toDateString(),
-            ])
+            ->whereBetween('date', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
             ->where(function ($q) {
                 $q->whereNull('payment_method')
                     ->orWhere(function ($q2) {
@@ -345,6 +342,8 @@ class ReportDataService
      */
     private function generateReport(User $user, Carbon $startDate, Carbon $endDate, string $type): array
     {
+        $startDate = $startDate->copy()->startOfDay();
+        $endDate   = $endDate->copy()->endOfDay();
         $accounts = Account::where('user_id', $user->id)->where('is_active', true)->get();
 
         // Historical client funds balance — the TRUE total still owed to
@@ -764,10 +763,7 @@ class ReportDataService
         }
 
         $interestByAccount = Transaction::whereIn('account_id', $savingsAccounts->pluck('id'))
-            ->whereBetween('date', [
-                $startDate->toDateString(),
-                $endDate->toDateString(),
-            ])
+            ->whereBetween('date', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
             ->whereHas('category', fn($q) => $q->where('name', 'Interest'))
             ->selectRaw('account_id, SUM(amount) as total')
             ->groupBy('account_id')
@@ -849,7 +845,7 @@ class ReportDataService
         // Pull all transactions on these accounts after asAtDate in one query
         $txAfter = Transaction::where('user_id', $user->id)
             ->whereIn('account_id', $savingsAccountIds)
-            ->where('date', '>', $asAtDate->toDateString())
+            ->where('date', '>', $asAtDate->copy()->endOfDay())
             ->with('category')
             ->get();
 
@@ -879,13 +875,13 @@ class ReportDataService
         $transfersInAfter = Transfer::withoutGlobalScopes()
             ->where('user_id', $user->id)
             ->whereIn('to_account_id', $savingsAccountIds)
-            ->whereDate('date', '>', $asAtDate->toDateString())   // was ->where(
+            ->where('date', '>', $asAtDate->copy()->endOfDay())
             ->sum('amount');
 
         $transfersOutAfter = Transfer::withoutGlobalScopes()
             ->where('user_id', $user->id)
             ->whereIn('from_account_id', $savingsAccountIds)
-            ->whereDate('date', '>', $asAtDate->toDateString())   // was ->where(
+            ->where('date', '>', $asAtDate->copy()->endOfDay())
             ->sum('amount');
 
         $balanceAsAt = $currentSavingsTotal
@@ -922,7 +918,7 @@ class ReportDataService
 
         $txAfter = Transaction::where('user_id', $account->user_id)
             ->where('account_id', $account->id)
-            ->where('date', '>', $asAtDate->toDateString())
+            ->where('date', '>', $asAtDate->copy()->endOfDay())
             ->with('category')
             ->get();
 
@@ -950,13 +946,13 @@ class ReportDataService
         $transfersInAfter = Transfer::withoutGlobalScopes()
             ->where('user_id', $account->user_id)
             ->where('to_account_id', $account->id)
-            ->whereDate('date', '>', $asAtDate->toDateString())   // was ->where(
+            ->where('date', '>', $asAtDate->copy()->endOfDay())
             ->sum('amount');
 
         $transfersOutAfter = Transfer::withoutGlobalScopes()
             ->where('user_id', $account->user_id)
             ->where('from_account_id', $account->id)
-            ->whereDate('date', '>', $asAtDate->toDateString())   // was ->where(
+            ->where('date', '>', $asAtDate->copy()->endOfDay())
             ->sum('amount');
 
         $balanceAsAt = $currentBalance
@@ -1115,10 +1111,7 @@ class ReportDataService
     public function getSalarySavingsRate(User $user, Carbon $startDate, Carbon $endDate): array
     {
         $salaryTransactions = Transaction::where('user_id', $user->id)
-            ->whereBetween('date', [
-                $startDate->toDateString(),
-                $endDate->toDateString(),
-            ])
+            ->whereBetween('date', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
             ->whereHas('category', fn($q) => $q->where('name', 'like', '%salary%'))
             ->where('amount', '>=', self::MIN_SALARY_AMOUNT_FOR_SAVINGS_RATE)
             ->with(['category', 'account'])
