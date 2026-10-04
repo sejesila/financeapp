@@ -78,7 +78,9 @@
                                         </option>
                                     @endforeach
                                 </select>
-                                <p class="mt-1 text-xs text-gray-500" id="account_balance_hint">Funds are deducted from this account on disbursement.</p>
+                                {{-- Funds are deducted from this account on disbursement.
+                                     Empty by default; JS fills it only with an insufficient-balance warning. --}}
+                                <p class="mt-1 text-xs text-red-600 font-medium" id="account_balance_hint"></p>
                                 @error('account_id')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                 @enderror
@@ -88,7 +90,7 @@
                                 <label for="principal_amount" class="block text-sm font-medium text-gray-700">Principal Amount (KES) <span class="text-red-600">*</span></label>
                                 <input type="number" step="0.01" min="1" id="principal_amount" name="principal_amount" value="{{ old('principal_amount') }}"
                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 @error('principal_amount') border-red-500 @enderror" required>
-                                <p class="mt-1 text-xs text-gray-500">This is exactly what the borrower owes back — keep it clean of any sending fees.</p>
+                                {{-- This is exactly what the borrower owes back — keep it clean of any sending fees. --}}
                                 @error('principal_amount')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                 @enderror
@@ -100,11 +102,9 @@
                                 <input type="number" step="0.01" min="0" id="transaction_cost" name="transaction_cost"
                                        value="{{ old('transaction_cost') }}"
                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 @error('transaction_cost') border-red-500 @enderror">
-                                <p class="mt-1 text-xs text-gray-500">
-                                    Auto-calculated from M-Pesa send money rates based on the principal. You can overwrite it;
-                                    clear the field to go back to the automatic value. Recorded as its own expense and never
-                                    added to what the borrower owes.
-                                </p>
+                                {{-- Auto-calculated from M-Pesa send money rates based on the principal. You can overwrite it;
+                                     clear the field to go back to the automatic value. Recorded as its own expense and never
+                                     added to what the borrower owes. --}}
                                 @error('transaction_cost')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                 @enderror
@@ -135,7 +135,7 @@
                                 <input type="number" step="0.01" min="0" max="100" id="referrer_share_percentage" name="referrer_share_percentage"
                                        value="{{ old('referrer_share_percentage') }}"
                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 @error('referrer_share_percentage') border-red-500 @enderror">
-                                <p class="mt-1 text-xs text-gray-500">Defaults to the referrer's usual %, but you can override it for this loan.</p>
+                                {{-- Defaults to the referrer's usual %, but you can override it for this loan. --}}
                                 @error('referrer_share_percentage')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                 @enderror
@@ -149,7 +149,7 @@
                                 @error('disbursed_date')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                 @enderror
-                                <p class="mt-1 text-xs text-gray-500">Due date is automatically set to 30 days from this date.</p>
+                                {{-- Due date is automatically set to 30 days from this date. --}}
                             </div>
                         </div>
 
@@ -163,28 +163,12 @@
                             @enderror
                         </div>
 
-                        <!-- Summary Alert -->
-                        <div class="bg-blue-50 border-l-4 border-blue-400 p-4">
-                            <div class="flex">
-                                <div class="flex-shrink-0">
-                                    <svg class="h-5 w-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                    </svg>
-                                </div>
-                                <div class="ml-3">
-                                    <p class="text-sm text-blue-700">
-                                        <span class="font-medium">No interest rate needed here.</span>
-                                        Just record what you're lending out. When repayments come in and you
-                                        close the loan out, the interest and rate are calculated automatically
-                                        from whatever total amount you actually received.
-                                        <span class="block mt-1">
-                                            The transaction cost above is pre-filled from M-Pesa send money rates —
-                                            it'll be tracked as its own expense, separately from the principal.
-                                        </span>
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
+                        {{-- Info note removed from UI to keep the form minimal. Original text:
+                             No interest rate needed here. Just record what you're lending out. When repayments
+                             come in and you close the loan out, the interest and rate are calculated automatically
+                             from whatever total amount you actually received.
+                             The transaction cost above is pre-filled from M-Pesa send money rates — it's tracked
+                             as its own expense, separately from the principal. --}}
 
                         <div class="flex items-center space-x-4">
                             <button type="submit" class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 focus:bg-indigo-700 active:bg-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
@@ -230,7 +214,7 @@
 
             function checkBalance() {
                 const opt = accountSelect.options[accountSelect.selectedIndex];
-                if (!opt || !opt.value) return;
+                if (!opt || !opt.value) { hint.textContent = ''; return; }
                 const balance = parseFloat(opt.getAttribute('data-balance')) || 0;
                 const amount = parseFloat(principalInput.value) || 0;
                 const fee = parseFloat(feeInput.value) || 0;
@@ -244,8 +228,7 @@
                         : `⚠️ Amount exceeds available balance (KES ${balanceLabel})`;
                     hint.className = 'mt-1 text-xs text-red-600 font-medium';
                 } else {
-                    hint.textContent = 'Funds are deducted from this account on disbursement.';
-                    hint.className = 'mt-1 text-xs text-gray-500';
+                    hint.textContent = '';
                 }
             }
 
