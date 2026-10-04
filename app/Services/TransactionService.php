@@ -154,6 +154,30 @@ class TransactionService
         ];
     }
     /**
+     * M-Pesa "send money" tiers, exposed so other callers (e.g. the loan form)
+     * share the single source of truth for the rates.
+     */
+    public function mpesaSendMoneyTiers(): array
+    {
+        return $this->getMpesaTransactionCosts()['send_money'];
+    }
+
+    /**
+     * M-Pesa send-money fee for an amount, independent of the account type.
+     */
+    public function mpesaSendMoneyFee(float $amount): float
+    {
+        $tiers = $this->mpesaSendMoneyTiers();
+
+        foreach ($tiers as $tier) {
+            if ($amount >= $tier['min'] && $amount <= $tier['max']) {
+                return (float) $tier['cost'];
+            }
+        }
+
+        return (float) end($tiers)['cost'];
+    }
+    /**
      * Fee resolution for a transaction. If the caller supplied an explicit
      * 'manual_fee' (e.g. loan disbursement letting the user type in the real
      * M-Pesa charge, or a fee for an account type the tier tables don't cover),

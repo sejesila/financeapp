@@ -345,7 +345,8 @@ class LoanGivenController extends Controller implements HasMiddleware
                     // table) instead of relying purely on the auto-calculated
                     // one. Leave blank to just use the auto-calculated fee (or
                     // none, for cash/bank disbursements).
-                    'manual_fee' => $validated['transaction_cost'] ?? null,
+                    'manual_fee' => $validated['transaction_cost']
+                        ?? $this->transactionService->mpesaSendMoneyFee($principalAmount),
                 ]);
 
                 // Direct link so destroy() never has to guess which transaction to remove.
@@ -410,7 +411,9 @@ class LoanGivenController extends Controller implements HasMiddleware
                 ->orderBy('name')
                 ->get();
 
-            return view('loans-given.create', compact('accounts', 'referrers'));
+            $sendMoneyTiers = $this->transactionService->mpesaSendMoneyTiers();
+
+            return view('loans-given.create', compact('accounts', 'referrers', 'sendMoneyTiers'));
 
         } catch (ValidationException|AuthorizationException $e) {
             throw $e;

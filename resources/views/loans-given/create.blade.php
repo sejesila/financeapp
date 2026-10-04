@@ -97,12 +97,13 @@
                             <!-- Transaction Cost (e.g. M-Pesa charge) — separate from principal -->
                             <div>
                                 <label for="transaction_cost" class="block text-sm font-medium text-gray-700">Transaction Cost (KES)</label>
-                                <input type="number" step="0.01" min="0" id="transaction_cost" name="transaction_cost" value="{{ old('transaction_cost', 0) }}"
+                                <input type="number" step="0.01" min="0" id="transaction_cost" name="transaction_cost"
+                                       value="{{ old('transaction_cost') }}"
                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 @error('transaction_cost') border-red-500 @enderror">
                                 <p class="mt-1 text-xs text-gray-500">
-                                    e.g. the M-Pesa charge for sending the loan. Kept separate from principal —
-                                    recorded as its own expense so it never inflates what the borrower owes,
-                                    but still shows up in your expense totals.
+                                    Auto-calculated from M-Pesa send money rates based on the principal. You can overwrite it;
+                                    clear the field to go back to the automatic value. Recorded as its own expense and never
+                                    added to what the borrower owes.
                                 </p>
                                 @error('transaction_cost')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -177,8 +178,8 @@
                                         close the loan out, the interest and rate are calculated automatically
                                         from whatever total amount you actually received.
                                         <span class="block mt-1">
-                                            If sending the loan cost you a fee, add it above — it'll be tracked
-                                            as its own expense, separately from the principal.
+                                            The transaction cost above is pre-filled from M-Pesa send money rates —
+                                            it'll be tracked as its own expense, separately from the principal.
                                         </span>
                                     </p>
                                 </div>
@@ -209,6 +210,24 @@
             const feeInput = document.getElementById('transaction_cost');
             const hint = document.getElementById('account_balance_hint');
 
+            // M-Pesa "send money" tiers, passed from TransactionService (single source of truth).
+            const tiers = @json($sendMoneyTiers);
+
+            // If the form came back from a validation error with a fee, treat it as user-entered.
+            let feeEdited = {{ old('transaction_cost') !== null && old('transaction_cost') !== '' ? 'true' : 'false' }};
+
+            function mpesaSendMoneyFee(amount) {
+                if (!amount || amount <= 0) return 0;
+                const tier = tiers.find(t => amount >= t.min && amount <= t.max);
+                return tier ? tier.cost : tiers[tiers.length - 1].cost;
+            }
+
+            function autoFillFee() {
+                if (feeEdited) return;
+                const amount = parseFloat(principalInput.value) || 0;
+                feeInput.value = mpesaSendMoneyFee(amount);
+            }
+
             function checkBalance() {
                 const opt = accountSelect.options[accountSelect.selectedIndex];
                 if (!opt || !opt.value) return;
@@ -231,8 +250,21 @@
             }
 
             accountSelect.addEventListener('change', checkBalance);
-            principalInput.addEventListener('input', checkBalance);
-            feeInput.addEventListener('input', checkBalance);
+
+            principalInput.addEventListener('input', () => {
+                autoFillFee();
+                checkBalance();
+            });
+
+            feeInput.addEventListener('input', () => {
+                // Typing a value locks it in; clearing the field re-enables auto-calculation.
+                feeEdited = feeInput.value.trim() !== '';
+                if (!feeEdited) autoFillFee();
+                checkBalance();
+            });
+
+            autoFillFee();
+            checkBalance();
 
             // Referrer share toggle
             const referrerSelect = document.getElementById('referrer_id');
