@@ -38,6 +38,10 @@ class ReferrerPayout extends Model
     {
         return $this->belongsTo(Referrer::class);
     }
+    public function account()
+    {
+        return $this->belongsTo(Account::class);
+    }
 
     public function loans()
     {
