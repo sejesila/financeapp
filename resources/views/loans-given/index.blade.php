@@ -1,8 +1,8 @@
 <x-app-layout>
-    <div class="py-12">
+    <div class="py-6 sm:py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg">
-                <div class="p-6">
+                <div class="p-4 sm:p-6">
                     <!-- Flash Messages -->
                     @if(session('success'))
                         <div class="mb-6 bg-green-50 border-l-4 border-green-400 p-4">
@@ -16,12 +16,12 @@
                     @endif
 
                     <!-- Header -->
-                    <div class="flex justify-between items-center mb-6">
-                        <h1 class="text-2xl font-semibold text-gray-800">Loans Given</h1>
+                    <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
+                        <h1 class="text-lg sm:text-2xl font-semibold text-gray-800">Loans Given</h1>
                         <div class="flex gap-2">
                             <a href="{{ route('loans-given.report') }}{{ $referrerId ? '?referrer_id=' . $referrerId : '' }}"
                                target="_blank"
-                               class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                               class="inline-flex items-center px-3 sm:px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-[11px] sm:text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
                                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                           d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
@@ -29,7 +29,7 @@
                                 Generate Report
                             </a>
                             <a href="{{ route('loans-given.create') }}"
-                               class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 focus:bg-indigo-700 active:bg-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                               class="inline-flex items-center px-3 sm:px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-[11px] sm:text-xs text-white uppercase tracking-widest hover:bg-indigo-700 focus:bg-indigo-700 active:bg-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
                                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                           d="M12 4v16m8-8H4"></path>
@@ -81,24 +81,24 @@
                     </div>
 
                     <!-- Statistics Dashboard -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
                         <!-- Total Outstanding -->
                         <div
                             class="bg-gradient-to-br from-indigo-50 to-indigo-100 overflow-hidden shadow-sm rounded-lg border border-indigo-200">
-                            <div class="p-4">
+                            <div class="p-3 sm:p-4">
                                 <div class="flex items-center">
-                                    <div class="flex-shrink-0 bg-indigo-500 rounded-lg p-3">
+                                    <div class="hidden sm:block flex-shrink-0 bg-indigo-500 rounded-lg p-3">
                                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor"
                                              viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                                         </svg>
                                     </div>
-                                    <div class="ml-4 min-w-0">
-                                        <p class="text-sm font-medium text-gray-500 break-words">Outstanding</p>
-                                        <p class="text-lg font-semibold text-gray-900">
+                                    <div class="sm:ml-4 min-w-0">
+                                        <p class="text-xs sm:text-sm font-medium text-gray-500 break-words">Outstanding</p>
+                                        <p class="text-base sm:text-lg font-semibold text-gray-900">
                                             KES {{ number_format($totalOutstanding ?? 0, 0) }}</p>
-                                        <p class="text-xs text-gray-500">Active loans only</p>
+                                        <p class="text-[10px] sm:text-xs leading-tight text-gray-500">Active loans only</p>
                                     </div>
                                 </div>
                             </div>
@@ -106,20 +106,20 @@
                         <!-- Total Principal -->
                         <div
                             class="bg-gradient-to-br from-blue-50 to-blue-100 overflow-hidden shadow-sm rounded-lg border border-blue-200">
-                            <div class="p-4">
+                            <div class="p-3 sm:p-4">
                                 <div class="flex items-center">
-                                    <div class="flex-shrink-0 bg-blue-500 rounded-lg p-3">
+                                    <div class="hidden sm:block flex-shrink-0 bg-blue-500 rounded-lg p-3">
                                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor"
                                              viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v1m0 1v1m0 1v1m0 1v1"></path>
                                         </svg>
                                     </div>
-                                    <div class="ml-4 min-w-0">
-                                        <p class="text-sm font-medium text-gray-500 break-words">Principal Disbursed</p>
-                                        <p class="text-lg font-semibold text-gray-900">
+                                    <div class="sm:ml-4 min-w-0">
+                                        <p class="text-xs sm:text-sm font-medium text-gray-500 break-words">Principal Disbursed</p>
+                                        <p class="text-base sm:text-lg font-semibold text-gray-900">
                                             KES {{ number_format($totalPrincipal ?? 0, 0) }}</p>
-                                        <p class="text-xs text-gray-500">{{ $statsLabel }}, active + paid</p>
+                                        <p class="text-[10px] sm:text-xs leading-tight text-gray-500">Active + paid</p>
                                     </div>
                                 </div>
                             </div>
@@ -128,20 +128,20 @@
                         <!-- Total Cash Collected (active partials + paid loans) -->
                         <div
                             class="bg-gradient-to-br from-teal-50 to-teal-100 overflow-hidden shadow-sm rounded-lg border border-teal-200">
-                            <div class="p-4">
+                            <div class="p-3 sm:p-4">
                                 <div class="flex items-center">
-                                    <div class="flex-shrink-0 bg-teal-500 rounded-lg p-3">
+                                    <div class="hidden sm:block flex-shrink-0 bg-teal-500 rounded-lg p-3">
                                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor"
                                              viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z"></path>
                                         </svg>
                                     </div>
-                                    <div class="ml-4 min-w-0">
-                                        <p class="text-sm font-medium text-gray-500 break-words">Cash Collected</p>
-                                        <p class="text-lg font-semibold text-gray-900">
+                                    <div class="sm:ml-4 min-w-0">
+                                        <p class="text-xs sm:text-sm font-medium text-gray-500 break-words">Cash Collected</p>
+                                        <p class="text-base sm:text-lg font-semibold text-gray-900">
                                             KES {{ number_format($totalReceivedAllTime ?? 0, 0) }}</p>
-                                        <p class="text-xs text-gray-500">{{ $statsLabel }}, incl. partial payments</p>
+                                        <p class="text-[10px] sm:text-xs leading-tight text-gray-500">Incl. partial payments</p>
                                     </div>
                                 </div>
                             </div>
@@ -150,22 +150,21 @@
                         <!-- Total Repaid (closed loans only) -->
                         <div
                             class="bg-gradient-to-br from-green-50 to-green-100 overflow-hidden shadow-sm rounded-lg border border-green-200">
-                            <div class="p-4">
+                            <div class="p-3 sm:p-4">
                                 <div class="flex items-center">
-                                    <div class="flex-shrink-0 bg-green-500 rounded-lg p-3">
+                                    <div class="hidden sm:block flex-shrink-0 bg-green-500 rounded-lg p-3">
                                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor"
                                              viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                         </svg>
                                     </div>
-                                    <div class="ml-4 min-w-0">
-                                        <p class="text-sm font-medium text-gray-500 break-words">Repaid (Closed
+                                    <div class="sm:ml-4 min-w-0">
+                                        <p class="text-xs sm:text-sm font-medium text-gray-500 break-words">Repaid (Closed
                                             Loans)</p>
-                                        <p class="text-lg font-semibold text-gray-900">
+                                        <p class="text-base sm:text-lg font-semibold text-gray-900">
                                             KES {{ number_format($totalRepaid ?? 0, 0) }}</p>
-                                        <p class="text-xs text-gray-500">{{ $statsLabel }}, principal + interest, closed
-                                            only</p>
+                                        <p class="text-[10px] sm:text-xs leading-tight text-gray-500">Principal + interest, closed only</p>
                                     </div>
                                 </div>
                             </div>
@@ -174,20 +173,20 @@
                         <!-- Total Interest -->
                         <div
                             class="bg-gradient-to-br from-purple-50 to-purple-100 overflow-hidden shadow-sm rounded-lg border border-purple-200">
-                            <div class="p-4">
+                            <div class="p-3 sm:p-4">
                                 <div class="flex items-center">
-                                    <div class="flex-shrink-0 bg-purple-500 rounded-lg p-3">
+                                    <div class="hidden sm:block flex-shrink-0 bg-purple-500 rounded-lg p-3">
                                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor"
                                              viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
                                         </svg>
                                     </div>
-                                    <div class="ml-4 min-w-0">
-                                        <p class="text-sm font-medium text-gray-500 break-words">Interest Earned</p>
-                                        <p class="text-lg font-semibold text-gray-900">
+                                    <div class="sm:ml-4 min-w-0">
+                                        <p class="text-xs sm:text-sm font-medium text-gray-500 break-words">Interest Earned</p>
+                                        <p class="text-base sm:text-lg font-semibold text-gray-900">
                                             KES {{ number_format($totalInterest ?? 0, 0) }}</p>
-                                        <p class="text-xs text-gray-500">{{ $statsLabel }}, incl. active rollovers</p>
+                                        <p class="text-[10px] sm:text-xs leading-tight text-gray-500">Incl. active rollovers</p>
                                     </div>
                                 </div>
                             </div>
@@ -195,21 +194,20 @@
                         <!-- Transaction Costs -->
                         <div
                             class="bg-gradient-to-br from-orange-50 to-orange-100 overflow-hidden shadow-sm rounded-lg border border-orange-200">
-                            <div class="p-4">
+                            <div class="p-3 sm:p-4">
                                 <div class="flex items-center">
-                                    <div class="flex-shrink-0 bg-orange-500 rounded-lg p-3">
+                                    <div class="hidden sm:block flex-shrink-0 bg-orange-500 rounded-lg p-3">
                                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor"
                                              viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z"></path>
                                         </svg>
                                     </div>
-                                    <div class="ml-4 min-w-0">
-                                        <p class="text-sm font-medium text-gray-500 break-words">Transaction Costs</p>
-                                        <p class="text-lg font-semibold text-gray-900">
+                                    <div class="sm:ml-4 min-w-0">
+                                        <p class="text-xs sm:text-sm font-medium text-gray-500 break-words">Transaction Costs</p>
+                                        <p class="text-base sm:text-lg font-semibold text-gray-900">
                                             KES {{ number_format($totalTransactionCosts ?? 0, 0) }}</p>
-                                        <p class="text-xs text-gray-500">Fees on
-                                            disbursement, {{ strtolower($statsLabel) }}</p>
+                                        <p class="text-[10px] sm:text-xs leading-tight text-gray-500">Fees on disbursement</p>
                                     </div>
                                 </div>
                             </div>
@@ -218,20 +216,20 @@
                         <!-- Net Interest -->
                         <div
                             class="bg-gradient-to-br from-emerald-50 to-emerald-100 overflow-hidden shadow-sm rounded-lg border border-emerald-200">
-                            <div class="p-4">
+                            <div class="p-3 sm:p-4">
                                 <div class="flex items-center">
-                                    <div class="flex-shrink-0 bg-emerald-600 rounded-lg p-3">
+                                    <div class="hidden sm:block flex-shrink-0 bg-emerald-600 rounded-lg p-3">
                                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor"
                                              viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
                                         </svg>
                                     </div>
-                                    <div class="ml-4 min-w-0">
-                                        <p class="text-sm font-medium text-gray-500 break-words">Net Interest</p>
-                                        <p class="text-lg font-semibold text-gray-900">
+                                    <div class="sm:ml-4 min-w-0">
+                                        <p class="text-xs sm:text-sm font-medium text-gray-500 break-words">Net Interest</p>
+                                        <p class="text-base sm:text-lg font-semibold text-gray-900">
                                             KES {{ number_format($netInterest ?? 0, 0) }}</p>
-                                        <p class="text-xs text-gray-500">
+                                        <p class="text-[10px] sm:text-xs leading-tight text-gray-500">
                                             Interest − costs − referrer share owed
                                             (KES {{ number_format($referrerCut ?? 0, 0) }})
                                         </p>
@@ -243,20 +241,20 @@
                         <!-- Average Interest -->
                         <div
                             class="bg-gradient-to-br from-pink-50 to-pink-100 overflow-hidden shadow-sm rounded-lg border border-pink-200">
-                            <div class="p-4">
+                            <div class="p-3 sm:p-4">
                                 <div class="flex items-center">
-                                    <div class="flex-shrink-0 bg-pink-500 rounded-lg p-3">
+                                    <div class="hidden sm:block flex-shrink-0 bg-pink-500 rounded-lg p-3">
                                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor"
                                              viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"></path>
                                         </svg>
                                     </div>
-                                    <div class="ml-4 min-w-0">
-                                        <p class="text-sm font-medium text-gray-500 break-words">Avg Interest Rate</p>
-                                        <p class="text-lg font-semibold text-gray-900">{{ number_format($avgInterestRate ?? 0, 1) }}
+                                    <div class="sm:ml-4 min-w-0">
+                                        <p class="text-xs sm:text-sm font-medium text-gray-500 break-words">Avg Interest Rate</p>
+                                        <p class="text-base sm:text-lg font-semibold text-gray-900">{{ number_format($avgInterestRate ?? 0, 1) }}
                                             %</p>
-                                        <p class="text-xs text-gray-500">Closed loans, {{ strtolower($statsLabel) }}</p>
+                                        <p class="text-[10px] sm:text-xs leading-tight text-gray-500">Closed loans</p>
                                     </div>
                                 </div>
                             </div>
@@ -265,20 +263,20 @@
                         <!-- Repayment Rate -->
                         <div
                             class="bg-gradient-to-br from-yellow-50 to-yellow-100 overflow-hidden shadow-sm rounded-lg border border-yellow-200">
-                            <div class="p-4">
+                            <div class="p-3 sm:p-4">
                                 <div class="flex items-center">
-                                    <div class="flex-shrink-0 bg-yellow-500 rounded-lg p-3">
+                                    <div class="hidden sm:block flex-shrink-0 bg-yellow-500 rounded-lg p-3">
                                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor"
                                              viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                                         </svg>
                                     </div>
-                                    <div class="ml-4 min-w-0">
-                                        <p class="text-sm font-medium text-gray-500 break-words">Repayment Rate</p>
-                                        <p class="text-lg font-semibold text-gray-900">{{ number_format($repaymentRate ?? 0, 1) }}
+                                    <div class="sm:ml-4 min-w-0">
+                                        <p class="text-xs sm:text-sm font-medium text-gray-500 break-words">Repayment Rate</p>
+                                        <p class="text-base sm:text-lg font-semibold text-gray-900">{{ number_format($repaymentRate ?? 0, 1) }}
                                             %</p>
-                                        <p class="text-xs text-gray-500">{{ $repaidCount ?? 0 }}
+                                        <p class="text-[10px] sm:text-xs leading-tight text-gray-500">{{ $repaidCount ?? 0 }}
                                             of {{ $disbursedCount ?? 0 }} loans</p>
                                     </div>
                                 </div>
@@ -289,7 +287,7 @@
                     <div class="mb-6 border border-gray-200 rounded-lg" x-data="{ open: true }">
                         <button type="button" @click="open = !open"
                                 class="w-full flex items-center justify-between px-4 py-3 text-left">
-                            <span class="text-sm font-medium text-gray-700">Monthly trend — last 12 months</span>
+                            <span class="text-xs sm:text-sm font-medium text-gray-700">Monthly trend — last 12 months</span>
                             <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-180': open }"
                                  fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -297,7 +295,7 @@
                             </svg>
                         </button>
                         <div x-show="open" x-cloak class="px-4 pb-4">
-                            <div style="height: 280px;">
+                            <div class="h-56 sm:h-72">
                                 <canvas id="loansTrendChart"></canvas>
                             </div>
                         </div>
@@ -305,9 +303,9 @@
 
                     <!-- Filter Tabs -->
                     <div class="border-b border-gray-200 mb-6">
-                        <nav class="-mb-px flex space-x-8">
+                        <nav class="-mb-px flex space-x-5 sm:space-x-8">
                             <a href="{{ route('loans-given.index', ['filter' => 'active', 'stats_period' => $statsPeriod, 'stats_start' => $statsStart?->format('Y-m-d'), 'stats_end' => $statsEnd?->format('Y-m-d')]) }}"
-                               class="{{ $filter === 'active' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+                               class="{{ $filter === 'active' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap py-2 px-1 border-b-2 font-medium text-xs sm:text-sm">
                                 Active Loans
                                 <span
                                     class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
@@ -315,7 +313,7 @@
                                 </span>
                             </a>
                             <a href="{{ route('loans-given.index', ['filter' => 'paid', 'stats_period' => $statsPeriod, 'stats_start' => $statsStart?->format('Y-m-d'), 'stats_end' => $statsEnd?->format('Y-m-d')]) }}"
-                               class="{{ $filter === 'paid' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+                               class="{{ $filter === 'paid' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap py-2 px-1 border-b-2 font-medium text-xs sm:text-sm">
                                 Paid Loans
                                 <span
                                     class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
@@ -335,7 +333,7 @@
 
                         <!-- Active Loans Section -->
                     @if($filter === 'active')
-                        <div class="flex justify-end gap-3 mb-4">
+                        <div class="flex flex-col sm:flex-row sm:justify-end gap-3 mb-4">
                             <!-- Referrer filter -->
                             <div x-data="{
                                      open: false,
@@ -348,9 +346,9 @@
                                      }
                                  }"
                                  @mouseenter="open = true" @mouseleave="open = false" @click.outside="open = false"
-                                 class="relative w-52">
+                                 class="relative w-full sm:w-52">
                                 <button type="button" @click="open = !open"
-                                        class="w-full rounded-md border border-gray-300 shadow-sm text-sm px-3 py-2 text-left flex justify-between items-center gap-2 bg-white focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                                        class="w-full rounded-md border border-gray-300 shadow-sm text-xs sm:text-sm px-3 py-2 text-left flex justify-between items-center gap-2 bg-white focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
                                     <span x-text="labels[referrerId]"></span>
                                     <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24"
                                          stroke="currentColor">
@@ -359,7 +357,7 @@
                                     </svg>
                                 </button>
                                 <ul x-show="open" x-transition x-cloak
-                                    class="absolute z-20 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg text-sm overflow-hidden">
+                                    class="absolute z-20 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg text-xs sm:text-sm overflow-hidden">
                                     <template x-for="(label, value) in labels" :key="value">
                                         <li @click="select(value)"
                                             :class="{ 'bg-indigo-50': referrerId === value }"
@@ -381,9 +379,9 @@
                                      }
                                  }"
                                  @mouseenter="open = true" @mouseleave="open = false" @click.outside="open = false"
-                                 class="relative w-52">
+                                 class="relative w-full sm:w-52">
                                 <button type="button" @click="open = !open"
-                                        class="w-full rounded-md border border-gray-300 shadow-sm text-sm px-3 py-2 text-left flex justify-between items-center gap-2 bg-white focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                                        class="w-full rounded-md border border-gray-300 shadow-sm text-xs sm:text-sm px-3 py-2 text-left flex justify-between items-center gap-2 bg-white focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
                                     <span>Sort: <span x-text="labels[sort]"></span></span>
                                     <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24"
                                          stroke="currentColor">
@@ -392,7 +390,7 @@
                                     </svg>
                                 </button>
                                 <ul x-show="open" x-transition x-cloak
-                                    class="absolute z-20 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg text-sm overflow-hidden">
+                                    class="absolute z-20 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg text-xs sm:text-sm overflow-hidden">
                                     <template x-for="(label, value) in labels" :key="value">
                                         <li @click="select(value)"
                                             :class="{ 'bg-indigo-50': sort === value }"
@@ -423,10 +421,10 @@
                                 @foreach($activeLoans as $loan)
                                     <div
                                         class="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 flex flex-col h-full">
-                                        <div class="p-5 flex-1">
+                                        <div class="p-4 sm:p-5 flex-1">
                                             <div class="flex justify-between items-start mb-3">
                                                 <div class="flex items-center gap-2 min-w-0">
-                                                    <h3 class="text-lg font-medium text-gray-900 truncate">{{ $loan->borrower_name }}</h3>
+                                                    <h3 class="text-base sm:text-lg font-medium text-gray-900 truncate">{{ $loan->borrower_name }}</h3>
                                                     @if($loan->referrer)
                                                         <a href="{{ route('referrers.show', $loan->referrer->id) }}"
                                                            title="Referred by {{ $loan->referrer->name }}"
@@ -440,7 +438,7 @@
                                                     Active
                                                 </span>
                                             </div>
-                                            <div class="space-y-2 text-sm">
+                                            <div class="space-y-1.5 sm:space-y-2 text-xs sm:text-sm">
                                                 <div class="flex justify-between">
                                                     <span class="text-gray-500">Principal:</span>
                                                     <span
@@ -519,10 +517,10 @@
                                                 </div>
                                             @endif
                                         </div>
-                                        <div class="bg-gray-50 px-5 py-3 rounded-b-lg border-t border-gray-200 mt-auto">
+                                        <div class="bg-gray-50 px-4 sm:px-5 py-3 rounded-b-lg border-t border-gray-200 mt-auto">
                                             <div class="flex space-x-2">
                                                 <a href="{{ route('loans-given.show', $loan->id) }}"
-                                                   class="flex-1 inline-flex justify-center items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition ease-in-out duration-150">
+                                                   class="flex-1 inline-flex justify-center items-center px-3 py-2 border border-gray-300 shadow-sm text-xs sm:text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition ease-in-out duration-150">
                                                     <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor"
                                                          viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -535,7 +533,7 @@
                                                     View
                                                 </a>
                                                 <a href="{{ route('loans-given.payment', $loan->id) }}"
-                                                   class="flex-1 inline-flex justify-center items-center px-3 py-2 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition ease-in-out duration-150">
+                                                   class="flex-1 inline-flex justify-center items-center px-3 py-2 border border-transparent shadow-sm text-xs sm:text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition ease-in-out duration-150">
                                                     <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor"
                                                          viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -614,7 +612,7 @@
                         <div class="bg-white rounded-lg border border-gray-200">
                             <div class="p-4 border-b border-gray-200">
                                 <div class="flex flex-wrap items-center justify-between gap-4">
-                                    <h2 class="text-lg font-medium text-gray-900">Paid Loans</h2>
+                                    <h2 class="text-base sm:text-lg font-medium text-gray-900">Paid Loans</h2>
 
                                     <form method="GET"
                                           action="{{ route('loans-given.index') }}"
@@ -657,7 +655,7 @@
                                              class="relative w-44">
                                             <button type="button"
                                                     @click="open = !open"
-                                                    class="w-full rounded-md border border-gray-300 shadow-sm text-sm px-3 py-2 text-left flex justify-between items-center gap-2 bg-white focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                                                    class="w-full rounded-md border border-gray-300 shadow-sm text-xs sm:text-sm px-3 py-2 text-left flex justify-between items-center gap-2 bg-white focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
                                                 <span x-text="labels[period]"></span>
                                                 <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none"
                                                      viewBox="0 0 24 24" stroke="currentColor">
@@ -669,7 +667,7 @@
                                             <ul x-show="open"
                                                 x-transition
                                                 x-cloak
-                                                class="absolute z-20 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg text-sm overflow-hidden">
+                                                class="absolute z-20 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg text-xs sm:text-sm overflow-hidden">
                                                 <template x-for="(label, value) in labels" :key="value">
                                                     <li @click="select(value)"
                                                         :class="{ 'bg-indigo-50': period === value }"
@@ -721,25 +719,25 @@
                                     <table class="min-w-full divide-y divide-gray-200">
                                         <thead class="bg-gray-50">
                                         <tr>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th class="px-3 sm:px-6 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                 Borrower
                                             </th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th class="px-3 sm:px-6 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                 Principal
                                             </th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th class="px-3 sm:px-6 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                 Interest
                                             </th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th class="px-3 sm:px-6 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                 Referrer
                                             </th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th class="px-3 sm:px-6 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                 Total Received
                                             </th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th class="px-3 sm:px-6 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                 Repaid Date
                                             </th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th class="px-3 sm:px-6 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                 Actions
                                             </th>
                                         </tr>
@@ -747,10 +745,10 @@
                                         <tbody class="bg-white divide-y divide-gray-200">
                                         @foreach($paidLoans as $loan)
                                             <tr>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $loan->borrower_name }}</td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900">{{ $loan->borrower_name }}</td>
+                                                <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
                                                     KES {{ number_format($loan->original_principal, 0) }}</td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
                                                     @if($loan->interest_amount > 0)
                                                         KES {{ number_format($loan->interest_amount, 0) }}
                                                         ({{ number_format($loan->interest_rate, 1) }}%)
@@ -758,7 +756,7 @@
                                                         -
                                                     @endif
                                                 </td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
                                                     @if($loan->referrer)
                                                         <a href="{{ route('referrers.show', $loan->referrer->id) }}"
                                                            class="text-indigo-600 hover:text-indigo-900">
@@ -766,8 +764,8 @@
                                                         </a>
                                                         @if($loan->referrer_deducted_before_deposit)
                                                             <span class="block text-xs text-blue-600">
-        KES {{ number_format($loan->referrer_retained_amount, 0) }} kept by referrer
-    </span>
+                                                                KES {{ number_format($loan->referrer_retained_amount, 0) }} kept by referrer
+                                                            </span>
                                                         @elseif($loan->interest_amount > 0 && $loan->referrer_share_percentage !== null)
                                                             @php $cut = round($loan->interest_amount * ($loan->referrer_share_percentage / 100), 2); @endphp
                                                             @if($loan->referrer_payout_id)
@@ -782,10 +780,10 @@
                                                         -
                                                     @endif
                                                 </td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
+                                                <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-green-600">
                                                     KES {{ number_format($loan->amount_paid, 0) }}</td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $loan->repaid_date ? $loan->repaid_date->format('M d, Y') : '-' }}</td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">{{ $loan->repaid_date ? $loan->repaid_date->format('M d, Y') : '-' }}</td>
+                                                <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
                                                     <a href="{{ route('loans-given.show', $loan->id) }}"
                                                        class="text-indigo-600 hover:text-indigo-900">
                                                         <svg class="w-5 h-5 inline" fill="none" stroke="currentColor"
@@ -820,6 +818,8 @@
             const t = @json($monthlyTrend);
             const short = v => v >= 1000000 ? (v / 1000000) + 'M' : (v >= 1000 ? (v / 1000) + 'k' : v);
 
+            Chart.defaults.font.size = window.innerWidth < 640 ? 10 : 12;
+
             new Chart(document.getElementById('loansTrendChart'), {
                 data: {
                     labels: t.labels,
@@ -851,6 +851,7 @@
                         },
                     },
                     plugins: {
+                        legend: {labels: {boxWidth: 12}},
                         tooltip: {
                             callbacks: {
                                 label: c => c.dataset.label + ': KES ' + Math.round(c.parsed.y).toLocaleString(),
