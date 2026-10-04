@@ -534,10 +534,18 @@
             {{-- Three Column Layout (a card with nothing to show is hidden; the rest fill the row) --}}
             @php
                 $showTopExpenses = $topExpenses->count() > 0;
-                $showActiveLoans = $activeLoans->count() > 0;
+                // Loans the user has GIVEN out (not the ones they've borrowed). The
+                // LoanGiven model's own global scope limits this to the current user.
+                $loansGiven = \App\Models\LoanGiven::where('status', 'active')
+                    ->orderByRaw('due_date IS NULL')
+                    ->orderBy('due_date')
+                    ->get();
+                $showLoansGiven = $loansGiven->isNotEmpty();
+                $loansGivenOutstanding = $loansGiven->sum('outstanding_amount');
+                $loansGivenOverdue = $loansGiven->filter(fn ($l) => $l->isOverdue());
                 $showRecent = $recentTransactions->count() > 0;
 
-                $visibleColumns = (int) $showTopExpenses + (int) $showActiveLoans + (int) $showRecent;
+                $visibleColumns = (int) $showTopExpenses + (int) $showLoansGiven + (int) $showRecent;
 
                 $columnClass = [
                     1 => 'lg:grid-cols-1',
@@ -589,33 +597,63 @@
                         </div>
                     @endif
 
-                    {{-- Active Loans --}}
-                    @if($showActiveLoans)
+                    {{-- Loans Given (replaces the old "Active Loans" / borrowed card) --}}
+                    @if($showLoansGiven)
                         <div class="stat-card bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 sm:p-5">
                             <div class="flex justify-between items-center mb-3">
-                                <h3 class="text-sm sm:text-base font-bold text-gray-800 dark:text-white">Active Loans</h3>
-
-                                @if($activeLoans->count() > 3)
-                                    <a href="{{ route('loans.index') }}"
-                                       class="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 self-start sm:self-auto">View
-                                        All →</a>
-                                @endif
+                                <h3 class="text-sm sm:text-base font-bold text-gray-800 dark:text-white">Loans Given</h3>
+                                <a href="{{ route('loans-given.index') }}"
+                                   class="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400">View All →</a>
                             </div>
-                            <div class="space-y-2.5">
-                                @foreach($activeLoans->take(3) as $loan)
-                                    <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
-                                        <div class="flex flex-col xs:flex-row xs:justify-between xs:items-start gap-2">
-                                            <div class="flex-1 min-w-0">
-                                                <h4 class="font-semibold text-gray-900 dark:text-white text-xs sm:text-sm truncate">{{ $loan->account->name ?? 'Loan' }}</h4>
-                                                <p class="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                                    Due: {{ \Carbon\Carbon::parse($loan->due_date)->format('M d, Y') }}</p>
-                                            </div>
-                                            <div class="text-left xs:text-right xs:ml-2 flex-shrink-0">
-                                                <p class="text-base sm:text-lg font-bold text-red-600 dark:text-red-400">{{ number_format($loan->balance, 0) }}</p>
-                                                <p class="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400">{{ number_format($loan->interest_rate, 1) }}%</p>
-                                            </div>
+
+                            {{-- Summary --}}
+                            <div class="grid grid-cols-2 gap-2 mb-3">
+                                <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2.5">
+                                    <p class="text-[11px] text-gray-500 dark:text-gray-400">Outstanding</p>
+                                    <p class="text-sm sm:text-base font-bold text-indigo-600 dark:text-indigo-400">
+                                        KES {{ number_format($loansGivenOutstanding, 0) }}
+                                    </p>
+                                </div>
+                                <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2.5">
+                                    <p class="text-[11px] text-gray-500 dark:text-gray-400">Active</p>
+                                    <p class="text-sm sm:text-base font-bold text-gray-900 dark:text-white">
+                                        {{ $loansGiven->count() }} loan{{ $loansGiven->count() != 1 ? 's' : '' }}
+                                    </p>
+                                    @if($loansGivenOverdue->count() > 0)
+                                        <p class="text-[11px] font-medium text-red-600 dark:text-red-400">
+                                            {{ $loansGivenOverdue->count() }} overdue
+                                        </p>
+                                    @endif
+                                </div>
+                            </div>
+
+                            {{-- Next due (overdue first) --}}
+                            <div class="space-y-2">
+                                @foreach($loansGiven->take(3) as $loanGiven)
+                                    @php
+                                        $isLate = $loanGiven->isOverdue();
+                                        $daysLate = $loanGiven->due_date
+                                            ? abs((int) now()->startOfDay()->diffInDays($loanGiven->due_date->copy()->startOfDay(), true))
+                                            : null;
+                                    @endphp
+                                    <a href="{{ route('loans-given.show', $loanGiven->id) }}"
+                                       class="flex items-center justify-between gap-2 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                        <div class="min-w-0">
+                                            <p class="font-semibold text-gray-900 dark:text-white text-xs sm:text-sm truncate">{{ $loanGiven->borrower_name }}</p>
+                                            <p class="text-[11px] sm:text-xs {{ $isLate ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400' }}">
+                                                @if(!$loanGiven->due_date)
+                                                    No due date
+                                                @elseif($isLate)
+                                                    Overdue {{ $daysLate }}d
+                                                @else
+                                                    Due {{ $loanGiven->due_date->format('M d') }}
+                                                @endif
+                                            </p>
                                         </div>
-                                    </div>
+                                        <p class="text-xs sm:text-sm font-bold text-gray-900 dark:text-white whitespace-nowrap">
+                                            KES {{ number_format($loanGiven->outstanding_amount, 0) }}
+                                        </p>
+                                    </a>
                                 @endforeach
                             </div>
                         </div>
