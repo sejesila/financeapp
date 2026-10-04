@@ -177,6 +177,8 @@
 
         Route::get('referrers/{referrer}', [ReferrerPayoutController::class, 'show'])
             ->name('referrers.show');
+        Route::get('referrers/{referrer}/statement', [ReferrerFloatController::class, 'statement'])
+            ->name('referrers.statement');
 
         // ======================================================================
         // Client Funds Management

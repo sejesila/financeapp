@@ -7,6 +7,7 @@ use App\Models\LoanGiven;
 use App\Models\Referrer;
 use App\Models\ReferrerFloatReconciliation;
 use App\Models\Transfer;
+use App\Services\ReferrerLedgerService;
 use App\Services\TransferFeeCalculator;
 use App\Services\TransferService;
 use Illuminate\Http\Request;
@@ -171,5 +172,17 @@ class ReferrerFloatController extends Controller
             ]);
             return back()->with('error', 'Failed to reconcile: ' . $e->getMessage())->withInput();
         }
+    }
+    public function statement(Referrer $referrer, ReferrerLedgerService $ledger)
+    {
+        if ($referrer->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        return view('referrers.statement', [
+            'referrer'   => $referrer,
+            'commission' => $ledger->commissionLedger($referrer),
+            'float'      => $ledger->floatLedger($referrer),
+        ]);
     }
 }

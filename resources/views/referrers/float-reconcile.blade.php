@@ -30,10 +30,16 @@
                                 Money she's collected on your behalf and is holding — not her own referral commission.
                             </p>
                         </div>
-                        <a href="{{ route('referrers.show', $referrer->id) }}"
-                           class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 transition">
-                            Back
-                        </a>
+                        <div class="flex items-center gap-4">
+                            <a href="{{ route('referrers.statement', $referrer) }}"
+                               class="text-indigo-600 hover:text-indigo-900 text-sm">
+                                View statement
+                            </a>
+                            <a href="{{ route('referrers.show', $referrer->id) }}"
+                               class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 transition">
+                                Back
+                            </a>
+                        </div>
                     </div>
 
                     @if(!$floatAccount)

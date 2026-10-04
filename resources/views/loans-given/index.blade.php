@@ -48,7 +48,8 @@
                     @endphp
                     <div class="mb-4" x-data="{ custom: {{ $statsPeriod === 'custom' ? 'true' : 'false' }} }">
                         <div class="flex flex-wrap items-center gap-2">
-                            <span class="text-xs font-medium text-gray-500 uppercase tracking-wider mr-1">Stats period</span>
+                            <span
+                                class="text-xs font-medium text-gray-500 uppercase tracking-wider mr-1">Stats period</span>
                             @foreach($statsPeriods as $key => $label)
                                 @if($key === 'custom')
                                     <button type="button" @click="custom = !custom"
@@ -82,11 +83,13 @@
                     <!-- Statistics Dashboard -->
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                         <!-- Total Outstanding -->
-                        <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 overflow-hidden shadow-sm rounded-lg border border-indigo-200">
+                        <div
+                            class="bg-gradient-to-br from-indigo-50 to-indigo-100 overflow-hidden shadow-sm rounded-lg border border-indigo-200">
                             <div class="p-4">
                                 <div class="flex items-center">
                                     <div class="flex-shrink-0 bg-indigo-500 rounded-lg p-3">
-                                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor"
+                                             viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                                         </svg>
@@ -157,10 +160,12 @@
                                         </svg>
                                     </div>
                                     <div class="ml-4 min-w-0">
-                                        <p class="text-sm font-medium text-gray-500 break-words">Repaid (Closed Loans)</p>
+                                        <p class="text-sm font-medium text-gray-500 break-words">Repaid (Closed
+                                            Loans)</p>
                                         <p class="text-lg font-semibold text-gray-900">
                                             KES {{ number_format($totalRepaid ?? 0, 0) }}</p>
-                                        <p class="text-xs text-gray-500">{{ $statsLabel }}, principal + interest, closed only</p>
+                                        <p class="text-xs text-gray-500">{{ $statsLabel }}, principal + interest, closed
+                                            only</p>
                                     </div>
                                 </div>
                             </div>
@@ -203,7 +208,8 @@
                                         <p class="text-sm font-medium text-gray-500 break-words">Transaction Costs</p>
                                         <p class="text-lg font-semibold text-gray-900">
                                             KES {{ number_format($totalTransactionCosts ?? 0, 0) }}</p>
-                                        <p class="text-xs text-gray-500">Fees on disbursement, {{ strtolower($statsLabel) }}</p>
+                                        <p class="text-xs text-gray-500">Fees on
+                                            disbursement, {{ strtolower($statsLabel) }}</p>
                                     </div>
                                 </div>
                             </div>
@@ -226,7 +232,8 @@
                                         <p class="text-lg font-semibold text-gray-900">
                                             KES {{ number_format($netInterest ?? 0, 0) }}</p>
                                         <p class="text-xs text-gray-500">
-                                            Interest − costs − referrer share owed (KES {{ number_format($referrerCut ?? 0, 0) }})
+                                            Interest − costs − referrer share owed
+                                            (KES {{ number_format($referrerCut ?? 0, 0) }})
                                         </p>
                                     </div>
                                 </div>
@@ -285,7 +292,8 @@
                             <span class="text-sm font-medium text-gray-700">Monthly trend — last 12 months</span>
                             <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-180': open }"
                                  fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M19 9l-7 7-7-7"/>
                             </svg>
                         </button>
                         <div x-show="open" x-cloak class="px-4 pb-4">
@@ -295,7 +303,7 @@
                         </div>
                     </div>
 
-                                        <!-- Filter Tabs -->
+                    <!-- Filter Tabs -->
                     <div class="border-b border-gray-200 mb-6">
                         <nav class="-mb-px flex space-x-8">
                             <a href="{{ route('loans-given.index', ['filter' => 'active', 'stats_period' => $statsPeriod, 'stats_start' => $statsStart?->format('Y-m-d'), 'stats_end' => $statsEnd?->format('Y-m-d')]) }}"
@@ -332,12 +340,7 @@
                             <div x-data="{
                                      open: false,
                                      referrerId: '{{ $referrerId ?? '' }}',
-                                     labels: {
-                                         '': 'All Referrers',
-                                         @foreach($referrers as $referrer)
-                                             '{{ $referrer->id }}': '{{ $referrer->name }}',
-                                         @endforeach
-                                     },
+                                     labels: {{ Js::from(['' => 'All Referrers'] + $referrers->pluck('name', 'id')->all()) }},
                                      select(value) {
                                          this.referrerId = value;
                                          this.open = false;
@@ -349,8 +352,10 @@
                                 <button type="button" @click="open = !open"
                                         class="w-full rounded-md border border-gray-300 shadow-sm text-sm px-3 py-2 text-left flex justify-between items-center gap-2 bg-white focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
                                     <span x-text="labels[referrerId]"></span>
-                                    <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                    <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24"
+                                         stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                              d="M19 9l-7 7-7-7"/>
                                     </svg>
                                 </button>
                                 <ul x-show="open" x-transition x-cloak
@@ -380,8 +385,10 @@
                                 <button type="button" @click="open = !open"
                                         class="w-full rounded-md border border-gray-300 shadow-sm text-sm px-3 py-2 text-left flex justify-between items-center gap-2 bg-white focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
                                     <span>Sort: <span x-text="labels[sort]"></span></span>
-                                    <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                    <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24"
+                                         stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                              d="M19 9l-7 7-7-7"/>
                                     </svg>
                                 </button>
                                 <ul x-show="open" x-transition x-cloak
@@ -544,32 +551,48 @@
                                     <!-- Rollover confirmation modal for this loan -->
                                     @if($loan->isEligibleForRollover())
                                         @php $preview = $loan->rolloverPreview(); @endphp
-                                        <dialog id="rolloverModal{{ $loan->id }}" class="rounded-lg shadow-xl w-full max-w-md">
+                                        <dialog id="rolloverModal{{ $loan->id }}"
+                                                class="rounded-lg shadow-xl w-full max-w-md">
                                             <div class="p-6">
                                                 <div class="flex items-center justify-between mb-4">
-                                                    <h3 class="text-lg font-medium text-gray-900">Roll Over Loan — {{ $loan->borrower_name }}</h3>
-                                                    <button type="button" onclick="document.getElementById('rolloverModal{{ $loan->id }}').close()"
+                                                    <h3 class="text-lg font-medium text-gray-900">Roll Over Loan
+                                                        — {{ $loan->borrower_name }}</h3>
+                                                    <button type="button"
+                                                            onclick="document.getElementById('rolloverModal{{ $loan->id }}').close()"
                                                             class="text-gray-400 hover:text-gray-500">
-                                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                        <svg class="w-6 h-6" fill="none" stroke="currentColor"
+                                                             viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                  stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                                                         </svg>
                                                     </button>
                                                 </div>
                                                 <div class="text-sm text-gray-600 space-y-2 mb-4">
                                                     <p>
-                                                        This loan is {{ $preview['periods'] }} period{{ $preview['periods'] > 1 ? 's' : '' }}
-                                                        overdue (7+ days past due, uncollected). Rolling over capitalizes the expected
+                                                        This loan is {{ $preview['periods'] }}
+                                                        period{{ $preview['periods'] > 1 ? 's' : '' }}
+                                                        overdue (7+ days past due, uncollected). Rolling over
+                                                        capitalizes the expected
                                                         interest into principal and starts a fresh 30-day period.
                                                     </p>
-                                                    <p>Current principal: <span class="font-medium text-gray-900">KES {{ number_format($loan->principal_amount, 0) }}</span></p>
-                                                    <p>New principal: <span class="font-medium text-gray-900">KES {{ number_format($preview['new_principal'], 0) }}</span></p>
-                                                    <p>New expected interest: <span class="font-medium text-gray-900">KES {{ number_format($preview['new_expected_interest'], 0) }}</span></p>
-                                                    <p>New due date: <span class="font-medium text-gray-900">{{ $preview['new_due_date']->format('M d, Y') }}</span></p>
+                                                    <p>Current principal: <span
+                                                            class="font-medium text-gray-900">KES {{ number_format($loan->principal_amount, 0) }}</span>
+                                                    </p>
+                                                    <p>New principal: <span
+                                                            class="font-medium text-gray-900">KES {{ number_format($preview['new_principal'], 0) }}</span>
+                                                    </p>
+                                                    <p>New expected interest: <span class="font-medium text-gray-900">KES {{ number_format($preview['new_expected_interest'], 0) }}</span>
+                                                    </p>
+                                                    <p>New due date: <span
+                                                            class="font-medium text-gray-900">{{ $preview['new_due_date']->format('M d, Y') }}</span>
+                                                    </p>
                                                 </div>
-                                                <form method="POST" action="{{ route('loans-given.rollover', $loan->id) }}">
+                                                <form method="POST"
+                                                      action="{{ route('loans-given.rollover', $loan->id) }}">
                                                     @csrf
                                                     <div class="flex justify-end space-x-3">
-                                                        <button type="button" onclick="document.getElementById('rolloverModal{{ $loan->id }}').close()"
+                                                        <button type="button"
+                                                                onclick="document.getElementById('rolloverModal{{ $loan->id }}').close()"
                                                                 class="px-4 py-2 bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-gray-800 uppercase tracking-widest hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
                                                             Not Yet
                                                         </button>
@@ -620,10 +643,12 @@
                                         <input type="hidden" name="period" :value="period">
                                         <input type="hidden" name="stats_period" value="{{ $statsPeriod }}">
                                         @if($statsStart)
-                                            <input type="hidden" name="stats_start" value="{{ $statsStart->format('Y-m-d') }}">
+                                            <input type="hidden" name="stats_start"
+                                                   value="{{ $statsStart->format('Y-m-d') }}">
                                         @endif
                                         @if($statsEnd)
-                                            <input type="hidden" name="stats_end" value="{{ $statsEnd->format('Y-m-d') }}">
+                                            <input type="hidden" name="stats_end"
+                                                   value="{{ $statsEnd->format('Y-m-d') }}">
                                         @endif
 
                                         <div @mouseenter="open = true"
@@ -634,8 +659,10 @@
                                                     @click="open = !open"
                                                     class="w-full rounded-md border border-gray-300 shadow-sm text-sm px-3 py-2 text-left flex justify-between items-center gap-2 bg-white focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
                                                 <span x-text="labels[period]"></span>
-                                                <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                                <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none"
+                                                     viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                          stroke-width="2" d="M19 9l-7 7-7-7"/>
                                                 </svg>
                                             </button>
 
@@ -738,13 +765,18 @@
                                                             {{ $loan->referrer->name }}
                                                         </a>
                                                         @if($loan->referrer_deducted_before_deposit)
-                                                            <span class="block text-xs text-gray-500">
-            KES {{ number_format($loan->referrer_retained_amount, 0) }} retain</span>
+                                                            <span class="block text-xs text-blue-600">
+        KES {{ number_format($loan->referrer_retained_amount, 0) }} kept by referrer
+    </span>
                                                         @elseif($loan->interest_amount > 0 && $loan->referrer_share_percentage !== null)
-                                                            <span class="block text-xs text-purple-600">
-                KES {{ number_format($loan->interest_amount * ($loan->referrer_share_percentage / 100), 0) }}
-                ({{ number_format($loan->referrer_share_percentage, 1) }}%)
-            </span>
+                                                            @php $cut = round($loan->interest_amount * ($loan->referrer_share_percentage / 100), 2); @endphp
+                                                            @if($loan->referrer_payout_id)
+                                                                <span class="block text-xs text-green-600">KES {{ number_format($cut, 0) }} paid out</span>
+                                                            @else
+                                                                <span class="block text-xs text-amber-600">
+                                                                    KES {{ number_format($cut, 0) }} owed ({{ number_format($loan->referrer_share_percentage, 1) }}%)
+                                                                </span>
+                                                            @endif
                                                         @endif
                                                     @else
                                                         -
@@ -792,23 +824,31 @@
                 data: {
                     labels: t.labels,
                     datasets: [
-                        { type: 'bar', label: 'Disbursed', data: t.disbursed,
-                            backgroundColor: 'rgba(59,130,246,0.6)', borderRadius: 4 },
-                        { type: 'bar', label: 'Collected', data: t.collected,
-                            backgroundColor: 'rgba(20,184,166,0.6)', borderRadius: 4 },
-                        { type: 'line', label: 'Interest earned', data: t.interest,
+                        {
+                            type: 'bar', label: 'Disbursed', data: t.disbursed,
+                            backgroundColor: 'rgba(59,130,246,0.6)', borderRadius: 4
+                        },
+                        {
+                            type: 'bar', label: 'Collected', data: t.collected,
+                            backgroundColor: 'rgba(20,184,166,0.6)', borderRadius: 4
+                        },
+                        {
+                            type: 'line', label: 'Interest earned', data: t.interest,
                             borderColor: '#7c3aed', backgroundColor: '#7c3aed',
-                            tension: 0.3, yAxisID: 'y1' },
+                            tension: 0.3, yAxisID: 'y1'
+                        },
                     ],
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
+                    interaction: {mode: 'index', intersect: false},
                     scales: {
-                        y:  { beginAtZero: true, ticks: { callback: short } },
-                        y1: { beginAtZero: true, position: 'right',
-                            grid: { drawOnChartArea: false }, ticks: { callback: short } },
+                        y: {beginAtZero: true, ticks: {callback: short}},
+                        y1: {
+                            beginAtZero: true, position: 'right',
+                            grid: {drawOnChartArea: false}, ticks: {callback: short}
+                        },
                     },
                     plugins: {
                         tooltip: {
