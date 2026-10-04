@@ -1,4 +1,14 @@
 <x-app-layout>
+    @php
+        // Display-only short names. Keys must match the category name exactly.
+        $shortNames = [
+            'School Fees & Supplies' => 'Fees',
+            'Referrer Commission'    => 'Commission',
+            'Loan Transaction Fees'  => 'Loan Txn fees',
+        ];
+        $displayName = fn ($name) => $shortNames[$name] ?? $name;
+    @endphp
+
     {{-- Header --}}
     <x-slot name="header">
         <div class="flex flex-wrap items-center justify-between gap-4">
@@ -150,7 +160,7 @@
                                     @if($actualAmount > 0 || $budgetAmount > 0)
                                         <div class="text-sm">
                                             <div class="flex items-center justify-between">
-                                                <span class="text-gray-700 dark:text-gray-300">{{ $category->name }}</span>
+                                                <span class="text-gray-700 dark:text-gray-300" title="{{ $category->name }}">{{ $displayName($category->name) }}</span>
                                                 <div class="flex items-center gap-2">
                                                     @if($actualAmount > 0)
                                                         <span class="text-xs text-gray-400 dark:text-gray-500">{{ $monthSharePercent }}%</span>
@@ -206,9 +216,9 @@
                                     @if($actualAmount > 0 || $budgetAmount > 0)
                                         <div class="text-sm">
                                             <div class="flex items-center justify-between">
-                                                <span class="text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                                                <span class="text-gray-700 dark:text-gray-300 flex items-center gap-1.5" title="{{ $category->name }}">
                                                     <span class="inline-block w-2 h-2 rounded-full {{ ($category->rule_group ?? 'needs') === 'wants' ? 'bg-amber-500' : 'bg-blue-500' }}"></span>
-                                                    {{ $category->name }}
+                                                    {{ $displayName($category->name) }}
                                                 </span>
                                                 <div class="flex items-center gap-2">
                                                     @if($actualAmount > 0)
@@ -462,8 +472,8 @@
 
                     @foreach($incomeCategoriesDisplay as $category)
                         <tr class="border-b hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                            <td class="px-3 py-1.5 font-medium text-gray-700 dark:text-gray-300">
-                                {{ $category->name }}
+                            <td class="px-3 py-1.5 font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap" title="{{ $category->name }}">
+                                {{ $displayName($category->name) }}
                             </td>
                             @for($m = 1; $m <= 12; $m++)
                                 @php
@@ -566,9 +576,9 @@
 
                     @foreach($expenseCategoriesDisplay as $category)
                         <tr class="border-b hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                            <td class="px-3 py-1.5 font-medium text-gray-700 dark:text-gray-300">
+                            <td class="px-3 py-1.5 font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap" title="{{ $category->name }}">
                                 <span class="inline-block w-2 h-2 rounded-full mr-1.5 align-middle {{ ($category->rule_group ?? 'needs') === 'wants' ? 'bg-amber-500' : 'bg-blue-500' }}"></span>
-                                {{ $category->name }}
+                                {{ $displayName($category->name) }}
                             </td>
                             @for($m = 1; $m <= 12; $m++)
                                 @php
