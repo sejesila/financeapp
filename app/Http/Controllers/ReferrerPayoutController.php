@@ -191,6 +191,8 @@ class ReferrerPayoutController extends Controller
     {
         $this->authorize('view', $referrer);
 
+        $referrer->load(['payouts.account', 'payouts.loans']);
+
         return view('referrers.show', compact('referrer'));
     }
 }
