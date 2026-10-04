@@ -52,6 +52,14 @@ class StatementDataService
      * Compute the settled balance of an account at a given point in time.
      * Pending income (value_date in the future relative to $at) is excluded,
      * but Interest-category transactions are always counted as settled.
+     *
+     * FIX: every date comparison here is now DATE-only. `date` / `value_date`
+     * columns carry a time component (transfers cast `date` as datetime), so
+     * a plain `date <= '2026-09-30'` is really `<= '2026-09-30 00:00:00'` and
+     * silently dropped everything posted later on the last day of the month
+     * from the next month's opening balance (B/F). Only midnight-stamped rows
+     * (the interest postings) survived, which is why the opening balance was
+     * overstated by exactly the month-end withdrawals.
      */
     public function computeBalanceAt(Account $account, Carbon $at): float
     {
@@ -60,14 +68,14 @@ class StatementDataService
         $txNet = $account->transactions()
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->whereNull('transactions.deleted_at')
-            ->where('transactions.date', '<=', $atDate)
+            ->whereRaw('DATE(transactions.date) <= ?', [$atDate])
             ->selectRaw("
             SUM(CASE
                 WHEN categories.type IN ('income', 'liability')
                  AND NOT (
                         categories.name NOT IN ('Interest')
                         AND transactions.value_date IS NOT NULL
-                        AND transactions.value_date > ?
+                        AND DATE(transactions.value_date) > ?
                      )
                 THEN transactions.amount
                 ELSE 0
@@ -81,15 +89,15 @@ class StatementDataService
             ->value('net');
 
         $transfersInNet = Transfer::where('to_account_id', $account->id)
-            ->where('date', '<=', $atDate)
+            ->whereDate('date', '<=', $atDate)
             ->where(function ($q) use ($atDate) {
                 $q->whereNull('value_date')
-                    ->orWhere('value_date', '<=', $atDate);
+                    ->orWhereDate('value_date', '<=', $atDate);
             })
             ->sum('amount');
 
         $transfersOutNet = Transfer::where('from_account_id', $account->id)
-            ->where('date', '<=', $atDate)
+            ->whereDate('date', '<=', $atDate)
             ->sum('amount');
 
         return (float) ($account->initial_balance ?? 0)
@@ -229,9 +237,9 @@ class StatementDataService
             $rawRows[] = array_merge($item, ['running_balance' => $runningBalance]);
         }
 
-        // Step 2: consolidate interest rows for display only, after balances are correct.
-        // Each group's displayed row uses the LAST individual row's running_balance
-        // (which is already correct) and the SUMMED amount for that month.
+        // Step 2: consolidate interest rows for display only.
+        // Each group's displayed row uses the SUMMED amount for that month,
+        // dated at the LAST posting.
         $rows = collect($rawRows)
             ->groupBy(function ($item) {
                 return $item['interest_group'] !== null
@@ -259,6 +267,25 @@ class StatementDataService
             ->sortBy([['sort_date', 'asc'], ['sort_id', 'asc']])
             ->values()
             ->all();
+
+        // Step 3 (FIX): recompute running balances over the rows AS DISPLAYED.
+        // Step 1's balances were computed before consolidation, so any interest
+        // posted earlier in the month was already baked into the rows that
+        // followed it, even though that interest is only shown later as one
+        // consolidated line. The visible rows then didn't foot (previous
+        // balance + this row's amount != this row's balance). Recomputing here
+        // makes every line equal the previous balance plus its own amount.
+        // The closing balance is unchanged: the amounts being summed are the same.
+        $running = $openingBalance;
+        $rows = array_map(function ($row) use (&$running) {
+            $running += ($row['inflow'] ?? 0)
+                - ($row['withdrawal'] ?? 0)
+                + ($row['net_interest'] ?? 0);
+
+            $row['running_balance'] = $running;
+
+            return $row;
+        }, $rows);
 
         return [
             'rows'            => $rows,
