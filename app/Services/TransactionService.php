@@ -14,6 +14,9 @@ use Illuminate\Support\Facades\DB;
 
 class TransactionService
 {
+    public const FEES_CATEGORY      = 'Transaction Fees';
+    public const LOAN_FEES_CATEGORY = 'Loan Transaction Fees';
+    private const LOAN_DISBURSEMENT_CATEGORY = 'Friend Loan Given';
     public function createTransaction(array $data): Transaction
     {
         return DB::transaction(function () use ($data) {
@@ -256,7 +259,10 @@ class TransactionService
         string      $transactionType,
         string      $paymentMethod
     ): Transaction {
-        $feesCategory = $this->getFeesCategory($mainTransaction->user_id);
+        $feesCategory = $this->getFeesCategory(
+            $mainTransaction->user_id,
+            $this->isLoanDisbursement($mainTransaction)
+        );
         $typeLabel    = $this->getTransactionTypeLabel($transactionType);
 
         return Transaction::withoutGlobalScope('ownedByUser')->create([
@@ -272,12 +278,23 @@ class TransactionService
         ]);
     }
 
-    private function getFeesCategory(int $userId): Category
+    private function getFeesCategory(int $userId, bool $forLoan = false): Category
     {
         return Category::withoutGlobalScope('ownedByUser')->firstOrCreate(
-            ['user_id' => $userId, 'name' => 'Transaction Fees'],
+            ['user_id' => $userId, 'name' => $forLoan ? self::LOAN_FEES_CATEGORY : self::FEES_CATEGORY],
             ['type' => 'expense', 'icon' => '💸', 'is_active' => true]
         );
+    }
+
+    /**
+     * Fees on a loan-given disbursement are categorised separately so they
+     * never mix with everyday M-Pesa/bank charges.
+     */
+    private function isLoanDisbursement(Transaction $transaction): bool
+    {
+        return Category::withoutGlobalScope('ownedByUser')
+                ->whereKey($transaction->category_id)
+                ->value('name') === self::LOAN_DISBURSEMENT_CATEGORY;
     }
 
     private function getTransactionTypeLabel(?string $transactionType): string

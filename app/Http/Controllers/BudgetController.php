@@ -77,6 +77,7 @@ class BudgetController extends Controller
         'Clothing',
         'Loan Repayment',
     ];
+    private const LENDING_COST_CATEGORY_NAMES = ['Loan Transaction Fees'];
 
     public function index(Request $request, $year = null)
     {
@@ -484,13 +485,24 @@ class BudgetController extends Controller
      */
     private function calculate503020Breakdown(int $year): Collection
     {
-        $wantsSet = $this->wantsCategoryNameSet();
+        $wantsSet   = $this->wantsCategoryNameSet();
+        $lendingSet = collect(self::LENDING_COST_CATEGORY_NAMES)
+            ->map(fn($n) => strtolower($n))
+            ->flip();
 
         $expenseCategoryGroup = Category::where('user_id', Auth::id())
             ->where('type', 'expense')
             ->whereNotIn('name', array_merge(self::EXCLUDED_LOAN_CATEGORIES, self::EXCLUDED_ROLLING_FUND_CATEGORIES))
             ->get()
-            ->mapWithKeys(fn($c) => [$c->id => $wantsSet->has(strtolower($c->name)) ? 'wants' : 'needs']);
+            ->mapWithKeys(function ($c) use ($wantsSet, $lendingSet) {
+                $name = strtolower($c->name);
+
+                return [$c->id => match (true) {
+                    $lendingSet->has($name) => 'lending',
+                    $wantsSet->has($name)   => 'wants',
+                    default                 => 'needs',
+                }];
+            });
 
         $expenseActuals = Transaction::query()
             ->selectRaw('category_id, MONTH(COALESCE(period_date, date)) as month, SUM(amount) as total')
@@ -517,6 +529,11 @@ class BudgetController extends Controller
 
         foreach ($expenseActuals as $row) {
             $group = $expenseCategoryGroup[$row->category_id] ?? 'needs';
+
+            if ($group === 'lending') {
+                continue; // lending costs don't belong in Needs or Wants
+            }
+
             if ($group === 'wants') {
                 $wantsByMonth[$row->month] += (float)$row->total;
             } else {

@@ -238,6 +238,28 @@
                 </div>
             </div>
 
+            {{-- Loan Transaction Fees (kept apart from everyday fees) --}}
+            @if($loanFeesAll > 0)
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-3">
+                        Loan Transaction Fees
+                    </p>
+                    <div class="grid grid-cols-3 gap-3">
+                        @foreach([
+                            ['This Month', $loanFeesThisMonth, 'from-sky-500 to-cyan-600'],
+                            ['Last Month', $loanFeesLastMonth, 'from-cyan-500 to-teal-600'],
+                            ['All Time',   $loanFeesAll,       'from-teal-500 to-emerald-700'],
+                        ] as [$label, $value, $gradient])
+                            <div class="stat-card rounded-2xl shadow-lg p-4 text-white bg-gradient-to-br {{ $gradient }}">
+                                <p class="text-xs font-semibold uppercase tracking-wider opacity-80 mb-2">{{ $label }}</p>
+                                <p class="text-2xl font-bold tabular-nums">{{ number_format($value, 0) }}</p>
+                                <p class="text-xs opacity-60 mt-1">KES</p>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             {{-- Filters --}}
             <div
                 class="rounded-2xl border border-white/60 bg-white dark:bg-gray-800 dark:border-gray-700 p-4 shadow-lg space-y-4">
@@ -391,12 +413,16 @@
                     @forelse($transactions as $t)
                         @php
                             $isFee    = $t->is_transaction_fee;
+                            // Fees on loan-given disbursements live in their own category and get sky styling
+                            $isLoanFee = $isFee && $t->category->name === \App\Services\TransactionService::LOAN_FEES_CATEGORY;
                             $isIncome = $t->category->type === 'income';
                             $txDate   = Carbon::parse($t->date);
                             $isToday  = $txDate->isToday();
                         @endphp
                         <tr class="hover:bg-blue-50/40 dark:hover:bg-gray-700/50 transition-colors duration-150
-                               {{ $isFee ? 'bg-yellow-50/60 dark:bg-yellow-900/10' : '' }}">
+                               {{ $isLoanFee
+                                    ? 'bg-sky-50/60 dark:bg-sky-900/10'
+                                    : ($isFee ? 'bg-yellow-50/60 dark:bg-yellow-900/10' : '') }}">
 
                             {{-- Date (hidden on mobile, shown sm+) --}}
                             <td class="px-4 py-3 whitespace-nowrap text-xs font-medium hidden sm:table-cell">
@@ -429,12 +455,15 @@
                                 <div class="flex flex-wrap items-center gap-1.5">
                                     @if($isFee)
                                         <span
-                                            class="inline-flex items-center gap-1 rounded-full bg-yellow-100 dark:bg-yellow-900/40 px-1.5 py-0.5 text-xs font-medium text-yellow-700 dark:text-yellow-400">
+                                            class="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs font-medium
+                                            {{ $isLoanFee
+                                                ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400'
+                                                : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400' }}">
                                         <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                                             <path
                                                 d="M10 2a8 8 0 100 16 8 8 0 000-16zM9 9a1 1 0 012 0v4a1 1 0 11-2 0V9zm1-5a1 1 0 100 2 1 1 0 000-2z"/>
                                         </svg>
-                                        FEE
+                                        {{ $isLoanFee ? 'LOAN FEE' : 'FEE' }}
                                     </span>
                                     @endif
                                     <span>{{ $t->description }}</span>
@@ -452,9 +481,11 @@
                                 <span class="font-bold tabular-nums
                                     {{ $isIncome
                                         ? 'text-emerald-600 dark:text-emerald-400'
-                                        : ($isFee
-                                            ? 'text-yellow-700 dark:text-yellow-400'
-                                            : 'text-red-600 dark:text-red-400') }}">
+                                        : ($isLoanFee
+                                            ? 'text-sky-700 dark:text-sky-400'
+                                            : ($isFee
+                                                ? 'text-yellow-700 dark:text-yellow-400'
+                                                : 'text-red-600 dark:text-red-400')) }}">
                                     {{ $isIncome ? '+' : '−' }}{{ number_format($t->amount, 0) }}
                                 </span>
                                     @if(!$isFee && $t->hasFee())
@@ -475,9 +506,11 @@
                             <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium
                                 {{ $isIncome
                                     ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                    : ($isFee
-                                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                                        : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400') }}">
+                                    : ($isLoanFee
+                                        ? 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-400'
+                                        : ($isFee
+                                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                            : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400')) }}">
                                 {{ $t->category->name }}
                             </span>
                             </td>

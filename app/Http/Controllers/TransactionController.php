@@ -116,6 +116,7 @@ class TransactionController extends Controller
             ),
             $this->stats->totals(),
             $this->stats->feeTotals(),
+            $this->feeCardTotals(),
             ['summary' => $this->stats->summary(), 'periodStats' => $this->stats->periodStats()],
         ));
     }
@@ -327,7 +328,7 @@ class TransactionController extends Controller
             // reachable via normal transaction entry to begin with,
             // or are meta-categories like 'Income'/'Loans' used only
             // as parent groupers in the category tree).
-            ['Income', 'Loans', 'Excise Duty', 'Loan Fees Refund', 'Facility Fee Refund', 'Transaction Fees'],
+            ['Income', 'Loans', 'Excise Duty', 'Loan Fees Refund', 'Facility Fee Refund', 'Transaction Fees', TransactionService::LOAN_FEES_CATEGORY],
         );
 
         $allowedChildren = ['Loan Repayment']; // exceptions that bypass parent exclusion
@@ -399,5 +400,34 @@ class TransactionController extends Controller
             array_keys($baseTypes),
             $baseTypes,
         );
+    }
+    private function feeCardTotals(): array
+    {
+        $loanCategoryIds = Category::where('user_id', Auth::id())
+            ->where('name', TransactionService::LOAN_FEES_CATEGORY)
+            ->pluck('id');
+
+        $sum = fn (bool $loan, $from = null, $to = null) => Transaction::where('is_transaction_fee', true)
+            ->when(
+                $loan,
+                fn ($q) => $q->whereIn('category_id', $loanCategoryIds),
+                fn ($q) => $q->whereNotIn('category_id', $loanCategoryIds)
+            )
+            ->when($from, fn ($q) => $q->whereBetween('date', [$from, $to]))
+            ->sum('amount');
+
+        $thisStart = now()->startOfMonth();
+        $thisEnd   = now()->endOfMonth();
+        $lastStart = now()->subMonthNoOverflow()->startOfMonth();
+        $lastEnd   = now()->subMonthNoOverflow()->endOfMonth();
+
+        return [
+            'totalFeesThisMonth' => $sum(false, $thisStart, $thisEnd),
+            'totalFeesLastMonth' => $sum(false, $lastStart, $lastEnd),
+            'totalFeesAll'       => $sum(false),
+            'loanFeesThisMonth'  => $sum(true, $thisStart, $thisEnd),
+            'loanFeesLastMonth'  => $sum(true, $lastStart, $lastEnd),
+            'loanFeesAll'        => $sum(true),
+        ];
     }
 }
