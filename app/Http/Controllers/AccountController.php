@@ -11,6 +11,7 @@ use App\Services\BorrowedFundReturnService;
 use App\Services\InterestService;
 use App\Services\KenyanBusinessDays;
 use App\Services\TopUpService;
+use App\Services\TransactionService;
 use App\Services\TransferService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -548,7 +549,11 @@ class AccountController extends Controller
             ->get()
             ->groupBy('account_id');
 
-        return view('accounts.transfer', compact('sourceAccounts', 'destinationAccounts', 'outstandingFunds'));
+        $sendMoneyTiers = app(TransactionService::class)->mpesaSendMoneyTiers();
+
+        return view('accounts.transfer', compact(
+            'sourceAccounts', 'destinationAccounts', 'outstandingFunds', 'sendMoneyTiers'
+        ));
     }
 
     // ── transfer post ─────────────────────────────────────────────────────────

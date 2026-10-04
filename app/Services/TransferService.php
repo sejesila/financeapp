@@ -69,6 +69,15 @@ readonly class TransferService
     {
         $this->enforceTransferRules($from, $to, $amount);
 
+        // Referrer float → M-Pesa: same send-money tiers as any M-Pesa send,
+        // charged to (and deducted from) the float account. Server-side safety
+        // net for callers that don't submit a fee (webhook, API) — the transfer
+        // form normally pre-fills the same figure. An explicit manual fee,
+        // including 0, still wins.
+        if ($manualFee === null && $from->type === 'referrer_float' && $to->type === 'mpesa') {
+            $manualFee = app(TransactionService::class)->mpesaSendMoneyFee($amount);
+        }
+
         $fee = $this->feeCalculator->calculate($from, $to, $amount);
 
         if ($manualFee !== null) {

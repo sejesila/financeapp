@@ -204,7 +204,7 @@
                                                        '📱 ' + (fromAccountType === 'mpesa' ? 'M-Pesa' : 'Airtel Money') + ' PayBill Fee'
                         "></span>
                         <span class="text-xs font-normal text-gray-500 dark:text-gray-400 ml-1"
-                              x-text="(feeType === 'savings' || feeType === 'float') ? '(enter manually)' : '(auto-calculated, editable)'"></span>
+                              x-text="(feeType === 'savings' || (feeType === 'float' && toAccountType !== 'mpesa')) ? '(enter manually)' : '(auto-calculated, editable)'"></span>
                     </label>
 
                     <div class="flex items-center gap-2">
@@ -219,7 +219,7 @@
                         >
                         <button
                             type="button"
-                            x-show="feeManuallyEdited && feeType !== 'float' && feeType !== 'savings'"
+                            x-show="feeManuallyEdited && feeType !== 'savings' && (feeType !== 'float' || toAccountType === 'mpesa')"
                             @click="feeManuallyEdited = false; calculateFee()"
                             class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
                         >
@@ -235,9 +235,13 @@
                        class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         Enter the withdrawal fee charged by your savings provider.
                     </p>
-                    <p x-show="feeType === 'float'"
+                    <p x-show="feeType === 'float' && toAccountType === 'mpesa' && !feeManuallyEdited"
                        class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Enter the fee for this remittance (e.g. the M-Pesa send-money charge). It is deducted from the float account.
+                        M-Pesa send money fee for this amount, deducted from the float account.
+                    </p>
+                    <p x-show="feeType === 'float' && toAccountType !== 'mpesa'"
+                       class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Enter the fee for this remittance. It is deducted from the float account.
                     </p>
                 </div>
 
@@ -333,6 +337,16 @@
 
                 ATM_FEE: 33 + (33 * 0.15),
 
+                // M-Pesa "send money" tiers, passed from TransactionService (single
+                // source of truth). Used for referrer float → M-Pesa transfers.
+                sendMoneyTiers: @json($sendMoneyTiers),
+
+                getSendMoneyFee(amount) {
+                    if (!amount || amount <= 0) return 0;
+                    const tier = this.sendMoneyTiers.find(t => amount >= t.min && amount <= t.max);
+                    return tier ? tier.cost : this.sendMoneyTiers[this.sendMoneyTiers.length - 1].cost;
+                },
+
                 get totalDeduction() {
                     return parseFloat(this.amount || 0) + parseFloat(this.transactionFee || 0);
                 },
@@ -364,12 +378,25 @@
                     this.fromAccountName = fromAccount.name;
                     this.toAccountType   = toAccount.type;
 
-                    // Savings / Referrer float → anywhere: manual fee entry, shown
-                    // immediately (no amount needed)
-                    if (fromAccount.type === 'savings' || fromAccount.type === 'referrer_float') {
-                        this.feeType = fromAccount.type === 'savings' ? 'savings' : 'float';
+                    // Savings → anywhere: manual fee entry, shown immediately
+                    // (no amount needed)
+                    if (fromAccount.type === 'savings') {
+                        this.feeType = 'savings';
                         this.showFee = true;
                         if (!this.feeManuallyEdited) this.transactionFee = 0;
+                        return;
+                    }
+
+                    // Referrer float → M-Pesa: auto-calculated from M-Pesa send money
+                    // rates, deducted from the float. Other destinations stay manual.
+                    if (fromAccount.type === 'referrer_float') {
+                        this.feeType = 'float';
+                        this.showFee = true;
+                        if (!this.feeManuallyEdited) {
+                            this.transactionFee = (toAccount.type === 'mpesa' && this.amount > 0)
+                                ? this.getSendMoneyFee(parseFloat(this.amount))
+                                : 0;
+                        }
                         return;
                     }
 
