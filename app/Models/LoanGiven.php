@@ -39,6 +39,7 @@ class LoanGiven extends Model
         'expected_interest_amount',
         'rollover_count',
         'capitalized_interest',
+        'borrower_id',
     ];
 
     protected $casts = [
@@ -84,6 +85,10 @@ class LoanGiven extends Model
     public function payments()
     {
         return $this->hasMany(LoanGivenPayment::class);
+    }
+    public function borrower()
+    {
+        return $this->belongsTo(Borrower::class);
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Account;
+use App\Models\Borrower;
 use App\Models\Category;
 use App\Models\LoanGiven;
 use App\Models\LoanGivenPayment;
@@ -306,9 +307,11 @@ class LoanGivenController extends Controller implements HasMiddleware
                 $dueDate = ($validated['due_date'] ?? null)
                     ? Carbon::parse($validated['due_date'])
                     : $disbursedDate->copy()->addDays(30);
+                $borrower = Borrower::resolve($validated['borrower_name'], $validated['borrower_contact'] ?? null);
 
                 $loan = LoanGiven::create([
                     'user_id' => Auth::id(),
+                    'borrower_id' => $borrower->id,
                     'account_id' => $validated['account_id'],
                     'borrower_name' => $validated['borrower_name'],
                     'borrower_contact' => $validated['borrower_contact'] ?? null,
