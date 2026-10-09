@@ -76,10 +76,14 @@ class ReferrerLedgerService
                     : ' (not counted)';
             }
 
-            // Fees that belong to a transfer sort right after that transfer.
+            // Same-day order: borrower money in (0), transfers in (1), everything
+            // else (2), transfers out (3). Ties go by created_at, then id.
+            // A transfer's fee sits right after that transfer.
+            $priority = in_array($cat, ['Loan Recovery', 'Loan Interest'], true) ? 0 : 2;
+
             $sort = ($t->is_transaction_fee && $t->transfer_id)
-                ? [$t->date->format('Y-m-d'), 2, (int) $t->transfer_id, 1]
-                : [$t->date->format('Y-m-d'), 1, $t->id, 0];
+                ? [$t->date->format('Y-m-d'), 3, (int) $t->transfer_id, 1]
+                : [$t->date->format('Y-m-d'), $priority, $t->created_at?->timestamp ?? 0, $t->id];
 
             $rows->push([
                 'date'   => $t->date,
@@ -145,15 +149,14 @@ class ReferrerLedgerService
             // so it appears as a "Transaction fee" line, not here.
             $rows->push($out ? [
                 'date'   => $date,
-                'sort'   => [$date->format('Y-m-d'), 2, $tr->id, 0],
+                'sort'   => [$date->format('Y-m-d'), 3, $tr->id, 0],
                 'title'  => 'Remitted to ' . ($tr->toAccount?->name ?? 'you'),
                 'credit' => 0,
                 'debit'  => (float) $tr->amount,
             ] : [
-                // Money coming in sorts first on its day, so it lands before
-                // any loan given or other spending it was meant to fund.
+                // Sorts after borrower repayments/interest but before spending.
                 'date'   => $date,
-                'sort'   => [$date->format('Y-m-d'), 0, $tr->id, 0],
+                'sort'   => [$date->format('Y-m-d'), 1, $tr->id, 0],
                 'title'  => 'Transfer in: ' . ($tr->fromAccount?->name ?? 'another account')
                     . ($incomingPending ? ' (clears ' . Carbon::parse($tr->value_date)->format('M j') . ')' : ''),
                 'credit' => $incomingPending ? 0 : (float) $tr->amount,
