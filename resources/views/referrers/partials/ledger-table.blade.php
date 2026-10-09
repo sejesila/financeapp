@@ -19,9 +19,9 @@
                     <td class="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{{ $row['date']->format('M j, Y') }}</td>
                     <td class="px-4 py-3 text-sm text-gray-900">
                         {{ $row['title'] }}
-                        @if($row['detail'])
-                            <span class="block text-xs text-gray-500 mt-0.5">{{ $row['detail'] }}</span>
-                        @endif
+{{--                        @if($row['detail'])--}}
+{{--                            <span class="block text-xs text-gray-500 mt-0.5">{{ $row['detail'] }}</span>--}}
+{{--                        @endif--}}
                     </td>
                     <td class="px-4 py-3 text-sm text-right text-green-700 whitespace-nowrap">
                         {{ $row['credit'] > 0 ? '+ ' . number_format($row['credit'], 0) : '' }}
