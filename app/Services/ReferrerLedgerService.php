@@ -90,13 +90,18 @@ class ReferrerLedgerService
                         : '(Not counted in the account balance.)'));
             }
 
+            // Fees that belong to a transfer sort right after that transfer.
+            $sort = ($t->is_transaction_fee && $t->transfer_id)
+                ? [$t->date->format('Y-m-d'), 2, (int) $t->transfer_id, 1]
+                : [$t->date->format('Y-m-d'), 1, $t->id, 0];
+
             $rows->push([
-                'date' => $t->date,
-                'sort' => [$t->date->format('Y-m-d'), 1, $t->id],
-                'title' => $title,
+                'date'   => $t->date,
+                'sort'   => $sort,
+                'title'  => $title,
                 'detail' => $detail,
                 'credit' => $effect > 0 ? $effect : 0,
-                'debit' => $effect < 0 ? -$effect : 0,
+                'debit'  => $effect < 0 ? -$effect : 0,
             ]);
         }
 
@@ -163,7 +168,7 @@ class ReferrerLedgerService
 
                 $rows->push([
                     'date' => $date,
-                    'sort' => [$date->format('Y-m-d'), 2, $tr->id],
+                    'sort' => [$date->format('Y-m-d'), 2, $tr->id, 0],
                     'title' => 'Remitted to ' . ($tr->toAccount?->name ?? 'your account'),
                     'detail' => $covers
                         ? "She sent you this interest from the float. Covers: {$covers}."
@@ -177,7 +182,7 @@ class ReferrerLedgerService
             } else {
                 $rows->push([
                     'date' => $date,
-                    'sort' => [$date->format('Y-m-d'), 2, $tr->id],
+                    'sort' => [$date->format('Y-m-d'), 2, $tr->id, 0],
                     'title' => 'Transfer in from ' . ($tr->fromAccount?->name ?? 'another account'),
                     'detail' => ($tr->description ?: 'Money moved into the float.')
                         . ($incomingPending ? ' (Not in the balance yet — clears on ' . \Carbon\Carbon::parse($tr->value_date)->format('M j') . '.)' : ''),
@@ -232,7 +237,7 @@ class ReferrerLedgerService
 
         return [
             "Repayment received — {$name}",
-            'Money returned by the borrower into the float. Any interest earned on it is shown as its own "Interest earned" line. Loan #' . $p->loan_given_id . '.',
+
         ];
     }
 
@@ -242,7 +247,6 @@ class ReferrerLedgerService
 
         return [
             "Interest earned — {$name}",
-            'Your profit on this loan. It stays in her float until she remits it to you (see Reconcile Float).',
         ];
     }
 

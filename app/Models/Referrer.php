@@ -63,6 +63,45 @@ class Referrer extends Model
             ->where('referrer_deducted_before_deposit', false)
             ->sum('interest_amount');
     }
+    /**
+     * Per-loan float interest that is safe to move out to YOU: only loans that
+     * are fully paid, and only YOUR share of what's pending.
+     *
+     * pendingFloatInterestByLoan() is gross — on a closed loan it still
+     * includes the referrer's own commission until that has been paid out.
+     * That commission has to stay in the float so Pay Out Referrer can still
+     * take it from there, so it's subtracted here.
+     *
+     * Returns [loan_given_id => amount], oldest-closed loan first.
+     */
+    public function reconcilableFloatInterestByLoan(): \Illuminate\Support\Collection
+    {
+        $pending = $this->pendingFloatInterestByLoan();
+
+        if ($pending->isEmpty()) {
+            return collect();
+        }
+
+        $loans = $this->loans()
+            ->whereIn('id', $pending->keys())
+            ->where('status', 'paid')
+            ->orderBy('repaid_date')
+            ->orderBy('id')
+            ->get();
+
+        return $loans->mapWithKeys(function ($loan) use ($pending) {
+            $commissionStillInFloat = 0.0;
+
+            // Commission is only still sitting in the float if it hasn't been
+            // paid out in a batch and wasn't kept by the referrer upfront.
+            if (!$loan->referrer_payout_id && !$loan->referrer_deducted_before_deposit) {
+                $pct = $loan->referrer_share_percentage ?? $this->default_share_percentage;
+                $commissionStillInFloat = round($loan->interest_amount * ($pct / 100), 2);
+            }
+
+            return [$loan->id => max(0, round((float) $pending[$loan->id] - $commissionStillInFloat, 2))];
+        })->filter(fn ($amount) => $amount > 0.01);
+    }
 
     /**
      * Per-loan interest that has been recognized (via a rollover payment or

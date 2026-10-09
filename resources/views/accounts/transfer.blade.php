@@ -1,3 +1,4 @@
+@php use Carbon\Carbon; @endphp
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between mb-6">
@@ -22,7 +23,8 @@
         @endif
 
         <div x-data="transferForm()">
-            <form method="POST" action="{{ route('accounts.transferPost') }}" class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+            <form method="POST" action="{{ route('accounts.transferPost') }}"
+                  class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
                 @csrf
 
                 {{-- Hidden input so the manual fee is submitted with the form --}}
@@ -30,7 +32,8 @@
 
                 <!-- From Account -->
                 <div class="mb-4">
-                    <label for="from_account_id" class="block text-gray-700 dark:text-gray-200 font-semibold mb-2">From Account</label>
+                    <label for="from_account_id" class="block text-gray-700 dark:text-gray-200 font-semibold mb-2">From
+                        Account</label>
                     <select
                         name="from_account_id"
                         id="from_account_id"
@@ -47,12 +50,18 @@
                                 data-name="{{ $account->name }}"
                                 {{ old('from_account_id') == $account->id ? 'selected' : '' }}
                             >
-                                @if($account->type == 'cash') 💵
-                                @elseif($account->type == 'mpesa') 📱
-                                @elseif($account->type == 'airtel_money') 📲
-                                @elseif($account->type == 'bank') 🏦
-                                @elseif($account->type == 'savings') 💰
-                                @elseif($account->type == 'referrer_float') 🤝
+                                @if($account->type == 'cash')
+                                    💵
+                                @elseif($account->type == 'mpesa')
+                                    📱
+                                @elseif($account->type == 'airtel_money')
+                                    📲
+                                @elseif($account->type == 'bank')
+                                    🏦
+                                @elseif($account->type == 'savings')
+                                    💰
+                                @elseif($account->type == 'referrer_float')
+                                    🤝
                                 @endif
                                 {{ $account->name }}
                                 @if($account->type !== 'savings')
@@ -68,7 +77,8 @@
 
                 <!-- To Account -->
                 <div class="mb-4">
-                    <label for="to_account_id" class="block text-gray-700 dark:text-gray-200 font-semibold mb-2">To Account</label>
+                    <label for="to_account_id" class="block text-gray-700 dark:text-gray-200 font-semibold mb-2">To
+                        Account</label>
                     <select
                         name="to_account_id"
                         id="to_account_id"
@@ -85,12 +95,18 @@
                                 data-name="{{ $account->name }}"
                                 {{ old('to_account_id') == $account->id ? 'selected' : '' }}
                             >
-                                @if($account->type == 'cash') 💵
-                                @elseif($account->type == 'mpesa') 📱
-                                @elseif($account->type == 'airtel_money') 📲
-                                @elseif($account->type == 'bank') 🏦
-                                @elseif($account->type == 'savings') 💰
-                                @elseif($account->type == 'referrer_float') 🤝
+                                @if($account->type == 'cash')
+                                    💵
+                                @elseif($account->type == 'mpesa')
+                                    📱
+                                @elseif($account->type == 'airtel_money')
+                                    📲
+                                @elseif($account->type == 'bank')
+                                    🏦
+                                @elseif($account->type == 'savings')
+                                    💰
+                                @elseif($account->type == 'referrer_float')
+                                    🤝
                                 @endif
                                 {{ $account->name }}
                                 @if($account->type !== 'savings')
@@ -134,18 +150,22 @@
                         What's this transfer for?
                     </label>
                     <div class="grid grid-cols-3 gap-2">
-                        <label class="flex flex-col items-center gap-1 border rounded px-2 py-2 cursor-pointer text-center"
-                               :class="purpose === 'personal' ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-gray-300 dark:border-gray-600'">
+                        <label
+                            class="flex flex-col items-center gap-1 border rounded px-2 py-2 cursor-pointer text-center"
+                            :class="purpose === 'personal' ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-gray-300 dark:border-gray-600'">
                             <input type="radio" name="purpose_radio" value="personal" x-model="purpose" class="hidden">
                             <span class="text-sm">💼 My Spending</span>
                         </label>
-                        <label class="flex flex-col items-center gap-1 border rounded px-2 py-2 cursor-pointer text-center"
-                               :class="purpose === 'client_fund' ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'border-gray-300 dark:border-gray-600'">
-                            <input type="radio" name="purpose_radio" value="client_fund" x-model="purpose" class="hidden">
+                        <label
+                            class="flex flex-col items-center gap-1 border rounded px-2 py-2 cursor-pointer text-center"
+                            :class="purpose === 'client_fund' ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'border-gray-300 dark:border-gray-600'">
+                            <input type="radio" name="purpose_radio" value="client_fund" x-model="purpose"
+                                   class="hidden">
                             <span class="text-sm">👤 Client Fund</span>
                         </label>
-                        <label class="flex flex-col items-center gap-1 border rounded px-2 py-2 cursor-pointer text-center"
-                               :class="purpose === 'lending' ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-gray-300 dark:border-gray-600'">
+                        <label
+                            class="flex flex-col items-center gap-1 border rounded px-2 py-2 cursor-pointer text-center"
+                            :class="purpose === 'lending' ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-gray-300 dark:border-gray-600'">
                             <input type="radio" name="purpose_radio" value="lending" x-model="purpose" class="hidden">
                             <span class="text-sm">🤝 Lending Out</span>
                         </label>
@@ -174,13 +194,16 @@
                         @foreach($outstandingFunds ?? [] as $accountId => $funds)
                             @foreach($funds as $fund)
                                 <option value="{{ $fund->id }}" data-account="{{ $accountId }}">
-                                    Fund #{{ $fund->id }} — received {{ \Carbon\Carbon::parse($fund->received_date)->format('M d, Y') }} — KES {{ number_format($fund->balance, 0, '.', ',') }}
+                                    Fund #{{ $fund->id }} —
+                                    received {{ Carbon::parse($fund->received_date)->format('M d, Y') }} —
+                                    KES {{ number_format($fund->balance, 0, '.', ',') }}
                                 </option>
                             @endforeach
                         @endforeach
                     </select>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Optional but recommended — keeps this fund's balance correctly tracked if the money moves again later.
+                        Optional but recommended — keeps this fund's balance correctly tracked if the money moves again
+                        later.
                     </p>
                 </div>
 
@@ -263,6 +286,28 @@
                         + Fee: KES <span x-text="parseFloat(transactionFee || 0).toFixed(2)"></span>
                     </p>
                 </div>
+                <div x-show="fromAccountType === 'referrer_float'" x-transition class="mb-4" x-data="{ on: false }">
+                    <label class="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-200">
+                        <input type="checkbox" name="auto_reconcile_referrer" value="1" x-model="on"
+                               class="mt-1 rounded">
+                        <span>
+            Reconcile pending interest
+            <span class="block text-xs text-gray-500 dark:text-gray-400">
+                Links the interest part to her pending loans, oldest first. The rest of the transfer is principal.
+            </span>
+        </span>
+                    </label>
+
+                    <div x-show="on" x-transition class="mt-2 flex items-center gap-2">
+                        <span class="text-gray-600 dark:text-gray-300 font-medium">KES</span>
+                        <input type="number" step="0.01" min="0" name="referrer_interest_amount"
+                               :disabled="!on" placeholder="Interest part"
+                               class="w-40 border border-gray-300 dark:border-gray-600 rounded px-3 py-2 dark:bg-gray-700 dark:text-gray-200">
+                    </div>
+                    @error('referrer_interest_amount')
+                    <p class="text-red-500 text-sm mt-2">{{ $message }}</p>
+                    @enderror
+                </div>
 
                 <!-- Date -->
                 <div class="mb-4">
@@ -278,7 +323,8 @@
 
                 <!-- Description -->
                 <div class="mb-6">
-                    <label for="description" class="block text-gray-700 dark:text-gray-200 font-semibold mb-2">Description (Optional)</label>
+                    <label for="description" class="block text-gray-700 dark:text-gray-200 font-semibold mb-2">Description
+                        (Optional)</label>
                     <input
                         type="text"
                         name="description"
@@ -293,8 +339,10 @@
                 </div>
 
                 <div class="flex items-center justify-between">
-                    <a href="{{ route('accounts.index') }}" class="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">Cancel</a>
-                    <button type="submit" class="bg-purple-600 text-white px-6 py-2 rounded hover:bg-purple-700 focus:outline-none">
+                    <a href="{{ route('accounts.index') }}"
+                       class="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">Cancel</a>
+                    <button type="submit"
+                            class="bg-purple-600 text-white px-6 py-2 rounded hover:bg-purple-700 focus:outline-none">
                         Transfer Money
                     </button>
                 </div>
@@ -363,7 +411,7 @@
 
                 calculateFee() {
                     const fromAccount = this.getAccount(this.fromAccountId);
-                    const toAccount   = this.getAccount(this.toAccountId);
+                    const toAccount = this.getAccount(this.toAccountId);
 
                     if (!fromAccount || !toAccount) {
                         if (!this.feeManuallyEdited) {
@@ -376,7 +424,7 @@
 
                     this.fromAccountType = fromAccount.type;
                     this.fromAccountName = fromAccount.name;
-                    this.toAccountType   = toAccount.type;
+                    this.toAccountType = toAccount.type;
 
                     // Savings → anywhere: manual fee entry, shown immediately
                     // (no amount needed)
@@ -415,24 +463,21 @@
                     const isMobileMoney = ['mpesa', 'airtel_money'].includes(fromAccount.type);
 
                     if (isMobileMoney && toAccount.type === 'cash') {
-                        this.feeType        = 'withdrawal';
+                        this.feeType = 'withdrawal';
                         this.transactionFee = this.getWithdrawalFee(parseFloat(this.amount), fromAccount.type);
-                        this.showFee        = this.transactionFee > 0;
-                    }
-                    else if (isMobileMoney && (toAccount.type === 'bank' || toAccount.type === 'savings')) {
-                        this.feeType        = 'paybill';
+                        this.showFee = this.transactionFee > 0;
+                    } else if (isMobileMoney && (toAccount.type === 'bank' || toAccount.type === 'savings')) {
+                        this.feeType = 'paybill';
                         this.transactionFee = this.getPayBillFee(parseFloat(this.amount), fromAccount.type);
-                        this.showFee        = this.transactionFee > 0;
-                    }
-                    else if (fromAccount.type === 'bank' && toAccount.type === 'cash') {
-                        this.feeType        = 'atm';
+                        this.showFee = this.transactionFee > 0;
+                    } else if (fromAccount.type === 'bank' && toAccount.type === 'cash') {
+                        this.feeType = 'atm';
                         this.transactionFee = this.ATM_FEE;
-                        this.showFee        = true;
-                    }
-                    else {
-                        this.feeType        = null;
+                        this.showFee = true;
+                    } else {
+                        this.feeType = null;
                         this.transactionFee = 0;
-                        this.showFee        = false;
+                        this.showFee = false;
                     }
                 },
 
@@ -440,20 +485,20 @@
                     if (!amount || amount < 50) return 0;
 
                     const tiers = [
-                        { min: 50,    max: 100,    cost: 11  },
-                        { min: 101,   max: 500,    cost: 29  },
-                        { min: 501,   max: 1000,   cost: 29  },
-                        { min: 1001,  max: 1500,   cost: 29  },
-                        { min: 1501,  max: 2500,   cost: 29  },
-                        { min: 2501,  max: 3500,   cost: 52  },
-                        { min: 3501,  max: 5000,   cost: 69  },
-                        { min: 5001,  max: 7500,   cost: 87  },
-                        { min: 7501,  max: 10000,  cost: 115 },
-                        { min: 10001, max: 15000,  cost: 167 },
-                        { min: 15001, max: 20000,  cost: 185 },
-                        { min: 20001, max: 35000,  cost: 197 },
-                        { min: 35001, max: 50000,  cost: 278 },
-                        { min: 50001, max: 250000, cost: 309 },
+                        {min: 50, max: 100, cost: 11},
+                        {min: 101, max: 500, cost: 29},
+                        {min: 501, max: 1000, cost: 29},
+                        {min: 1001, max: 1500, cost: 29},
+                        {min: 1501, max: 2500, cost: 29},
+                        {min: 2501, max: 3500, cost: 52},
+                        {min: 3501, max: 5000, cost: 69},
+                        {min: 5001, max: 7500, cost: 87},
+                        {min: 7501, max: 10000, cost: 115},
+                        {min: 10001, max: 15000, cost: 167},
+                        {min: 15001, max: 20000, cost: 185},
+                        {min: 20001, max: 35000, cost: 197},
+                        {min: 35001, max: 50000, cost: 278},
+                        {min: 50001, max: 250000, cost: 309},
                     ];
 
                     for (let tier of tiers) {
@@ -468,25 +513,25 @@
                     if (accountType === 'airtel_money') return 0;
 
                     const tiers = [
-                        { min: 1,     max: 49,     cost: 0   },
-                        { min: 50,    max: 100,    cost: 0   },
-                        { min: 101,   max: 500,    cost: 5   },
-                        { min: 501,   max: 1000,   cost: 10  },
-                        { min: 1001,  max: 1500,   cost: 15  },
-                        { min: 1501,  max: 2500,   cost: 20  },
-                        { min: 2501,  max: 3500,   cost: 25  },
-                        { min: 3501,  max: 5000,   cost: 34  },
-                        { min: 5001,  max: 7500,   cost: 42  },
-                        { min: 7501,  max: 10000,  cost: 48  },
-                        { min: 10001, max: 15000,  cost: 57  },
-                        { min: 15001, max: 20000,  cost: 62  },
-                        { min: 20001, max: 25000,  cost: 67  },
-                        { min: 25001, max: 30000,  cost: 72  },
-                        { min: 30001, max: 35000,  cost: 83  },
-                        { min: 35001, max: 40000,  cost: 99  },
-                        { min: 40001, max: 45000,  cost: 103 },
-                        { min: 45001, max: 50000,  cost: 108 },
-                        { min: 50001, max: 250000, cost: 108 },
+                        {min: 1, max: 49, cost: 0},
+                        {min: 50, max: 100, cost: 0},
+                        {min: 101, max: 500, cost: 5},
+                        {min: 501, max: 1000, cost: 10},
+                        {min: 1001, max: 1500, cost: 15},
+                        {min: 1501, max: 2500, cost: 20},
+                        {min: 2501, max: 3500, cost: 25},
+                        {min: 3501, max: 5000, cost: 34},
+                        {min: 5001, max: 7500, cost: 42},
+                        {min: 7501, max: 10000, cost: 48},
+                        {min: 10001, max: 15000, cost: 57},
+                        {min: 15001, max: 20000, cost: 62},
+                        {min: 20001, max: 25000, cost: 67},
+                        {min: 25001, max: 30000, cost: 72},
+                        {min: 30001, max: 35000, cost: 83},
+                        {min: 35001, max: 40000, cost: 99},
+                        {min: 40001, max: 45000, cost: 103},
+                        {min: 45001, max: 50000, cost: 108},
+                        {min: 50001, max: 250000, cost: 108},
                     ];
 
                     for (let tier of tiers) {
@@ -497,7 +542,7 @@
 
                 updateDestinationOptions() {
                     const fromAccount = this.getAccount(this.fromAccountId);
-                    const toSelect    = document.getElementById('to_account_id');
+                    const toSelect = document.getElementById('to_account_id');
                     if (!toSelect) return;
 
                     Array.from(toSelect.options).forEach(option => {
@@ -508,7 +553,7 @@
                         // Disable same account
                         if (option.value === this.fromAccountId) {
                             option.disabled = true;
-                            option.hidden   = true;
+                            option.hidden = true;
                             return;
                         }
 
@@ -516,17 +561,16 @@
                         if (fromAccount && fromAccount.type === 'bank') {
                             const allowed = ['mpesa', 'airtel_money', 'cash', 'savings', 'referrer_float'];
                             option.disabled = !allowed.includes(optionType);
-                            option.hidden   = !allowed.includes(optionType);
+                            option.hidden = !allowed.includes(optionType);
                         }
                         // Savings source: allow mpesa, airtel_money, bank, cash, referrer_float
                         else if (fromAccount && fromAccount.type === 'savings') {
                             const allowed = ['mpesa', 'airtel_money', 'bank', 'cash', 'referrer_float'];
                             option.disabled = !allowed.includes(optionType);
                             option.hidden = !allowed.includes(optionType);
-                        }
-                        else {
+                        } else {
                             option.disabled = false;
-                            option.hidden   = false;
+                            option.hidden = false;
                         }
                     });
 

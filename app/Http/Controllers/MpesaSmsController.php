@@ -116,6 +116,15 @@ class MpesaSmsController extends Controller
             if ($parsed['subtype'] === 'airtelcashback') {
                 return $this->transactions->applyCashback($user, $parsed);
             }
+            // Money received from a referrer is her float being remitted to
+            // you, not side income.
+            if ($parsed['subtype'] === 'receive_money' && !empty($parsed['sender'])) {
+                $referrer = $this->transfers->findReferrerBySender($user, $parsed['sender']);
+
+                if ($referrer) {
+                    return $this->transfers->referrerFloatToMpesa($user, $parsed, $referrer);
+                }
+            }
 
             // ── 6. Record expense / income ────────────────────────────────
             return $this->transactions->record($user, $parsed);

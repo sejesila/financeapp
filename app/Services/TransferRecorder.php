@@ -5,6 +5,8 @@ namespace App\Services;
 
 use App\Models\Account;
 use App\Models\ClientFund;
+use App\Models\Referrer;
+use App\Models\ReferrerFloatReconciliation;
 use App\Models\Transaction;
 use App\Models\Transfer;
 use App\Models\User;
@@ -229,6 +231,188 @@ class TransferRecorder
             'to'      => $cashAccount->name,
         ], 201);
     }
+    /**
+     * Is the sender of a "You have received…" SMS one of this user's
+     * referrers (with a float account)? Matches on the referrer's name as a
+     * whole word, e.g. "PHIDES  NJERU 0713***724" matches referrer "Phides".
+     * If the SMS carries a masked phone and the referrer has a contact saved,
+     * the first 4 / last 3 digits must also match, so an unrelated person
+     * sharing a first name isn't treated as the referrer.
+     */
+    public function findReferrerBySender(User $user, string $sender): ?Referrer
+    {
+        $s = mb_strtolower(preg_replace('/\s+/', ' ', trim($sender)));
+
+        $hasMask = preg_match('/(\d{4})\*+(\d{3})/', $s, $mask);
+
+        $referrers = Referrer::withoutGlobalScopes()
+            ->where('user_id', $user->id)
+            ->where('is_active', true)
+            ->get();
+
+        foreach ($referrers as $referrer) {
+            $name = mb_strtolower(trim($referrer->name));
+
+            if ($name === '' || !preg_match('/\b' . preg_quote($name, '/') . '\b/u', $s)) {
+                continue;
+            }
+
+            $hasFloat = Account::withoutGlobalScopes()
+                ->where('user_id', $user->id)
+                ->where('type', 'referrer_float')
+                ->where('referrer_id', $referrer->id)
+                ->exists();
+
+            if (!$hasFloat) {
+                continue;
+            }
+
+            if ($hasMask && !empty($referrer->contact)) {
+                $digits = preg_replace('/\D/', '', $referrer->contact);
+                if (str_starts_with($digits, '254')) {
+                    $digits = '0' . substr($digits, 3);
+                }
+
+                if (!str_starts_with($digits, $mask[1]) || !str_ends_with($digits, $mask[2])) {
+                    continue;
+                }
+            }
+
+            return $referrer;
+        }
+
+        return null;
+    }
+
+    /**
+     * Money received from a referrer is her float being remitted to you, not
+     * income: record it as a Transfer float → M-Pesa, charge the M-Pesa
+     * send-money fee to the float (same rule as TransferService), and link
+     * the interest part to the loans' pending float interest. Whatever is
+     * left over is principal and stays unlinked.
+     */
+    public function referrerFloatToMpesa(User $user, array $parsed, Referrer $referrer): JsonResponse
+    {
+        $floatAccount = Account::withoutGlobalScopes()
+            ->where('user_id', $user->id)
+            ->where('type', 'referrer_float')
+            ->where('referrer_id', $referrer->id)
+            ->first();
+
+        $mpesaAccount = Account::withoutGlobalScopes()
+            ->where('user_id', $user->id)
+            ->where('type', 'mpesa')
+            ->where('is_active', true)
+            ->first();
+
+        if (!$floatAccount || !$mpesaAccount) {
+            Log::warning('Webhook: referrer receipt — float or mpesa account not found', [
+                'user_id' => $user->id, 'referrer_id' => $referrer->id,
+            ]);
+            return response()->json(['error' => 'Referrer float or Mpesa account not found'], 404);
+        }
+
+        $amount = (float) $parsed['amount'];
+        $fee    = (float) app(TransactionService::class)->mpesaSendMoneyFee($amount);
+
+        if ((float) $floatAccount->current_balance < $amount + $fee) {
+            // Don't block — the money has genuinely arrived — but surface it.
+            Log::warning('Webhook: referrer receipt exceeds recorded float balance', [
+                'referrer_id'   => $referrer->id,
+                'float_balance' => $floatAccount->current_balance,
+                'amount'        => $amount,
+                'fee'           => $fee,
+            ]);
+        }
+
+        $interestLinked = 0.0;
+
+        DB::transaction(function () use (
+            $user, $parsed, $referrer, $floatAccount, $mpesaAccount, $amount, $fee, &$interestLinked
+        ) {
+            $transfer = Transfer::create([
+                'user_id'         => $user->id,
+                'from_account_id' => $floatAccount->id,
+                'to_account_id'   => $mpesaAccount->id,
+                'amount'          => $amount,
+                'date'            => $parsed['date'],
+                'description'     => "Interest/principal remittance from {$referrer->name} [{$parsed['reference']}]",
+                'mpesa_reference' => $parsed['reference'],
+            ]);
+
+            if ($fee > 0) {
+                $feeCategory = $this->categories->findOrCreate($user, 'Transaction Fees', 'expense');
+
+                Transaction::withoutGlobalScopes()->create([
+                    'user_id'            => $user->id,
+                    'account_id'         => $floatAccount->id,
+                    'category_id'        => $feeCategory->id,
+                    'amount'             => $fee,
+                    'date'               => $parsed['date'],
+                    'description'        => "{$floatAccount->name} to {$mpesaAccount->name} fee [{$parsed['reference']}]",
+                    'payment_method'     => 'Mpesa',
+                    'is_transaction_fee' => true,
+                    'transfer_id'        => $transfer->id,
+                ]);
+            }
+
+            // Interest first (paid loans only, net of her unpaid commission),
+            // oldest closed loan first. The rest of the transfer is principal.
+            $remaining = $amount;
+
+            foreach ($referrer->reconcilableFloatInterestByLoan() as $loanId => $reconcilable) {
+                if ($remaining <= 0) {
+                    break;
+                }
+
+                $portion = min($remaining, (float) $reconcilable);
+
+                ReferrerFloatReconciliation::create([
+                    'user_id'       => $user->id,
+                    'loan_given_id' => $loanId,
+                    'transfer_id'   => $transfer->id,
+                    'amount'        => $portion,
+                ]);
+
+                $remaining -= $portion;
+            }
+
+            $interestLinked = $amount - $remaining;
+
+            $floatAccount->updateBalance();
+            $mpesaAccount->updateBalance();
+
+            app(BorrowedFundReturnService::class)->applyDepositAgainstBorrowed(
+                userId: $user->id,
+                accountId: $mpesaAccount->id,
+                depositAmount: $amount,
+                date: $parsed['date']->format('Y-m-d'),
+                transfer: $transfer,
+            );
+        });
+
+        Log::info('Webhook: referrer float remittance recorded', [
+            'user_id'         => $user->id,
+            'referrer'        => $referrer->name,
+            'reference'       => $parsed['reference'],
+            'amount'          => $amount,
+            'fee'             => $fee,
+            'interest_linked' => $interestLinked,
+            'principal'       => $amount - $interestLinked,
+        ]);
+
+        return response()->json([
+            'status'          => 'created',
+            'subtype'         => 'referrer_float_remittance',
+            'amount'          => $amount,
+            'fee'             => $fee,
+            'interest_linked' => $interestLinked,
+            'principal'       => $amount - $interestLinked,
+            'from'            => $floatAccount->name,
+            'to'              => $mpesaAccount->name,
+        ], 201);
+    }
+
 
     // ─────────────────────────────────────────────────────────────────────
     // PesaLink — Bank → Savings account (e.g. Etica at Equity Bank)

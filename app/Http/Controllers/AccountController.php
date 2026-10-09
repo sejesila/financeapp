@@ -575,6 +575,8 @@ class AccountController extends Controller
             'is_client_fund'  => 'nullable|boolean',
             'is_lending'      => 'nullable|boolean',
             'client_fund_id'  => 'nullable|exists:client_funds,id',
+            'auto_reconcile_referrer'  => 'nullable|boolean',
+            'referrer_interest_amount' => 'nullable|required_if:auto_reconcile_referrer,1|numeric|min:0.01',
         ]);
 
         if ($request->boolean('is_client_fund') && $request->boolean('is_lending')) {
@@ -624,6 +626,8 @@ class AccountController extends Controller
                 $request->boolean('is_client_fund'),
                 $request->boolean('is_lending'),
                 $request->filled('client_fund_id') ? (int) $request->client_fund_id : null,
+                $request->boolean('auto_reconcile_referrer'),
+                $request->filled('referrer_interest_amount') ? (float) $request->referrer_interest_amount : null,
             );
         } catch (ValidationException $e) {
             return redirect()->back()->withInput()->withErrors($e->errors());

@@ -7,7 +7,7 @@ use App\Models\Category;
 use App\Models\Referrer;
 use App\Models\ReferrerFloatReconciliation;
 use App\Models\ReferrerPayout;
-use App\Models\Transaction;
+use App\Services\TransactionService;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -97,8 +97,13 @@ class ReferrerPayoutController extends Controller
             return back()->with('error', 'Computed payout amount is zero — nothing to pay.');
         }
 
-        if ($account->current_balance < $amountPaid) {
-            return back()->with('error', "Insufficient balance in {$account->name} to pay out KES " . number_format($amountPaid, 0));
+        $fee = in_array($account->type, ['mpesa', 'airtel_money'])
+            ? app(TransactionService::class)->mpesaSendMoneyFee($amountPaid)
+            : 0;
+
+        if (round((float) $account->current_balance, 2) < round($amountPaid + $fee, 2)) {
+            return back()->with('error', "Insufficient balance in {$account->name}: need KES "
+                . number_format($amountPaid + $fee, 2) . " (payout {$amountPaid} + fee {$fee}).");
         }
         // Paying out of HER OWN float account: the commission leaves money she's
 // holding for us, so the same amount must be marked settled in float
@@ -117,14 +122,13 @@ class ReferrerPayoutController extends Controller
                 'name' => 'Referrer Commission', 'type' => 'expense', 'is_active' => true,
             ]);
 
-            $transaction = Transaction::create([
-                'user_id' => Auth::id(),
-                'account_id' => $account->id,
-                'category_id' => $commissionCategory->id,
-                'type' => 'expense',
-                'description' => "Referrer commission to {$referrer->name} ({$validated['period_start']} to {$validated['period_end']})",
-                'amount' => $amountPaid,
-                'date' => $validated['paid_date'],
+            $transaction = app(TransactionService::class)->createTransaction([
+                'account_id'        => $account->id,
+                'category_id'       => $commissionCategory->id,
+                'amount'            => $amountPaid,
+                'date'              => $validated['paid_date'],
+                'description'       => "Referrer commission to {$referrer->name} ({$validated['period_start']} to {$validated['period_end']})",
+                'mobile_money_type' => 'send_money', // M-Pesa send-money rates
             ]);
 
             $payout = ReferrerPayout::create([

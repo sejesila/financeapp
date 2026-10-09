@@ -6,6 +6,8 @@ use App\Models\Account;
 use App\Models\Category;
 use App\Models\ClientFund;
 use App\Models\ClientFundTransaction;
+use App\Models\Referrer;
+use App\Models\ReferrerFloatReconciliation;
 use App\Models\Transaction;
 use App\Models\Transfer;
 use Carbon\Carbon;
@@ -25,6 +27,8 @@ use Illuminate\Validation\ValidationException;
  *   - Auto-reconcile transfers out of savings that dip into money still
  *     owed to clients, by recording the shortfall as "borrowed" against
  *     the relevant ClientFund(s)
+ *   - Optionally (opt-in) link part of a referrer-float transfer to the
+ *     referrer's pending float interest; the remainder stays as principal
  *   - Trigger balance recalculation on both accounts
  *
  * Throws ValidationException so the controller can let Laravel's normal
@@ -51,6 +55,8 @@ readonly class TransferService
      * @param float|null $manualFee User-supplied fee override (null = use calculator)
      * @param bool $isClientFund Withdrawal is someone else's money, not personal spend
      * @param bool $isLending Withdrawal is earmarked to lend out, not personal spend
+     * @param bool $autoReconcileReferrer Opt-in: link part of this referrer-float transfer to pending float interest
+     * @param float|null $referrerInterestAmount How much of the transfer is interest to link (rest is principal)
      * @return TransferFee  The fee that was charged (amount may be 0).
      *
      * @throws ValidationException
@@ -65,9 +71,12 @@ readonly class TransferService
         bool    $isClientFund = false,
         bool    $isLending = false,
         ?int    $clientFundId = null,
+        bool    $autoReconcileReferrer = false,
+        ?float  $referrerInterestAmount = null,
     ): TransferFee
     {
         $this->enforceTransferRules($from, $to, $amount);
+        $this->enforceReferrerReconcileRules($from, $amount, $autoReconcileReferrer, $referrerInterestAmount);
 
         // Referrer float → M-Pesa: same send-money tiers as any M-Pesa send,
         // charged to (and deducted from) the float account. Server-side safety
@@ -114,10 +123,13 @@ readonly class TransferService
             }
         }
 
+        $interestReconciled = 0.0;
+
         DB::transaction(function () use (
             $from, $to, $amount, $date, $description, $fee,
             $isClientFund, $isLending, $clientFundId, $needsReconciliation,
             $outstandingFunds, $borrowShortfall,
+            $autoReconcileReferrer, $referrerInterestAmount, &$interestReconciled,
         ) {
             $valueDate = $this->resolveEticaValueDate($from, $to, $date);
 
@@ -147,6 +159,15 @@ readonly class TransferService
                 );
             }
 
+            // Opt-in: link the interest part of a referrer-float transfer to
+            // the referrer's pending float interest. Anything above that
+            // amount is treated as principal and left unlinked.
+            if ($autoReconcileReferrer && $from->type === 'referrer_float') {
+                $interestReconciled = $this->reconcileReferrerInterest(
+                    $from, $transfer, (float) $referrerInterestAmount
+                );
+            }
+
             $from->updateBalance();
             $to->updateBalance();
 
@@ -161,6 +182,16 @@ readonly class TransferService
                 );
             }
         });
+
+        if ($interestReconciled > 0) {
+            Log::info('TransferService: referrer float transfer linked to pending interest', [
+                'user_id'             => Auth::id(),
+                'from_account_id'     => $from->id,
+                'amount'              => $amount,
+                'interest_reconciled' => $interestReconciled,
+                'principal_remainder' => $amount - $interestReconciled,
+            ]);
+        }
 
         if ($from->type !== 'savings' && $needsReconciliation) {
             Log::warning('TransferService: transfer moved money out of an account with outstanding client funds — not flagged as client fund, needs manual reconciliation', [
@@ -178,6 +209,86 @@ readonly class TransferService
         }
 
         return $fee;
+    }
+
+    // ── Referrer float interest reconciliation (opt-in) ──────────────────────
+
+    /**
+     * Validate the opt-in referrer reconciliation inputs.
+     *
+     * The interest amount is explicit on purpose: the pending figure per loan
+     * can include the referrer's own unpaid commission, which must stay in
+     * the float so it can still be paid out via Pay Out Referrer.
+     */
+    private function enforceReferrerReconcileRules(
+        Account $from,
+        float   $amount,
+        bool    $autoReconcileReferrer,
+        ?float  $referrerInterestAmount,
+    ): void
+    {
+        if (! $autoReconcileReferrer) {
+            return;
+        }
+
+        if ($from->type !== 'referrer_float' || ! $from->referrer_id) {
+            throw ValidationException::withMessages([
+                'auto_reconcile_referrer' => 'Interest reconciliation only applies to transfers out of a referrer float account.',
+            ]);
+        }
+
+        if ($referrerInterestAmount === null || $referrerInterestAmount <= 0) {
+            throw ValidationException::withMessages([
+                'referrer_interest_amount' => 'Enter how much of this transfer is interest to reconcile.',
+            ]);
+        }
+
+        if ($referrerInterestAmount > $amount) {
+            throw ValidationException::withMessages([
+                'referrer_interest_amount' => 'Interest to reconcile cannot be more than the transfer amount.',
+            ]);
+        }
+    }
+
+    /**
+     * Link up to $interestAmount of the transfer to the referrer's pending
+     * float interest, oldest loan first (pending is keyed by loan id).
+     * Never allocates more than a loan's pending amount. Whatever part of
+     * the transfer is not linked is principal.
+     *
+     * Must run after the Transfer row exists. Returns the total linked.
+     */
+    private function reconcileReferrerInterest(Account $from, Transfer $transfer, float $interestAmount): float
+    {
+        $referrer = Referrer::find($from->referrer_id);
+
+        if (! $referrer) {
+            return 0.0;
+        }
+
+        $remaining = $interestAmount;
+
+        foreach ($referrer->pendingFloatInterestByLoan() as $loanId => $pending) {
+            if ($remaining <= 0) {
+                break;
+            }
+
+            $portion = min($remaining, (float) $pending);
+            if ($portion <= 0) {
+                continue;
+            }
+
+            ReferrerFloatReconciliation::create([
+                'user_id'       => Auth::id(),
+                'loan_given_id' => $loanId,
+                'transfer_id'   => $transfer->id,
+                'amount'        => $portion,
+            ]);
+
+            $remaining -= $portion;
+        }
+
+        return $interestAmount - $remaining;
     }
 
     // ── Value date resolution ────────────────────────────────────────────────

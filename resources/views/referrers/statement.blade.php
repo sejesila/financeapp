@@ -47,14 +47,11 @@
 
             {{-- ───────────── Float ───────────── --}}
             <div class="bg-white shadow-xl sm:rounded-lg p-6">
-                <h3 class="text-lg font-semibold text-gray-800">Her float account</h3>
+                <h3 class="text-lg font-semibold text-gray-800">Float Account</h3>
 
                 @if(!$float['account'])
                     <p class="text-sm text-gray-500 mt-2">{{ $referrer->name }} has no float account set up.</p>
                 @else
-                    <p class="text-sm text-gray-500 mb-4">
-                        Money she holds on your behalf. Credit = money into the float, debit = money out of it.
-                    </p>
 
                     @if(abs($float['difference']) > 0.5)
                         <div class="mb-4 bg-amber-50 border-l-4 border-amber-400 p-3 text-sm text-amber-800">
