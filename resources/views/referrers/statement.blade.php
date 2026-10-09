@@ -42,7 +42,7 @@
                     </div>
                 </div>
 
-                @include('referrers.partials.ledger-table', ['rows' => $commission['rows'], 'balanceLabel' => 'Owed', 'empty' => 'No closed loans with commission yet.'])
+                @include('referrers.partials.ledger-table', ['months' => $commission['months'], 'balanceLabel' => 'Owed', 'empty' => 'No closed loans with commission yet.'])
             </div>
 
             {{-- ───────────── Float ───────────── --}}
@@ -72,7 +72,7 @@
                             <div class="font-semibold">KES {{ number_format($float['current_balance'], 0) }}</div></div>
                     </div>
 
-                    @include('referrers.partials.ledger-table', ['rows' => $float['rows'], 'balanceLabel' => 'Balance', 'empty' => 'No movements on the float account yet.'])
+                        @include('referrers.partials.ledger-table', ['months' => $float['months'], 'balanceLabel' => 'Balance', 'empty' => 'No movements on the float account yet.'])
                 @endif
             </div>
         </div>

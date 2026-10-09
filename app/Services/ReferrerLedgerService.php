@@ -117,6 +117,7 @@ class ReferrerLedgerService
         return [
             'account' => $account,
             'rows' => $rows,
+            'months' => $this->groupByMonth($rows),
             'opening' => $opening,
             'total_credits' => $rows->sum('credit'),
             'total_debits' => $rows->sum('debit'),
@@ -270,9 +271,35 @@ class ReferrerLedgerService
 
         return [
             'rows' => $rows,
+            'months' => $this->groupByMonth($rows),
             'total_earned' => $rows->sum('credit'),
             'total_settled' => $rows->sum('debit'),
             'still_owed' => round($running, 2),
         ];
+    }
+
+    // ── MONTHLY GROUPING ────────────────────────────────────────────────────
+
+    /**
+     * Splits rows (already sorted, with running balances) into months, each
+     * with its opening balance, closing balance and totals.
+     */
+    private function groupByMonth(Collection $rows): Collection
+    {
+        return $rows
+            ->groupBy(fn ($row) => $row['date']->format('Y-m'))
+            ->map(function (Collection $group) {
+                $first = $group->first();
+
+                return [
+                    'label'   => $first['date']->format('F Y'),
+                    'opening' => round($first['balance'] - $first['credit'] + $first['debit'], 2),
+                    'closing' => $group->last()['balance'],
+                    'credits' => $group->sum('credit'),
+                    'debits'  => $group->sum('debit'),
+                    'rows'    => $group,
+                ];
+            })
+            ->values();
     }
 }
