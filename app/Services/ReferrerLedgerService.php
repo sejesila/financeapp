@@ -150,8 +150,10 @@ class ReferrerLedgerService
                 'credit' => 0,
                 'debit'  => (float) $tr->amount,
             ] : [
+                // Money coming in sorts first on its day, so it lands before
+                // any loan given or other spending it was meant to fund.
                 'date'   => $date,
-                'sort'   => [$date->format('Y-m-d'), 2, $tr->id, 0],
+                'sort'   => [$date->format('Y-m-d'), 0, $tr->id, 0],
                 'title'  => 'Transfer in: ' . ($tr->fromAccount?->name ?? 'another account')
                     . ($incomingPending ? ' (clears ' . Carbon::parse($tr->value_date)->format('M j') . ')' : ''),
                 'credit' => $incomingPending ? 0 : (float) $tr->amount,
