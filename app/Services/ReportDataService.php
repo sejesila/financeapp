@@ -658,21 +658,35 @@ class ReportDataService
         ];
     }
 
+    /**
+     * Interest recognised in the period, attributed to the date it was booked
+     * (each payment's interest_portion on its payment_date) — the same rule the
+     * Budget page and Loans Given dashboard use, so all three always agree and
+     * a loan closing later doesn't drag earlier months' interest into the
+     * closing month.
+     *
+     * Plus any closed-loan interest that was never attached to a payment row
+     * (legacy loans), attributed to the month the loan closed.
+     */
     private function getLoanGivenInterestIncome(User $user, Carbon $startDate, Carbon $endDate): float
     {
-        // Closed loans: whole-loan interest, attributed to the month they closed.
-        $closedInterest = (float)LoanGiven::where('user_id', $user->id)
-            ->where('status', 'paid')
-            ->whereBetween('repaid_date', [$startDate, $endDate])
-            ->sum('interest_amount');
+        $allPayments = LoanGivenPayment::where('user_id', $user->id)->get();
 
-        // Active loans: interest already recognized via rollover payments this period.
-        $rolloverInterest = (float)LoanGivenPayment::where('user_id', $user->id)
-            ->whereHas('loanGiven', fn($q) => $q->where('status', 'active'))
-            ->whereBetween('payment_date', [$startDate->toDateString(), $endDate->toDateString()])
+        $recognizedByLoan = $allPayments
+            ->groupBy('loan_given_id')
+            ->map(fn($g) => (float)$g->sum('interest_portion'));
+
+        $paymentInterest = (float)$allPayments
+            ->filter(fn($p) => Carbon::parse($p->payment_date)->between($startDate, $endDate))
             ->sum('interest_portion');
 
-        return $closedInterest + $rolloverInterest;
+        $residualInterest = (float)LoanGiven::where('user_id', $user->id)
+            ->where('status', 'paid')
+            ->whereBetween('repaid_date', [$startDate, $endDate])
+            ->get()
+            ->sum(fn($l) => max(0, (float)$l->interest_amount - ($recognizedByLoan[$l->id] ?? 0)));
+
+        return $paymentInterest + $residualInterest;
     }
     /**
      * Loans-given dashboard stats for an arbitrary period. Same bucketing as

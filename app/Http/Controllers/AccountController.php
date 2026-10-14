@@ -29,6 +29,24 @@ class AccountController extends Controller
         private readonly TopUpService          $topUpService,
         private readonly InterestService       $interestService,
     ) {}
+    private const TOPUP_REVERSAL_WINDOW_MINUTES = 720; // 12 hours
+    /**
+     * Wallets only receive money via transfers. Savings accounts do too, except
+     * the dedicated Etica account, which accepts direct deposits (same
+     * name-based check show() uses).
+     */
+    private function acceptsDirectTopUps(Account $account): bool
+    {
+        if ($account->type === 'wallet') {
+            return false;
+        }
+
+        if ($account->type === 'savings') {
+            return strtolower($account->name) === 'etica';
+        }
+
+        return true;
+    }
 
     // ── index ─────────────────────────────────────────────────────────────────
 
@@ -647,7 +665,7 @@ class AccountController extends Controller
             abort(403);
         }
 
-        if (in_array($account->type, ['wallet', 'savings'])) {
+        if (! $this->acceptsDirectTopUps($account)) {
             return redirect()->route('accounts.index')
                 ->with('error', 'This account can only receive money via transfers.');
         }
@@ -667,14 +685,10 @@ class AccountController extends Controller
             abort(403);
         }
 
-        if (in_array($account->type, ['wallet', 'savings'])) {
-            return redirect()->route('accounts.index')
-                ->with('error', 'This account can only receive money via transfers.');
-        }
-
-        $isClientFund = $request->boolean('is_client_fund');
-
-        if ($isClientFund) {
+        // Client fund recording is handled first: it never creates a transaction
+        // here, it only validates amount/date and hands off to the client fund
+        // form, so it must not be caught by the "transfers only" guard below.
+        if ($request->boolean('is_client_fund')) {
             if ($account->type !== 'savings') {
                 return redirect()->route('accounts.index')
                     ->with('error', 'Client fund recording is only allowed for savings accounts.');
@@ -690,6 +704,11 @@ class AccountController extends Controller
                 'amount'     => $request->amount,
                 'date'       => $request->date,
             ])->with('info', 'Complete the client fund details below.');
+        }
+
+        if (! $this->acceptsDirectTopUps($account)) {
+            return redirect()->route('accounts.index')
+                ->with('error', 'This account can only receive money via transfers.');
         }
 
         $request->validate([
@@ -722,6 +741,7 @@ class AccountController extends Controller
                 'notes'      => $request->description,
             ])->with('info', 'Loans require additional details. Please complete the loan form.');
         }
+
         $transactionDate = Carbon::parse($request->date);
 
         // For savings accounts, deposits are effective the next business day
@@ -774,7 +794,7 @@ class AccountController extends Controller
     {
         if ($account->user_id !== Auth::id()) abort(403);
 
-        if ($transaction->created_at->diffInMinutes(now()) > 720) {
+        if ($transaction->created_at->diffInMinutes(now()) > self::TOPUP_REVERSAL_WINDOW_MINUTES) {
             return redirect()->route('accounts.show', ['account' => $account, 'tab' => 'topups'])
                 ->with('error', 'Top-ups can only be reversed within 12 hours of being recorded.');
         }
@@ -793,7 +813,7 @@ class AccountController extends Controller
     {
         if ($account->user_id !== Auth::id()) abort(403);
 
-        if ($transaction->created_at->diffInMinutes(now()) > 720) {
+        if ($transaction->created_at->diffInMinutes(now()) > self::TOPUP_REVERSAL_WINDOW_MINUTES) {
             return redirect()->route('accounts.show', ['account' => $account, 'tab' => 'topups'])
                 ->with('error', 'Top-ups can only be reversed within 12 hours of being recorded.');
         }
@@ -802,7 +822,6 @@ class AccountController extends Controller
             return redirect()->route('accounts.show', $account)
                 ->with('error', 'Only top-up transactions can be reversed.');
         }
-
 
         $request->validate([
             'reason' => 'nullable|string|max:500',

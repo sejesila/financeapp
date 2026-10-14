@@ -687,7 +687,7 @@ describe('Standard Top-up Functionality', function () {
     });
 });
 
-describe('Reverse Top-up — 6-Hour Window', function () {
+describe('Reverse Top-up — 12-Hour Window', function () {
 
     it('shows the reverse top-up form within 6 hours of creation', function () {
         $user = User::factory()->create();
@@ -720,7 +720,7 @@ describe('Reverse Top-up — 6-Hour Window', function () {
             ->assertViewIs('accounts.reverse-topup');
     });
 
-    it('blocks the reverse top-up form after 6 hours', function () {
+    it('blocks the reverse top-up form after 12 hours', function () {
         $user = User::factory()->create();
         $account = Account::factory()->create([
             'user_id'         => $user->id,
@@ -742,7 +742,7 @@ describe('Reverse Top-up — 6-Hour Window', function () {
             'category_id' => $category->id,
             'amount'      => 500,
             'date'        => now()->toDateString(),
-            'created_at'  => now()->subMinutes(361),
+            'created_at'  => now()->subMinutes(721),
         ]);
 
         $this->actingAs($user)
@@ -751,7 +751,7 @@ describe('Reverse Top-up — 6-Hour Window', function () {
             ->assertSessionHas('error');
     });
 
-    it('blocks the reverse top-up form at exactly 361 minutes', function () {
+    it('blocks the reverse top-up form at exactly 721 minutes', function () {
         $user = User::factory()->create();
         $account = Account::factory()->create([
             'user_id'         => $user->id,
@@ -773,7 +773,7 @@ describe('Reverse Top-up — 6-Hour Window', function () {
             'category_id' => $category->id,
             'amount'      => 500,
             'date'        => now()->toDateString(),
-            'created_at'  => now()->subMinutes(361),
+            'created_at'  => now()->subMinutes(721),
         ]);
 
         $this->actingAs($user)
@@ -782,7 +782,7 @@ describe('Reverse Top-up — 6-Hour Window', function () {
             ->assertSessionHas('error');
     });
 
-    it('allows reversal at exactly 360 minutes (boundary)', function () {
+    it('allows reversal at exactly 720 minutes (boundary)', function () {
         $user = User::factory()->create();
         $account = Account::factory()->create([
             'user_id'         => $user->id,
@@ -804,7 +804,7 @@ describe('Reverse Top-up — 6-Hour Window', function () {
             'category_id' => $category->id,
             'amount'      => 500,
             'date'        => now()->toDateString(),
-            'created_at'  => now()->subMinutes(359),
+            'created_at'  => now()->subMinutes(719),
         ]);
 
         $this->actingAs($user)
@@ -813,7 +813,7 @@ describe('Reverse Top-up — 6-Hour Window', function () {
             ->assertViewIs('accounts.reverse-topup');
     });
 
-    it('executes reversal within 6 hours and soft-deletes the transaction', function () {
+    it('executes reversal within 12 hours and soft-deletes the transaction', function () {
         $user = User::factory()->create();
         $account = Account::factory()->create([
             'user_id'         => $user->id,
@@ -835,7 +835,7 @@ describe('Reverse Top-up — 6-Hour Window', function () {
             'category_id' => $category->id,
             'amount'      => 500,
             'date'        => now()->toDateString(),
-            'created_at'  => now()->subMinutes(5),
+            'created_at'  => now()->subMinutes(13),
         ]);
 
         $this->actingAs($user)
@@ -882,7 +882,7 @@ describe('Reverse Top-up — 6-Hour Window', function () {
         expect((float)$account->current_balance)->toEqual(1000.0);
     });
 
-    it('blocks post reversal after 6 hours even if form was somehow reached', function () {
+    it('blocks post reversal after 12 hours even if form was somehow reached', function () {
         $user = User::factory()->create();
         $account = Account::factory()->create([
             'user_id'         => $user->id,
@@ -904,7 +904,7 @@ describe('Reverse Top-up — 6-Hour Window', function () {
             'category_id' => $category->id,
             'amount'      => 500,
             'date'        => now()->toDateString(),
-            'created_at'  => now()->subHours(7),
+            'created_at'  => now()->subHours(13),
         ]);
 
         $this->actingAs($user)
@@ -937,7 +937,7 @@ describe('Reverse Top-up — 6-Hour Window', function () {
             'category_id' => $category->id,
             'amount'      => 500,
             'date'        => now()->toDateString(),
-            'created_at'  => now()->subHours(8),
+            'created_at'  => now()->subHours(13),
         ]);
 
         $this->actingAs($user)
@@ -1011,7 +1011,7 @@ describe('Reverse Top-up — 6-Hour Window', function () {
             ->assertSessionHas('error', 'Only top-up transactions can be reversed.');
     });
 
-    it('the 6-hour window is based on created_at not the transaction date', function () {
+    it('the 12-hour window is based on created_at not the transaction date', function () {
         $user = User::factory()->create();
         $account = Account::factory()->create([
             'user_id'         => $user->id,
@@ -1033,7 +1033,7 @@ describe('Reverse Top-up — 6-Hour Window', function () {
             'category_id' => $category->id,
             'amount'      => 500,
             'date'        => now()->toDateString(),
-            'created_at'  => now()->subHours(9),
+            'created_at'  => now()->subHours(13),
         ]);
 
         $this->actingAs($user)
