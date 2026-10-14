@@ -847,15 +847,19 @@
                     datasets: [
                         {
                             type: 'bar', label: 'Disbursed', data: t.disbursed,
-                            backgroundColor: 'rgba(59,130,246,0.6)', borderRadius: 4
+                            backgroundColor: 'rgba(37,99,235,0.85)',   // strong blue
+                            borderRadius: 4
                         },
                         {
                             type: 'bar', label: 'Collected', data: t.collected,
-                            backgroundColor: 'rgba(20,184,166,0.6)', borderRadius: 4
+                            backgroundColor: 'rgba(249,115,22,0.85)',  // orange
+                            borderRadius: 4
                         },
                         {
                             type: 'line', label: 'Interest earned', data: t.interest,
-                            borderColor: '#7c3aed', backgroundColor: '#7c3aed',
+                            borderColor: '#15803d', backgroundColor: '#15803d', // dark green
+                            borderWidth: 3, pointRadius: 4, pointHoverRadius: 6,
+                            pointBackgroundColor: '#ffffff', pointBorderColor: '#15803d', pointBorderWidth: 2,
                             tension: 0.3, yAxisID: 'y1'
                         },
                     ],
