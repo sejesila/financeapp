@@ -755,6 +755,7 @@ class LoanGivenController extends Controller implements HasMiddleware
                         // LoanGivenController::reverseInterest() reopens it.
                         $payment->interest_portion = round($newInterestToRecognize, 2);
                         $payment->save();
+                        $loanGiven->updateBalance();
                     }
 
                     $this->applyReferrerDeduction($loanGiven, ($validated['referrer_deducted_before_deposit'] ?? null) === '1');
@@ -984,6 +985,7 @@ class LoanGivenController extends Controller implements HasMiddleware
 
                 $loanGiven->closeAsRepaid($lastPayment?->payment_date);
                 $affectedAccountIds = $this->splitInterestOutOfFinalPayment($loanGiven, $interestAccount);
+                $loanGiven->updateBalance();   // ← add: re-derive principal_paid/balance after interest_portion changes
                 $this->applyReferrerDeduction($loanGiven, $request->boolean('referrer_deducted_before_deposit'));
 
                 DB::commit();
