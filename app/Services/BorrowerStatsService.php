@@ -62,6 +62,14 @@ class BorrowerStatsService
         $maxOverdueDays = $overdueNow->isNotEmpty()
             ? (int) $overdueNow->map(fn ($l) => $l->due_date->diffInDays(now(), true))->max()
             : 0;
+        // Rollovers on loans still open (borrower hasn't cleared it, debt keeps compounding)
+        $activeRollovers = (int) $active->sum('rollover_count');
+// Rollovers on loans that eventually closed (lighter signal: they did pay in the end)
+        $closedRollovers = (int) $paid->sum('rollover_count');
+// Rolled-over loans with no payment received at all
+        $stalledRollovers = $active->filter(
+            fn ($l) => $l->rollover_count > 0 && $l->payments->isEmpty()
+        )->count();
 
         $stats = [
             'loans_count'       => $loans->count(),
@@ -80,6 +88,9 @@ class BorrowerStatsService
             'overdue_now'       => $overdueNow->count(),
             'max_overdue_days'  => $maxOverdueDays,
             'rollovers'         => (int) $loans->sum('rollover_count'),
+            'active_rollovers'  => $activeRollovers,
+            'closed_rollovers'  => $closedRollovers,
+            'stalled_rollovers' => $stalledRollovers,
             'first_loan'        => $loans->min('disbursed_date'),
             'last_loan'         => $loans->max('disbursed_date'),
         ];
@@ -114,10 +125,24 @@ class BorrowerStatsService
         if ($s['late_rate'] >= 50) {
             $score += 10; $why[] = "{$s['late_rate']}% of closed loans were late";
         }
-        if ($s['loans_count'] > 0 && $s['rollovers'] / $s['loans_count'] >= 1) {
-            $score += 10; $why[] = 'Frequently rolls loans over';
+
+        // Rollovers on loans still open: the debt is compounding and unresolved
+        if ($s['active_rollovers'] > 0) {
+            $score += min(45, $s['active_rollovers'] * 20);
+            $why[] = "{$s['active_rollovers']} rollover(s) on loans still open";
         }
-        if ($s['paid_count'] >= 3 && $s['bad_count'] === 0 && $s['overdue_now'] === 0) {
+        // Rolled-over loans where nothing has been received at all
+        if ($s['stalled_rollovers'] > 0) {
+            $score += min(30, $s['stalled_rollovers'] * 15);
+            $why[] = "{$s['stalled_rollovers']} rolled-over loan(s) with no payment received";
+        }
+        // Rollovers on loans that eventually closed: lighter signal
+        if ($s['closed_rollovers'] > 0) {
+            $score += min(15, $s['closed_rollovers'] * 5);
+            $why[] = "{$s['closed_rollovers']} rollover(s) on past loans";
+        }
+
+        if ($s['paid_count'] >= 3 && $s['bad_count'] === 0 && $s['overdue_now'] === 0 && $s['active_rollovers'] === 0) {
             $score -= 10; $why[] = 'Clean record over 3+ repaid loans';
         }
 
