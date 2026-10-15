@@ -9,6 +9,7 @@ use App\Models\LoanGiven;
 use App\Models\LoanGivenPayment;
 use App\Models\Referrer;
 use App\Models\Transaction;
+use App\Services\LoanYieldService;
 use App\Services\TransactionService;
 use Carbon\Carbon;
 use Exception;
@@ -188,6 +189,8 @@ class LoanGivenController extends Controller implements HasMiddleware
                 ->sum(fn($l) => round($l->interest_amount * ($l->referrer_share_percentage / 100), 2));
 
             $netInterest = $totalInterest - $totalTransactionCosts - $referrerCut;
+            $loanYield = app(LoanYieldService::class)
+                ->compute($allLoans, $allPayments, $statsStart, $statsEnd, (float) $netInterest);
 
             // Actual cash collected in the period: partial + full payments.
             $totalReceivedAllTime = LoanGivenPayment::where('user_id', Auth::id())
@@ -253,7 +256,7 @@ class LoanGivenController extends Controller implements HasMiddleware
                 'startDate', 'endDate', 'minYear', 'maxYear', 'accounts',
                 'totalPrincipal', 'totalRepaid', 'totalInterest', 'avgInterestRate', 'repaymentRate',
                 'totalOutstanding', 'totalReceivedAllTime', 'totalTransactionCosts', 'netInterest', 'referrerCut',
-                'statsPeriod', 'statsStart', 'statsEnd', 'statsLabel', 'repaidCount', 'disbursedCount', 'monthlyTrend'
+                'statsPeriod', 'statsStart', 'statsEnd', 'statsLabel', 'repaidCount', 'disbursedCount', 'monthlyTrend','loanYield'
             ));
 
         } catch (ValidationException|AuthorizationException $e) {

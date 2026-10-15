@@ -289,6 +289,7 @@
                                 </div>
                             </div>
                         </div>
+                        @include('loans-given.partials.yield-card')
                     </div>
                     <!-- Monthly Trend -->
                     <div class="mb-6 border border-gray-200 rounded-lg" x-data="{ open: true }">
