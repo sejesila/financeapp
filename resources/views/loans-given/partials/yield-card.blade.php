@@ -18,10 +18,7 @@
                         {{ number_format($loanYield['simple_annualized'], 1) }}%
                     </p>
                     <p class="text-[10px] sm:text-xs leading-tight text-gray-500">
-                        Net of fees, referrer share{{ $loanYield['write_offs'] > 0 ? ' & write-offs' : '' }}.
-                        Avg out: KES {{ number_format($loanYield['avg_capital'], 0) }}
-                        over {{ $loanYield['days'] }}d
-                        ({{ number_format($loanYield['period_return_pct'], 2) }}% for the period).
+                        Avg KES {{ number_format($loanYield['avg_capital'], 0) }} out over {{ $loanYield['days'] }}d
                     </p>
                     @if($loanYield['short_period'])
                         <p class="text-[10px] sm:text-xs leading-tight text-amber-600 mt-0.5">
