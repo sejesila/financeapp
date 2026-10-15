@@ -184,6 +184,7 @@
         /* ── Print overrides ─────────────────────────────────────────── */
         @media print {
             .print-bar { display: none !important; }
+            .sm-yield  { display: none !important; }
             body { padding: 0; }
             .page { max-width: 100%; padding: 20px 30px 40px; }
             table { font-size: 10pt; }
@@ -265,6 +266,34 @@
         Kindly see below your {{ $account->name }} statement showing account status
         as at {{ $to->format('F d, Y') }}.
     </p>
+
+    {{-- ── Personal yield summary (screen only; omitted from the PDF download
+         so it can't be mistaken for something Etica issued) ──────────── --}}
+    @if(!empty($yield) && ! request()->boolean('download'))
+        <div class="sm-yield" style="display:flex; gap:24px; flex-wrap:wrap; font-family:Arial,sans-serif;
+             font-size:10pt; background:#f7f9fb; border:1px solid #dde3ec; border-radius:6px;
+             padding:10px 14px; margin:12px 18px 16px;">
+            <div>
+                <div style="font-size:8pt;color:#888">AVG BALANCE</div>
+                <strong>{{ number_format($yield['avg_balance'], 0) }}</strong>
+            </div>
+            <div>
+                <div style="font-size:8pt;color:#888">YOUR RETURN (AFTER WHT &amp; FEES)</div>
+                <strong>{{ number_format($yield['net_annualized'], 2) }}%</strong>
+            </div>
+            <div>
+                <div style="font-size:8pt;color:#888">AFTER WHT, BEFORE FEES</div>
+                <strong>{{ number_format($yield['gross_annualized'], 2) }}%</strong>
+            </div>
+            <div>
+                <div style="font-size:8pt;color:#888">ETICA-COMPARABLE (PRE-WHT)</div>
+                <strong>{{ number_format($yield['pre_wht_annualized'], 2) }}%</strong>
+            </div>
+            <div style="font-size:8pt;color:#888;align-self:center">
+                Annualized, based on {{ $yield['days'] }} days
+            </div>
+        </div>
+    @endif
 
     {{-- ── Statement Table ─────────────────────────────────────────────── --}}
     <table>

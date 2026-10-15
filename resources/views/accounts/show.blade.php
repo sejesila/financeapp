@@ -891,11 +891,13 @@
                         const periodLabel = doc.querySelector('.sm-period-label')?.textContent?.trim() ?? '';
                         const dataMonth  = doc.querySelector('[data-month]')?.dataset?.month           ?? '';
 
-                        // Grab the nav bar and table rendered inside statement.blade.php
+                        // Grab the nav bar, yield summary and table rendered inside statement.blade.php
                         const navEl   = doc.querySelector('.sm-month-nav');
+                        const yieldEl = doc.querySelector('.sm-yield');
                         const tableEl = doc.querySelector('table');
 
                         const navHTML   = navEl   ? navEl.outerHTML   : '';
+                        const yieldHTML = yieldEl ? yieldEl.outerHTML : '';
                         const tableHTML = tableEl ? tableEl.outerHTML
                             : '<p style="color:#888;text-align:center;padding:32px">No transactions found.</p>';
 
@@ -911,6 +913,7 @@
                             </div>
                         </div>
                         ${navHTML}
+                        ${yieldHTML}
                         <div class="sm-table-wrap">${tableHTML}</div>
                     `;
 
@@ -1147,6 +1150,7 @@
             #smContent .sm-month-nav button  { background:#1e2535; border-color:#2d3748; color:#93c5fd; }
             #smContent .sm-month-nav button:hover { background:#263050; border-color:#93c5fd; }
             #smContent .sm-month-nav span    { color:#93c5fd; }
+            #smContent .sm-yield             { background:#1a2237 !important; border-color:#2d3748 !important; color:#e2e8f0; }
         }
     </style>
 </x-app-layout>

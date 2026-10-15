@@ -9,6 +9,7 @@ use Illuminate\Support\Collection;
 
 class StatementDataService
 {
+    private const WITHHOLDING_TAX = 0.15;
     /**
      * Build the full statement data array for a given account and date range.
      * This is the single source of truth used by the controller, the Etica
@@ -35,6 +36,7 @@ class StatementDataService
             'totalInterest'   => $totalInterest,
             'closingBalance'  => $closingBalance,
         ] = $this->buildRunningBalance($merged, $openingBalance);
+        $yield = $this->computeYield($merged, $openingBalance, $from, $to, $totalInterest);
 
         return [
             'from'            => $from,
@@ -45,6 +47,47 @@ class StatementDataService
             'totalInflow'     => $totalInflow,
             'totalWithdrawal' => $totalWithdrawal,
             'totalInterest'   => $totalInterest,
+            'yield' => $yield,
+        ];
+    }
+    private function computeYield(Collection $merged, float $opening, Carbon $from, Carbon $to, float $interest): ?array
+    {
+        // Net principal movement per day (interest excluded, so the base isn't inflated by compounding)
+        $changes = [];
+        $fees    = 0.0;
+        foreach ($merged as $i) {
+            $day = Carbon::parse($i['sort_date'])->toDateString();
+            $changes[$day] = ($changes[$day] ?? 0) + ($i['inflow'] ?? 0) - ($i['withdrawal'] ?? 0);
+            if (! empty($i['is_fee'])) {
+                $fees += (float) $i['withdrawal'];
+            }
+        }
+
+        // Average end-of-day balance across every day in the period
+        $balance = $opening;
+        $sum     = 0.0;
+        $days    = 0;
+        for ($d = $from->copy()->startOfDay(); $d->lte($to); $d->addDay()) {
+            $balance += $changes[$d->toDateString()] ?? 0;
+            $sum     += $balance;
+            $days++;
+        }
+
+        $avg = $days > 0 ? $sum / $days : 0;
+        if ($avg <= 0 || $interest <= 0) {
+            return null;
+        }
+
+        $annualize = fn (float $amount) => (pow(1 + $amount / $avg, 365 / $days) - 1) * 100;
+
+        return [
+            'days'                 => $days,
+            'avg_balance'          => $avg,
+            'fees'                 => $fees,
+            'gross_annualized'     => $annualize($interest),
+            'net_annualized'       => $annualize($interest - $fees),
+            // Comparable to Etica's published figure (gross of withholding tax)
+            'pre_wht_annualized'   => $annualize($interest / (1 - self::WITHHOLDING_TAX)),
         ];
     }
 
@@ -147,6 +190,7 @@ class StatementDataService
                     'source'           => 'txn',
                     // Group key used only for display consolidation, applied AFTER running balance is built
                     'interest_group'   => $isInterest ? substr($txn->date, 0, 7) : null,
+                    'is_fee' => (bool) ($txn->is_transaction_fee ?? false),
                 ];
             })
             ->values();
