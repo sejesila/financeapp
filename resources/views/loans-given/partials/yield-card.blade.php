@@ -1,7 +1,7 @@
 {{-- resources/views/loans-given/partials/yield-card.blade.php
      Include inside the stats grid:  @include('loans-given.partials.yield-card')
      Expects $loanYield (array|null) and $statsLabel. --}}
-<div class="bg-gradient-to-br from-cyan-50 to-cyan-100 overflow-hidden shadow-sm rounded-lg border border-cyan-200">
+<div class="col-span-2 lg:col-span-3 bg-gradient-to-br from-cyan-50 to-cyan-100 overflow-hidden shadow-sm rounded-lg border border-cyan-200">
     <div class="p-3 sm:p-4">
         <div class="flex items-center">
             <div class="hidden sm:block flex-shrink-0 bg-cyan-600 rounded-lg p-3">

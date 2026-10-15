@@ -88,7 +88,7 @@
                     </div>
 
                     <!-- Statistics Dashboard -->
-                    <div class="col-span-2 lg:col-span-3 bg-gradient-to-br from-cyan-50 to-cyan-100 overflow-hidden shadow-sm rounded-lg border border-cyan-200">
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
                         <!-- Total Outstanding -->
                         <div
                             class="bg-gradient-to-br from-indigo-50 to-indigo-100 overflow-hidden shadow-sm rounded-lg border border-indigo-200">
