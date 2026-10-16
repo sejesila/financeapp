@@ -109,6 +109,7 @@
                     </div>
                 </div>
             </div>
+                @include('referrers.partials.loan-stats')
 
             <!-- Referred Loans -->
             <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg mb-6">

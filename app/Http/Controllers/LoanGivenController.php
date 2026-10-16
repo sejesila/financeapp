@@ -9,7 +9,7 @@ use App\Models\LoanGiven;
 use App\Models\LoanGivenPayment;
 use App\Models\Referrer;
 use App\Models\Transaction;
-use App\Services\LoanYieldService;
+use App\Services\LoanBookStatsService;
 use App\Services\TransactionService;
 use Carbon\Carbon;
 use Exception;
@@ -103,112 +103,31 @@ class LoanGivenController extends Controller implements HasMiddleware
             // ── Stats period (independent of the paid-list "period" filter) ───
             $statsPeriod = $request->get('stats_period', 'this_month');
 
-            [$statsStart, $statsEnd] = match ($statsPeriod) {
-                'this_month' => [now()->startOfMonth(), now()->endOfMonth()],
-                'last_month' => [now()->subMonthNoOverflow()->startOfMonth(), now()->subMonthNoOverflow()->endOfMonth()],
-                'this_year'  => [now()->startOfYear(), now()->endOfYear()],
-                'last_year'  => [now()->subYear()->startOfYear(), now()->subYear()->endOfYear()],
-                'custom'     => [
-                    $request->filled('stats_start') ? Carbon::parse($request->stats_start)->startOfDay() : null,
-                    $request->filled('stats_end')   ? Carbon::parse($request->stats_end)->endOfDay()     : null,
-                ],
-                default      => [null, null],
-            };
-
-            $statsLabel = match ($statsPeriod) {
-                'this_month' => 'This month',
-                'last_month' => 'Last month',
-                'this_year'  => 'This year',
-                'last_year'  => 'Last year',
-                'custom'     => 'Custom range',
-                default      => 'All-time',
-            };
-
-            $inRange = fn($date) => $date !== null
-                && (!$statsStart || Carbon::parse($date)->gte($statsStart))
-                && (!$statsEnd   || Carbon::parse($date)->lte($statsEnd));
+            [$statsStart, $statsEnd, $statsLabel] = LoanBookStatsService::resolvePeriod(
+                $statsPeriod,
+                $request->get('stats_start'),
+                $request->get('stats_end')
+            );
 
             $allLoans = LoanGiven::where('user_id', Auth::id())->get();
             $paidLoansCollection = $allLoans->where('status', 'paid');
-
-            // Loans disbursed in the period / closed in the period
-            $disbursedInRange = $allLoans->filter(fn($l) => $inRange($l->disbursed_date));
-            $paidInRange      = $paidLoansCollection->filter(fn($l) => $inRange($l->repaid_date));
-
-            $totalPrincipal = $disbursedInRange->sum(fn($l) => $l->original_principal);
-            $totalRepaid    = $paidInRange->sum('amount_paid');
-
-            // ── Interest: attributed to the month it was RECOGNISED ──────────
-            // Every payment's interest_portion is booked as its own "Loan Interest"
-            // transaction on the payment date (rollover payments at the time they
-            // are recorded, the closing payment when the loan closes). Counting it
-            // by payment_date therefore matches the Budget page exactly, and a
-            // loan's status no longer changes which month its interest falls in.
-            //
-            // Previously a closed loan's whole lifetime interest_amount was counted
-            // in the month it closed, while rollover interest was counted only for
-            // loans still active — so once a loan closed, interest recognised in
-            // earlier months jumped into the closing month.
             $allPayments = LoanGivenPayment::where('user_id', Auth::id())->get();
 
+            // All the headline numbers (principal, repaid, interest, costs,
+            // referrer cut, net interest, yield, rates...) come from the shared
+            // service, so the referrer page uses the exact same rules.
+            $stats = app(LoanBookStatsService::class)
+                ->compute($allLoans, $allPayments, $statsStart, $statsEnd);
+
+            // ── Monthly trend (trailing 12 months, independent of stats period) ───
+            // Same interest-recognition rule as the service: payments' interest_portion
+            // by payment month, plus any legacy residual on closed loans by closing month.
             $recognizedByLoan = $allPayments
                 ->groupBy('loan_given_id')
                 ->map(fn($g) => (float)$g->sum('interest_portion'));
 
-            // Closed-loan interest not attached to any payment row (legacy loans
-            // closed before interest_portion was synced). Falls in the closing month.
             $residualInterest = fn($l) => max(0, (float)$l->interest_amount - ($recognizedByLoan[$l->id] ?? 0));
 
-            $totalInterest = $allPayments
-                    ->filter(fn($p) => $inRange($p->payment_date))
-                    ->sum('interest_portion')
-                + $paidInRange->sum($residualInterest);
-
-            // Snapshot, not period-based
-            $totalOutstanding = $activeLoans->sum('outstanding_amount');
-
-            // Transaction costs paid out to disburse the loans disbursed in the
-            // period (M-Pesa/bank/etc fees), pulled from the linked fee
-            // transactions on each loan's disbursement.
-            $disbursementTransactionIds = $disbursedInRange->pluck('disbursement_transaction_id')->filter()->values();
-
-            $totalTransactionCosts = $disbursementTransactionIds->isNotEmpty()
-                ? Transaction::where('is_transaction_fee', true)
-                    ->whereIn('fee_for_transaction_id', $disbursementTransactionIds)
-                    ->sum('amount')
-                : 0;
-
-            // Referrer share still OWED on loans closed in the period: not yet
-            // included in a payout, and not already kept by the referrer before
-            // depositing.
-            $referrerCut = $paidInRange
-                ->filter(fn($l) => $l->referrer_id
-                    && $l->referrer_share_percentage !== null
-                    && !$l->referrer_payout_id
-                    && !$l->referrer_deducted_before_deposit)
-                ->sum(fn($l) => round($l->interest_amount * ($l->referrer_share_percentage / 100), 2));
-
-            $netInterest = $totalInterest - $totalTransactionCosts - $referrerCut;
-            $loanYield = app(LoanYieldService::class)
-                ->compute($allLoans, $allPayments, $statsStart, $statsEnd, (float) $netInterest);
-
-            // Actual cash collected in the period: partial + full payments.
-            $totalReceivedAllTime = LoanGivenPayment::where('user_id', Auth::id())
-                ->when($statsStart, fn($q) => $q->whereDate('payment_date', '>=', $statsStart))
-                ->when($statsEnd, fn($q) => $q->whereDate('payment_date', '<=', $statsEnd))
-                ->sum('amount');
-
-            $loansWithInterest = $paidInRange->filter(fn($loan) => $loan->interest_amount > 0);
-            $avgInterestRate = $loansWithInterest->isNotEmpty()
-                ? $loansWithInterest->avg('interest_rate')
-                : 0;
-
-            // Of the loans disbursed in the period, how many are now paid.
-            $disbursedCount = $disbursedInRange->count();
-            $repaidCount    = $disbursedInRange->where('status', 'paid')->count();
-            $repaymentRate  = $disbursedCount > 0 ? ($repaidCount / $disbursedCount) * 100 : 0;
-
-            // ── Monthly trend (trailing 12 months, independent of stats period) ───
             $trendStart = now()->startOfMonth()->subMonths(11);
             $monthKey   = fn($date) => Carbon::parse($date)->format('Y-m');
 
@@ -224,7 +143,6 @@ class LoanGivenController extends Controller implements HasMiddleware
                 ->groupBy(fn($p) => $monthKey($p->payment_date))
                 ->map(fn($g) => $g->sum('amount'));
 
-            // Interest in the month it was recognised (same rule as $totalInterest).
             $paymentInterestByMonth = $trendPayments
                 ->groupBy(fn($p) => $monthKey($p->payment_date))
                 ->map(fn($g) => $g->sum('interest_portion'));
@@ -254,10 +172,8 @@ class LoanGivenController extends Controller implements HasMiddleware
             return view('loans-given.index', compact(
                 'activeLoans', 'paidLoans', 'filter', 'period', 'sort', 'referrerId', 'referrers',
                 'startDate', 'endDate', 'minYear', 'maxYear', 'accounts',
-                'totalPrincipal', 'totalRepaid', 'totalInterest', 'avgInterestRate', 'repaymentRate',
-                'totalOutstanding', 'totalReceivedAllTime', 'totalTransactionCosts', 'netInterest', 'referrerCut',
-                'statsPeriod', 'statsStart', 'statsEnd', 'statsLabel', 'repaidCount', 'disbursedCount', 'monthlyTrend','loanYield'
-            ));
+                'statsPeriod', 'statsStart', 'statsEnd', 'statsLabel', 'monthlyTrend'
+            ))->with($stats);
 
         } catch (ValidationException|AuthorizationException $e) {
             // Let Laravel's normal handling take over (redirect-with-errors / 403).

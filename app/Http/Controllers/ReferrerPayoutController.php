@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Account;
 use App\Models\Category;
+use App\Models\LoanGivenPayment;
 use App\Models\Referrer;
 use App\Models\ReferrerFloatReconciliation;
 use App\Models\ReferrerPayout;
+use App\Services\LoanBookStatsService;
 use App\Services\TransactionService;
 use Exception;
 use Illuminate\Http\Request;
@@ -191,12 +193,26 @@ class ReferrerPayoutController extends Controller
             return back()->with('error', 'Payout failed: ' . $e->getMessage());
         }
     }
-    public function show(Referrer $referrer)
+    public function show(Request $request, Referrer $referrer, LoanBookStatsService $stats)
     {
         $this->authorize('view', $referrer);
 
         $referrer->load(['payouts.account', 'payouts.loans']);
 
-        return view('referrers.show', compact('referrer'));
+        $statsPeriod = $request->get('stats_period', 'this_month');
+        [$statsStart, $statsEnd, $statsLabel] = LoanBookStatsService::resolvePeriod(
+            $statsPeriod, $request->get('stats_start'), $request->get('stats_end')
+        );
+
+        $loans    = $referrer->loans()->get();
+        $payments = LoanGivenPayment::where('user_id', Auth::id())
+            ->whereIn('loan_given_id', $loans->pluck('id'))
+            ->get();
+
+        $loanStats = $stats->compute($loans, $payments, $statsStart, $statsEnd);
+
+        return view('referrers.show', compact(
+            'referrer', 'loanStats', 'statsPeriod', 'statsStart', 'statsEnd', 'statsLabel'
+        ));
     }
 }
