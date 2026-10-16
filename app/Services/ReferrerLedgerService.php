@@ -16,8 +16,12 @@ use Illuminate\Support\Collection;
  * Builds two statements for a referrer, each with credits, debits, a running
  * balance and a short title on every line:
  *
- *  1. floatLedger()      – real money moving in/out of her float account,
- *                          also split into principal / interest / other.
+ *  1. floatLedger()      – real money moving in/out of her float account, plus
+ *                          two focused ledgers carved out of it:
+ *                            • principal: repayments of FULLY PAID loans that
+ *                              landed in her float, less principal she sent back
+ *                            • interest: interest earned on partially or fully
+ *                              paid loans, less commission paid / interest sent back
  *  2. commissionLedger() – her referral cut: earned vs. paid/kept vs. still owed.
  */
 class ReferrerLedgerService
@@ -32,7 +36,6 @@ class ReferrerLedgerService
 
     private const PRINCIPAL = 'principal';
     private const INTEREST  = 'interest';
-    private const OTHER     = 'other';
 
     // ── 1. FLOAT ACCOUNT LEDGER ─────────────────────────────────────────────
 
@@ -50,7 +53,6 @@ class ReferrerLedgerService
             ->get();
 
         $txnIds = $txns->pluck('id');
-        $byId   = $txns->keyBy('id');
 
         $paymentsByTxn = LoanGivenPayment::with('loanGiven')
             ->whereIn('transaction_id', $txnIds)->get()->keyBy('transaction_id');
@@ -98,7 +100,7 @@ class ReferrerLedgerService
                 'title'     => $title,
                 'credit'    => $effect > 0 ? $effect : 0,
                 'debit'     => $effect < 0 ? -$effect : 0,
-                'component' => $this->componentFor($t, $cat, $byId),
+                'component' => $this->componentFor($t, $cat, $paymentsByTxn),
             ]);
         }
 
@@ -122,19 +124,18 @@ class ReferrerLedgerService
         $closing = round($running, 2);
         $current = (float) $account->current_balance;
 
-        // Same rows, split into three running balances. Opening balance goes to
-        // principal; the three closings always add up to $closing.
-        $byComponent = [
-            self::PRINCIPAL => $this->componentLedger($rows, self::PRINCIPAL, 'Principal', $opening),
-            self::INTEREST  => $this->componentLedger($rows, self::INTEREST,  'Interest',  0.0),
-            self::OTHER     => $this->componentLedger($rows, self::OTHER,     'Other',     0.0),
-        ];
-
         return [
             'account' => $account,
+            // Everything that moved through the account, unfiltered.
             'rows' => $rows,
             'months' => $this->groupByMonth($rows),
-            'by_component' => $byComponent,
+            // The two focused ledgers. Rows not tagged principal/interest
+            // (capital you put in, loans given out, fees) only appear in the
+            // full activity above.
+            'by_component' => [
+                self::PRINCIPAL => $this->componentLedger($rows, self::PRINCIPAL, 'Principal'),
+                self::INTEREST  => $this->componentLedger($rows, self::INTEREST,  'Interest'),
+            ],
             'opening' => $opening,
             'total_credits' => $rows->sum('credit'),
             'total_debits' => $rows->sum('debit'),
@@ -146,33 +147,37 @@ class ReferrerLedgerService
     }
 
     /**
-     * Which bucket a float transaction belongs to. Change the mapping here if
-     * you'd rather classify anything differently.
+     * Which focused ledger (if any) a float transaction belongs to.
+     *
+     *  - Loan Recovery  → principal, but ONLY when the loan is fully paid
+     *                     (status 'paid'). Repayments on still-active loans
+     *                     stay out of the principal ledger until the loan closes.
+     *  - Loan Interest  → interest, whether the loan is partially or fully paid.
+     *  - Referrer Commission (paid out of the float) → interest.
+     *  - Everything else (loans given, fees, capital in) → null: shows in the
+     *    full account activity only.
      */
-    private function componentFor(Transaction $t, ?string $cat, Collection $byId): string
+    private function componentFor(Transaction $t, ?string $cat, Collection $paymentsByTxn): ?string
     {
-        // A fee follows whatever it was charged for.
         if ($t->is_transaction_fee) {
-            $parent = $t->fee_for_transaction_id ? $byId->get($t->fee_for_transaction_id) : null;
-
-            return $parent
-                ? $this->componentFor($parent, $parent->category?->name, $byId)
-                : self::OTHER;
+            return null;
         }
 
         return match ($cat) {
-            'Loan Recovery', 'Friend Loan Given'   => self::PRINCIPAL,
+            'Loan Recovery' => $paymentsByTxn->get($t->id)?->loanGiven?->status === 'paid'
+                ? self::PRINCIPAL
+                : null,
             'Loan Interest', 'Referrer Commission' => self::INTEREST,
-            default                                => self::OTHER,
+            default => null,
         };
     }
 
     /**
-     * Running-balance ledger for a single bucket (principal / interest / other).
+     * Running-balance ledger for one focused bucket. Starts from zero.
      */
-    private function componentLedger(Collection $rows, string $key, string $label, float $opening): array
+    private function componentLedger(Collection $rows, string $key, string $label): array
     {
-        $running = $opening;
+        $running = 0.0;
 
         $sub = $rows->where('component', $key)->values()->map(function ($row) use (&$running) {
             $running += $row['credit'] - $row['debit'];
@@ -182,7 +187,6 @@ class ReferrerLedgerService
 
         return [
             'label'   => $label,
-            'opening' => $opening,
             'rows'    => $sub,
             'months'  => $this->groupByMonth($sub),
             'credits' => $sub->sum('credit'),
@@ -237,8 +241,11 @@ class ReferrerLedgerService
                     ]);
                 }
 
-                // Anything not covered by a reconciliation row (e.g. older
-                // transfers, or amounts not tied to a loan) goes to Other.
+                // Older remittances (before principal/interest tagging) only ever
+                // reconciled interest, so whatever part of the transfer isn't
+                // covered by a reconciliation row was principal going back to you.
+                // To keep such leftovers out of the principal ledger instead,
+                // change 'component' below to null.
                 $rest = round((float) $tr->amount - array_sum($split->all()), 2);
 
                 if ($rest > 0.005) {
@@ -248,7 +255,7 @@ class ReferrerLedgerService
                         'title'     => "Remitted to {$dest}",
                         'credit'    => 0,
                         'debit'     => $rest,
-                        'component' => self::OTHER,
+                        'component' => self::PRINCIPAL,
                     ]);
                 }
 
@@ -269,7 +276,7 @@ class ReferrerLedgerService
                     . ($incomingPending ? ' (clears ' . Carbon::parse($tr->value_date)->format('M j') . ')' : ''),
                 'credit'    => $incomingPending ? 0 : (float) $tr->amount,
                 'debit'     => 0,
-                'component' => self::PRINCIPAL, // money you fund her float with is capital
+                'component' => null, // capital you fund her float with: full activity only
             ]);
         }
 

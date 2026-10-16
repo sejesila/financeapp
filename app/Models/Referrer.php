@@ -133,6 +133,7 @@ class Referrer extends Model
             ->join('loan_given_payments', 'transactions.reference_id', '=', 'loan_given_payments.id')
             ->join('loans_given', 'loan_given_payments.loan_given_id', '=', 'loans_given.id')
             ->where('loans_given.referrer_id', $this->id)
+            ->where('loans_given.status', 'paid')
             ->where('transactions.account_id', $floatAccount->id)
             ->where('categories.name', 'Loan Interest')
             ->whereNull('transactions.deleted_at')

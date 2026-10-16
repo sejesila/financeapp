@@ -61,7 +61,7 @@
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 text-sm">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 text-sm">
                             <div class="bg-gray-50 rounded-lg p-3">
                                 <div class="text-gray-500">Interest held</div>
                                 <div class="text-lg font-semibold text-green-700">KES {{ number_format($totals['interest'], 0) }}</div>
@@ -70,10 +70,7 @@
                                 <div class="text-gray-500">Principal held</div>
                                 <div class="text-lg font-semibold text-indigo-700">KES {{ number_format($totals['principal'], 0) }}</div>
                             </div>
-                            <div class="bg-gray-50 rounded-lg p-3">
-                                <div class="text-gray-500">Not tied to a loan</div>
-                                <div class="text-lg font-semibold text-gray-700">KES {{ number_format($totals['other'], 0) }}</div>
-                            </div>
+
                         </div>
 
                         @if($pendingLoans->isEmpty())

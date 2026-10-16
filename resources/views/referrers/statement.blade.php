@@ -48,9 +48,6 @@
             {{-- ───────────── Float ───────────── --}}
             <div class="bg-white shadow-xl sm:rounded-lg p-6">
                 <h3 class="text-lg font-semibold text-gray-800">Float Account</h3>
-                <p class="text-sm text-gray-500 mb-4">
-                    Split into principal (your capital she's holding), interest (earned on loans), and anything not tied to a loan.
-                </p>
 
                 @if(!$float['account'])
                     <p class="text-sm text-gray-500 mt-2">{{ $referrer->name }} has no float account set up.</p>
@@ -64,33 +61,71 @@
                         </div>
                     @endif
 
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 text-sm">
-                        @foreach($float['by_component'] as $key => $c)
-                            <div class="rounded-lg p-3 {{ $key === 'principal' ? 'bg-indigo-50' : ($key === 'interest' ? 'bg-green-50' : 'bg-gray-50') }}">
-                                <div class="text-gray-500">{{ $c['label'] }} now</div>
-                                <div class="text-lg font-semibold text-gray-900">KES {{ number_format($c['closing'], 0) }}</div>
-                                <div class="text-xs text-gray-400 mt-1">
-                                    in {{ number_format($c['credits'], 0) }} · out {{ number_format($c['debits'], 0) }}
-                                </div>
+                    @php
+                        $principal = $float['by_component']['principal'];
+                        $interest  = $float['by_component']['interest'];
+                    @endphp
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                        <div class="bg-indigo-50 rounded-lg p-3">
+                            <div class="text-gray-500">Principal she holds for you</div>
+                            <div class="text-lg font-semibold text-gray-900">KES {{ number_format($principal['closing'], 0) }}</div>
+                            <div class="text-xs text-gray-400 mt-1">
+                                in {{ number_format($principal['credits'], 0) }} · sent back {{ number_format($principal['debits'], 0) }}
                             </div>
-                        @endforeach
+                        </div>
+                        <div class="bg-green-50 rounded-lg p-3">
+                            <div class="text-gray-500">Interest she holds for you</div>
+                            <div class="text-lg font-semibold text-gray-900">KES {{ number_format($interest['closing'], 0) }}</div>
+                            <div class="text-xs text-gray-400 mt-1">
+                                in {{ number_format($interest['credits'], 0) }} · out {{ number_format($interest['debits'], 0) }}
+                            </div>
+                        </div>
                         <div class="bg-blue-50 rounded-lg p-3">
-                            <div class="text-gray-500">Balance now</div>
+                            <div class="text-gray-500">Float account balance</div>
                             <div class="text-lg font-semibold text-gray-900">KES {{ number_format($float['current_balance'], 0) }}</div>
-                            <div class="text-xs text-gray-400 mt-1">Opening KES {{ number_format($float['opening'], 0) }}</div>
+                            <div class="text-xs text-gray-400 mt-1">everything in the account</div>
                         </div>
                     </div>
+                    <p class="text-xs text-gray-400 mt-2 mb-6">
+                        The account balance also includes the capital you put in, loans she gave out and fees,
+                        which is why it isn't simply principal + interest. Those are in the full activity at the bottom.
+                    </p>
 
-                    @foreach($float['by_component'] as $key => $c)
-                        @if($key !== 'other' || $c['rows']->isNotEmpty())
-                            <h4 class="text-md font-semibold text-gray-800 mt-6 mb-2">{{ $c['label'] }}</h4>
+                    <h4 class="text-md font-semibold text-gray-800 mt-6">Principal</h4>
+                    <p class="text-sm text-gray-500 mb-2">
+                        Repayments of fully paid loans that landed in her float, less principal she has sent back to you.
+                        Repayments on loans that are still active show here once the loan is closed.
+                    </p>
+                    @include('referrers.partials.ledger-table', [
+                        'months'       => $principal['months'],
+                        'balanceLabel' => 'Principal held',
+                        'empty'        => 'No principal from fully paid loans yet.',
+                    ])
+
+                    <h4 class="text-md font-semibold text-gray-800 mt-8">Interest</h4>
+                    <p class="text-sm text-gray-500 mb-2">
+                        Interest earned on partially or fully paid loans, less her commission and any interest she has sent back.
+                    </p>
+                    @include('referrers.partials.ledger-table', [
+                        'months'       => $interest['months'],
+                        'balanceLabel' => 'Interest held',
+                        'empty'        => 'No interest movements yet.',
+                    ])
+
+                    <details class="mt-8">
+                        <summary class="cursor-pointer text-md font-semibold text-gray-800">
+                            Full account activity
+                            <span class="text-sm font-normal text-gray-500">(every movement, unfiltered)</span>
+                        </summary>
+                        <div class="mt-3">
                             @include('referrers.partials.ledger-table', [
-                                'months'       => $c['months'],
-                                'balanceLabel' => $c['label'] . ' held',
-                                'empty'        => 'No ' . strtolower($c['label']) . ' movements yet.',
+                                'months'       => $float['months'],
+                                'balanceLabel' => 'Balance',
+                                'empty'        => 'No movements on the float account yet.',
                             ])
-                        @endif
-                    @endforeach
+                        </div>
+                    </details>
                 @endif
             </div>
         </div>

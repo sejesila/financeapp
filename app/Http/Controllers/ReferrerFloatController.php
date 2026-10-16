@@ -58,11 +58,6 @@ class ReferrerFloatController extends Controller
             'interest'  => round((float) $pendingInterest->sum(), 2),
             'principal' => round((float) $pendingPrincipal->sum(), 2),
         ];
-        // Whatever in the float isn't tied to a loan (opening balance, fees, etc.)
-        $totals['other'] = round(
-            (float) ($floatAccount?->current_balance ?? 0) - $totals['interest'] - $totals['principal'],
-            2
-        );
 
         $destinationAccounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
