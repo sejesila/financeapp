@@ -16,6 +16,7 @@ class ReferrerFloatReconciliation extends Model
         'transfer_id',
         'amount',
         'referrer_payout_id',
+        'component'
     ];
 
     protected $casts = [

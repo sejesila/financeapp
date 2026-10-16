@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\LoanGiven;
 use App\Models\LoanGivenPayment;
 use App\Models\Referrer;
+use App\Models\ReferrerFloatReconciliation;
 use App\Models\ReferrerPayout;
 use App\Models\Transaction;
 use App\Models\Transfer;
@@ -15,7 +16,8 @@ use Illuminate\Support\Collection;
  * Builds two statements for a referrer, each with credits, debits, a running
  * balance and a short title on every line:
  *
- *  1. floatLedger()      – real money moving in/out of her float account.
+ *  1. floatLedger()      – real money moving in/out of her float account,
+ *                          also split into principal / interest / other.
  *  2. commissionLedger() – her referral cut: earned vs. paid/kept vs. still owed.
  */
 class ReferrerLedgerService
@@ -27,6 +29,10 @@ class ReferrerLedgerService
      * right after a remittance. If you see a row for it, set this to true.
      */
     private const TRANSFERS_ALREADY_IN_TRANSACTIONS = false;
+
+    private const PRINCIPAL = 'principal';
+    private const INTEREST  = 'interest';
+    private const OTHER     = 'other';
 
     // ── 1. FLOAT ACCOUNT LEDGER ─────────────────────────────────────────────
 
@@ -44,6 +50,7 @@ class ReferrerLedgerService
             ->get();
 
         $txnIds = $txns->pluck('id');
+        $byId   = $txns->keyBy('id');
 
         $paymentsByTxn = LoanGivenPayment::with('loanGiven')
             ->whereIn('transaction_id', $txnIds)->get()->keyBy('transaction_id');
@@ -86,11 +93,12 @@ class ReferrerLedgerService
                 : [$t->date->format('Y-m-d'), $priority, $t->created_at?->timestamp ?? 0, $t->id];
 
             $rows->push([
-                'date'   => $t->date,
-                'sort'   => $sort,
-                'title'  => $title,
-                'credit' => $effect > 0 ? $effect : 0,
-                'debit'  => $effect < 0 ? -$effect : 0,
+                'date'      => $t->date,
+                'sort'      => $sort,
+                'title'     => $title,
+                'credit'    => $effect > 0 ? $effect : 0,
+                'debit'     => $effect < 0 ? -$effect : 0,
+                'component' => $this->componentFor($t, $cat, $byId),
             ]);
         }
 
@@ -114,10 +122,19 @@ class ReferrerLedgerService
         $closing = round($running, 2);
         $current = (float) $account->current_balance;
 
+        // Same rows, split into three running balances. Opening balance goes to
+        // principal; the three closings always add up to $closing.
+        $byComponent = [
+            self::PRINCIPAL => $this->componentLedger($rows, self::PRINCIPAL, 'Principal', $opening),
+            self::INTEREST  => $this->componentLedger($rows, self::INTEREST,  'Interest',  0.0),
+            self::OTHER     => $this->componentLedger($rows, self::OTHER,     'Other',     0.0),
+        ];
+
         return [
             'account' => $account,
             'rows' => $rows,
             'months' => $this->groupByMonth($rows),
+            'by_component' => $byComponent,
             'opening' => $opening,
             'total_credits' => $rows->sum('credit'),
             'total_debits' => $rows->sum('debit'),
@@ -125,6 +142,52 @@ class ReferrerLedgerService
             'current_balance' => $current,
             // Anything other than ~0 means the ledger and the stored balance disagree.
             'difference' => round($current - $closing, 2),
+        ];
+    }
+
+    /**
+     * Which bucket a float transaction belongs to. Change the mapping here if
+     * you'd rather classify anything differently.
+     */
+    private function componentFor(Transaction $t, ?string $cat, Collection $byId): string
+    {
+        // A fee follows whatever it was charged for.
+        if ($t->is_transaction_fee) {
+            $parent = $t->fee_for_transaction_id ? $byId->get($t->fee_for_transaction_id) : null;
+
+            return $parent
+                ? $this->componentFor($parent, $parent->category?->name, $byId)
+                : self::OTHER;
+        }
+
+        return match ($cat) {
+            'Loan Recovery', 'Friend Loan Given'   => self::PRINCIPAL,
+            'Loan Interest', 'Referrer Commission' => self::INTEREST,
+            default                                => self::OTHER,
+        };
+    }
+
+    /**
+     * Running-balance ledger for a single bucket (principal / interest / other).
+     */
+    private function componentLedger(Collection $rows, string $key, string $label, float $opening): array
+    {
+        $running = $opening;
+
+        $sub = $rows->where('component', $key)->values()->map(function ($row) use (&$running) {
+            $running += $row['credit'] - $row['debit'];
+            $row['balance'] = round($running, 2);
+            return $row;
+        });
+
+        return [
+            'label'   => $label,
+            'opening' => $opening,
+            'rows'    => $sub,
+            'months'  => $this->groupByMonth($sub),
+            'credits' => $sub->sum('credit'),
+            'debits'  => $sub->sum('debit'),
+            'closing' => round($running, 2),
         ];
     }
 
@@ -136,32 +199,77 @@ class ReferrerLedgerService
             ->orderBy('date')->orderBy('id')
             ->get();
 
+        // What each outgoing transfer was reconciled as (principal / interest).
+        $allocByTransfer = ReferrerFloatReconciliation::whereIn('transfer_id', $transfers->pluck('id'))
+            ->get()
+            ->groupBy('transfer_id');
+
         $rows = collect();
 
         foreach ($transfers as $tr) {
             $date = Carbon::parse($tr->date);
             $out = (int) $tr->from_account_id === $accountId;
 
+            if ($out) {
+                $dest = $tr->toAccount?->name ?? 'you';
+
+                $split = ($allocByTransfer->get($tr->id) ?? collect())
+                    ->groupBy('component')
+                    ->map(fn ($g) => (float) $g->sum('amount'));
+
+                $i = 0;
+
+                foreach ([self::PRINCIPAL, self::INTEREST] as $component) {
+                    $amt = (float) ($split[$component] ?? 0);
+
+                    if ($amt <= 0) {
+                        continue;
+                    }
+
+                    $rows->push([
+                        'date'      => $date,
+                        // 4th slot kept numeric so it sorts correctly against fee rows (…, 3, id, 1).
+                        'sort'      => [$date->format('Y-m-d'), 3, $tr->id, $i++ * 0.01],
+                        'title'     => "Remitted to {$dest} ({$component})",
+                        'credit'    => 0,
+                        'debit'     => $amt,
+                        'component' => $component,
+                    ]);
+                }
+
+                // Anything not covered by a reconciliation row (e.g. older
+                // transfers, or amounts not tied to a loan) goes to Other.
+                $rest = round((float) $tr->amount - array_sum($split->all()), 2);
+
+                if ($rest > 0.005) {
+                    $rows->push([
+                        'date'      => $date,
+                        'sort'      => [$date->format('Y-m-d'), 3, $tr->id, $i * 0.01],
+                        'title'     => "Remitted to {$dest}",
+                        'credit'    => 0,
+                        'debit'     => $rest,
+                        'component' => self::OTHER,
+                    ]);
+                }
+
+                continue;
+            }
+
             // Mirrors Account::updateBalance(): incoming transfers don't count
             // until their value_date has arrived.
-            $incomingPending = !$out && $tr->value_date && Carbon::parse($tr->value_date)->isFuture();
+            $incomingPending = $tr->value_date && Carbon::parse($tr->value_date)->isFuture();
 
             // Any transfer fee is its own fee transaction on the account,
             // so it appears as a "Transaction fee" line, not here.
-            $rows->push($out ? [
-                'date'   => $date,
-                'sort'   => [$date->format('Y-m-d'), 3, $tr->id, 0],
-                'title'  => 'Remitted to ' . ($tr->toAccount?->name ?? 'you'),
-                'credit' => 0,
-                'debit'  => (float) $tr->amount,
-            ] : [
+            $rows->push([
                 // Sorts after borrower repayments/interest but before spending.
-                'date'   => $date,
-                'sort'   => [$date->format('Y-m-d'), 1, $tr->id, 0],
-                'title'  => 'Transfer in: ' . ($tr->fromAccount?->name ?? 'another account')
+                'date'      => $date,
+                'sort'      => [$date->format('Y-m-d'), 1, $tr->id, 0],
+                'title'     => 'Transfer in: ' . ($tr->fromAccount?->name ?? 'another account')
                     . ($incomingPending ? ' (clears ' . Carbon::parse($tr->value_date)->format('M j') . ')' : ''),
-                'credit' => $incomingPending ? 0 : (float) $tr->amount,
-                'debit'  => 0,
+                'credit'    => $incomingPending ? 0 : (float) $tr->amount,
+                'debit'     => 0,
+                'component' => self::PRINCIPAL, // money you fund her float with is capital
             ]);
         }
 

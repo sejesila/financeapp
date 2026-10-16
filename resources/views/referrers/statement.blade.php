@@ -48,6 +48,9 @@
             {{-- ───────────── Float ───────────── --}}
             <div class="bg-white shadow-xl sm:rounded-lg p-6">
                 <h3 class="text-lg font-semibold text-gray-800">Float Account</h3>
+                <p class="text-sm text-gray-500 mb-4">
+                    Split into principal (your capital she's holding), interest (earned on loans), and anything not tied to a loan.
+                </p>
 
                 @if(!$float['account'])
                     <p class="text-sm text-gray-500 mt-2">{{ $referrer->name }} has no float account set up.</p>
@@ -61,18 +64,33 @@
                         </div>
                     @endif
 
-                    <div class="grid grid-cols-4 gap-4 mb-4 text-sm">
-                        <div class="bg-gray-50 rounded-lg p-3"><div class="text-gray-500">Opening</div>
-                            <div class="font-semibold">KES {{ number_format($float['opening'], 0) }}</div></div>
-                        <div class="bg-gray-50 rounded-lg p-3"><div class="text-gray-500">Total in</div>
-                            <div class="font-semibold text-green-700">KES {{ number_format($float['total_credits'], 0) }}</div></div>
-                        <div class="bg-gray-50 rounded-lg p-3"><div class="text-gray-500">Total out</div>
-                            <div class="font-semibold text-red-700">KES {{ number_format($float['total_debits'], 0) }}</div></div>
-                        <div class="bg-blue-50 rounded-lg p-3"><div class="text-gray-500">Balance now</div>
-                            <div class="font-semibold">KES {{ number_format($float['current_balance'], 0) }}</div></div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 text-sm">
+                        @foreach($float['by_component'] as $key => $c)
+                            <div class="rounded-lg p-3 {{ $key === 'principal' ? 'bg-indigo-50' : ($key === 'interest' ? 'bg-green-50' : 'bg-gray-50') }}">
+                                <div class="text-gray-500">{{ $c['label'] }} now</div>
+                                <div class="text-lg font-semibold text-gray-900">KES {{ number_format($c['closing'], 0) }}</div>
+                                <div class="text-xs text-gray-400 mt-1">
+                                    in {{ number_format($c['credits'], 0) }} · out {{ number_format($c['debits'], 0) }}
+                                </div>
+                            </div>
+                        @endforeach
+                        <div class="bg-blue-50 rounded-lg p-3">
+                            <div class="text-gray-500">Balance now</div>
+                            <div class="text-lg font-semibold text-gray-900">KES {{ number_format($float['current_balance'], 0) }}</div>
+                            <div class="text-xs text-gray-400 mt-1">Opening KES {{ number_format($float['opening'], 0) }}</div>
+                        </div>
                     </div>
 
-                        @include('referrers.partials.ledger-table', ['months' => $float['months'], 'balanceLabel' => 'Balance', 'empty' => 'No movements on the float account yet.'])
+                    @foreach($float['by_component'] as $key => $c)
+                        @if($key !== 'other' || $c['rows']->isNotEmpty())
+                            <h4 class="text-md font-semibold text-gray-800 mt-6 mb-2">{{ $c['label'] }}</h4>
+                            @include('referrers.partials.ledger-table', [
+                                'months'       => $c['months'],
+                                'balanceLabel' => $c['label'] . ' held',
+                                'empty'        => 'No ' . strtolower($c['label']) . ' movements yet.',
+                            ])
+                        @endif
+                    @endforeach
                 @endif
             </div>
         </div>

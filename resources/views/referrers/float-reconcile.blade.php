@@ -1,6 +1,6 @@
 <x-app-layout>
     <div class="py-12">
-        <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
+        <div class="max-w-6xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg">
                 <div class="p-6">
                     @if(session('success'))
@@ -27,7 +27,7 @@
                         <div>
                             <h2 class="text-2xl font-semibold text-gray-800">Reconcile {{ $referrer->name }}'s Float</h2>
                             <p class="text-sm text-gray-500 mt-1">
-                                Money she's collected on your behalf and is holding — not her own referral commission.
+                                Money she's collected on your behalf and is holding — principal and interest tracked separately. Not her own referral commission.
                             </p>
                         </div>
                         <div class="flex items-center gap-4">
@@ -61,26 +61,44 @@
                             </div>
                         </div>
 
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 text-sm">
+                            <div class="bg-gray-50 rounded-lg p-3">
+                                <div class="text-gray-500">Interest held</div>
+                                <div class="text-lg font-semibold text-green-700">KES {{ number_format($totals['interest'], 0) }}</div>
+                            </div>
+                            <div class="bg-gray-50 rounded-lg p-3">
+                                <div class="text-gray-500">Principal held</div>
+                                <div class="text-lg font-semibold text-indigo-700">KES {{ number_format($totals['principal'], 0) }}</div>
+                            </div>
+                            <div class="bg-gray-50 rounded-lg p-3">
+                                <div class="text-gray-500">Not tied to a loan</div>
+                                <div class="text-lg font-semibold text-gray-700">KES {{ number_format($totals['other'], 0) }}</div>
+                            </div>
+                        </div>
+
                         @if($pendingLoans->isEmpty())
                             <div class="bg-green-50 border-l-4 border-green-400 p-4">
                                 <p class="text-sm text-green-700">
-                                    Nothing pending — every loan of hers with interest in the float has been fully reconciled.
+                                    Nothing pending — every loan of hers with interest or principal in the float has been fully reconciled.
                                 </p>
                             </div>
                         @else
                             <form method="POST" action="{{ route('referrers.float.reconcile', $referrer) }}" class="space-y-6"
                                   x-data="{
                                       allocations: {
-                                          @foreach($pendingLoans as $loan)
-                                              {{ $loan->id }}: 0,
-                                          @endforeach
+                                          interest: { @foreach($pendingLoans as $loan) {{ $loan->id }}: 0, @endforeach },
+                                          principal: { @foreach($pendingLoans as $loan) {{ $loan->id }}: 0, @endforeach },
                                       },
-                                      get total() {
-                                          return Object.values(this.allocations).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
+                                      sum(obj) {
+                                          return Object.values(obj).reduce((s, v) => s + (parseFloat(v) || 0), 0);
                                       },
-                                      fillFull(loanId, pending) {
-                                          this.allocations[loanId] = pending;
-                                      }
+                                      get interestTotal() { return this.sum(this.allocations.interest); },
+                                      get principalTotal() { return this.sum(this.allocations.principal); },
+                                      get total() { return this.interestTotal + this.principalTotal; },
+                                      fill(component, loanId, amount) {
+                                          this.allocations[component][loanId] = amount;
+                                      },
+                                      fRound(n) { return n.toLocaleString('en-US', {maximumFractionDigits: 0}); }
                                   }">
                                 @csrf
 
@@ -89,8 +107,10 @@
                                         <thead class="bg-gray-50">
                                         <tr>
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Borrower</th>
-                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pending in Float</th>
-                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount Covered Now</th>
+                                            @foreach(['Interest', 'Principal'] as $label)
+                                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ $label }} pending</th>
+                                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ $label }} covered now</th>
+                                            @endforeach
                                         </tr>
                                         </thead>
                                         <tbody class="bg-white divide-y divide-gray-200">
@@ -102,32 +122,47 @@
                                                         {{ $loan->status === 'active' ? 'Active loan' : ucfirst($loan->status) }}
                                                     </span>
                                                 </td>
-                                                <td class="px-4 py-3 text-sm text-gray-700">
-                                                    KES {{ number_format($loan->pending_float_interest, 0) }}
-                                                </td>
-                                                <td class="px-4 py-3">
-                                                    <div class="flex items-center gap-2">
-                                                        <input type="number" step="0.01" min="0"
-                                                               max="{{ $loan->pending_float_interest }}"
-                                                               name="allocations[{{ $loan->id }}]"
-                                                               x-model="allocations[{{ $loan->id }}]"
-                                                               class="w-32 rounded-md border-gray-300 shadow-sm text-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                                                        <button type="button"
-                                                                @click="fillFull({{ $loan->id }}, {{ $loan->pending_float_interest }})"
-                                                                class="text-xs text-indigo-600 hover:text-indigo-900 whitespace-nowrap">
-                                                            Fill full amount
-                                                        </button>
-                                                    </div>
-                                                </td>
+
+                                                @foreach(['interest' => $loan->pending_float_interest, 'principal' => $loan->pending_float_principal] as $component => $pending)
+                                                    <td class="px-4 py-3 text-sm text-gray-700">
+                                                        {{ $pending > 0 ? 'KES ' . number_format($pending, 0) : '—' }}
+                                                    </td>
+                                                    <td class="px-4 py-3">
+                                                        @if($pending > 0)
+                                                            <div class="flex items-center gap-2">
+                                                                <input type="number" step="0.01" min="0"
+                                                                       max="{{ $pending }}"
+                                                                       name="allocations[{{ $component }}][{{ $loan->id }}]"
+                                                                       x-model="allocations.{{ $component }}[{{ $loan->id }}]"
+                                                                       class="w-28 rounded-md border-gray-300 shadow-sm text-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                                                                <button type="button"
+                                                                        @click="fill('{{ $component }}', {{ $loan->id }}, {{ $pending }})"
+                                                                        class="text-xs text-indigo-600 hover:text-indigo-900 whitespace-nowrap">
+                                                                    Full
+                                                                </button>
+                                                            </div>
+                                                        @endif
+                                                    </td>
+                                                @endforeach
                                             </tr>
                                         @endforeach
                                         </tbody>
                                     </table>
                                 </div>
 
-                                <div class="bg-gray-50 rounded-lg p-4 flex justify-between items-center">
-                                    <span class="text-sm font-medium text-gray-700">Total being reconciled</span>
-                                    <span class="text-lg font-semibold text-gray-900" x-text="'KES ' + total.toLocaleString('en-US', {maximumFractionDigits: 0})"></span>
+                                <div class="bg-gray-50 rounded-lg p-4 space-y-2">
+                                    <div class="flex justify-between items-center text-sm text-gray-600">
+                                        <span>Interest</span>
+                                        <span x-text="'KES ' + fRound(interestTotal)"></span>
+                                    </div>
+                                    <div class="flex justify-between items-center text-sm text-gray-600">
+                                        <span>Principal</span>
+                                        <span x-text="'KES ' + fRound(principalTotal)"></span>
+                                    </div>
+                                    <div class="flex justify-between items-center border-t border-gray-200 pt-2">
+                                        <span class="text-sm font-medium text-gray-700">Total being reconciled</span>
+                                        <span class="text-lg font-semibold text-gray-900" x-text="'KES ' + fRound(total)"></span>
+                                    </div>
                                 </div>
 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
