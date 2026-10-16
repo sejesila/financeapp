@@ -10,16 +10,14 @@ use Illuminate\Support\Collection;
  * Return on deployed capital for the loans-given book.
  *
  * Mirrors StatementDataService::computeYield(): build a daily series of capital
- * at work, average it, then annualize. The differences from the savings version:
+ * at work and average it. Returns the raw (un-annualized) return for the period.
+ * The differences from the savings version:
  *
  *  - Capital is PRINCIPAL OUT (cash you actually lent and haven't got back),
  *    not a balance that interest compounds into. Capitalized/rolled-over
  *    interest is NOT counted as deployed cash.
  *  - Numerator is NET interest (after disbursement fees and referrer share),
  *    minus principal written off in the period.
- *  - Simple annualization is the headline figure, because loan interest is paid
- *    out, not reinvested. Compound is returned too, but only meaningful if you
- *    really do recycle the proceeds into new loans.
  */
 class LoanYieldService
 {
@@ -126,11 +124,6 @@ class LoanYieldService
         $netAfterLosses = $netInterest - $writeOffs;
         $periodReturn   = $netAfterLosses / $avg;
 
-        $simple   = $periodReturn * (365 / $days) * 100;
-        $compound = (1 + $periodReturn) > 0
-            ? (pow(1 + $periodReturn, 365 / $days) - 1) * 100
-            : null;
-
         return [
             'days'                => $days,
             'avg_capital'         => $avg,
@@ -138,10 +131,6 @@ class LoanYieldService
             'write_offs'          => (float) $writeOffs,
             'at_risk'             => (float) $atRisk,
             'period_return_pct'   => $periodReturn * 100,
-            'simple_annualized'   => $simple,
-            'compound_annualized' => $compound,
-            // Under ~30 days a single loan can swing the annualized figure wildly.
-            'short_period'        => $days < 30,
         ];
     }
 
