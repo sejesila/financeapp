@@ -1,6 +1,6 @@
 {{-- resources/views/loans-given/partials/yield-card.blade.php
-     Include inside the stats grid:  @include('loans-given.partials.yield-card')
-     Expects $loanYield (array|null) and $statsLabel. --}}
+     Include as the last child of the stats grid:  @include('loans-given.partials.yield-card')
+     Expects $loanYield (array|null). --}}
 <div class="col-span-2 lg:col-span-3 bg-gradient-to-br from-cyan-50 to-cyan-100 overflow-hidden shadow-sm rounded-lg border border-cyan-200">
     <div class="p-3 sm:p-4">
         <div class="flex items-center">
@@ -11,22 +11,24 @@
                 </svg>
             </div>
             <div class="sm:ml-4 min-w-0">
-                <p class="text-xs sm:text-sm font-medium text-gray-500 break-words">Return on Capital (annualized)</p>
+                <p class="text-xs sm:text-sm font-medium text-gray-500 break-words">Return on Capital</p>
 
                 @if(!empty($loanYield))
                     <p class="text-base sm:text-lg font-semibold text-gray-900">
-                        {{ number_format($loanYield['simple_annualized'], 1) }}%
+                        {{ number_format($loanYield['period_return_pct'], 1) }}%
                     </p>
                     <p class="text-[10px] sm:text-xs leading-tight text-gray-500">
-                        Avg KES {{ number_format($loanYield['avg_capital'], 0) }} out over {{ $loanYield['days'] }}d
+                        Net interest KES {{ number_format($loanYield['net_interest'], 0) }}
+                        on avg KES {{ number_format($loanYield['avg_capital'], 0) }} out
+                        · {{ $loanYield['days'] }} days
                     </p>
-                    @if($loanYield['short_period'])
-                        <p class="text-[10px] sm:text-xs leading-tight text-amber-600 mt-0.5">
-                            Short window: treat as indicative only.
+                    @if(($loanYield['write_offs'] ?? 0) > 0)
+                        <p class="text-[10px] sm:text-xs leading-tight text-red-600 mt-0.5">
+                            Includes KES {{ number_format($loanYield['write_offs'], 0) }} written off.
                         </p>
                     @endif
                     @if(($loanYield['at_risk'] ?? 0) > 0)
-                        <p class="text-[10px] sm:text-xs leading-tight text-red-600 mt-0.5">
+                        <p class="text-[10px] sm:text-xs leading-tight text-amber-600 mt-0.5">
                             KES {{ number_format($loanYield['at_risk'], 0) }} in defaulted loans not deducted.
                         </p>
                     @endif
