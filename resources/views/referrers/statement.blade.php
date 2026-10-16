@@ -132,6 +132,25 @@
                     </details>
                 @endif
             </div>
+
+            {{-- ───────────── Everything involving her ───────────── --}}
+            <div class="bg-white shadow-xl sm:rounded-lg p-6">
+                <details>
+                    <summary class="cursor-pointer text-lg font-semibold text-gray-800">
+                        Everything involving {{ $referrer->name }}
+                        <span class="text-sm font-normal text-gray-500">({{ $movements['count'] }} movements, on every account)</span>
+                    </summary>
+                    <p class="text-sm text-gray-500 mt-2 mb-4">
+                        Her float account, transfers in and out of it, and every disbursement, repayment, interest and commission
+                        tied to loans she referred, on whichever account it landed. In and Out are from the point of view of the
+                        account shown, so they don't add up to one balance. Use the filter to see only what never passed through her float.
+                    </p>
+                    @include('referrers.partials.movements-table', [
+                        'months' => $movements['months'],
+                        'empty'  => 'No movements found.',
+                    ])
+                </details>
+            </div>
         </div>
     </div>
 </x-app-layout>

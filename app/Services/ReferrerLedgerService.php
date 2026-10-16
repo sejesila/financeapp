@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Account;
 use App\Models\LoanGiven;
 use App\Models\LoanGivenPayment;
 use App\Models\Referrer;
@@ -149,9 +150,8 @@ class ReferrerLedgerService
     /**
      * Which focused ledger (if any) a float transaction belongs to.
      *
-     *  - Loan Recovery  → principal, but ONLY when the loan is fully paid
-     *                     (status 'paid'). Repayments on still-active loans
-     *                     stay out of the principal ledger until the loan closes.
+     *  - Loan Recovery  → principal, on any loan with a payment record
+     *                     (fully or partly paid).
      *  - Loan Interest  → interest, whether the loan is partially or fully paid.
      *  - Referrer Commission (paid out of the float) → interest.
      *  - Everything else (loans given, fees, capital in) → null: shows in the
@@ -414,5 +414,199 @@ class ReferrerLedgerService
                 ];
             })
             ->values();
+    }
+
+    // ── 3. EVERYTHING INVOLVING THE REFERRER ────────────────────────────────
+
+    /**
+     * Every movement that touches this referrer, on ANY account:
+     *  - everything on her float account, plus transfers in and out of it;
+     *  - for loans she referred: the disbursement (and its fee), each repayment,
+     *    each interest row, wherever it landed (float, M-Pesa, bank, ...);
+     *  - her commission payouts.
+     *
+     * Interest rows that were never linked to a payment (reference_id empty) are
+     * matched by borrower name from their description and flagged as such.
+     *
+     * "in" / "out" are from the point of view of the account shown on each row,
+     * so this is a trail to trace money, not a single running balance.
+     */
+    public function allMovements(Referrer $referrer): array
+    {
+        $floatId = $referrer->floatAccount?->id;
+
+        $accountNames = Account::withoutGlobalScopes()
+            ->where('user_id', $referrer->user_id)
+            ->pluck('name', 'id');
+
+        $loans = $referrer->loans()->get()->keyBy('id');
+
+        $payments = $loans->isEmpty()
+            ? collect()
+            : LoanGivenPayment::whereIn('loan_given_id', $loans->keys())->get();
+
+        $paymentsById  = $payments->keyBy('id');
+        $paymentsByTxn = $payments->filter(fn ($p) => $p->transaction_id)->keyBy('transaction_id');
+        $loansByDisb   = $loans->filter(fn ($l) => $l->disbursement_transaction_id)->keyBy('disbursement_transaction_id');
+
+        $payouts = ReferrerPayout::where('referrer_id', $referrer->id)->get();
+
+        $baseIds = $loans->pluck('disbursement_transaction_id')
+            ->merge($payments->pluck('transaction_id'))
+            ->merge($payouts->pluck('transaction_id'))
+            ->filter()->unique()->values();
+
+        $names = $loans->pluck('borrower_name')->filter()->unique()->values();
+
+        $txns = Transaction::with('category')
+            ->where(function ($q) use ($baseIds, $paymentsById, $floatId, $names) {
+                $q->whereIn('id', $baseIds)
+                    ->orWhereIn('fee_for_transaction_id', $baseIds);
+
+                // Interest rows linked to one of her loans' payments.
+                if ($paymentsById->isNotEmpty()) {
+                    $q->orWhere(fn ($i) => $i->whereIn('reference_id', $paymentsById->keys())
+                        ->whereHas('category', fn ($c) => $c->where('name', 'Loan Interest')));
+                }
+
+                // Everything on her float account.
+                if ($floatId) {
+                    $q->orWhere('account_id', $floatId);
+                }
+
+                // Unlinked interest rows, matched by borrower name.
+                if ($names->isNotEmpty()) {
+                    $q->orWhere(fn ($i) => $i->whereNull('reference_id')
+                        ->whereHas('category', fn ($c) => $c->where('name', 'Loan Interest'))
+                        ->where(function ($d) use ($names) {
+                            foreach ($names as $n) {
+                                $d->orWhere('description', 'like', "%{$n}'s loan%");
+                            }
+                        }));
+                }
+            })
+            ->orderBy('date')->orderBy('id')
+            ->get();
+
+        $rows = collect();
+
+        foreach ($txns as $t) {
+            $cat = $t->category?->name;
+            $effect = $this->signedEffect($t);
+
+            $payment = $paymentsByTxn->get($t->id)
+                ?? ($t->reference_id ? $paymentsById->get($t->reference_id) : null);
+
+            $loan = $payment
+                ? $loans->get($payment->loan_given_id)
+                : ($loansByDisb->get($t->id)
+                    ?? ($t->fee_for_transaction_id ? $loansByDisb->get($t->fee_for_transaction_id) : null));
+
+            $descName = preg_match("/(?:earned from|correction for) (.+?)'s loan/", (string) $t->description, $m)
+                ? $m[1]
+                : null;
+
+            $name = $loan?->borrower_name ?? $descName;
+            $unlinked = $cat === 'Loan Interest' && !$payment;
+
+            $title = match (true) {
+                (bool) $t->is_transaction_fee   => 'Transaction fee' . ($name ? " ({$name})" : ''),
+                $cat === 'Loan Recovery'        => 'Principal: ' . ($name ?? 'borrower'),
+                $cat === 'Loan Interest'        => 'Interest: ' . ($name ?? 'borrower') . ($unlinked ? ' (not linked to a payment)' : ''),
+                $cat === 'Friend Loan Given'    => 'Loan given: ' . ($name ?? 'borrower'),
+                $cat === 'Referrer Commission'  => "Commission paid: {$referrer->name}",
+                default                         => $t->description ?: ($effect >= 0 ? 'Money in' : 'Money out'),
+            };
+
+            if ($effect == 0.0 && (float) $t->amount != 0.0) {
+                $title .= ' (not counted)';
+            }
+
+            $order = match (true) {
+                $cat === 'Friend Loan Given'    => 0,
+                (bool) $t->is_transaction_fee   => 3,
+                $cat === 'Referrer Commission'  => 4,
+                default                         => 2,
+            };
+
+            $rows->push([
+                'date'     => $t->date,
+                'sort'     => [$t->date->format('Y-m-d'), $order, $t->id],
+                'account'  => $accountNames[$t->account_id] ?? "#{$t->account_id}",
+                'title'    => $title,
+                'note'     => $t->description && $t->description !== $title ? $t->description : null,
+                'in'       => $effect > 0 ? $effect : 0,
+                'out'      => $effect < 0 ? -$effect : 0,
+                'in_float' => $floatId && (int) $t->account_id === (int) $floatId,
+                'unlinked' => $unlinked,
+            ]);
+        }
+
+        // Transfers in and out of her float.
+        if ($floatId) {
+            $transfers = Transfer::withoutGlobalScopes()
+                ->where(fn ($q) => $q->where('from_account_id', $floatId)->orWhere('to_account_id', $floatId))
+                ->orderBy('date')->orderBy('id')
+                ->get();
+
+            $allocByTransfer = ReferrerFloatReconciliation::whereIn('transfer_id', $transfers->pluck('id'))
+                ->get()
+                ->groupBy('transfer_id');
+
+            foreach ($transfers as $tr) {
+                $date = Carbon::parse($tr->date);
+                $out = (int) $tr->from_account_id === (int) $floatId;
+                $from = $accountNames[$tr->from_account_id] ?? 'account';
+                $to = $accountNames[$tr->to_account_id] ?? 'account';
+
+                $note = null;
+
+                if ($out) {
+                    $split = ($allocByTransfer->get($tr->id) ?? collect())
+                        ->groupBy('component')
+                        ->map(fn ($g) => (float) $g->sum('amount'));
+
+                    $parts = [];
+                    foreach ($split as $component => $amt) {
+                        $parts[] = "{$component} " . number_format($amt, 0);
+                    }
+
+                    $rest = round((float) $tr->amount - array_sum($split->all()), 2);
+                    if ($rest > 0.005) {
+                        $parts[] = 'not allocated ' . number_format($rest, 0);
+                    }
+
+                    $note = implode(' · ', $parts) ?: null;
+                }
+
+                $rows->push([
+                    'date'     => $date,
+                    'sort'     => [$date->format('Y-m-d'), 1, $tr->id],
+                    'account'  => "{$from} → {$to}",
+                    'title'    => $out ? "Remitted to {$to}" : "Transfer in from {$from}",
+                    'note'     => $note ?? ($tr->description ?: null),
+                    'in'       => $out ? 0 : (float) $tr->amount,
+                    'out'      => $out ? (float) $tr->amount : 0,
+                    'in_float' => true,
+                    'unlinked' => false,
+                ]);
+            }
+        }
+
+        $rows = $rows->sortBy('sort')->values();
+
+        $months = $rows
+            ->groupBy(fn ($row) => $row['date']->format('Y-m'))
+            ->map(fn (Collection $g) => [
+                'label' => $g->first()['date']->format('F Y'),
+                'rows'  => $g,
+            ])
+            ->values();
+
+        return [
+            'rows'   => $rows,
+            'months' => $months,
+            'count'  => $rows->count(),
+        ];
     }
 }
