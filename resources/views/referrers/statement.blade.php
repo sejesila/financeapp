@@ -94,8 +94,7 @@
 
                     <h4 class="text-md font-semibold text-gray-800 mt-6">Principal</h4>
                     <p class="text-sm text-gray-500 mb-2">
-                        Repayments of fully paid loans that landed in her float, less principal she has sent back to you.
-                        Repayments on loans that are still active show here once the loan is closed.
+                        Repayments (principal only) on fully or partly paid loans that landed in her float, less principal she has sent back to you.
                     </p>
                     @include('referrers.partials.ledger-table', [
                         'months'       => $principal['months'],

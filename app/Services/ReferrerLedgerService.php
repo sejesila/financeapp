@@ -164,9 +164,7 @@ class ReferrerLedgerService
         }
 
         return match ($cat) {
-            'Loan Recovery' => $paymentsByTxn->get($t->id)?->loanGiven?->status === 'paid'
-                ? self::PRINCIPAL
-                : null,
+            'Loan Recovery' => $paymentsByTxn->has($t->id) ? self::PRINCIPAL : null,
             'Loan Interest', 'Referrer Commission' => self::INTEREST,
             default => null,
         };
