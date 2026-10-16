@@ -1,4 +1,7 @@
 {{-- resources/views/referrers/partials/ledger-table.blade.php --}}
+{{-- Optional: pass 'kindStyles' to tint rows that carry a 'kind' (principal, interest, ...). --}}
+@php $styles = $kindStyles ?? null; @endphp
+
 @if($months->isEmpty())
     <p class="text-sm text-gray-500">{{ $empty }}</p>
 @else
@@ -29,8 +32,9 @@
                 </tr>
 
                 @foreach($month['rows'] as $row)
-                    <tr>
-                        <td class="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{{ $row['date']->format('M j') }}</td>
+                    @php $s = ($styles && !empty($row['kind'])) ? ($styles[$row['kind']] ?? null) : null; @endphp
+                    <tr class="{{ $s['row'] ?? '' }}">
+                        <td class="px-4 py-3 text-sm text-gray-600 whitespace-nowrap {{ $s ? 'border-l-4 ' . $s['border'] : '' }}">{{ $row['date']->format('M j') }}</td>
                         <td class="px-4 py-3 text-sm text-gray-900">{{ $row['title'] }}</td>
                         <td class="px-4 py-3 text-sm text-right text-green-700 whitespace-nowrap">
                             {{ $row['credit'] > 0 ? '+ ' . number_format($row['credit'], 0) : '' }}

@@ -102,6 +102,7 @@ class ReferrerLedgerService
                 'credit'    => $effect > 0 ? $effect : 0,
                 'debit'     => $effect < 0 ? -$effect : 0,
                 'component' => $this->componentFor($t, $cat, $paymentsByTxn),
+                'kind'      => $this->kindFor($cat, (bool) $t->is_transaction_fee),
             ]);
         }
 
@@ -193,6 +194,25 @@ class ReferrerLedgerService
         ];
     }
 
+    /**
+     * Colour-coding key for a row, so the statement can tint principal, interest,
+     * loans given, fees, commission and transfers differently.
+     */
+    private function kindFor(?string $cat, bool $isFee): ?string
+    {
+        if ($isFee) {
+            return 'fee';
+        }
+
+        return match ($cat) {
+            'Loan Recovery'       => 'principal',
+            'Loan Interest'       => 'interest',
+            'Friend Loan Given'   => 'loan_given',
+            'Referrer Commission' => 'commission',
+            default               => null,
+        };
+    }
+
     private function transferRows(int $accountId): Collection
     {
         $transfers = Transfer::withoutGlobalScopes()
@@ -236,6 +256,7 @@ class ReferrerLedgerService
                         'credit'    => 0,
                         'debit'     => $amt,
                         'component' => $component,
+                        'kind'      => 'remitted',
                     ]);
                 }
 
@@ -253,6 +274,7 @@ class ReferrerLedgerService
                         'title'     => "Remitted to {$dest}",
                         'credit'    => 0,
                         'debit'     => $rest,
+                        'kind'      => 'remitted',
                         'component' => self::PRINCIPAL,
                     ]);
                 }
@@ -275,6 +297,7 @@ class ReferrerLedgerService
                 'credit'    => $incomingPending ? 0 : (float) $tr->amount,
                 'debit'     => 0,
                 'component' => null, // capital you fund her float with: full activity only
+                'kind'      => 'transfer_in',
             ]);
         }
 
@@ -539,6 +562,7 @@ class ReferrerLedgerService
                 'out'      => $effect < 0 ? -$effect : 0,
                 'in_float' => $floatId && (int) $t->account_id === (int) $floatId,
                 'unlinked' => $unlinked,
+                'kind'     => $this->kindFor($cat, (bool) $t->is_transaction_fee),
             ]);
         }
 
@@ -589,6 +613,7 @@ class ReferrerLedgerService
                     'out'      => $out ? (float) $tr->amount : 0,
                     'in_float' => true,
                     'unlinked' => false,
+                    'kind'     => $out ? 'remitted' : 'transfer_in',
                 ]);
             }
         }

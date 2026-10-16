@@ -1,6 +1,18 @@
 <x-app-layout>
     @php
         $money = fn ($v) => $v > 0 ? number_format($v, 0) : '';
+
+        // Colour key shared by every table below. Full class names are spelled out
+        // here so Tailwind picks them up.
+        $kindStyles = [
+            'principal'   => ['label' => 'Principal',        'row' => 'bg-indigo-50',  'border' => 'border-indigo-400',  'badge' => 'bg-indigo-100 text-indigo-800'],
+            'interest'    => ['label' => 'Interest',         'row' => 'bg-green-50',   'border' => 'border-green-400',   'badge' => 'bg-green-100 text-green-800'],
+            'transfer_in' => ['label' => 'Transfer in',      'row' => 'bg-sky-50',     'border' => 'border-sky-400',     'badge' => 'bg-sky-100 text-sky-800'],
+            'remitted'    => ['label' => 'Sent back to you', 'row' => 'bg-orange-50',  'border' => 'border-orange-400',  'badge' => 'bg-orange-100 text-orange-800'],
+            'loan_given'  => ['label' => 'Loan given',       'row' => 'bg-rose-50',    'border' => 'border-rose-400',    'badge' => 'bg-rose-100 text-rose-800'],
+            'commission'  => ['label' => 'Commission',       'row' => 'bg-purple-50',  'border' => 'border-purple-400',  'badge' => 'bg-purple-100 text-purple-800'],
+            'fee'         => ['label' => 'Fee',              'row' => 'bg-gray-50',    'border' => 'border-gray-300',    'badge' => 'bg-gray-200 text-gray-700'],
+        ];
     @endphp
 
     <div class="py-12">
@@ -104,6 +116,7 @@
                     @include('referrers.partials.ledger-table', [
                         'months'       => $principal['months'],
                         'balanceLabel' => 'Net collected',
+                        'kindStyles'   => $kindStyles,
                         'empty'        => 'No principal received yet.',
                     ])
 
@@ -114,6 +127,7 @@
                     @include('referrers.partials.ledger-table', [
                         'months'       => $interest['months'],
                         'balanceLabel' => 'Interest held',
+                        'kindStyles'   => $kindStyles,
                         'empty'        => 'No interest movements yet.',
                     ])
 
@@ -123,8 +137,14 @@
                             <span class="text-sm font-normal text-gray-500">(every movement, unfiltered)</span>
                         </summary>
                         <div class="mt-3">
+                            <div class="flex flex-wrap gap-2 text-xs mb-3">
+                                @foreach($kindStyles as $s)
+                                    <span class="rounded px-2 py-0.5 {{ $s['badge'] }}">{{ $s['label'] }}</span>
+                                @endforeach
+                            </div>
                             @include('referrers.partials.ledger-table', [
                                 'months'       => $float['months'],
+                                'kindStyles'   => $kindStyles,
                                 'balanceLabel' => 'Balance',
                                 'empty'        => 'No movements on the float account yet.',
                             ])
@@ -145,7 +165,13 @@
                         tied to loans she referred, on whichever account it landed. In and Out are from the point of view of the
                         account shown, so they don't add up to one balance. Use the filter to see only what never passed through her float.
                     </p>
+                    <div class="flex flex-wrap gap-2 text-xs mb-3">
+                        @foreach($kindStyles as $s)
+                            <span class="rounded px-2 py-0.5 {{ $s['badge'] }}">{{ $s['label'] }}</span>
+                        @endforeach
+                    </div>
                     @include('referrers.partials.movements-table', [
+                        'kindStyles' => $kindStyles,
                         'months' => $movements['months'],
                         'empty'  => 'No movements found.',
                     ])

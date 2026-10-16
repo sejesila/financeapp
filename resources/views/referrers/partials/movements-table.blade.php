@@ -1,4 +1,7 @@
 {{-- resources/views/referrers/partials/movements-table.blade.php --}}
+{{-- Optional: pass 'kindStyles' to tint rows and show a small type badge. --}}
+@php $styles = $kindStyles ?? null; @endphp
+
 @if($months->isEmpty())
     <p class="text-sm text-gray-500">{{ $empty }}</p>
 @else
@@ -27,8 +30,9 @@
                     </tr>
 
                     @foreach($month['rows'] as $row)
-                        <tr @if($row['in_float']) x-show="!outsideOnly" @endif>
-                            <td class="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{{ $row['date']->format('M j') }}</td>
+                        @php $s = ($styles && !empty($row['kind'])) ? ($styles[$row['kind']] ?? null) : null; @endphp
+                        <tr class="{{ $s['row'] ?? '' }}" @if($row['in_float']) x-show="!outsideOnly" @endif>
+                            <td class="px-4 py-3 text-sm text-gray-600 whitespace-nowrap {{ $s ? 'border-l-4 ' . $s['border'] : '' }}">{{ $row['date']->format('M j') }}</td>
                             <td class="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
                                 {{ $row['account'] }}
                                 @if($row['in_float'])
@@ -37,6 +41,9 @@
                             </td>
                             <td class="px-4 py-3 text-sm text-gray-900">
                                 {{ $row['title'] }}
+                                @if($s)
+                                    <span class="ml-1 inline-block rounded px-1.5 py-0.5 text-xs {{ $s['badge'] }}">{{ $s['label'] }}</span>
+                                @endif
                                 @if($row['unlinked'])
                                     <span class="ml-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">matched by name</span>
                                 @endif
