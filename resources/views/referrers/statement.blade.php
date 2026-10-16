@@ -94,12 +94,12 @@
 
                     <h4 class="text-md font-semibold text-gray-800 mt-6">Principal</h4>
                     <p class="text-sm text-gray-500 mb-2">
-                        Repayments (principal only) on fully or partly paid loans that landed in her float, less principal she has sent back to you.
+                        Principal received on fully or partly paid loans that landed in her float, less principal she has sent back to you.
                     </p>
                     @include('referrers.partials.ledger-table', [
                         'months'       => $principal['months'],
                         'balanceLabel' => 'Principal held',
-                        'empty'        => 'No principal from fully paid loans yet.',
+                        'empty'        => 'No principal received yet.',
                     ])
 
                     <h4 class="text-md font-semibold text-gray-800 mt-8">Interest</h4>

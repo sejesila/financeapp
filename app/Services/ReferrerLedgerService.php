@@ -72,7 +72,7 @@ class ReferrerLedgerService
 
             $title = match (true) {
                 (bool) $t->is_transaction_fee  => 'Transaction fee',
-                $cat === 'Loan Recovery'       => 'Repayment: ' . ($paymentsByTxn->get($t->id)?->loanGiven?->borrower_name ?? 'borrower'),
+                $cat === 'Loan Recovery'       => 'Principal: ' . ($paymentsByTxn->get($t->id)?->loanGiven?->borrower_name ?? 'borrower'),
                 $cat === 'Loan Interest'       => 'Interest: ' . ($paymentsById->get($t->reference_id)?->loanGiven?->borrower_name ?? 'borrower'),
                 $cat === 'Friend Loan Given'   => 'Loan given: ' . ($loansByDisbursement->get($t->id)?->borrower_name ?? 'borrower'),
                 $cat === 'Referrer Commission' => "Commission paid: {$referrer->name}",
