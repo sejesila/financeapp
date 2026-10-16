@@ -225,6 +225,7 @@ class ReferrerFloatController extends Controller
             'referrer'   => $referrer,
             'commission' => $ledger->commissionLedger($referrer),
             'float'      => $ledger->floatLedger($referrer),
+            'movements'  => $ledger->allMovements($referrer),
         ]);
     }
 }
