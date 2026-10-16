@@ -64,15 +64,18 @@
                     @php
                         $principal = $float['by_component']['principal'];
                         $interest  = $float['by_component']['interest'];
+
+                        // What's physically in the float besides interest. She re-lends
+                        // repayments, so this can't be derived by adding up principal
+                        // received; it's the account balance less the interest in it.
+                        $principalInFloat = (float) $float['current_balance'] - (float) $interest['closing'];
                     @endphp
 
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                         <div class="bg-indigo-50 rounded-lg p-3">
-                            <div class="text-gray-500">Principal she holds for you</div>
-                            <div class="text-lg font-semibold text-gray-900">KES {{ number_format($principal['closing'], 0) }}</div>
-                            <div class="text-xs text-gray-400 mt-1">
-                                in {{ number_format($principal['credits'], 0) }} · sent back {{ number_format($principal['debits'], 0) }}
-                            </div>
+                            <div class="text-gray-500">Principal in her float now</div>
+                            <div class="text-lg font-semibold text-gray-900">KES {{ number_format($principalInFloat, 0) }}</div>
+                            <div class="text-xs text-gray-400 mt-1">account balance less interest</div>
                         </div>
                         <div class="bg-green-50 rounded-lg p-3">
                             <div class="text-gray-500">Interest she holds for you</div>
@@ -88,17 +91,19 @@
                         </div>
                     </div>
                     <p class="text-xs text-gray-400 mt-2 mb-6">
-                        The account balance also includes the capital you put in, loans she gave out and fees,
-                        which is why it isn't simply principal + interest. Those are in the full activity at the bottom.
+                        She re-lends repayments, so the principal in her float is what's left of the account after interest. It reflects
+                        the capital you put in, loans she gave out and fees. Every movement is in the full activity at the bottom.
                     </p>
 
-                    <h4 class="text-md font-semibold text-gray-800 mt-6">Principal</h4>
+                    <h4 class="text-md font-semibold text-gray-800 mt-6">Principal collected</h4>
                     <p class="text-sm text-gray-500 mb-2">
                         Principal received on fully or partly paid loans that landed in her float, less principal she has sent back to you.
+                        Collected KES {{ number_format($principal['credits'], 0) }} · sent back KES {{ number_format($principal['debits'], 0) }}.
+                        This is a running tally of what came in and went back, not what she holds.
                     </p>
                     @include('referrers.partials.ledger-table', [
                         'months'       => $principal['months'],
-                        'balanceLabel' => 'Principal held',
+                        'balanceLabel' => 'Net collected',
                         'empty'        => 'No principal received yet.',
                     ])
 
