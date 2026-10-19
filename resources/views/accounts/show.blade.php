@@ -103,7 +103,7 @@
                                class="bg-emerald-600 text-white px-6 py-2.5 rounded-lg hover:bg-emerald-700 transition text-center font-medium shadow-md">
                                 📈 Record Interest
                             </a>
-                        @endif
+                        @endifTotal Expenses
                         @if($account->type === 'savings')
                             <button id="openStatementBtn"
                                     class="bg-indigo-700 text-white px-6 py-2.5 rounded-lg hover:bg-indigo-800 transition text-center font-medium shadow-md">
@@ -127,7 +127,11 @@
                         $stats = [
                             ['label' => 'Total Transactions', 'value' => number_format($totalTransactions), 'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', 'color' => 'blue'],
                             ['label' => 'Total Interest', 'value' => 'KES ' . number_format($savingsStats->total_interest ?? 0, 0), 'icon' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'emerald'],
-                            ['label' => 'Total Expenses', 'value' => 'KES ' . number_format($savingsStats->total_expenses ?? 0, 0), 'icon' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'red'],
+                            ['label' => 'Total Expenses', 'value' => 'KES ' . number_format($savingsStats->total_expenses ?? 0, 0),
+ 'sub' => (($savingsStats->total_interest ?? 0) > 0
+        ? number_format(($savingsStats->total_expenses / $savingsStats->total_interest) * 100, 1)
+        : '0.0') . '% of interest',
+ 'icon' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'red'],
                             ['label' => 'All-Time Net', 'value' => 'KES ' . number_format($savingsNetAllTime, 0), 'icon' => 'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z', 'color' => $savingsNetAllTime >= 0 ? 'emerald' : 'red'],
                         ];
                     @endphp
@@ -163,6 +167,9 @@
                         </div>
                         <p class="text-xs text-gray-500 dark:text-gray-400">{{ $stat['label'] }}</p>
                         <p class="text-lg font-bold text-gray-900 dark:text-white mt-1">{{ $stat['value'] }}</p>
+                        @if(!empty($stat['sub']))
+                            <p class="text-[11px] text-gray-400 mt-0.5">{{ $stat['sub'] }}</p>
+                        @endif
                     </div>
                 @endforeach
             </div>
@@ -257,6 +264,7 @@
                                     </th>
                                     <th class="px-4 py-3 text-right font-medium text-emerald-700 dark:text-emerald-400">Interest (KES)</th>
                                     <th class="px-4 py-3 text-right font-medium text-red-700 dark:text-red-400">Expenses (KES)</th>
+                                    <th class="px-4 py-3 text-right font-medium text-amber-700 dark:text-amber-400">Costs eat</th>
                                     <th class="px-4 py-3 text-right font-medium text-indigo-700 dark:text-indigo-400">Net (KES)</th>
                                 </tr>
                                 </thead>
@@ -278,6 +286,9 @@
                                         <td class="px-4 py-3 text-right text-red-600 dark:text-red-400 font-medium">
                                             {{ $expenses > 0 ? number_format($expenses, 0) : '—' }}
                                         </td>
+                                        <td class="px-4 py-3 text-right font-medium {{ $interest > 0 && ($expenses / $interest) > 0.15 ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300' }}">
+                                            {{ $interest > 0 && $expenses > 0 ? number_format($expenses / $interest * 100, 1) . '%' : '—' }}
+                                        </td>
                                         <td class="px-4 py-3 text-right font-semibold {{ $net >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-red-600 dark:text-red-400' }}">
                                             {{ ($net >= 0 ? '+' : '') . number_format($net, 0) }}
                                         </td>
@@ -289,6 +300,9 @@
                                     <td class="px-4 py-3">Total</td>
                                     <td class="px-4 py-3 text-right text-emerald-700 dark:text-emerald-400">{{ number_format($grandInterest, 0) }}</td>
                                     <td class="px-4 py-3 text-right text-red-700 dark:text-red-400">{{ number_format($grandExpenses, 0) }}</td>
+                                    <td class="px-4 py-3 text-right text-amber-700 dark:text-amber-400">
+                                        {{ $grandInterest > 0 ? number_format($grandExpenses / $grandInterest * 100, 1) . '%' : '—' }}
+                                    </td>
                                     <td class="px-4 py-3 text-right {{ ($grandInterest - $grandExpenses) >= 0 ? 'text-indigo-700 dark:text-indigo-400' : 'text-red-700 dark:text-red-400' }}">
                                         {{ (($grandInterest - $grandExpenses) >= 0 ? '+' : '') . number_format($grandInterest - $grandExpenses, 0) }}
                                     </td>
