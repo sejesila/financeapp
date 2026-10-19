@@ -291,6 +291,10 @@
                         </div>
                         @include('loans-given.partials.yield-card')
                     </div>
+
+                    <!-- Transaction costs vs gross profit (referred vs unreferred) -->
+                    @include('loans-given.partials.cost-drag')
+
                     <!-- Monthly Trend -->
                     <div class="mb-6 border border-gray-200 rounded-lg" x-data="{ open: true }">
                         <button type="button" @click="open = !open"

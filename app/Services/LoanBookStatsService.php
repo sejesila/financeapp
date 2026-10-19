@@ -88,10 +88,58 @@ class LoanBookStatsService
         $repaidCount    = $disbursedInRange->where('status', 'paid')->count();
         $repaymentRate  = $disbursedCount > 0 ? ($repaidCount / $disbursedCount) * 100 : 0;
 
+        // ── Transaction costs vs gross profit, referred vs unreferred ──────
+        // Same rules as the headline cards: interest by payment date + legacy
+        // residual on loans closed in the period; costs = disbursement fees on
+        // loans disbursed in the period.
+        $loansById = $loans->keyBy('id');
+
+        $feeByDisbursement = $disbursementIds->isNotEmpty()
+            ? Transaction::where('is_transaction_fee', true)
+                ->whereIn('fee_for_transaction_id', $disbursementIds)
+                ->selectRaw('fee_for_transaction_id, SUM(amount) as fee')
+                ->groupBy('fee_for_transaction_id')
+                ->pluck('fee', 'fee_for_transaction_id')
+            : collect();
+
+        $costBySource = [];
+
+        foreach (['referred' => true, 'unreferred' => false] as $key => $wantReferred) {
+            $inGroup = fn ($l) => $l && ((bool) $l->referrer_id === $wantReferred);
+
+            $interest = $payments
+                    ->filter(fn ($p) => $inRange($p->payment_date) && $inGroup($loansById->get($p->loan_given_id)))
+                    ->sum('interest_portion')
+                + $paidInRange->filter($inGroup)->sum($residualInterest);
+
+            $costs = $disbursedInRange->filter($inGroup)
+                ->sum(fn ($l) => (float) ($feeByDisbursement[$l->disbursement_transaction_id] ?? 0));
+
+            $cut = $wantReferred ? (float) $referrerCut : 0.0;
+
+            $costBySource[$key] = [
+                'loans'         => $disbursedInRange->filter($inGroup)->count(),
+                'interest'      => (float) $interest,
+                'costs'         => (float) $costs,
+                'cost_pct'      => $interest > 0 ? round($costs / $interest * 100, 1) : null,
+                'referrer_cut'  => $cut,
+                'net'           => (float) $interest - $costs,         // after costs
+                'net_after_cut' => (float) $interest - $costs - $cut,  // after costs + referrer share
+            ];
+        }
+
+        $allInterest = $costBySource['referred']['interest'] + $costBySource['unreferred']['interest'];
+        $allCosts    = $costBySource['referred']['costs'] + $costBySource['unreferred']['costs'];
+        $costBySource['total'] = [
+            'interest' => $allInterest,
+            'costs'    => $allCosts,
+            'cost_pct' => $allInterest > 0 ? round($allCosts / $allInterest * 100, 1) : null,
+        ];
+
         return compact(
             'totalPrincipal', 'totalRepaid', 'totalInterest', 'avgInterestRate', 'repaymentRate',
             'totalOutstanding', 'totalReceivedAllTime', 'totalTransactionCosts', 'netInterest',
-            'referrerCut', 'repaidCount', 'disbursedCount', 'loanYield'
+            'referrerCut', 'repaidCount', 'disbursedCount', 'loanYield', 'costBySource'
         );
     }
 }
