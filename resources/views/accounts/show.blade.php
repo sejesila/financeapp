@@ -103,7 +103,7 @@
                                class="bg-emerald-600 text-white px-6 py-2.5 rounded-lg hover:bg-emerald-700 transition text-center font-medium shadow-md">
                                 📈 Record Interest
                             </a>
-                        @endifTotal Expenses
+                        @endif
                         @if($account->type === 'savings')
                             <button id="openStatementBtn"
                                     class="bg-indigo-700 text-white px-6 py-2.5 rounded-lg hover:bg-indigo-800 transition text-center font-medium shadow-md">
