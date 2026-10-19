@@ -8,7 +8,7 @@
                 Transaction costs vs gross profit — {{ $statsLabel }}
             </span>
             @if(($costBySource['total']['cost_pct'] ?? null) !== null)
-                <span class="text-xs font-medium {{ $costBySource['total']['cost_pct'] >= 9 ? 'text-red-600' : 'text-amber-700' }}">
+                <span class="text-xs font-medium {{ $costBySource['total']['cost_pct'] >= 9 ? 'text-red-600' : 'text-gray-600' }}">
                     Overall: costs eat {{ number_format($costBySource['total']['cost_pct'], 1) }}% of interest
                 </span>
             @endif
@@ -65,7 +65,7 @@
                     </td>
                     <td class="px-4 py-2 text-right text-emerald-700">KES {{ number_format($t['interest'], 0) }}</td>
                     <td class="px-4 py-2 text-right text-red-700">KES {{ number_format($t['costs'], 0) }}</td>
-                    <td class="px-4 py-2 text-right {{ ($t['cost_pct'] ?? 0) >= 9 ? 'text-red-700' : 'text-amber-700' }}">
+                    <td class="px-4 py-2 text-right {{ ($t['cost_pct'] ?? 0) >= 9 ? 'text-red-700' : 'text-gray-900' }}">
                         {{ $t['cost_pct'] !== null ? number_format($t['cost_pct'], 1) . '%' : '—' }}
                     </td>
                     <td class="px-4 py-2 text-right {{ $tNet >= 0 ? 'text-indigo-700' : 'text-red-700' }}">
