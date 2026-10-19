@@ -9,19 +9,19 @@
             </span>
             @if(($costBySource['total']['cost_pct'] ?? null) !== null)
                 <span class="text-xs font-medium {{ $costBySource['total']['cost_pct'] > 15 ? 'text-red-600' : 'text-amber-700' }}">
-                    Overall: costs eat {{ $costBySource['total']['cost_pct'] }}% of interest
+                    Overall: costs eat {{ number_format($costBySource['total']['cost_pct'], 1) }}% of interest
                 </span>
             @endif
         </div>
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
+            <table class="min-w-full table-fixed divide-y divide-gray-200 text-xs sm:text-sm">
                 <thead class="bg-gray-50 text-[10px] sm:text-xs uppercase">
                 <tr>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Source</th>
-                    <th class="px-4 py-2 text-right font-medium text-emerald-700">Gross profit</th>
-                    <th class="px-4 py-2 text-right font-medium text-red-700">Txn costs</th>
-                    <th class="px-4 py-2 text-right font-medium text-amber-700">Costs eat</th>
-                    <th class="px-4 py-2 text-right font-medium text-indigo-700">After costs</th>
+                    <th class="px-4 py-2 text-left font-medium text-gray-600 w-[28%]">Source</th>
+                    <th class="px-4 py-2 text-right font-medium text-emerald-700 w-[18%]">Gross profit</th>
+                    <th class="px-4 py-2 text-right font-medium text-red-700 w-[18%]">Txn costs</th>
+                    <th class="px-4 py-2 text-right font-medium text-amber-700 w-[16%]">Costs eat</th>
+                    <th class="px-4 py-2 text-right font-medium text-indigo-700 w-[20%]">After costs</th>
                 </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -39,7 +39,7 @@
                             KES {{ number_format($r['costs'], 0) }}
                         </td>
                         <td class="px-4 py-2 text-right font-medium {{ ($r['cost_pct'] ?? 0) > 15 ? 'text-red-600' : 'text-gray-700' }}">
-                            {{ $r['cost_pct'] !== null ? $r['cost_pct'] . '%' : '—' }}
+                            {{ $r['cost_pct'] !== null ? number_format($r['cost_pct'], 1) . '%' : '—' }}
                         </td>
                         <td class="px-4 py-2 text-right font-semibold {{ $r['net'] >= 0 ? 'text-indigo-600' : 'text-red-600' }}">
                             KES {{ number_format($r['net'], 0) }}
@@ -66,7 +66,7 @@
                     <td class="px-4 py-2 text-right text-emerald-700">KES {{ number_format($t['interest'], 0) }}</td>
                     <td class="px-4 py-2 text-right text-red-700">KES {{ number_format($t['costs'], 0) }}</td>
                     <td class="px-4 py-2 text-right text-amber-700">
-                        {{ $t['cost_pct'] !== null ? $t['cost_pct'] . '%' : '—' }}
+                        {{ $t['cost_pct'] !== null ? number_format($t['cost_pct'], 1) . '%' : '—' }}
                     </td>
                     <td class="px-4 py-2 text-right {{ $tNet >= 0 ? 'text-indigo-700' : 'text-red-700' }}">
                         KES {{ number_format($tNet, 0) }}
