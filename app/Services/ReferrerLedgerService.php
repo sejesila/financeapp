@@ -291,7 +291,7 @@ class ReferrerLedgerService
             $rows->push([
                 // Sorts after borrower repayments/interest but before spending.
                 'date'      => $date,
-                'sort'      => [$date->format('Y-m-d'), 1, $tr->id, 0],
+                'sort'      => [$date->format('Y-m-d'), 2, $date->timestamp, $tr->id],
                 'title'     => 'Transfer in: ' . ($tr->fromAccount?->name ?? 'another account')
                     . ($incomingPending ? ' (clears ' . Carbon::parse($tr->value_date)->format('M j') . ')' : ''),
                 'credit'    => $incomingPending ? 0 : (float) $tr->amount,
