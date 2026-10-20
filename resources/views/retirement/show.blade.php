@@ -10,8 +10,13 @@
         $inputClass    = 'mt-1 w-full rounded border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm';
         $readonlyClass = $inputClass . ' bg-gray-100 dark:bg-gray-600 cursor-not-allowed';
         $sections      = $fund->sections();
-        $multiplier    = $fund->employerMultiplier();
-        $lastMonth     = now()->subMonthNoOverflow()->format('Y-m'); // latest month that can be recorded
+
+        // Recordable range: from the month after the opening balance, up to the last completed month.
+        $lastMonth = now()->subMonthNoOverflow()->format('Y-m');
+        $minMonth  = $fund->opening_balance_date
+            ? $fund->opening_balance_date->copy()->startOfMonth()->addMonthNoOverflow()->format('Y-m')
+            : null;
+        $defaultMonth = ($minMonth && $minMonth > $lastMonth) ? $minMonth : $lastMonth;
     @endphp
 
     <div class="py-3 sm:py-8">
@@ -52,26 +57,35 @@
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 sm:p-6">
                 <h3 class="font-semibold text-gray-800 dark:text-gray-200 mb-1">📄 Add payslip figures</h3>
                 <p class="text-xs text-gray-500 mb-4">
-                    Enter the employee amount per section.
-                    Employer is filled in automatically:
-                    {{ $multiplier === 1 ? 'same as employee.' : 'double the employee amount.' }}
-                    A month that is already recorded is locked. Only months that have ended can be recorded.
+                    Enter the employee amount per section. The employer amount is filled in automatically for each section.
+                    A month that is already recorded is locked. You can record months that have ended
+                    @if($minMonth)
+                        and come after your opening balance ({{ \Carbon\Carbon::createFromFormat('Y-m', $minMonth)->format('M Y') }} onward).
+                    @else
+                        .
+                    @endif
                 </p>
                 <form method="POST" action="{{ route('retirement.contributions.store', $fund) }}" class="space-y-4"
-                      id="payslip-form" data-multiplier="{{ $multiplier }}"
+                      id="payslip-form"
                       data-recorded="{{ json_encode($recordedMonths) }}">
                     @csrf
                     <label class="block text-sm w-full sm:w-56">Month
                         <input type="month" name="month" required
+                               @if($minMonth) min="{{ $minMonth }}" @endif
                                max="{{ $lastMonth }}"
-                               value="{{ old('month', $lastMonth) }}"
+                               value="{{ old('month', $defaultMonth) }}"
                                class="{{ $inputClass }}">
                     </label>
                     <p id="future-note" class="hidden text-xs text-amber-600 dark:text-amber-400">
                         Figures can only be added for months that have ended.
                     </p>
+                    <p id="before-note" class="hidden text-xs text-amber-600 dark:text-amber-400">
+                        This month is already included in your opening balance
+                        @if($fund->opening_balance_date) (as at {{ $fund->opening_balance_date->format('M d, Y') }}) @endif.
+                    </p>
 
                     @foreach($sections as $key => $label)
+                        @php $mult = $fund->employerMultiplier($key); @endphp
                         <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
                             <p class="text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">{{ $label }}
                                 <span data-locked-note="{{ $key }}" class="hidden text-xs font-normal text-amber-600 dark:text-amber-400">· already recorded for this month</span>
@@ -81,9 +95,10 @@
                                     <input type="number" step="0.01" min="0" inputmode="decimal"
                                            name="sections[{{ $key }}][employee]"
                                            data-employee="{{ $key }}"
+                                           data-multiplier="{{ $mult }}"
                                            value="{{ old("sections.$key.employee") }}" class="{{ $inputClass }}">
                                 </label>
-                                <label class="block">Employer {{ $multiplier === 1 ? '(= employee)' : '(= employee × ' . $multiplier . ')' }}
+                                <label class="block">Employer {{ $mult === 1 ? '(= employee)' : '(= employee × ' . $mult . ')' }}
                                     <input type="number" step="0.01" readonly tabindex="-1"
                                            data-employer="{{ $key }}"
                                            class="{{ $readonlyClass }}">
@@ -210,18 +225,19 @@
         (function () {
             const form = document.getElementById('payslip-form');
             if (!form) return;
-            const multiplier = parseFloat(form.dataset.multiplier) || 1;
             const recorded   = JSON.parse(form.dataset.recorded || '{}');
             const month      = form.querySelector('[name="month"]');
             const saveBtn    = document.getElementById('payslip-save');
             const futureNote = document.getElementById('future-note');
+            const beforeNote = document.getElementById('before-note');
             const lockClasses = ['bg-gray-100', 'dark:bg-gray-600', 'cursor-not-allowed'];
             const fields = [];
 
             form.querySelectorAll('[data-employee]').forEach(function (employee) {
-                const key      = employee.dataset.employee;
-                const employer = form.querySelector('[data-employer="' + key + '"]');
-                const note     = form.querySelector('[data-locked-note="' + key + '"]');
+                const key        = employee.dataset.employee;
+                const multiplier = parseFloat(employee.dataset.multiplier) || 1;
+                const employer   = form.querySelector('[data-employer="' + key + '"]');
+                const note       = form.querySelector('[data-locked-note="' + key + '"]');
 
                 const sync = function () {
                     const v = parseFloat(employee.value);
@@ -232,22 +248,24 @@
             });
 
             // A month that already has figures is shown filled in and locked.
-            // The current month and future months are blocked as well.
+            // Months that have not ended, or that the opening balance already covers, are blocked too.
             const applyMonth = function () {
                 const rec      = recorded[month.value] || {};
                 // 'YYYY-MM' strings compare correctly as plain strings
                 const isFuture = month.value !== '' && month.max && month.value > month.max;
+                const isBefore = month.value !== '' && month.min && month.value < month.min;
+                const outOfRange = isFuture || isBefore;
                 let lockedCount = 0;
 
                 fields.forEach(function (f) {
-                    const isLocked = !isFuture && Object.prototype.hasOwnProperty.call(rec, f.key);
-                    const blocked  = isLocked || isFuture;
+                    const isLocked = !outOfRange && Object.prototype.hasOwnProperty.call(rec, f.key);
+                    const blocked  = isLocked || outOfRange;
 
                     if (isLocked) {
                         f.employee.value = Number(rec[f.key]).toFixed(2);
                         f.employee.dataset.locked = '1';
                         lockedCount++;
-                    } else if (f.employee.dataset.locked || isFuture) {
+                    } else if (f.employee.dataset.locked || outOfRange) {
                         f.employee.value = '';
                         delete f.employee.dataset.locked;
                     }
@@ -259,7 +277,8 @@
                 });
 
                 if (futureNote) futureNote.classList.toggle('hidden', !isFuture);
-                if (saveBtn) saveBtn.disabled = isFuture || lockedCount === fields.length;
+                if (beforeNote) beforeNote.classList.toggle('hidden', !isBefore);
+                if (saveBtn) saveBtn.disabled = outOfRange || lockedCount === fields.length;
             };
 
             month.addEventListener('input', applyMonth);

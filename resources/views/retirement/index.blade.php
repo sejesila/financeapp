@@ -39,6 +39,7 @@
                     </a>
                 @endforeach
             </div>
+                @include('retirement._projection', ['funds' => $funds])
 
             {{-- Add fund: hidden once the maximum number of funds exists --}}
             @if($canAddFund)

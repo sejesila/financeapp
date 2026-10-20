@@ -126,11 +126,21 @@ class RetirementFundController extends Controller
             );
         }
 
-        $multiplier = $fund->employerMultiplier();
-        $saved      = 0;
-        $locked     = 0;
+        // The opening balance already includes its own month and everything before it,
+        // so recording those months would count them twice.
+        if ($fund->opening_balance_date
+            && $period->lte($fund->opening_balance_date->copy()->startOfMonth())) {
+            return back()->withInput()->with(
+                'error',
+                'Your opening balance (as at ' . $fund->opening_balance_date->format('M d, Y')
+                . ') already includes ' . $period->format('F Y') . '.'
+            );
+        }
 
-        DB::transaction(function () use ($request, $fund, $period, $multiplier, &$saved, &$locked) {
+        $saved  = 0;
+        $locked = 0;
+
+        DB::transaction(function () use ($request, $fund, $period, &$saved, &$locked) {
             foreach (array_keys($fund->sections()) as $key) {
                 $employee = (float) $request->input("sections.$key.employee", 0);
 
@@ -138,8 +148,9 @@ class RetirementFundController extends Controller
                     continue;
                 }
 
-                // Employer is always derived from employee (NSSF: same, Provident: double).
-                $employer = round($employee * $multiplier, 2);
+                // Employer is derived from employee, with a multiplier per section
+                // (NSSF Tier I: 1x, Provident Tier II: 1x, Provident Main: 2x).
+                $employer = round($employee * $fund->employerMultiplier($key), 2);
 
                 $keys = [
                     'retirement_fund_id' => $fund->id,

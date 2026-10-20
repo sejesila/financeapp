@@ -25,9 +25,14 @@ class RetirementFund extends Model
 
     /** Employer contribution as a multiple of the employee contribution. */
     public const EMPLOYER_MULTIPLIER = [
-        'nssf'      => 1,
-        'provident' => 2,
+        'nssf'      => ['tier1' => 1],
+        'provident' => ['tier2' => 1, 'main' => 2],
     ];
+
+    public function employerMultiplier(string $section): int
+    {
+        return self::EMPLOYER_MULTIPLIER[$this->type][$section] ?? 1;
+    }
 
     protected static function booted()
     {
@@ -36,6 +41,18 @@ class RetirementFund extends Model
                 $builder->where($builder->getModel()->getTable() . '.user_id', Auth::id());
             }
         });
+    }
+    public function monthlyRunRate(): float
+    {
+        $rows = $this->entries()
+            ->where('entry_type', 'contribution')
+            ->selectRaw('period_date, SUM(employee_amount + employer_amount) as total')
+            ->groupBy('period_date')
+            ->orderByDesc('period_date')
+            ->limit(3)
+            ->get();
+
+        return $rows->isEmpty() ? 0.0 : round((float) $rows->avg('total'), 2);
     }
 
     public function entries()
@@ -46,11 +63,6 @@ class RetirementFund extends Model
     public function sections(): array
     {
         return self::SECTIONS[$this->type] ?? [];
-    }
-
-    public function employerMultiplier(): int
-    {
-        return self::EMPLOYER_MULTIPLIER[$this->type] ?? 1;
     }
 
     public function balance(): float
