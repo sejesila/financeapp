@@ -20,9 +20,9 @@
 
             <div class="flex items-center justify-between">
                 <div>
-                    <h2 class="text-2xl font-semibold text-gray-800">{{ $referrer->name }} — Statement</h2>
+                    <h2 class="text-2xl font-semibold text-gray-800"> Statement </h2>
                     <p class="text-sm text-gray-500 mt-1">
-                        Every credit (money or commission coming in) and debit (going out), in order.
+                        Every credit and debit (going out), in order.
                     </p>
                 </div>
                 <a href="{{ route('referrers.show', $referrer->id) }}"
@@ -33,11 +33,11 @@
 
             {{-- ───────────── Commission ───────────── --}}
             <div class="bg-white shadow-xl sm:rounded-lg p-6">
-                <h3 class="text-lg font-semibold text-gray-800">Commission she has earned</h3>
-                <p class="text-sm text-gray-500 mb-4">
-                    Credit = commission earned on a closed loan. Debit = paid to her, or kept by her before depositing.
-                    The balance is what you still owe her.
-                </p>
+                <h3 class="text-lg font-semibold text-gray-800">Commission earned</h3>
+{{--                <p class="text-sm text-gray-500 mb-4">--}}
+{{--                    Credit = commission earned on a closed loan. Debit = paid to her, or kept by her before depositing.--}}
+{{--                    The balance is what you still owe her.--}}
+{{--                </p>--}}
 
                 <div class="grid grid-cols-3 gap-4 mb-4 text-sm">
                     <div class="bg-gray-50 rounded-lg p-3">
@@ -85,12 +85,12 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                         <div class="bg-indigo-50 rounded-lg p-3">
-                            <div class="text-gray-500">Principal in her float now</div>
+                            <div class="text-gray-500">Principal in the float now</div>
                             <div class="text-lg font-semibold text-gray-900">KES {{ number_format($principalInFloat, 0) }}</div>
                             <div class="text-xs text-gray-400 mt-1">account balance less interest</div>
                         </div>
                         <div class="bg-green-50 rounded-lg p-3">
-                            <div class="text-gray-500">Interest she holds for you</div>
+                            <div class="text-gray-500">Interest held</div>
                             <div class="text-lg font-semibold text-gray-900">KES {{ number_format($interest['closing'], 0) }}</div>
                             <div class="text-xs text-gray-400 mt-1">
                                 in {{ number_format($interest['credits'], 0) }} · out {{ number_format($interest['debits'], 0) }}
