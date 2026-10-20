@@ -157,7 +157,7 @@
             <div class="bg-white shadow-xl sm:rounded-lg p-6">
                 <details>
                     <summary class="cursor-pointer text-lg font-semibold text-gray-800">
-                        Everything involving {{ $referrer->name }}
+                        Everything
                         <span class="text-sm font-normal text-gray-500">({{ $movements['count'] }} movements, on every account)</span>
                     </summary>
 {{--                    <p class="text-sm text-gray-500 mt-2 mb-4">--}}
