@@ -102,17 +102,17 @@
                             <div class="text-xs text-gray-400 mt-1">everything in the account</div>
                         </div>
                     </div>
-                    <p class="text-xs text-gray-400 mt-2 mb-6">
-                        She re-lends repayments, so the principal in her float is what's left of the account after interest. It reflects
-                        the capital you put in, loans she gave out and fees. Every movement is in the full activity at the bottom.
-                    </p>
+{{--                    <p class="text-xs text-gray-400 mt-2 mb-6">--}}
+{{--                        She re-lends repayments, so the principal in her float is what's left of the account after interest. It reflects--}}
+{{--                        the capital you put in, loans she gave out and fees. Every movement is in the full activity at the bottom.--}}
+{{--                    </p>--}}
 
                     <h4 class="text-md font-semibold text-gray-800 mt-6">Principal collected</h4>
-                    <p class="text-sm text-gray-500 mb-2">
-                        Principal received on fully or partly paid loans that landed in her float, less principal she has sent back to you.
-                        Collected KES {{ number_format($principal['credits'], 0) }} · sent back KES {{ number_format($principal['debits'], 0) }}.
-                        This is a running tally of what came in and went back, not what she holds.
-                    </p>
+{{--                    <p class="text-sm text-gray-500 mb-2">--}}
+{{--                        Principal received on fully or partly paid loans that landed in her float, less principal she has sent back to you.--}}
+{{--                        Collected KES {{ number_format($principal['credits'], 0) }} · sent back KES {{ number_format($principal['debits'], 0) }}.--}}
+{{--                        This is a running tally of what came in and went back, not what she holds.--}}
+{{--                    </p>--}}
                     @include('referrers.partials.ledger-table', [
                         'months'       => $principal['months'],
                         'balanceLabel' => 'Net collected',
@@ -121,9 +121,9 @@
                     ])
 
                     <h4 class="text-md font-semibold text-gray-800 mt-8">Interest</h4>
-                    <p class="text-sm text-gray-500 mb-2">
-                        Interest earned on partially or fully paid loans, less her commission and any interest she has sent back.
-                    </p>
+{{--                    <p class="text-sm text-gray-500 mb-2">--}}
+{{--                        Interest earned on partially or fully paid loans, less her commission and any interest she has sent back.--}}
+{{--                    </p>--}}
                     @include('referrers.partials.ledger-table', [
                         'months'       => $interest['months'],
                         'balanceLabel' => 'Interest held',
@@ -160,11 +160,11 @@
                         Everything involving {{ $referrer->name }}
                         <span class="text-sm font-normal text-gray-500">({{ $movements['count'] }} movements, on every account)</span>
                     </summary>
-                    <p class="text-sm text-gray-500 mt-2 mb-4">
-                        Her float account, transfers in and out of it, and every disbursement, repayment, interest and commission
-                        tied to loans she referred, on whichever account it landed. In and Out are from the point of view of the
-                        account shown, so they don't add up to one balance. Use the filter to see only what never passed through her float.
-                    </p>
+{{--                    <p class="text-sm text-gray-500 mt-2 mb-4">--}}
+{{--                        Her float account, transfers in and out of it, and every disbursement, repayment, interest and commission--}}
+{{--                        tied to loans she referred, on whichever account it landed. In and Out are from the point of view of the--}}
+{{--                        account shown, so they don't add up to one balance. Use the filter to see only what never passed through her float.--}}
+{{--                    </p>--}}
                     <div class="flex flex-wrap gap-2 text-xs mb-3">
                         @foreach($kindStyles as $s)
                             <span class="rounded px-2 py-0.5 {{ $s['badge'] }}">{{ $s['label'] }}</span>
