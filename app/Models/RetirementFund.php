@@ -42,18 +42,7 @@ class RetirementFund extends Model
             }
         });
     }
-    public function monthlyRunRate(): float
-    {
-        $rows = $this->entries()
-            ->where('entry_type', 'contribution')
-            ->selectRaw('period_date, SUM(employee_amount + employer_amount) as total')
-            ->groupBy('period_date')
-            ->orderByDesc('period_date')
-            ->limit(3)
-            ->get();
 
-        return $rows->isEmpty() ? 0.0 : round((float) $rows->avg('total'), 2);
-    }
 
     public function entries()
     {
