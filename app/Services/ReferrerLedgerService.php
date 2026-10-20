@@ -55,6 +55,10 @@ class ReferrerLedgerService
 
         $txnIds = $txns->pluck('id');
 
+        // Fee ↔ loan lookups, so a loan's fee can sit directly beneath it.
+        $byId      = $txns->keyBy('id');
+        $feeToDisb = $this->feeToDisbursementMap($txns);
+
         $paymentsByTxn = LoanGivenPayment::with('loanGiven')
             ->whereIn('transaction_id', $txnIds)->get()->keyBy('transaction_id');
 
@@ -86,14 +90,27 @@ class ReferrerLedgerService
                     : ' (not counted)';
             }
 
-            // Same-day order: borrower money in (0), transfers in (1), everything
-            // else (2), transfers out (3). Ties go by created_at, then id.
-            // A transfer's fee sits right after that transfer.
+            // Same-day order: borrower money in (0), transfers in / loans / fees /
+            // everything else in real entry order (2), transfers out (3).
+            // A transfer's fee sits right after that transfer; a loan's fee sits
+            // right after that loan.
             $priority = in_array($cat, ['Loan Recovery', 'Loan Interest'], true) ? 0 : 2;
 
-            $sort = ($t->is_transaction_fee && $t->transfer_id)
-                ? [$t->date->format('Y-m-d'), 3, (int) $t->transfer_id, 1]
-                : [$t->date->format('Y-m-d'), $priority, $t->created_at?->timestamp ?? 0, $t->id];
+            $parent = $this->parentOfFee($t, $byId, $feeToDisb);
+
+            if ($t->is_transaction_fee && $t->transfer_id) {
+                $sort = [$t->date->format('Y-m-d'), 3, (int) $t->transfer_id, 1];
+            } elseif ($parent) {
+                // Take the loan's slot, plus 0.5 so it lands directly beneath it.
+                $sort = [
+                    $parent->date->format('Y-m-d'),
+                    2,
+                    $parent->created_at?->timestamp ?? 0,
+                    $parent->id + 0.5,
+                ];
+            } else {
+                $sort = [$t->date->format('Y-m-d'), $priority, $t->created_at?->timestamp ?? 0, $t->id];
+            }
 
             $rows->push([
                 'date'      => $t->date,
@@ -146,6 +163,34 @@ class ReferrerLedgerService
             // Anything other than ~0 means the ledger and the stored balance disagree.
             'difference' => round($current - $closing, 2),
         ];
+    }
+
+    /**
+     * Map of fee-transaction id → the disbursement it belongs to, built from the
+     * disbursement's related_fee_transaction_id. Covers retroactive fees that
+     * have no fee_for_transaction_id of their own.
+     */
+    private function feeToDisbursementMap(Collection $txns): Collection
+    {
+        return $txns
+            ->filter(fn ($x) => $x->related_fee_transaction_id)
+            ->pluck('id', 'related_fee_transaction_id');
+    }
+
+    /**
+     * The loan disbursement a (non-transfer) fee row belongs to, if it can be
+     * found among the loaded transactions. Null means "no linked loan" and the
+     * fee keeps its normal position.
+     */
+    private function parentOfFee(Transaction $t, Collection $byId, Collection $feeToDisb): ?Transaction
+    {
+        if (!$t->is_transaction_fee || $t->transfer_id) {
+            return null;
+        }
+
+        $parentId = $t->fee_for_transaction_id ?? $feeToDisb->get($t->id);
+
+        return $parentId ? $byId->get($parentId) : null;
     }
 
     /**
@@ -289,7 +334,8 @@ class ReferrerLedgerService
             // Any transfer fee is its own fee transaction on the account,
             // so it appears as a "Transaction fee" line, not here.
             $rows->push([
-                // Sorts after borrower repayments/interest but before spending.
+                // Slotted in by the real time it happened, alongside loans and
+                // fees, so the statement reads in the order things occurred.
                 'date'      => $date,
                 'sort'      => [$date->format('Y-m-d'), 2, $date->timestamp, $tr->id],
                 'title'     => 'Transfer in: ' . ($tr->fromAccount?->name ?? 'another account')
@@ -453,6 +499,9 @@ class ReferrerLedgerService
      *
      * "in" / "out" are from the point of view of the account shown on each row,
      * so this is a trail to trace money, not a single running balance.
+     *
+     * A loan's fee (when linked via fee_for_transaction_id or the disbursement's
+     * related_fee_transaction_id) is sorted directly beneath that loan.
      */
     public function allMovements(Referrer $referrer): array
     {
@@ -511,6 +560,10 @@ class ReferrerLedgerService
             ->orderBy('date')->orderBy('id')
             ->get();
 
+        // Fee ↔ loan lookups so each fee can sit directly beneath its loan.
+        $byId      = $txns->keyBy('id');
+        $feeToDisb = $this->feeToDisbursementMap($txns);
+
         $rows = collect();
 
         foreach ($txns as $t) {
@@ -545,16 +598,22 @@ class ReferrerLedgerService
                 $title .= ' (not counted)';
             }
 
-            $order = match (true) {
-                $cat === 'Friend Loan Given'    => 0,
-                (bool) $t->is_transaction_fee   => 3,
-                $cat === 'Referrer Commission'  => 4,
-                default                         => 2,
+            // All sort keys have four elements so arrays compare element by
+            // element. A linked fee takes its loan's slot with a trailing 1,
+            // which puts it directly beneath the loan (trailing 0).
+            $parent = $this->parentOfFee($t, $byId, $feeToDisb);
+
+            $sort = match (true) {
+                $parent !== null               => [$parent->date->format('Y-m-d'), 0, $parent->id, 1],
+                $cat === 'Friend Loan Given'   => [$t->date->format('Y-m-d'), 0, $t->id, 0],
+                (bool) $t->is_transaction_fee  => [$t->date->format('Y-m-d'), 3, $t->id, 0],
+                $cat === 'Referrer Commission' => [$t->date->format('Y-m-d'), 4, $t->id, 0],
+                default                        => [$t->date->format('Y-m-d'), 2, $t->id, 0],
             };
 
             $rows->push([
                 'date'     => $t->date,
-                'sort'     => [$t->date->format('Y-m-d'), $order, $t->id],
+                'sort'     => $sort,
                 'account'  => $accountNames[$t->account_id] ?? "#{$t->account_id}",
                 'title'    => $title,
                 'note'     => $t->description && $t->description !== $title ? $t->description : null,
@@ -605,7 +664,7 @@ class ReferrerLedgerService
 
                 $rows->push([
                     'date'     => $date,
-                    'sort'     => [$date->format('Y-m-d'), 1, $tr->id],
+                    'sort'     => [$date->format('Y-m-d'), 1, $tr->id, 0],
                     'account'  => "{$from} → {$to}",
                     'title'    => $out ? "Remitted to {$to}" : "Transfer in from {$from}",
                     'note'     => $note ?? ($tr->description ?: null),
