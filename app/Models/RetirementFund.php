@@ -41,6 +41,30 @@ class RetirementFund extends Model
                 $builder->where($builder->getModel()->getTable() . '.user_id', Auth::id());
             }
         });
+
+        // Generate the slug when a fund is created.
+        static::creating(function ($fund) {
+            $fund->slug = static::uniqueSlug($fund->name, $fund->user_id);
+        });
+    }
+
+    /** Use the slug instead of the id in URLs. */
+    public function getRouteKeyName(): string
+    {
+        return 'slug';
+    }
+
+    public static function uniqueSlug(string $name, int $userId): string
+    {
+        $base = Str::slug($name) ?: 'fund';
+        $slug = $base;
+        $i    = 2;
+
+        while (static::withoutGlobalScopes()->where('user_id', $userId)->where('slug', $slug)->exists()) {
+            $slug = $base . '-' . $i++;
+        }
+
+        return $slug;
     }
 
 
