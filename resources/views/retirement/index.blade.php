@@ -20,7 +20,7 @@
             <div class="bg-gradient-to-r from-slate-600 to-indigo-700 text-white p-4 sm:p-6 rounded-lg shadow-lg">
                 <p class="text-xs sm:text-sm font-semibold">🏦 Total Retirement Savings</p>
                 <p class="text-2xl sm:text-4xl font-bold mt-1">KES {{ number_format($total, 0, '.', ',') }}</p>
-                <p class="text-xs mt-1 opacity-90">Across {{ $funds->count() }} {{ Str::plural('fund', $funds->count()) }}. </p>
+{{--                <p class="text-xs mt-1 opacity-90">Across {{ $funds->count() }} {{ Str::plural('fund', $funds->count()) }}. </p>--}}
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">

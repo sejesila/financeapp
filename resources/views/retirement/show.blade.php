@@ -55,16 +55,17 @@
 
             {{-- Payslip form --}}
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 sm:p-6">
-                <h3 class="font-semibold text-gray-800 dark:text-gray-200 mb-1">📄 Add payslip figures</h3>
-                <p class="text-xs text-gray-500 mb-4">
-                    Enter the employee amount per section. The employer amount is filled in automatically for each section.
-                    A month that is already recorded is locked. You can record months that have ended
-                    @if($minMonth)
-                        and come after your opening balance ({{ \Carbon\Carbon::createFromFormat('Y-m', $minMonth)->format('M Y') }} onward).
-                    @else
-                        .
-                    @endif
-                </p>
+                <h3 class="font-semibold text-gray-800 dark:text-gray-200 mb-1">📄 Add monthly figures</h3>
+{{--                <p class="text-xs text-gray-500 mb-4">--}}
+{{--                    Enter the employee amount per section. The employer amount is filled in automatically for each section.--}}
+{{--                    A month that is already recorded is locked. --}}
+{{--                    You can record months that have ended--}}
+{{--                    @if($minMonth)--}}
+{{--                        and come after your opening balance ({{ \Carbon\Carbon::createFromFormat('Y-m', $minMonth)->format('M Y') }} onward).--}}
+{{--                    @else--}}
+{{--                        .--}}
+{{--                    @endif--}}
+{{--                </p>--}}
                 <form method="POST" action="{{ route('retirement.contributions.store', $fund) }}" class="space-y-4"
                       id="payslip-form"
                       data-recorded="{{ json_encode($recordedMonths) }}">
@@ -215,7 +216,7 @@
                             </tfoot>
                         </table>
                     </div>
-                    <p class="text-xs text-gray-500 mt-2">Entries can be removed for {{ \App\Http\Controllers\RetirementFundController::REMOVE_WINDOW_MINUTES }} minutes after saving.</p>
+{{--                    <p class="text-xs text-gray-500 mt-2">Entries can be removed for {{ \App\Http\Controllers\RetirementFundController::REMOVE_WINDOW_MINUTES }} minutes after saving.</p>--}}
                 @endif
             </div>
         </div>
