@@ -15,10 +15,10 @@ use App\Http\Controllers\{AccountController,
     ReferrerFloatController,
     ReferrerPayoutController,
     ReportsController,
+    RetirementFundController,
     RollingFundController,
     StatementController,
-    TransactionController
-};
+    TransactionController};
 use App\Http\Controllers\Auth\{AuthenticatedSessionController,
     EmailVerificationNotificationController,
     EmailVerificationPromptController,
@@ -280,6 +280,15 @@ Route::middleware('auth')->group(function () {
         Route::get('preview-custom', [EmailPreferenceController::class, 'previewCustom'])
             ->name('preview-custom');
     });
+    Route::prefix('retirement')->name('retirement.')->group(function () {
+        Route::get('/',                       [RetirementFundController::class, 'index'])->name('index');
+        Route::post('/',                      [RetirementFundController::class, 'store'])->name('store');
+        Route::get('/{fund}',                 [RetirementFundController::class, 'show'])->name('show');
+        Route::post('/{fund}/contributions',  [RetirementFundController::class, 'storeContribution'])->name('contributions.store');
+        Route::post('/{fund}/interest',       [RetirementFundController::class, 'storeInterest'])->name('interest.store');
+        Route::delete('/{fund}/entries/{entry}', [RetirementFundController::class, 'destroyEntry'])->name('entries.destroy');
+    });
+
 
     // ======================================================================
     // Email Verification Routes
