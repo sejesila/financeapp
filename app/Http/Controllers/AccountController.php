@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Account;
 use App\Models\Category;
 use App\Models\ClientFund;
+use App\Models\RetirementFund;
+use App\Models\Sacco;
 use App\Models\Transaction;
 use App\Models\Transfer;
 use App\Services\BorrowedFundReturnService;
@@ -93,11 +95,15 @@ class AccountController extends Controller
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
+        $showSaccoButton = Sacco::shouldShowButton();
+
+        $showRetirementButton = RetirementFund::shouldShowButton();
 
         return view('accounts.index', compact(
             'accounts', 'walletAccounts', 'savingsAccounts',
             'totalBalance', 'totalSavings',
             'recentTransfers', 'allAccounts', 'transferSearch',
+            'showRetirementButton', 'showSaccoButton'
         ));
     }
 

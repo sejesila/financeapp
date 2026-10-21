@@ -17,6 +17,7 @@ use App\Http\Controllers\{AccountController,
     ReportsController,
     RetirementFundController,
     RollingFundController,
+    SaccoController,
     StatementController,
     TransactionController};
 use App\Http\Controllers\Auth\{AuthenticatedSessionController,
@@ -288,6 +289,20 @@ Route::middleware('auth')->group(function () {
         Route::post('/{fund}/interest',       [RetirementFundController::class, 'storeInterest'])->name('interest.store');
         Route::delete('/{fund}/entries/{entry}', [RetirementFundController::class, 'destroyEntry'])->name('entries.destroy');
     });
+    Route::prefix('sacco')->name('sacco.')->group(function () {
+        Route::get('/',                          [SaccoController::class, 'index'])->name('index');
+        Route::post('/',                         [SaccoController::class, 'store'])->name('store');
+        Route::post('/contributions',            [SaccoController::class, 'storeContribution'])->name('contributions.store');
+        Route::post('/dividend',                 [SaccoController::class, 'storeDividend'])->name('dividend.store');
+        Route::post('/withdrawal',               [SaccoController::class, 'storeWithdrawal'])->name('withdrawal.store');
+        Route::post('/loans',                    [SaccoController::class, 'storeLoan'])->name('loans.store');
+        Route::post('/loans/{loan}/refinance',   [SaccoController::class, 'refinanceLoan'])->name('loans.refinance');
+        Route::post('/loans/{loan}/payments',    [SaccoController::class, 'storeLoanPayment'])->name('loans.payments.store');
+        Route::delete('/loans/{loan}',           [SaccoController::class, 'destroyLoan'])->name('loans.destroy');
+        Route::delete('/entries/{entry}',        [SaccoController::class, 'destroyEntry'])->name('entries.destroy');
+        Route::delete('/loan-payments/{payment}',[SaccoController::class, 'destroyLoanPayment'])->name('loan-payments.destroy');
+    });
+
 
 
     // ======================================================================

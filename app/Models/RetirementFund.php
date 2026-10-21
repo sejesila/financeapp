@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -97,5 +98,67 @@ class RetirementFund extends Model
             COALESCE(SUM(voluntary_amount), 0) as voluntary,
             COALESCE(SUM(interest_amount), 0)  as interest
         ')->first();
+    }
+    /** Last completed month, or null if the opening balance already covers it. */
+    public function recordableMonth(): ?Carbon
+    {
+        $last = now()->subMonthNoOverflow()->startOfMonth();
+
+        if ($this->opening_balance_date
+            && $last->lte($this->opening_balance_date->copy()->startOfMonth())) {
+            return null;
+        }
+
+        return $last;
+    }
+
+    /** True if any section is still missing last month's payslip figures. */
+    public function hasPendingFigures(): bool
+    {
+        $month = $this->recordableMonth();
+        if (! $month) {
+            return false;
+        }
+
+        $recorded = $this->entries()
+            ->where('entry_type', 'contribution')
+            ->whereDate('period_date', $month->toDateString())
+            ->pluck('section')
+            ->all();
+
+        return count(array_diff(array_keys($this->sections()), $recorded)) > 0;
+    }
+
+    /** True in Feb–Apr if any section is missing the previous year's interest. */
+    public function hasPendingInterest(): bool
+    {
+        if (! in_array(now()->month, [2, 3, 4], true)) {
+            return false;
+        }
+
+        $recorded = $this->entries()
+            ->where('entry_type', 'interest')
+            ->whereYear('period_date', now()->year - 1)
+            ->pluck('section')
+            ->all();
+
+        return count(array_diff(array_keys($this->sections()), $recorded)) > 0;
+    }
+
+    /** Show the dashboard button on days 1–10, only while something is left to record. */
+    public static function shouldShowButton(): bool
+    {
+        if (now()->day > 10) {
+            return false;
+        }
+
+        $funds = static::where('is_active', true)->get();
+
+        // No funds yet: show it so you can set them up.
+        if ($funds->isEmpty()) {
+            return true;
+        }
+
+        return $funds->contains(fn ($f) => $f->hasPendingFigures() || $f->hasPendingInterest());
     }
 }
