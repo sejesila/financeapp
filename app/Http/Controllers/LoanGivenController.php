@@ -748,30 +748,6 @@ class LoanGivenController extends Controller implements HasMiddleware
 
     // ── close as repaid (standalone action, e.g. from the loan page) ───────────
 
-    private function applyReferrerDeduction(LoanGiven $loanGiven, bool $deductedBeforeDeposit): void
-    {
-        if (!$deductedBeforeDeposit || !$loanGiven->referrer_id || $loanGiven->referrer_share_percentage === null) {
-            return;
-        }
-
-        $share = (float)$loanGiven->referrer_share_percentage;
-
-        if ($share <= 0 || $share >= 100) {
-            return;
-        }
-
-        $interest = (float)$loanGiven->interest_amount;
-
-        if ($interest <= 0) {
-            return;
-        }
-
-        $retained = round($interest * ($share / (100 - $share)), 2);
-
-        $loanGiven->referrer_deducted_before_deposit = true;
-        $loanGiven->referrer_retained_amount = $retained;
-        $loanGiven->save();
-    }
 
     // ── mark defaulted / written off ─────────────────────────────────────────
 

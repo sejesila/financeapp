@@ -57,11 +57,11 @@ class Referrer extends Model
      */
     public function getUnpaidInterestAttribute()
     {
-        return $this->loans()
-            ->where('status', 'paid')
-            ->whereNull('referrer_payout_id')
-            ->where('referrer_deducted_before_deposit', false)
-            ->sum('interest_amount');
+        return LoanGivenPayment::whereNull('referrer_payout_id')
+            ->where('referrer_commission_kept', false)
+            ->where('referrer_commission', '>', 0)
+            ->whereHas('loanGiven', fn ($q) => $q->where('referrer_id', $this->id))
+            ->sum('interest_portion');
     }
     /**
      * Per-loan float interest that is safe to move out to YOU: only loans that
@@ -89,18 +89,18 @@ class Referrer extends Model
             ->orderBy('id')
             ->get();
 
-        return $loans->mapWithKeys(function ($loan) use ($pending) {
-            $commissionStillInFloat = 0.0;
+        // Commission still sitting in her float: accrued on payments,
+        // not yet paid out, and not kept by her before depositing.
+        $commission = LoanGivenPayment::whereIn('loan_given_id', $loans->pluck('id'))
+            ->whereNull('referrer_payout_id')
+            ->where('referrer_commission_kept', false)
+            ->groupBy('loan_given_id')
+            ->selectRaw('loan_given_id, SUM(referrer_commission) as total')
+            ->pluck('total', 'loan_given_id');
 
-            // Commission is only still sitting in the float if it hasn't been
-            // paid out in a batch and wasn't kept by the referrer upfront.
-            if (!$loan->referrer_payout_id && !$loan->referrer_deducted_before_deposit) {
-                $pct = $loan->referrer_share_percentage ?? $this->default_share_percentage;
-                $commissionStillInFloat = round($loan->interest_amount * ($pct / 100), 2);
-            }
-
-            return [$loan->id => max(0, round((float) $pending[$loan->id] - $commissionStillInFloat, 2))];
-        })->filter(fn ($amount) => $amount > 0.01);
+        return $loans->mapWithKeys(fn ($loan) => [
+            $loan->id => max(0, round((float) $pending[$loan->id] - (float) ($commission[$loan->id] ?? 0), 2)),
+        ])->filter(fn ($amount) => $amount > 0.01);
     }
 
     /**
@@ -148,6 +148,9 @@ class Referrer extends Model
         $reconciled = DB::table('referrer_float_reconciliations')
             ->join('loans_given', 'referrer_float_reconciliations.loan_given_id', '=', 'loans_given.id')
             ->where('loans_given.referrer_id', $this->id)
+            ->where(fn ($q) => $q
+                ->whereNull('referrer_float_reconciliations.component')
+                ->orWhere('referrer_float_reconciliations.component', 'interest'))
             ->selectRaw('loans_given.id as loan_id, SUM(referrer_float_reconciliations.amount) as total')
             ->groupBy('loans_given.id')
             ->get()
@@ -157,6 +160,53 @@ class Referrer extends Model
 
         foreach ($earned as $loanId => $earnedTotal) {
             $remaining = round((float) $earnedTotal - (float) ($reconciled[$loanId] ?? 0), 2);
+            if ($remaining > 0.01) {
+                $pending->put($loanId, $remaining);
+            }
+        }
+
+        return $pending;
+    }
+    /**
+     * Principal collected into her float and not yet remitted back to you,
+     * keyed by loan id. Same shape as pendingFloatInterestByLoan().
+     */
+    public function pendingFloatPrincipalByLoan(): \Illuminate\Support\Collection
+    {
+        $floatAccount = $this->floatAccount;
+
+        if (!$floatAccount) {
+            return collect();
+        }
+
+        // What's left of each repayment transaction on her float after the
+        // interest was carved out. Pure-interest payments (soft-deleted) drop out.
+        $received = DB::table('loan_given_payments as p')
+            ->join('transactions as t', 't.id', '=', 'p.transaction_id')
+            ->join('loans_given as l', 'l.id', '=', 'p.loan_given_id')
+            ->where('l.referrer_id', $this->id)
+            ->where('t.account_id', $floatAccount->id)
+            ->whereNull('t.deleted_at')
+            ->selectRaw('l.id as loan_id, SUM(t.amount) as total')
+            ->groupBy('l.id')
+            ->pluck('total', 'loan_id');
+
+        if ($received->isEmpty()) {
+            return collect();
+        }
+
+        $reconciled = DB::table('referrer_float_reconciliations as r')
+            ->join('loans_given as l', 'l.id', '=', 'r.loan_given_id')
+            ->where('l.referrer_id', $this->id)
+            ->where('r.component', 'principal')
+            ->selectRaw('l.id as loan_id, SUM(r.amount) as total')
+            ->groupBy('l.id')
+            ->pluck('total', 'loan_id');
+
+        $pending = collect();
+
+        foreach ($received as $loanId => $total) {
+            $remaining = round((float) $total - (float) ($reconciled[$loanId] ?? 0), 2);
             if ($remaining > 0.01) {
                 $pending->put($loanId, $remaining);
             }

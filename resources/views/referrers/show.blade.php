@@ -50,32 +50,19 @@
                         // Eager-load payments so the "interest so far" figure on each
                         // active loan below (payments->sum('interest_portion')) doesn't
                         // run an extra query per row.
-                        $referredLoans = $referrer->loans()->with('payments')->orderByDesc('disbursed_date')->get();
-                        $paidLoans = $referredLoans->where('status', 'paid');
+                    $referredLoans = $referrer->loans()->with('payments')->orderByDesc('disbursed_date')->get();
+$allPayments   = $referredLoans->flatMap->payments;
+$unpaidPayments = $allPayments
+    ->whereNull('referrer_payout_id')
+    ->where('referrer_commission_kept', false)
+    ->where('referrer_commission', '>', 0);
 
-                        // Loans that are paid, not yet part of a payout batch,
-                        // and not retained upfront before deposit. This is the
-                        // single source of truth for "what's outstanding" —
-                        // both the raw interest and the referrer's cut of it
-                        // are derived from this same filtered set so they
-                        // never drift apart.
-                        $unpaidOutLoans = $paidLoans
-                            ->whereNull('referrer_payout_id')
-                            ->where('referrer_deducted_before_deposit', false);
-
-                        $outstandingInterest = $unpaidOutLoans->sum('interest_amount');
-
-                        $outstandingPayable = $unpaidOutLoans->sum(function ($loan) use ($referrer) {
-                            $sharePct = $loan->referrer_share_percentage ?? $referrer->default_share_percentage;
-                            return round($loan->interest_amount * ($sharePct / 100), 2);
-                        });
-
-                        $retainedTotal = $paidLoans->where('referrer_deducted_before_deposit', true)->sum('referrer_retained_amount');
-                        $paidOutTotal = ($referrer->payouts ?? collect())->sum('amount_paid');
-
-                        // YOUR money (principal + interest) she's collected on your
-                        // behalf and is still holding, not her own commission.
-                        $pendingFloatTotal = $referrer->pendingFloatInterestByLoan()->sum();
+$outstandingInterest = round((float) $unpaidPayments->sum('interest_portion'), 2);
+$outstandingPayable  = round((float) $unpaidPayments->sum('referrer_commission'), 2);
+$retainedTotal       = (float) $allPayments->where('referrer_commission_kept', true)->sum('referrer_commission');
+$paidOutTotal        = ($referrer->payouts ?? collect())->sum('amount_paid');
+$pendingFloatTotal   = $referrer->pendingFloatInterestByLoan()->sum()
+                     + $referrer->pendingFloatPrincipalByLoan()->sum();
                     @endphp
 
                     <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mb-6">
