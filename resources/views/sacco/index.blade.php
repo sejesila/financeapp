@@ -413,6 +413,65 @@
                     @endif
                 </div>
 
+                {{-- ── Loan simulator (nothing is saved) ── --}}
+                @php
+                    $simLoan  = $loans->firstWhere('status', 'active');
+                    $simStart = now()->addMonthNoOverflow()->format('Y-m');
+                    if ($simLoan) {
+                        $simLast  = $simLoan->payments->max('period_date') ?? $simLoan->disbursed_date;
+                        $simNext  = \Carbon\Carbon::parse($simLast)->startOfMonth()->addMonthNoOverflow()->format('Y-m');
+                    }
+                @endphp
+                <div class="{{ $card }}">
+                    <h3 class="font-semibold text-gray-800 dark:text-gray-200 mb-1">🧮 Loan simulator</h3>
+                    <p class="text-xs text-gray-500 mb-4">Try an amount and term to see every instalment, split into interest and principal, until the loan is cleared. Nothing here is saved.</p>
+
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 items-end text-xs text-gray-600 dark:text-gray-400">
+                        <label class="block">Amount you want
+                            <input type="number" step="0.01" min="1" id="sim-amount" placeholder="e.g. 500000" class="{{ $inp }}">
+                        </label>
+                        <label class="block">Term (months, max {{ $maxTerm }})
+                            <input type="number" min="1" max="{{ $maxTerm }}" id="sim-term" value="{{ $maxTerm }}" class="{{ $inp }}">
+                        </label>
+                        <label class="block">First instalment
+                            <input type="month" id="sim-start" value="{{ $simStart }}" class="{{ $inp }}">
+                        </label>
+                        <label class="flex items-center gap-2 pb-2">
+                            <input type="checkbox" id="sim-fee" checked class="rounded border-gray-300">
+                            Add new-loan fee
+                        </label>
+                    </div>
+
+                    @if($simLoan)
+                        <button type="button" id="sim-use-current"
+                                data-amount="{{ round($simLoan->outstanding(), 2) }}"
+                                data-term="{{ max(1, $simLoan->monthsLeft()) }}"
+                                data-start="{{ $simNext }}"
+                                class="mt-3 text-xs text-teal-700 dark:text-teal-400 underline">
+                            Use my current loan (KES {{ number_format($simLoan->outstanding(), 2) }} left, {{ $simLoan->monthsLeft() }} months)
+                        </button>
+                    @endif
+
+                    <div id="sim-summary" class="mt-4 text-xs text-gray-700 dark:text-gray-300"></div>
+
+                    <div id="sim-wrap" class="mt-3 hidden max-h-96 overflow-y-auto rounded border border-gray-100 dark:border-gray-700">
+                        <table class="w-full text-xs">
+                            <thead class="text-gray-500 bg-gray-50 dark:bg-gray-700 sticky top-0">
+                            <tr>
+                                <th class="text-left py-1 px-2">#</th>
+                                <th class="text-left px-2">Month</th>
+                                <th class="text-right px-2">Instalment</th>
+                                <th class="text-right px-2">Interest</th>
+                                <th class="text-right px-2">Principal</th>
+                                <th class="text-right px-2">Balance</th>
+                            </tr>
+                            </thead>
+                            <tbody id="sim-body" class="divide-y divide-gray-100 dark:divide-gray-700 text-gray-800 dark:text-gray-200"></tbody>
+                            <tfoot id="sim-foot" class="sticky bottom-0 bg-gray-50 dark:bg-gray-700 font-semibold text-gray-900 dark:text-white border-t border-gray-200 dark:border-gray-600"></tfoot>
+                        </table>
+                    </div>
+                </div>
+
                 {{-- ── Wallet withdrawal (15 March – 30 April) ── --}}
                 @if($withdrawalOpen)
                     <details class="{{ $card }}">
@@ -534,6 +593,77 @@
                     };
                     [tu, tm].forEach(el => el.addEventListener('input', refi));
                 }
+            })();
+
+            // Loan simulator
+            (function () {
+                const RATE = {{ $rate }}, MAX_TERM = {{ $maxTerm }};
+                const FEE_RATE = {{ SaccoLoan::NEW_LOAN_RATE }}, FLAT_FEE = {{ SaccoLoan::FLAT_FEE }};
+                const $ = id => document.getElementById(id);
+                const amt = $('sim-amount'), term = $('sim-term'), start = $('sim-start'), fee = $('sim-fee'),
+                    summary = $('sim-summary'), wrap = $('sim-wrap'), body = $('sim-body'), foot = $('sim-foot');
+                if (!amt) return;
+
+                const r2 = n => Math.round(n * 100) / 100;
+                const num = n => n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                const money = n => 'KES ' + num(n);
+                const monthLabel = (ym, i) => {
+                    const [y, m] = (ym || '').split('-').map(Number);
+                    if (!y || !m) return '';
+                    return new Date(y, m - 1 + i, 1).toLocaleString('en-US', {month: 'short', year: 'numeric'});
+                };
+
+                function run() {
+                    const p = parseFloat(amt.value), n = parseInt(term.value, 10);
+                    if (!(p > 0) || !(n > 0) || n > MAX_TERM) {
+                        summary.textContent = n > MAX_TERM ? 'Term can be at most ' + MAX_TERM + ' months.' : '';
+                        wrap.classList.add('hidden');
+                        return;
+                    }
+
+                    const f = fee.checked ? r2(p * FEE_RATE + FLAT_FEE) : 0;
+                    const owed = r2(p + f), r = RATE / 1200;
+                    const inst = r2(r > 0 ? owed * r / (1 - Math.pow(1 + r, -n)) : owed / n);
+
+                    let bal = owed, totInt = 0, totPaid = 0, rows = '';
+                    for (let i = 1; i <= n; i++) {
+                        const interest = r2(bal * r);
+                        const pay = i === n ? r2(bal + interest) : inst;   // last instalment clears the balance
+                        const principal = r2(pay - interest);
+                        bal = r2(bal - principal);
+                        totInt += interest;
+                        totPaid += pay;
+                        rows += '<tr><td class="py-1 px-2">' + i + '</td><td class="px-2">' + monthLabel(start.value, i - 1)
+                            + '</td><td class="text-right px-2">' + num(pay) + '</td><td class="text-right px-2">' + num(interest)
+                            + '</td><td class="text-right px-2">' + num(principal) + '</td><td class="text-right px-2">'
+                            + num(Math.max(0, bal)) + '</td></tr>';
+                    }
+
+                    body.innerHTML = rows;
+                    foot.innerHTML = '<tr><td class="py-1 px-2" colspan="2">Total (' + n + ')</td><td class="text-right px-2">' + num(totPaid)
+                        + '</td><td class="text-right px-2">' + num(totInt) + '</td><td class="text-right px-2">' + num(owed) + '</td><td></td></tr>';
+
+                    summary.innerHTML = (f > 0 ? 'You receive <b>' + money(p) + '</b> in full · fee ' + money(f) + ' added · ' : '')
+                        + 'you owe <b>' + money(owed) + '</b><br>'
+                        + 'Monthly instalment <b>' + money(inst) + '</b> · total interest <b>' + money(totInt)
+                        + '</b> · total repaid <b>' + money(totPaid) + '</b>'
+                        + (monthLabel(start.value, 0) ? ' · final instalment ' + monthLabel(start.value, n - 1) : '');
+                    wrap.classList.remove('hidden');
+                }
+
+                [amt, term, start, fee].forEach(el => el.addEventListener('input', run));
+
+                const use = $('sim-use-current');
+                if (use) {
+                    use.addEventListener('click', () => {
+                        amt.value = use.dataset.amount;
+                        term.value = use.dataset.term;
+                        start.value = use.dataset.start;
+                        fee.checked = false;   // already owed: no new fee
+                        run();
+                    });
+                }
+                run();
             })();
         </script>
     @endif
