@@ -33,6 +33,10 @@ class ReferrerPayout extends Model
             }
         });
     }
+    public function payments()
+    {
+        return $this->hasMany(LoanGivenPayment::class, 'referrer_payout_id');
+    }
 
     public function referrer()
     {

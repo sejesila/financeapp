@@ -65,12 +65,15 @@ class LoanBookStatsService
                 ->sum('amount')
             : 0;
 
-        $referrerCut = $paidInRange
-            ->filter(fn ($l) => $l->referrer_id
-                && $l->referrer_share_percentage !== null
-                && !$l->referrer_payout_id
-                && !$l->referrer_deducted_before_deposit)
-            ->sum(fn ($l) => round($l->interest_amount * ($l->referrer_share_percentage / 100), 2));
+        // Unpaid, not-kept commission, attributed by payment date, the same basis
+        // as $totalInterest above. Paid-out commission is already an expense
+        // transaction, and kept commission was never in our deposit, so neither
+        // is subtracted again here.
+        $referrerCut = (float) $payments
+            ->filter(fn ($p) => $inRange($p->payment_date)
+                && !$p->referrer_payout_id
+                && !$p->referrer_commission_kept)
+            ->sum('referrer_commission');
 
         $netInterest = $totalInterest - $totalTransactionCosts - $referrerCut;
 

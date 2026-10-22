@@ -388,54 +388,47 @@ class ReferrerLedgerService
 
     public function commissionLedger(Referrer $referrer): array
     {
-        $loans = $referrer->loans()
-            ->where('status', 'paid')
-            ->orderBy('repaid_date')->orderBy('id')
+        // One "Earned" line per payment that carried interest, dated when the
+        // interest actually landed, not when the loan eventually closed.
+        $payments = LoanGivenPayment::with('loanGiven')
+            ->where('referrer_commission', '>', 0)
+            ->whereHas('loanGiven', fn ($q) => $q->where('referrer_id', $referrer->id))
+            ->orderBy('payment_date')->orderBy('id')
             ->get();
 
-        $payouts = ReferrerPayout::whereIn('id', $loans->pluck('referrer_payout_id')->filter())
+        $payouts = ReferrerPayout::whereIn('id', $payments->pluck('referrer_payout_id')->filter())
             ->get()->keyBy('id');
 
         $rows = collect();
 
-        foreach ($loans as $loan) {
-            $share = (float) ($loan->referrer_share_percentage ?? $referrer->default_share_percentage);
-            $deducted = (bool) $loan->referrer_deducted_before_deposit;
-
-            // If she kept her cut before depositing, her real cut is what she kept.
-            $cut = $deducted
-                ? (float) $loan->referrer_retained_amount
-                : round((float) $loan->interest_amount * ($share / 100), 2);
-
-            if ($cut <= 0) {
-                continue;
-            }
-
-            $earnedOn = Carbon::parse($loan->repaid_date);
+        foreach ($payments as $p) {
+            $name = $p->loanGiven?->borrower_name ?? 'borrower';
+            $on   = Carbon::parse($p->payment_date);
+            $cut  = (float) $p->referrer_commission;
 
             $rows->push([
-                'date'   => $earnedOn,
-                'sort'   => [$earnedOn->format('Y-m-d'), 1, $loan->id],
-                'title'  => "Earned: {$loan->borrower_name}",
+                'date'   => $on,
+                'sort'   => [$on->format('Y-m-d'), 1, $p->id],
+                'title'  => "Earned: {$name}",
                 'credit' => $cut,
                 'debit'  => 0,
             ]);
 
-            if ($deducted) {
+            if ($p->referrer_commission_kept) {
                 $rows->push([
-                    'date'   => $earnedOn,
-                    'sort'   => [$earnedOn->format('Y-m-d'), 2, $loan->id],
-                    'title'  => "Kept: {$loan->borrower_name}",
+                    'date'   => $on,
+                    'sort'   => [$on->format('Y-m-d'), 2, $p->id],
+                    'title'  => "Kept: {$name}",
                     'credit' => 0,
                     'debit'  => $cut,
                 ]);
-            } elseif ($loan->referrer_payout_id && ($payout = $payouts->get($loan->referrer_payout_id))) {
+            } elseif ($p->referrer_payout_id && ($payout = $payouts->get($p->referrer_payout_id))) {
                 $paidOn = Carbon::parse($payout->paid_date);
 
                 $rows->push([
                     'date'   => $paidOn,
-                    'sort'   => [$paidOn->format('Y-m-d'), 2, $loan->id],
-                    'title'  => "Paid: {$loan->borrower_name}",
+                    'sort'   => [$paidOn->format('Y-m-d'), 2, $p->id],
+                    'title'  => "Paid: {$name}",
                     'credit' => 0,
                     'debit'  => $cut,
                 ]);

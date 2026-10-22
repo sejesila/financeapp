@@ -22,26 +22,34 @@ class ReferrerPayoutController extends Controller
     {
         $this->authorize('view', $referrer);
 
-        $unpaidLoans = $referrer->loans()
-            ->where('status', 'paid')
+        // Unpaid commission now lives on payments, not on closed loans.
+        $unpaidPayments = LoanGivenPayment::with('loanGiven')
             ->whereNull('referrer_payout_id')
-            ->where('referrer_deducted_before_deposit', false)
-            ->orderBy('repaid_date')
+            ->where('referrer_commission_kept', false)
+            ->where('referrer_commission', '>', 0)
+            ->whereHas('loanGiven', fn ($q) => $q->where('referrer_id', $referrer->id))
+            ->orderBy('payment_date')
+            ->orderBy('id')
             ->get();
 
-        // Per-loan cut, not a flat rate — each loan may carry its own
-        // referrer_share_percentage (it can be overridden per-loan at
-        // creation time in LoanGivenController@store), so the payout must
-        // respect what was actually promised on each individual loan.
-        $unpaidLoans = $unpaidLoans->map(function ($loan) use ($referrer) {
-            $sharePct = $loan->referrer_share_percentage ?? $referrer->default_share_percentage;
-            $loan->computed_share_percentage = $sharePct;
-            $loan->computed_cut = round($loan->interest_amount * ($sharePct / 100), 2);
-            return $loan;
-        });
+        // One row per loan, with that loan's unpaid interest and cut.
+        // Each row is a LoanGiven with extra display attributes:
+        //   unpaid_interest, computed_cut, computed_share_percentage, unpaid_payments
+        $unpaidLoans = $unpaidPayments
+            ->groupBy('loan_given_id')
+            ->map(function ($group) {
+                $loan = $group->first()->loanGiven;
+                $loan->unpaid_payments           = $group;
+                $loan->unpaid_interest           = round((float) $group->sum('interest_portion'), 2);
+                $loan->computed_cut              = round((float) $group->sum('referrer_commission'), 2);
+                $loan->computed_share_percentage = $group->first()->referrer_share_percentage;
+                return $loan;
+            })
+            ->sortBy(fn ($l) => $l->unpaid_payments->min('payment_date'))
+            ->values();
 
-        $totalInterest = $unpaidLoans->sum('interest_amount');
-        $totalCut = $unpaidLoans->sum('computed_cut');
+        $totalInterest = round((float) $unpaidPayments->sum('interest_portion'), 2);
+        $totalCut      = round((float) $unpaidPayments->sum('referrer_commission'), 2);
 
         $accounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
@@ -51,7 +59,7 @@ class ReferrerPayoutController extends Controller
         $floatAccount = $referrer->floatAccount;
 
         return view('referrer-payouts.create', compact(
-            'referrer', 'unpaidLoans', 'totalInterest', 'totalCut', 'accounts', 'floatAccount'
+            'referrer', 'unpaidLoans', 'unpaidPayments', 'totalInterest', 'totalCut', 'accounts', 'floatAccount'
         ));
     }
 
@@ -68,29 +76,23 @@ class ReferrerPayoutController extends Controller
 
         $account = Account::where('user_id', Auth::id())->findOrFail($validated['account_id']);
 
-        $loans = $referrer->loans()
-            ->where('status', 'paid')
+        // Unpaid, not-kept commission on payments dated within the period.
+        $payments = LoanGivenPayment::with('loanGiven')
             ->whereNull('referrer_payout_id')
-            ->where('referrer_deducted_before_deposit', false)
-            ->whereBetween('repaid_date', [$validated['period_start'], $validated['period_end']])
+            ->where('referrer_commission_kept', false)
+            ->where('referrer_commission', '>', 0)
+            ->whereBetween('payment_date', [$validated['period_start'], $validated['period_end']])
+            ->whereHas('loanGiven', fn ($q) => $q->where('referrer_id', $referrer->id))
             ->get();
 
-        if ($loans->isEmpty()) {
-            return back()->with('error', 'No unpaid referred loans found in that period.');
+        if ($payments->isEmpty()) {
+            return back()->with('error', 'No unpaid commission found in that period.');
         }
 
-        $totalInterest = $loans->sum('interest_amount');
-        // Sum each loan's own cut rather than applying one blended rate —
-        // see create() for why this must be per-loan.
-        $amountPaid = $loans->sum(function ($loan) use ($referrer) {
-            $sharePct = $loan->referrer_share_percentage ?? $referrer->default_share_percentage;
-            return round($loan->interest_amount * ($sharePct / 100), 2);
-        });
+        $totalInterest = round((float) $payments->sum('interest_portion'), 2);
+        $amountPaid    = round((float) $payments->sum('referrer_commission'), 2);
 
-        // Stored on the payout record as a derived, informational figure —
-        // "what this batch worked out to, blended" — not used in any
-        // calculation. Guards div-by-zero if every matched loan somehow
-        // has zero interest.
+        // Informational only: the blended share this batch worked out to.
         $effectiveSharePercentage = $totalInterest > 0
             ? round(($amountPaid / $totalInterest) * 100, 2)
             : 0;
@@ -107,10 +109,9 @@ class ReferrerPayoutController extends Controller
             return back()->with('error', "Insufficient balance in {$account->name}: need KES "
                 . number_format($amountPaid + $fee, 2) . " (payout {$amountPaid} + fee {$fee}).");
         }
-        // Paying out of HER OWN float account: the commission leaves money she's
-// holding for us, so the same amount must be marked settled in float
-// reconciliation, or the pending figure would still count her cut as owed
-// back to us.
+
+        // Paying out of HER OWN float: the same amount must be marked settled in
+        // float reconciliation, or her cut would still count as owed back to us.
         $paidFromFloat = $referrer->floatAccount && $referrer->floatAccount->id === $account->id;
         $pendingByLoan = $paidFromFloat ? $referrer->pendingFloatInterestByLoan() : collect();
 
@@ -130,7 +131,7 @@ class ReferrerPayoutController extends Controller
                 'amount'            => $amountPaid,
                 'date'              => $validated['paid_date'],
                 'description'       => "Referrer commission to {$referrer->name} ({$validated['period_start']} to {$validated['period_end']})",
-                'mobile_money_type' => 'send_money', // M-Pesa send-money rates
+                'mobile_money_type' => 'send_money',
             ]);
 
             $payout = ReferrerPayout::create([
@@ -146,27 +147,23 @@ class ReferrerPayoutController extends Controller
                 'paid_date' => $validated['paid_date'],
             ]);
 
-            // $loans()->each(fn () => null); // n/a — kept for clarity, see line below
-            $loans->each(function ($loan) use ($payout) {
-                $loan->referrer_payout_id = $payout->id;
-                $loan->save();
-            });
+            // Stamp the payments (not the loans) as paid. Their commission is now frozen.
+            LoanGivenPayment::whereIn('id', $payments->pluck('id'))
+                ->update(['referrer_payout_id' => $payout->id]);
+
             $settledInFloat = 0;
 
             if ($paidFromFloat) {
-                foreach ($loans as $loan) {
-                    $sharePct = $loan->referrer_share_percentage ?? $referrer->default_share_percentage;
-                    $cut = round($loan->interest_amount * ($sharePct / 100), 2);
+                foreach ($payments->groupBy('loan_given_id') as $loanId => $group) {
+                    $cut = round((float) $group->sum('referrer_commission'), 2);
 
-                    // Never settle more than is actually pending for that loan: if some of
-                    // the interest was routed elsewhere on closing, only the part that
-                    // really sat in the float can be reconciled here.
-                    $settle = min($cut, (float) ($pendingByLoan[$loan->id] ?? 0));
+                    // Never settle more than is actually pending in the float for that loan.
+                    $settle = min($cut, (float) ($pendingByLoan[$loanId] ?? 0));
 
                     if ($settle > 0.01) {
                         ReferrerFloatReconciliation::create([
                             'user_id' => Auth::id(),
-                            'loan_given_id' => $loan->id,
+                            'loan_given_id' => $loanId,
                             'transfer_id' => null,
                             'referrer_payout_id' => $payout->id,
                             'amount' => $settle,
@@ -179,7 +176,9 @@ class ReferrerPayoutController extends Controller
             DB::commit();
             $account->updateBalance();
 
-            $msg = "Paid KES " . number_format($amountPaid, 0) . " to {$referrer->name} for {$loans->count()} loan(s).";
+            $loanCount = $payments->pluck('loan_given_id')->unique()->count();
+            $msg = "Paid KES " . number_format($amountPaid, 0) . " to {$referrer->name} "
+                . "for {$payments->count()} payment(s) across {$loanCount} loan(s).";
             if ($paidFromFloat) {
                 $msg .= " Taken from her float; KES " . number_format($settledInFloat, 0)
                     . " marked as settled in float reconciliation.";
