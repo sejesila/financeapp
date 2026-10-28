@@ -61,8 +61,7 @@ $outstandingInterest = round((float) $unpaidPayments->sum('interest_portion'), 2
 $outstandingPayable  = round((float) $unpaidPayments->sum('referrer_commission'), 2);
 $retainedTotal       = (float) $allPayments->where('referrer_commission_kept', true)->sum('referrer_commission');
 $paidOutTotal        = ($referrer->payouts ?? collect())->sum('amount_paid');
-$pendingFloatTotal   = $referrer->pendingFloatInterestByLoan()->sum()
-                     + $referrer->pendingFloatPrincipalByLoan()->sum();
+$floatLimits = $referrer->floatAccount ? $referrer->floatReconcileLimits() : null;
                     @endphp
 
                     <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mb-6">
@@ -86,11 +85,13 @@ $pendingFloatTotal   = $referrer->pendingFloatInterestByLoan()->sum()
                             <p class="text-xs sm:text-sm font-medium text-gray-500">Paid Out (Batches)</p>
                             <p class="text-base sm:text-lg font-semibold text-gray-900">KES {{ number_format($paidOutTotal, 0) }}</p>
                         </div>
-                        @if($referrer->floatAccount)
+                        @if($floatLimits)
                             <div class="bg-gradient-to-br from-teal-50 to-teal-100 rounded-lg border border-teal-200 p-3 sm:p-4">
-                                <p class="text-xs sm:text-sm font-medium text-gray-500">Pending in Float</p>
-                                <p class="text-base sm:text-lg font-semibold text-gray-900">KES {{ number_format($pendingFloatTotal, 0) }}</p>
-                                <p class="text-[10px] sm:text-xs leading-tight text-gray-500">Collected on your behalf, not yet reconciled</p>
+                                <p class="text-xs sm:text-sm font-medium text-gray-500">Reconcilable Now</p>
+                                <p class="text-base sm:text-lg font-semibold text-gray-900">KES {{ number_format($floatLimits['max_total'], 0) }}</p>
+                                <p class="text-[10px] sm:text-xs leading-tight text-gray-500">
+                                    Float KES {{ number_format($floatLimits['balance'], 0) }} less her commission KES {{ number_format($floatLimits['commission'], 0) }}
+                                </p>
                             </div>
                         @endif
                     </div>
