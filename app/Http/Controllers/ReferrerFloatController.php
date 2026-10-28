@@ -24,7 +24,7 @@ class ReferrerFloatController extends Controller
         protected TransferFeeCalculator $feeCalculator,
     ) {}
 
-    // ── index: the reconciliation screen ────────────────────────────────────
+    // ── index ───────────────────────────────────────────────────────────────
 
     public function index(Referrer $referrer)
     {
@@ -33,31 +33,21 @@ class ReferrerFloatController extends Controller
         }
 
         $floatAccount = $referrer->floatAccount;
+        $limits       = $referrer->floatReconcileLimits();
 
-        $pendingInterest  = $referrer->pendingFloatInterestByLoan();
-        $pendingPrincipal = $referrer->pendingFloatPrincipalByLoan();
+        // Interest stays per loan (it is never re-lent, so per-loan is meaningful).
+        $interestByLoan = $referrer->floatInterestAvailableByLoan();
 
-        $loanIds = $pendingInterest->keys()
-            ->merge($pendingPrincipal->keys())
-            ->unique()
-            ->values();
-
-        $pendingLoans = $loanIds->isEmpty()
+        $pendingLoans = $interestByLoan->isEmpty()
             ? collect()
-            : LoanGiven::whereIn('id', $loanIds)
+            : LoanGiven::whereIn('id', $interestByLoan->keys())
                 ->get()
-                ->map(function ($loan) use ($pendingInterest, $pendingPrincipal) {
-                    $loan->pending_float_interest  = (float) ($pendingInterest[$loan->id] ?? 0);
-                    $loan->pending_float_principal = (float) ($pendingPrincipal[$loan->id] ?? 0);
+                ->map(function ($loan) use ($interestByLoan) {
+                    $loan->pending_float_interest = (float) $interestByLoan[$loan->id];
                     return $loan;
                 })
-                ->sortByDesc(fn ($l) => $l->pending_float_interest + $l->pending_float_principal)
+                ->sortByDesc('pending_float_interest')
                 ->values();
-
-        $totals = [
-            'interest'  => round((float) $pendingInterest->sum(), 2),
-            'principal' => round((float) $pendingPrincipal->sum(), 2),
-        ];
 
         $destinationAccounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
@@ -65,13 +55,14 @@ class ReferrerFloatController extends Controller
             ->orderBy('name')
             ->get();
 
+        // View needs: $limits['balance'|'commission'|'interest'|'principal'|'max_total'],
+        // $pendingLoans (interest boxes only) and ONE principal field: principal_amount.
         return view('referrers.float-reconcile', compact(
-            'referrer', 'floatAccount', 'pendingLoans', 'destinationAccounts', 'totals'
+            'referrer', 'floatAccount', 'pendingLoans', 'destinationAccounts', 'limits'
         ));
     }
 
-    // ── reconcile: record what she actually sent, split by loan AND by
-    //    principal / interest ────────────────────────────────────────────────
+    // ── reconcile ───────────────────────────────────────────────────────────
 
     public function reconcile(Request $request, Referrer $referrer)
     {
@@ -87,56 +78,98 @@ class ReferrerFloatController extends Controller
             }
 
             $validated = $request->validate([
-                'destination_account_id'  => 'required|exists:accounts,id',
-                'date'                    => 'required|date',
-                'description'             => 'nullable|string',
-                'allocations'             => 'required|array',
-                'allocations.interest.*'  => 'nullable|numeric|min:0',
-                'allocations.principal.*' => 'nullable|numeric|min:0',
+                'destination_account_id' => 'required|exists:accounts,id',
+                'date'                   => 'required|date',
+                'description'            => 'nullable|string',
+                'principal_amount'       => 'nullable|numeric|min:0',
+                'allocations.interest.*' => 'nullable|numeric|min:0',
             ]);
 
-            // Re-check against current pending amounts server-side — the form
-            // only knows what was pending when the page loaded, and it's a
-            // financial figure, so it isn't trusted blindly.
-            $pending = [
-                'interest'  => $referrer->pendingFloatInterestByLoan(),
-                'principal' => $referrer->pendingFloatPrincipalByLoan(),
-            ];
+            // Re-derive every limit server-side; the form is not trusted.
+            $limits         = $referrer->floatReconcileLimits();
+            $interestByLoan = $referrer->floatInterestAvailableByLoan();
 
             $rows = collect();
 
-            foreach (['interest', 'principal'] as $component) {
-                foreach (($validated['allocations'][$component] ?? []) as $loanId => $amount) {
-                    $amount = round((float) $amount, 2);
+            // ── interest: per loan, capped per loan ──
+            foreach (($validated['allocations']['interest'] ?? []) as $loanId => $amount) {
+                $amount = round((float) $amount, 2);
 
-                    if ($amount <= 0) {
-                        continue;
+                if ($amount <= 0) {
+                    continue;
+                }
+
+                $available = (float) ($interestByLoan[$loanId] ?? 0);
+
+                if ($amount > $available + 0.01) {
+                    $name = LoanGiven::find($loanId)?->borrower_name ?? "loan #{$loanId}";
+
+                    return back()->with('error',
+                        "Interest for {$name} (KES " . number_format($amount, 0)
+                        . ") exceeds what's yours to take (KES " . number_format($available, 0)
+                        . "), after her unpaid commission."
+                    )->withInput();
+                }
+
+                $rows->push(['loan_id' => $loanId, 'amount' => $amount, 'component' => 'interest']);
+            }
+
+            $interestTotal = round((float) $rows->sum('amount'), 2);
+
+            if ($interestTotal > $limits['interest'] + 0.01) {
+                return back()->with('error',
+                    'Interest (KES ' . number_format($interestTotal, 0) . ') is more than the float can release (KES '
+                    . number_format($limits['interest'], 0) . ').'
+                )->withInput();
+            }
+
+            // ── principal: ONE pool, capped by real cash ──
+            $principalTotal = round((float) ($validated['principal_amount'] ?? 0), 2);
+
+            if ($principalTotal > $limits['principal'] + 0.01) {
+                return back()->with('error',
+                    'Principal (KES ' . number_format($principalTotal, 0) . ') is more than she is actually holding (KES '
+                    . number_format($limits['principal'], 0) . '). Money already lent out again is not in the float.'
+                )->withInput();
+            }
+
+            $total = round($interestTotal + $principalTotal, 2);
+
+            if ($total <= 0) {
+                return back()->with('error', 'Enter an amount to reconcile.')->withInput();
+            }
+
+            if ($total > $limits['max_total'] + 0.01) {
+                return back()->with('error',
+                    'Total (KES ' . number_format($total, 0) . ') is more than the most you can reconcile now (KES '
+                    . number_format($limits['max_total'], 0) . ' = float balance KES '
+                    . number_format($limits['balance'], 0) . ' minus her unpaid commission KES '
+                    . number_format($limits['commission'], 0) . ').'
+                )->withInput();
+            }
+
+            // Principal rows still need a loan id for the existing schema, so the
+            // pool is spread oldest-first over loans that have principal on record.
+            if ($principalTotal > 0) {
+                $left = $principalTotal;
+
+                foreach ($referrer->pendingFloatPrincipalByLoan() as $loanId => $pending) {
+                    if ($left <= 0.005) {
+                        break;
                     }
 
-                    $available = (float) ($pending[$component][$loanId] ?? 0);
+                    $take = round(min($left, (float) $pending), 2);
 
-                    if ($amount > $available + 0.01) {
-                        $name = LoanGiven::find($loanId)?->borrower_name ?? "loan #{$loanId}";
-
-                        return back()->with('error',
-                            ucfirst($component) . " for {$name} (KES " . number_format($amount, 0)
-                            . ") exceeds what's pending (KES " . number_format($available, 0) . ")."
-                        )->withInput();
+                    if ($take > 0) {
+                        $rows->push(['loan_id' => $loanId, 'amount' => $take, 'component' => 'principal']);
+                        $left = round($left - $take, 2);
                     }
+                }
 
-                    $rows->push([
-                        'loan_id'   => $loanId,
-                        'amount'    => $amount,
-                        'component' => $component,
-                    ]);
+                if ($left > 0.01) {
+                    throw new \RuntimeException('Could not attach the principal to any loan record.');
                 }
             }
-
-            if ($rows->isEmpty()) {
-                return back()->with('error', 'Enter an amount for at least one loan.')->withInput();
-            }
-
-            $total = round((float) $rows->sum('amount'), 2);
 
             $destination = Account::withoutGlobalScopes()->findOrFail($validated['destination_account_id']);
 
@@ -147,11 +180,6 @@ class ReferrerFloatController extends Controller
             DB::beginTransaction();
 
             try {
-                // Watermark: TransferService::execute() only returns the fee it
-                // charged, not the Transfer row itself, so the transfer is
-                // recovered by id immediately after — safe here because nothing
-                // else can interleave a write between these two calls within a
-                // single synchronous request.
                 $lastIdBefore = Transfer::withoutGlobalScopes()
                     ->where('user_id', Auth::id())
                     ->max('id') ?? 0;
@@ -185,21 +213,15 @@ class ReferrerFloatController extends Controller
                 }
 
                 DB::commit();
-
             } catch (Throwable $e) {
                 DB::rollBack();
                 throw $e;
             }
 
-            $interestTotal  = round((float) $rows->where('component', 'interest')->sum('amount'), 2);
-            $principalTotal = round((float) $rows->where('component', 'principal')->sum('amount'), 2);
-            $loanCount      = $rows->pluck('loan_id')->unique()->count();
-
             return redirect()->route('referrers.float.index', $referrer)
-                ->with('success', "KES " . number_format($total, 0)
-                    . " reconciled across {$loanCount} loan(s): "
-                    . "KES " . number_format($interestTotal, 0) . " interest, "
-                    . "KES " . number_format($principalTotal, 0) . " principal.");
+                ->with('success', 'KES ' . number_format($total, 0) . ' reconciled: KES '
+                    . number_format($interestTotal, 0) . ' interest, KES '
+                    . number_format($principalTotal, 0) . ' principal.');
 
         } catch (ValidationException $e) {
             return back()->withErrors($e->errors())->withInput();

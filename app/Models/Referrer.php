@@ -214,4 +214,83 @@ class Referrer extends Model
 
         return $pending;
     }
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADD these methods to App\Models\Referrer (keep everything already there).
+// Needs: use Illuminate\Support\Collection;  (or keep the FQCN style)
+// ─────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Commission accrued on her referred loans that is still owed to HER
+     * (not paid out, not kept before deposit). It sits inside the float's
+     * interest, so it is never available to remit to you. [loan_id => amount]
+     */
+    public function unpaidCommissionByLoan(): \Illuminate\Support\Collection
+    {
+        return LoanGivenPayment::whereNull('referrer_payout_id')
+            ->where('referrer_commission_kept', false)
+            ->where('referrer_commission', '>', 0)
+            ->whereHas('loanGiven', fn($q) => $q->where('referrer_id', $this->id))
+            ->groupBy('loan_given_id')
+            ->selectRaw('loan_given_id, SUM(referrer_commission) as total')
+            ->pluck('total', 'loan_given_id')
+            ->map(fn($v) => (float)$v);
+    }
+
+    /**
+     * Interest that is YOURS and can be remitted now, per loan:
+     * pending interest in the float minus her unpaid commission on that loan.
+     */
+    public function floatInterestAvailableByLoan(): \Illuminate\Support\Collection
+    {
+        $commission = $this->unpaidCommissionByLoan();
+
+        return $this->pendingFloatInterestByLoan()
+            ->map(fn($pending, $loanId) => round(max(0, (float)$pending - (float)($commission[$loanId] ?? 0)), 2))
+            ->filter(fn($amount) => $amount > 0.01);
+    }
+
+    /**
+     * Principal she is physically holding for you, as ONE pool.
+     * = float balance - all interest sitting in the float (yours + her commission).
+     * Re-lent money has already left the balance, so it is never counted again.
+     */
+    public function floatPrincipalAvailable(): float
+    {
+        $account = $this->floatAccount;
+
+        if (!$account) {
+            return 0.0;
+        }
+
+        $interestHeld = (float)$this->pendingFloatInterestByLoan()->sum();
+
+        return round(max(0, (float)$account->current_balance - $interestHeld), 2);
+    }
+
+    /**
+     * Everything the reconcile page/validation needs, in one place.
+     */
+    public function floatReconcileLimits(): array
+    {
+        $account = $this->floatAccount;
+        $balance = $account ? round((float)$account->current_balance, 2) : 0.0;
+        $commission = round((float)$this->unpaidCommissionByLoan()->sum(), 2);
+
+        $interest = round((float)$this->floatInterestAvailableByLoan()->sum(), 2);
+        $principal = $this->floatPrincipalAvailable();
+
+        // Hard ceiling = real cash that is not hers. (Transfer fee still has to
+        // fit on top; TransferService checks that itself.)
+        $cash = round(max(0, $balance - $commission), 2);
+
+        return [
+            'balance' => $balance,
+            'commission' => $commission,
+            'interest' => min($interest, $cash),
+            'principal' => min($principal, $cash),
+            'max_total' => min($cash, $interest + $principal),
+        ];
+    }
 }
