@@ -7,6 +7,7 @@ use App\Models\LoanGiven;
 use App\Services\BorrowerStatsService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Support\Facades\DB;
 
@@ -28,14 +29,30 @@ class BorrowerController extends Controller implements HasMiddleware
 
     public function index(Request $request)
     {
-        $sort = $request->get('sort', 'interest_earned'); // interest_earned | risk_score | total_borrowed | outstanding | name
+        $sort    = $request->get('sort', 'interest_earned');
+        $perPage = 20;
 
         $rows = $this->stats->forAll();
-        $rows = $sort === 'name'
+        $rows = ($sort === 'name'
             ? $rows->sortBy(fn ($r) => $r['borrower']->name)
-            : $rows->sortByDesc(fn ($r) => $r[$sort] ?? 0);
+            : $rows->sortByDesc(fn ($r) => $r[$sort] ?? 0)
+        )->values();
 
-        return view('borrowers.index', ['rows' => $rows->values(), 'sort' => $sort]);
+        $page = LengthAwarePaginator::resolveCurrentPage();
+
+        $paginated = (new LengthAwarePaginator(
+            $rows->forPage($page, $perPage)->values(),
+            $rows->count(),
+            $perPage,
+            $page,
+            ['path' => $request->url()]
+        ))->withQueryString();
+
+        return view('borrowers.index', [
+            'rows'      => $rows,       // full set, for the summary cards
+            'paginated' => $paginated,  // current page, for the table
+            'sort'      => $sort,
+        ]);
     }
 
     public function show(Borrower $borrower)

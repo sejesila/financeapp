@@ -41,7 +41,7 @@
                         </a>
                     </div>
 
-                    <!-- Summary cards -->
+                    <!-- Summary cards (totals across ALL borrowers, not just the current page) -->
                     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
                         <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 shadow-sm rounded-lg border border-indigo-200 p-3 sm:p-4">
                             <p class="text-xs sm:text-sm font-medium text-gray-500">Borrowers</p>
@@ -95,7 +95,7 @@
                                     </tr>
                                     </thead>
                                     <tbody class="bg-white divide-y divide-gray-200">
-                                    @foreach($rows as $r)
+                                    @foreach($paginated as $r)
                                         <tr class="hover:bg-gray-50">
                                             <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900">
                                                 <a href="{{ route('borrowers.show', $r['borrower']->id) }}" class="hover:text-indigo-600">
@@ -141,6 +141,12 @@
                                     </tbody>
                                 </table>
                             </div>
+
+                            @if($paginated->hasPages())
+                                <div class="px-3 sm:px-6 py-3 border-t border-gray-200">
+                                    {{ $paginated->links() }}
+                                </div>
+                            @endif
                         @endif
                     </div>
                 </div>
