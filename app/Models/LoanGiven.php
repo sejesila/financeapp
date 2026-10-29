@@ -192,7 +192,12 @@ class LoanGiven extends Model
 
         $this->amount_paid    = $payments->sum('amount');
         $this->principal_paid = $payments->sum(fn ($p) => $p->amount - $p->interest_portion);
-        $this->balance         = max(0, $this->principal_amount - $this->principal_paid);
+
+        // A closed loan owes nothing, even if it was closed with a shortfall.
+        $this->balance = $this->status === 'paid'
+            ? 0
+            : max(0, $this->principal_amount - $this->principal_paid);
+
         $this->save();
     }
 
