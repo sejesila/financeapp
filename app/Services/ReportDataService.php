@@ -10,6 +10,12 @@ use App\Models\Loan;
 use App\Models\LoanGiven;
 use App\Models\LoanGivenPayment;
 use App\Models\LoanPayment;
+use App\Models\RetirementEntry;
+use App\Models\RetirementFund;
+use App\Models\Sacco;
+use App\Models\SaccoEntry;
+use App\Models\SaccoLoan;
+use App\Models\SaccoLoanPayment;
 use App\Models\Transaction;
 use App\Models\Transfer;
 use App\Models\User;
@@ -488,6 +494,8 @@ class ReportDataService
         // subtracted again in net worth: that liability is already fully
         // reflected in $totalClientFunds / client_funds_as_at.
         $totalUnreturnedBorrowed = $this->getUnreturnedBorrowedAsAt($user, $endDate);
+        $saccoSummary      = $this->getSaccoSummary($user, $startDate, $endDate);
+        $retirementSummary = $this->getRetirementSummary($user, $startDate, $endDate);
 
 // Net worth = only the money you actually own in savings (Etica — savings
 // accounts, net of the FULL amount owed to every client, not just what's
@@ -506,7 +514,13 @@ class ReportDataService
 //
 // No outer max(0, ...): you can legitimately owe more than you own, and
 // clamping here would hide that.
-        $netWorth = $ownedSavings + $totalLoansGivenBalance - $totalLoanBalance;
+        // Liquid net worth: Etica savings (net of client funds) + loans given - active loans
+// + Sacco net position (shares + deposits + wallet - Sacco loans).
+// Retirement funds are deliberately excluded: they're locked until retirement.
+        $netWorth = $ownedSavings
+            + $totalLoansGivenBalance
+            - $totalLoanBalance
+            + ($saccoSummary['net_position'] ?? 0);
 
 
         // --- Transactions ---
@@ -614,6 +628,7 @@ class ReportDataService
         $loansGivenStats = $this->getLoansGivenStats($user, $startDate, $endDate);
         $totalInterestIncome = (float)$investmentIncome['total'] + $loanGivenInterestIncome;
 
+
         return [
             'period_type' => $type,
             'start_date' => $startDate->format('M d, Y'),
@@ -654,7 +669,146 @@ class ReportDataService
             'total_interest_income' => $totalInterestIncome,
             'loan_given_interest_income' => $loanGivenInterestIncome,
             'loans_given_stats' => $loansGivenStats,
+            'sacco'               => $saccoSummary,
+            'retirement'          => $retirementSummary,
 
+        ];
+    }
+    /**
+     * Sacco position as at $endDate, plus activity inside the period.
+     * Returns null when the user has no sacco or it opened after $endDate.
+     */
+    private function getSaccoSummary(User $user, Carbon $startDate, Carbon $endDate): ?array
+    {
+        $sacco = Sacco::withoutGlobalScopes()->where('user_id', $user->id)->first();
+
+        if (! $sacco || $sacco->opening_date->gt($endDate)) {
+            return null;
+        }
+
+        $entries = SaccoEntry::withoutGlobalScopes()
+            ->where('sacco_id', $sacco->id)
+            ->whereDate('period_date', '<=', $endDate->toDateString())
+            ->get();
+
+        $inPeriod = $entries->filter(
+            fn($e) => Carbon::parse($e->period_date)->between($startDate, $endDate)
+        );
+
+        $ledgers = [];
+        foreach (Sacco::LEDGERS as $key => $label) {
+            $ledgers[$key] = [
+                'label'   => $label,
+                'balance' => (float)$sacco->{'opening_' . $key} + (float)$entries->where('ledger', $key)->sum('amount'),
+            ];
+        }
+
+        // Loans disbursed by $endDate. A loan that had already been refinanced
+        // by then is superseded by its replacement and not counted twice.
+        $loans = SaccoLoan::withoutGlobalScopes()
+            ->where('sacco_id', $sacco->id)
+            ->whereDate('disbursed_date', '<=', $endDate->toDateString())
+            ->get();
+
+        $payments = SaccoLoanPayment::withoutGlobalScopes()
+            ->whereIn('sacco_loan_id', $loans->pluck('id'))
+            ->whereDate('period_date', '<=', $endDate->toDateString())
+            ->get();
+
+        $paymentsByLoan = $payments->groupBy('sacco_loan_id');
+        $supersededIds  = $loans->pluck('refinanced_from_id')->filter();
+
+        $loanRows = $loans
+            ->reject(fn($l) => $supersededIds->contains($l->id))
+            ->map(fn($l) => [
+                'name'        => $l->name,
+                'principal'   => (float)$l->principal,
+                'outstanding' => max(0, (float)$l->principal - (float)$paymentsByLoan->get($l->id, collect())->sum('principal_portion')),
+                'instalment'  => (float)$l->instalment,
+                'term_months' => (int)$l->term_months,
+                'paid_count'  => $paymentsByLoan->get($l->id, collect())->count(),
+            ])
+            ->filter(fn($l) => $l['outstanding'] > 0.005)
+            ->values();
+
+        $loansOutstanding = (float)$loanRows->sum('outstanding');
+
+        $periodPayments = $payments->filter(
+            fn($p) => Carbon::parse($p->period_date)->between($startDate, $endDate)
+        );
+
+        $depositsBalance = $ledgers['deposits']['balance'];
+
+        return [
+            'name'             => $sacco->name,
+            'ledgers'          => $ledgers,
+            'loans'            => $loanRows->all(),
+            'loans_outstanding' => $loansOutstanding,
+            'net_position'     => array_sum(array_column($ledgers, 'balance')) - $loansOutstanding,
+            'borrowing_power'  => max(0, $depositsBalance * (float)$sacco->borrowing_multiple - $loansOutstanding),
+            'period' => [
+                'deposits_added'   => (float)$inPeriod->where('kind', 'contribution')->sum('amount'),
+                'dividends'        => (float)$inPeriod->where('kind', 'dividend')->sum('amount'),
+                'withdrawals'      => abs((float)$inPeriod->whereIn('kind', ['withdrawal', 'charges'])->sum('amount')),
+                'loan_repaid'      => (float)$periodPayments->sum('amount'),
+                'loan_interest'    => (float)$periodPayments->sum('interest_portion'),
+                'loan_principal'   => (float)$periodPayments->sum('principal_portion'),
+            ],
+        ];
+    }
+
+    /**
+     * Retirement funds (NSSF / provident) as at $endDate, plus period contributions.
+     * Funds whose opening balance is dated after $endDate are skipped, because
+     * the balance at $endDate can't be known.
+     */
+    private function getRetirementSummary(User $user, Carbon $startDate, Carbon $endDate): ?array
+    {
+        $funds = RetirementFund::withoutGlobalScopes()
+            ->where('user_id', $user->id)
+            ->where('is_active', true)
+            ->whereDate('opening_balance_date', '<=', $endDate->toDateString())
+            ->orderBy('name')
+            ->get();
+
+        if ($funds->isEmpty()) {
+            return null;
+        }
+
+        $entries = RetirementEntry::withoutGlobalScopes()
+            ->whereIn('retirement_fund_id', $funds->pluck('id'))
+            ->whereDate('period_date', '<=', $endDate->toDateString())
+            ->get()
+            ->groupBy('retirement_fund_id');
+
+        $rows = $funds->map(function ($fund) use ($entries, $startDate, $endDate) {
+            $all      = $entries->get($fund->id, collect());
+            $inPeriod = $all->filter(fn($e) => Carbon::parse($e->period_date)->between($startDate, $endDate));
+
+            $sum = fn($c, $f) => (float)$c->sum($f);
+
+            return [
+                'name'      => $fund->name,
+                'type'      => $fund->type === 'nssf' ? 'NSSF' : 'Provident',
+                'employee'  => $sum($inPeriod, 'employee_amount'),
+                'employer'  => $sum($inPeriod, 'employer_amount'),
+                'voluntary' => $sum($inPeriod, 'voluntary_amount'),
+                'interest'  => $sum($inPeriod, 'interest_amount'),
+                'balance'   => (float)$fund->opening_balance
+                    + $sum($all, 'employee_amount') + $sum($all, 'employer_amount')
+                    + $sum($all, 'voluntary_amount') + $sum($all, 'interest_amount'),
+            ];
+        })->values();
+
+        return [
+            'funds' => $rows->all(),
+            'total' => [
+                'employee'  => (float)$rows->sum('employee'),
+                'employer'  => (float)$rows->sum('employer'),
+                'voluntary' => (float)$rows->sum('voluntary'),
+                'interest'  => (float)$rows->sum('interest'),
+                'balance'   => (float)$rows->sum('balance'),
+            ],
         ];
     }
 

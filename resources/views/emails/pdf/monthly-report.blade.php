@@ -300,10 +300,14 @@
         Savings Accounts: {{ $currency }} {{ number_format($savingsBalance) }}
         &bull; Outstanding Loans Given: {{ $currency }} {{ number_format($totalLoansGiven) }}
         &bull; Active Loans: {{ $currency }} {{ number_format($totalLoans) }}
+        @if(!empty($data['sacco']))
+            &bull; Sacco (net of loan): {{ $currency }} {{ number_format($data['sacco']['net_position']) }}
+        @endif
         @if($totalUnreturnedBorrowed > 0)
             &bull; Borrowed (Unreturned): {{ $currency }} {{ number_format($totalUnreturnedBorrowed) }}
         @endif
     </div>
+
     @if($totalUnreturnedBorrowed > 0)
         <p style="font-size: 8px; color: rgba(255,255,255,0.85); margin-top: 4px;">
             Net worth above is reduced by {{ $currency }} {{ number_format($totalUnreturnedBorrowed) }} in client
@@ -757,6 +761,8 @@
         </table>
     </div>
 @endif
+
+@include('reports.partials.sacco-retirement', ['data' => $data, 'currency' => $currency, 'periodLabel' => 'This Month'])
 
 <!-- Active Loans -->
 @if($data['active_loans']->isNotEmpty())

@@ -331,6 +331,9 @@
         Savings Accounts: {{ $currency }} {{ number_format($savingsBalance) }}
         &bull; Outstanding Loans Given: {{ $currency }} {{ number_format($totalLoansGiven) }}
         &bull; Active Loans: {{ $currency }} {{ number_format($totalLoans) }}
+        @if(!empty($data['sacco']))
+            &bull; Sacco (net of loan): {{ $currency }} {{ number_format($data['sacco']['net_position']) }}
+        @endif
         @if($totalUnreturnedBorrowed > 0)
             &bull; Borrowed (Unreturned): {{ $currency }} {{ number_format($totalUnreturnedBorrowed) }}
         @endif
@@ -618,6 +621,8 @@
         @endif
     </div>
 @endif
+
+@include('reports.partials.sacco-retirement', ['data' => $data, 'currency' => $currency, 'periodLabel' => 'Year'])
 
 <!-- Month-by-Month Breakdown with Budget vs Actual -->
 @if(!empty($monthlyBreakdown))
