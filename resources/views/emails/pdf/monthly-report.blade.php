@@ -567,36 +567,6 @@
     </div>
 @endif
 
-<!-- Top Spending Categories -->
-@if($data['top_categories']->isNotEmpty())
-    <div class="section">
-        <div class="section-title">Spending Breakdown by Category</div>
-        <table>
-            <thead>
-            <tr>
-                <th style="width: 5%;">#</th>
-                <th style="width: 40%;">Category</th>
-                <th style="text-align: center; width: 15%;">Transactions</th>
-                <th style="text-align: right; width: 25%;">Total Amount</th>
-                <th style="text-align: right; width: 15%;">% of Expenses</th>
-            </tr>
-            </thead>
-            <tbody>
-            @foreach($data['top_categories'] as $i => $cat)
-                @php $catPct = $expenses > 0 ? ($cat['amount'] / $expenses) * 100 : 0; @endphp
-                <tr>
-                    <td style="color: #6B7280;">{{ $i + 1 }}</td>
-                    <td style="font-weight: 600;">{{ $cat['category'] }}</td>
-                    <td style="text-align: center; color: #6B7280;">{{ $cat['count'] }}</td>
-                    <td style="text-align: right; font-weight: bold; color: #DC2626;">{{ $currency }} {{ number_format($cat['amount']) }}</td>
-                    <td style="text-align: right; color: #6B7280;">{{ number_format($catPct, 1) }}%</td>
-                </tr>
-            @endforeach
-            </tbody>
-        </table>
-    </div>
-@endif
-
 <!-- Loan Activity This Month -->
 @php
     $loansPaid   = $data['loans_paid_in_period']   ?? ['count' => 0, 'total' => 0, 'items' => []];
