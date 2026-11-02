@@ -90,31 +90,39 @@ class ReferrerLedgerService
                     : ' (not counted)';
             }
 
-            // Same-day order: borrower money in (0), transfers in / loans / fees /
-            // everything else in real entry order (2), transfers out (3).
-            // A transfer's fee sits right after that transfer; a loan's fee sits
-            // right after that loan.
-            $priority = in_array($cat, ['Loan Recovery', 'Loan Interest'], true) ? 0 : 2;
-
+            // Ordering metadata (see orderWithoutOverdraft()):
+            //   unit = rows that must stay together (a loan + its fee, a transfer + its fee)
+            //   sub  = position inside the unit (0 = main row, 1 = its fee)
+            //   ts   = when the record was created; tie = id for equal timestamps
             $parent = $this->parentOfFee($t, $byId, $feeToDisb);
 
             if ($t->is_transaction_fee && $t->transfer_id) {
-                $sort = [$t->date->format('Y-m-d'), 3, (int) $t->transfer_id, 1];
+                $unit = "tr{$t->transfer_id}";
+                $sub  = 1;
+                $day  = $t->date->format('Y-m-d');
+                $ts   = $t->created_at?->timestamp ?? 0;
+                $tie  = (int) $t->id;
             } elseif ($parent) {
-                // Take the loan's slot, plus 0.5 so it lands directly beneath it.
-                $sort = [
-                    $parent->date->format('Y-m-d'),
-                    2,
-                    $parent->created_at?->timestamp ?? 0,
-                    $parent->id + 0.5,
-                ];
+                $unit = "t{$parent->id}";
+                $sub  = 1;
+                $day  = $parent->date->format('Y-m-d');
+                $ts   = $parent->created_at?->timestamp ?? 0;
+                $tie  = (int) $parent->id;
             } else {
-                $sort = [$t->date->format('Y-m-d'), $priority, $t->created_at?->timestamp ?? 0, $t->id];
+                $unit = "t{$t->id}";
+                $sub  = 0;
+                $day  = $t->date->format('Y-m-d');
+                $ts   = $t->created_at?->timestamp ?? 0;
+                $tie  = (int) $t->id;
             }
 
             $rows->push([
                 'date'      => $t->date,
-                'sort'      => $sort,
+                'day'       => $day,
+                'unit'      => $unit,
+                'sub'       => $sub,
+                'ts'        => $ts,
+                'tie'       => $tie,
                 'title'     => $title,
                 'credit'    => $effect > 0 ? $effect : 0,
                 'debit'     => $effect < 0 ? -$effect : 0,
@@ -127,11 +135,14 @@ class ReferrerLedgerService
             $rows = $rows->merge($this->transferRows($account->id));
         }
 
-        $rows = $rows->sortBy('sort')->values();
-
-        // Running balance. Opening balance assumed to be the account's initial
-        // balance; if your column is named differently, change it here.
+        // Opening balance assumed to be the account's initial balance; if your
+        // column is named differently, change it here.
         $opening = (float) ($account->initial_balance ?? 0);
+
+        // Timestamp order within each day, but never let the balance go
+        // negative when a same-day credit can cover the debit.
+        $rows = $this->orderWithoutOverdraft($rows, $opening);
+
         $running = $opening;
 
         $rows = $rows->map(function ($row) use (&$running) {
@@ -163,6 +174,66 @@ class ReferrerLedgerService
             // Anything other than ~0 means the ledger and the stored balance disagree.
             'difference' => round($current - $closing, 2),
         ];
+    }
+
+    /**
+     * Orders rows day by day. Inside a day, blocks ("units") go in the order
+     * they were created. If the next block is a net debit that would push the
+     * running balance below zero, the earliest later same-day block that is a
+     * net credit is moved ahead of it, repeatedly, until the debit is covered
+     * or no credit is left that day. Credits never cross into another day.
+     */
+    private function orderWithoutOverdraft(Collection $rows, float $opening): Collection
+    {
+        $balance = $opening;
+        $out     = collect();
+
+        $rows->groupBy('day')->sortKeys()->each(function (Collection $day) use (&$balance, &$out) {
+            $units = $day->groupBy('unit')
+                ->map(function (Collection $g) {
+                    $g = $g->sortBy('sub')->values();
+
+                    return [
+                        'rows' => $g,
+                        'ts'   => $g->min('ts'),
+                        'tie'  => $g->first()['tie'],
+                        'net'  => round($g->sum('credit') - $g->sum('debit'), 2),
+                    ];
+                })
+                ->sort(fn ($a, $b) => [$a['ts'], $a['tie']] <=> [$b['ts'], $b['tie']])
+                ->values()
+                ->all();
+
+            while ($units) {
+                $unit = array_shift($units);
+
+                if ($unit['net'] < 0) {
+                    while ($balance + $unit['net'] < -0.005) {
+                        $k = null;
+
+                        foreach ($units as $i => $cand) {
+                            if ($cand['net'] > 0) {
+                                $k = $i;
+                                break;
+                            }
+                        }
+
+                        if ($k === null) {
+                            break;
+                        }
+
+                        $pull = array_splice($units, $k, 1)[0];
+                        $balance += $pull['net'];
+                        $out->push(...$pull['rows']->all());
+                    }
+                }
+
+                $balance += $unit['net'];
+                $out->push(...$unit['rows']->all());
+            }
+        });
+
+        return $out->values();
     }
 
     /**
@@ -277,6 +348,14 @@ class ReferrerLedgerService
             $date = Carbon::parse($tr->date);
             $out = (int) $tr->from_account_id === $accountId;
 
+            $meta = [
+                'date' => $date,
+                'day'  => $date->format('Y-m-d'),
+                'unit' => "tr{$tr->id}",
+                'ts'   => $tr->created_at?->timestamp ?? $date->timestamp,
+                'tie'  => (int) $tr->id,
+            ];
+
             if ($out) {
                 $dest = $tr->toAccount?->name ?? 'you';
 
@@ -293,16 +372,15 @@ class ReferrerLedgerService
                         continue;
                     }
 
-                    $rows->push([
-                        'date'      => $date,
-                        // 4th slot kept numeric so it sorts correctly against fee rows (…, 3, id, 1).
-                        'sort'      => [$date->format('Y-m-d'), 3, $tr->id, $i++ * 0.01],
-                        'title'     => "Remitted to {$dest} ({$component})",
-                        'credit'    => 0,
-                        'debit'     => $amt,
-                        'component' => $component,
-                        'kind'      => 'remitted',
-                    ]);
+                    $rows->push($meta + [
+                            // The transfer's fee row uses sub 1, so these stay below it.
+                            'sub'       => $i++ * 0.01,
+                            'title'     => "Remitted to {$dest} ({$component})",
+                            'credit'    => 0,
+                            'debit'     => $amt,
+                            'component' => $component,
+                            'kind'      => 'remitted',
+                        ]);
                 }
 
                 // Older remittances (before principal/interest tagging) only ever
@@ -313,15 +391,14 @@ class ReferrerLedgerService
                 $rest = round((float) $tr->amount - array_sum($split->all()), 2);
 
                 if ($rest > 0.005) {
-                    $rows->push([
-                        'date'      => $date,
-                        'sort'      => [$date->format('Y-m-d'), 3, $tr->id, $i * 0.01],
-                        'title'     => "Remitted to {$dest}",
-                        'credit'    => 0,
-                        'debit'     => $rest,
-                        'kind'      => 'remitted',
-                        'component' => self::PRINCIPAL,
-                    ]);
+                    $rows->push($meta + [
+                            'sub'       => $i * 0.01,
+                            'title'     => "Remitted to {$dest}",
+                            'credit'    => 0,
+                            'debit'     => $rest,
+                            'kind'      => 'remitted',
+                            'component' => self::PRINCIPAL,
+                        ]);
                 }
 
                 continue;
@@ -333,18 +410,15 @@ class ReferrerLedgerService
 
             // Any transfer fee is its own fee transaction on the account,
             // so it appears as a "Transaction fee" line, not here.
-            $rows->push([
-                // Slotted in by the real time it happened, alongside loans and
-                // fees, so the statement reads in the order things occurred.
-                'date'      => $date,
-                'sort'      => [$date->format('Y-m-d'), 2, $date->timestamp, $tr->id],
-                'title'     => 'Transfer in: ' . ($tr->fromAccount?->name ?? 'another account')
-                    . ($incomingPending ? ' (clears ' . Carbon::parse($tr->value_date)->format('M j') . ')' : ''),
-                'credit'    => $incomingPending ? 0 : (float) $tr->amount,
-                'debit'     => 0,
-                'component' => null, // capital you fund her float with: full activity only
-                'kind'      => 'transfer_in',
-            ]);
+            $rows->push($meta + [
+                    'sub'       => 0,
+                    'title'     => 'Transfer in: ' . ($tr->fromAccount?->name ?? 'another account')
+                        . ($incomingPending ? ' (clears ' . Carbon::parse($tr->value_date)->format('M j') . ')' : ''),
+                    'credit'    => $incomingPending ? 0 : (float) $tr->amount,
+                    'debit'     => 0,
+                    'component' => null, // capital you fund her float with: full activity only
+                    'kind'      => 'transfer_in',
+                ]);
         }
 
         return $rows;
@@ -491,7 +565,8 @@ class ReferrerLedgerService
      * matched by borrower name from their description and flagged as such.
      *
      * "in" / "out" are from the point of view of the account shown on each row,
-     * so this is a trail to trace money, not a single running balance.
+     * so this is a trail to trace money, not a single running balance. Rows are
+     * ordered by day, then by when each record was created.
      *
      * A loan's fee (when linked via fee_for_transaction_id or the disbursement's
      * related_fee_transaction_id) is sorted directly beneath that loan.
@@ -591,18 +666,14 @@ class ReferrerLedgerService
                 $title .= ' (not counted)';
             }
 
-            // All sort keys have four elements so arrays compare element by
-            // element. A linked fee takes its loan's slot with a trailing 1,
-            // which puts it directly beneath the loan (trailing 0).
+            // Real order of entry: same day, then by when the record was created.
+            // A linked fee borrows its loan's timestamp and id; the trailing 1
+            // puts it directly beneath the loan (trailing 0).
             $parent = $this->parentOfFee($t, $byId, $feeToDisb);
 
-            $sort = match (true) {
-                $parent !== null               => [$parent->date->format('Y-m-d'), 0, $parent->id, 1],
-                $cat === 'Friend Loan Given'   => [$t->date->format('Y-m-d'), 0, $t->id, 0],
-                (bool) $t->is_transaction_fee  => [$t->date->format('Y-m-d'), 3, $t->id, 0],
-                $cat === 'Referrer Commission' => [$t->date->format('Y-m-d'), 4, $t->id, 0],
-                default                        => [$t->date->format('Y-m-d'), 2, $t->id, 0],
-            };
+            $sort = $parent !== null
+                ? [$parent->date->format('Y-m-d'), $parent->created_at?->timestamp ?? 0, $parent->id, 1]
+                : [$t->date->format('Y-m-d'), $t->created_at?->timestamp ?? 0, $t->id, 0];
 
             $rows->push([
                 'date'     => $t->date,
@@ -657,7 +728,7 @@ class ReferrerLedgerService
 
                 $rows->push([
                     'date'     => $date,
-                    'sort'     => [$date->format('Y-m-d'), 1, $tr->id, 0],
+                    'sort'     => [$date->format('Y-m-d'), $tr->created_at?->timestamp ?? $date->timestamp, $tr->id, 0],
                     'account'  => "{$from} → {$to}",
                     'title'    => $out ? "Remitted to {$to}" : "Transfer in from {$from}",
                     'note'     => $note ?? ($tr->description ?: null),
