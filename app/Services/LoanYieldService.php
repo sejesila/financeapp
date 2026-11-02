@@ -10,8 +10,7 @@ use Illuminate\Support\Collection;
  * Return on deployed capital for the loans-given book.
  *
  * Mirrors StatementDataService::computeYield(): build a daily series of capital
- * at work and average it. Returns the raw (un-annualized) return for the period,
- * plus a simple annualized figure so periods of different lengths can be compared.
+ * at work and average it. Returns the raw (un-annualized) return for the period.
  * The differences from the savings version:
  *
  *  - Capital is PRINCIPAL OUT (cash you actually lent and haven't got back),
@@ -150,11 +149,8 @@ class LoanYieldService
             'write_offs'          => (float) $writeOffs,
             'at_risk'             => (float) $atRisk,
             'period_return_pct'   => $periodReturn * 100,
-            // Simple (non-compounded) annualization of the period return.
-            'annualized_pct'      => $periodReturn * (365 / max(1, $days)) * 100,
             // Same return if all defaulted loans were written off in full.
-            'stress_return_pct'     => $stressReturn * 100,
-            'stress_annualized_pct' => $stressReturn * (365 / max(1, $days)) * 100,
+            'stress_return_pct'   => $stressReturn * 100,
         ];
     }
 
