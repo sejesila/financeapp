@@ -137,6 +137,12 @@ class LoanYieldService
         $netAfterLosses = $netInterest - $writeOffs;
         $periodReturn   = $netAfterLosses / $avg;
 
+        // ── Stress case ──────────────────────────────────────────────────────
+        // "What if every loan currently marked defaulted is never recovered?"
+        // Subtracts the at-risk balance from net interest as if it were written
+        // off today. Capital is left unchanged (it already includes those loans).
+        $stressReturn = ($netAfterLosses - $atRisk) / $avg;
+
         return [
             'days'                => $days,
             'avg_capital'         => $avg,
@@ -146,6 +152,9 @@ class LoanYieldService
             'period_return_pct'   => $periodReturn * 100,
             // Simple (non-compounded) annualization of the period return.
             'annualized_pct'      => $periodReturn * (365 / max(1, $days)) * 100,
+            // Same return if all defaulted loans were written off in full.
+            'stress_return_pct'     => $stressReturn * 100,
+            'stress_annualized_pct' => $stressReturn * (365 / max(1, $days)) * 100,
         ];
     }
 
