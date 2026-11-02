@@ -16,20 +16,33 @@
                 @if(!empty($loanYield))
                     <p class="text-base sm:text-lg font-semibold text-gray-900">
                         {{ number_format($loanYield['period_return_pct'], 1) }}%
+                        <span class="text-xs sm:text-sm font-medium text-gray-500">
+                            over {{ $loanYield['days'] }} {{ \Illuminate\Support\Str::plural('day', $loanYield['days']) }}
+                        </span>
                     </p>
+
                     <p class="text-[10px] sm:text-xs leading-tight text-gray-500">
                         Net interest KES {{ number_format($loanYield['net_interest'], 0) }}
                         on avg KES {{ number_format($loanYield['avg_capital'], 0) }} out
-                        · {{ $loanYield['days'] }} days
                     </p>
+
+                    <p class="text-[10px] sm:text-xs leading-tight text-gray-500 mt-0.5">
+                        ≈ {{ number_format($loanYield['annualized_pct'], 0) }}% annualized
+                        <span class="text-gray-400">(simple, not compounded)</span>
+                    </p>
+
                     @if(($loanYield['write_offs'] ?? 0) > 0)
                         <p class="text-[10px] sm:text-xs leading-tight text-red-600 mt-0.5">
                             Includes KES {{ number_format($loanYield['write_offs'], 0) }} written off.
                         </p>
                     @endif
+
                     @if(($loanYield['at_risk'] ?? 0) > 0)
                         <p class="text-[10px] sm:text-xs leading-tight text-amber-600 mt-0.5">
                             KES {{ number_format($loanYield['at_risk'], 0) }} in defaulted loans not deducted.
+                            If never recovered:
+                            <span class="font-semibold">{{ number_format($loanYield['stress_return_pct'], 1) }}%</span>
+                            (≈ {{ number_format($loanYield['stress_annualized_pct'], 0) }}% annualized).
                         </p>
                     @endif
                 @else

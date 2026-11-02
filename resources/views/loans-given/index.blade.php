@@ -106,6 +106,11 @@
                                         <p class="text-base sm:text-lg font-semibold text-gray-900">
                                             KES {{ number_format($totalOutstanding ?? 0, 0) }}</p>
                                         <p class="text-[10px] sm:text-xs leading-tight text-gray-500">Active loans only</p>
+                                        @if(($loanYield['at_risk'] ?? 0) > 0)
+                                            <p class="text-[10px] sm:text-xs leading-tight text-amber-600 mt-0.5">
+                                                + KES {{ number_format($loanYield['at_risk'], 0) }} in defaulted loans
+                                            </p>
+                                        @endif
                                     </div>
                                 </div>
                             </div>
