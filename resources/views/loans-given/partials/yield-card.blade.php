@@ -26,11 +26,6 @@
                         on avg KES {{ number_format($loanYield['avg_capital'], 0) }} out
                     </p>
 
-                    <p class="text-[10px] sm:text-xs leading-tight text-gray-500 mt-0.5">
-                        ≈ {{ number_format($loanYield['annualized_pct'], 0) }}% annualized
-                        <span class="text-gray-400">(simple, not compounded)</span>
-                    </p>
-
                     @if(($loanYield['write_offs'] ?? 0) > 0)
                         <p class="text-[10px] sm:text-xs leading-tight text-red-600 mt-0.5">
                             Includes KES {{ number_format($loanYield['write_offs'], 0) }} written off.
