@@ -10,7 +10,8 @@ use Illuminate\Support\Collection;
  * Return on deployed capital for the loans-given book.
  *
  * Mirrors StatementDataService::computeYield(): build a daily series of capital
- * at work and average it. Returns the raw (un-annualized) return for the period.
+ * at work and average it. Returns the raw (un-annualized) return for the period,
+ * plus a simple annualized figure so periods of different lengths can be compared.
  * The differences from the savings version:
  *
  *  - Capital is PRINCIPAL OUT (cash you actually lent and haven't got back),
@@ -18,6 +19,8 @@ use Illuminate\Support\Collection;
  *    interest is NOT counted as deployed cash.
  *  - Numerator is NET interest (after disbursement fees and referrer share),
  *    minus principal written off in the period.
+ *  - The window is clamped to start no earlier than the first disbursement, so
+ *    days before any capital was lent out don't dilute the average.
  */
 class LoanYieldService
 {
@@ -37,13 +40,23 @@ class LoanYieldService
             $end = $today;
         }
 
-        $start = $from?->copy()->startOfDay()
-            ?? $loans->filter(fn ($l) => $l->disbursed_date)
-                ->map(fn ($l) => Carbon::parse($l->disbursed_date)->startOfDay())
-                ->sortBy(fn ($d) => $d->timestamp)
-                ->first();
+        // Earliest disbursement: the book can't have capital at work before this.
+        $firstDisbursed = $loans->filter(fn ($l) => $l->disbursed_date)
+            ->map(fn ($l) => Carbon::parse($l->disbursed_date)->startOfDay())
+            ->sortBy(fn ($d) => $d->timestamp)
+            ->first();
 
-        if (! $start || $start->gt($end)) {
+        if (! $firstDisbursed) {
+            return null;
+        }
+
+        // Clamp the window: never start before the first loan went out.
+        $start = $from ? $from->copy()->startOfDay() : $firstDisbursed->copy();
+        if ($start->lt($firstDisbursed)) {
+            $start = $firstDisbursed->copy();
+        }
+
+        if ($start->gt($end)) {
             return null;
         }
 
@@ -131,6 +144,8 @@ class LoanYieldService
             'write_offs'          => (float) $writeOffs,
             'at_risk'             => (float) $atRisk,
             'period_return_pct'   => $periodReturn * 100,
+            // Simple (non-compounded) annualization of the period return.
+            'annualized_pct'      => $periodReturn * (365 / max(1, $days)) * 100,
         ];
     }
 
