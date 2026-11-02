@@ -1,4 +1,6 @@
 <x-app-layout>
+    @php $include = $include ?? false; @endphp
+
     <div class="py-12">
         <div class="max-w-6xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg">
@@ -52,6 +54,15 @@
                             </p>
                         </div>
                     @else
+                        {{-- Toggle: she sent ALL interest, including her share. Reloads so every limit refreshes. --}}
+                        <label class="flex items-center gap-2 text-sm text-gray-700 mb-4 cursor-pointer">
+                            <input type="checkbox" @checked($include)
+                            class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-200"
+                                   onchange="window.location = '{{ route('referrers.float.index', $referrer) }}' + (this.checked ? '?include_commission=1' : '')">
+                            She sent me all the interest, including her share
+                            <span class="text-xs text-gray-400">(her commission then stays on the commission ledger and is paid from your own account)</span>
+                        </label>
+
                         {{-- Cash waterfall: balance -> minus her commission -> what you can take --}}
                         <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4 space-y-1 text-sm">
                             <div class="flex justify-between">
@@ -59,8 +70,14 @@
                                 <span class="font-semibold text-gray-900">KES {{ number_format($limits['balance'], 0) }}</span>
                             </div>
                             <div class="flex justify-between">
-                                <span class="text-gray-700">Less: commission still owed to her</span>
-                                <span class="font-semibold text-red-700">− KES {{ number_format($limits['commission'], 0) }}</span>
+                                <span class="text-gray-700">
+                                    @if($include)
+                                        Commission held back (ignored: she sent it with the interest)
+                                    @else
+                                        Less: commission still owed to her
+                                    @endif
+                                </span>
+                                <span class="font-semibold {{ $include ? 'text-gray-400' : 'text-red-700' }}">− KES {{ number_format($limits['commission'], 0) }}</span>
                             </div>
                             <div class="flex justify-between border-t border-blue-200 pt-1">
                                 <span class="font-medium text-gray-800">Most you can reconcile now</span>
@@ -72,7 +89,9 @@
                             <div class="bg-gray-50 rounded-lg p-3">
                                 <div class="text-gray-500">Interest that's yours</div>
                                 <div class="text-lg font-semibold text-green-700">KES {{ number_format($limits['interest'], 0) }}</div>
-                                <div class="text-xs text-gray-400">per loan, after her commission</div>
+                                <div class="text-xs text-gray-400">
+                                    {{ $include ? 'per loan, including her share' : 'per loan, after her commission' }}
+                                </div>
                             </div>
                             <div class="bg-gray-50 rounded-lg p-3">
                                 <div class="text-gray-500">Principal she's holding</div>
@@ -103,6 +122,7 @@
                                       fRound(n) { return n.toLocaleString('en-US', {maximumFractionDigits: 0}); }
                                   }">
                                 @csrf
+                                <input type="hidden" name="include_commission" value="{{ $include ? 1 : 0 }}">
 
                                 @if($pendingLoans->isNotEmpty())
                                     <div>

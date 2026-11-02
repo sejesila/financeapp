@@ -26,17 +26,16 @@ class ReferrerFloatController extends Controller
 
     // ── index ───────────────────────────────────────────────────────────────
 
-    public function index(Referrer $referrer)
+    public function index(Referrer $referrer, Request $request)
     {
         if ($referrer->user_id !== Auth::id()) {
             abort(403);
         }
 
         $floatAccount = $referrer->floatAccount;
-        $limits       = $referrer->floatReconcileLimits();
-
-        // Interest stays per loan (it is never re-lent, so per-loan is meaningful).
-        $interestByLoan = $referrer->floatInterestAvailableByLoan();
+        $include        = $request->boolean('include_commission');
+        $limits         = $referrer->floatReconcileLimits($include);
+        $interestByLoan = $referrer->floatInterestAvailableByLoan($include);
 
         $pendingLoans = $interestByLoan->isEmpty()
             ? collect()
@@ -58,7 +57,7 @@ class ReferrerFloatController extends Controller
         // View needs: $limits['balance'|'commission'|'interest'|'principal'|'max_total'],
         // $pendingLoans (interest boxes only) and ONE principal field: principal_amount.
         return view('referrers.float-reconcile', compact(
-            'referrer', 'floatAccount', 'pendingLoans', 'destinationAccounts', 'limits'
+            'referrer', 'floatAccount', 'pendingLoans', 'destinationAccounts', 'limits', 'include'
         ));
     }
 
@@ -86,8 +85,9 @@ class ReferrerFloatController extends Controller
             ]);
 
             // Re-derive every limit server-side; the form is not trusted.
-            $limits         = $referrer->floatReconcileLimits();
-            $interestByLoan = $referrer->floatInterestAvailableByLoan();
+            $include        = $request->boolean('include_commission');
+            $limits         = $referrer->floatReconcileLimits($include);
+            $interestByLoan = $referrer->floatInterestAvailableByLoan($include);
 
             $rows = collect();
 

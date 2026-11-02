@@ -242,9 +242,9 @@ class Referrer extends Model
      * Interest that is YOURS and can be remitted now, per loan:
      * pending interest in the float minus her unpaid commission on that loan.
      */
-    public function floatInterestAvailableByLoan(): \Illuminate\Support\Collection
+    public function floatInterestAvailableByLoan(bool $includeCommission = false): \Illuminate\Support\Collection
     {
-        $commission = $this->unpaidCommissionByLoan();
+        $commission = $includeCommission ? collect() : $this->unpaidCommissionByLoan();
 
         return $this->pendingFloatInterestByLoan()
             ->map(fn($pending, $loanId) => round(max(0, (float)$pending - (float)($commission[$loanId] ?? 0)), 2))
@@ -272,25 +272,22 @@ class Referrer extends Model
     /**
      * Everything the reconcile page/validation needs, in one place.
      */
-    public function floatReconcileLimits(): array
+    public function floatReconcileLimits(bool $includeCommission = false): array
     {
-        $account = $this->floatAccount;
-        $balance = $account ? round((float)$account->current_balance, 2) : 0.0;
-        $commission = round((float)$this->unpaidCommissionByLoan()->sum(), 2);
+        $account    = $this->floatAccount;
+        $balance    = $account ? round((float)$account->current_balance, 2) : 0.0;
+        $commission = $includeCommission ? 0.0 : round((float)$this->unpaidCommissionByLoan()->sum(), 2);
 
-        $interest = round((float)$this->floatInterestAvailableByLoan()->sum(), 2);
+        $interest  = round((float)$this->floatInterestAvailableByLoan($includeCommission)->sum(), 2);
         $principal = $this->floatPrincipalAvailable();
-
-        // Hard ceiling = real cash that is not hers. (Transfer fee still has to
-        // fit on top; TransferService checks that itself.)
-        $cash = round(max(0, $balance - $commission), 2);
+        $cash      = round(max(0, $balance - $commission), 2);
 
         return [
-            'balance' => $balance,
+            'balance'    => $balance,
             'commission' => $commission,
-            'interest' => min($interest, $cash),
-            'principal' => min($principal, $cash),
-            'max_total' => min($cash, $interest + $principal),
+            'interest'   => min($interest, $cash),
+            'principal'  => min($principal, $cash),
+            'max_total'  => min($cash, $interest + $principal),
         ];
     }
 }
