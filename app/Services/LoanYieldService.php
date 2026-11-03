@@ -142,6 +142,11 @@ class LoanYieldService
         // off today. Capital is left unchanged (it already includes those loans).
         $stressReturn = ($netAfterLosses - $atRisk) / $avg;
 
+        // Simple (non-compounded) annualization: scale the period return to a
+        // 365-day year. Informational only, so short periods don't look wildly
+        // inflated the way compounding them would.
+        $annualize = 365 / max(1, $days);
+
         return [
             'days'                => $days,
             'avg_capital'         => $avg,
@@ -151,6 +156,8 @@ class LoanYieldService
             'period_return_pct'   => $periodReturn * 100,
             // Same return if all defaulted loans were written off in full.
             'stress_return_pct'   => $stressReturn * 100,
+            'period_annualized_pct' => $periodReturn * $annualize * 100,
+            'stress_annualized_pct' => $stressReturn * $annualize * 100,
         ];
     }
 
