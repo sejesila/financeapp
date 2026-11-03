@@ -10,6 +10,7 @@ use App\Models\Loan;
 use App\Models\LoanGiven;
 use App\Models\LoanGivenPayment;
 use App\Models\LoanPayment;
+use App\Models\Referrer;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\ReportDataService;
@@ -158,6 +159,89 @@ class ReportDataServiceTest extends TestCase
         $this->assertEquals(1, $report['loans_repaid_in_period']['count']);
         $this->assertEquals(55000, $report['loans_repaid_in_period']['total']);
         $this->assertEquals(50000, $report['loans_repaid_in_period']['principal_total']);
+    }
+    // ── REFERRER COMMISSION OWED ────────────────────────────────────────────
+
+    private function makeReferredPayment(LoanGiven $loan, string $date, float $commission, array $overrides = []): LoanGivenPayment
+    {
+        return LoanGivenPayment::create(array_merge([
+            'user_id'                   => $this->user->id,
+            'loan_given_id'             => $loan->id,
+            'account_id'                => $this->account->id,
+            'amount'                    => 1000,
+            'interest_portion'          => 400,
+            'payment_date'              => $date,
+            'referrer_share_percentage' => 40,
+            'referrer_commission'       => $commission,
+            'referrer_commission_kept'  => false,
+        ], $overrides));
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_counts_unpaid_referrer_commission_on_active_loans_by_payment_month()
+    {
+        $referrer = Referrer::create([
+            'user_id' => $this->user->id, 'name' => 'Phides',
+            'default_share_percentage' => 40, 'is_active' => true,
+        ]);
+
+        // Active loan: the old loan-level rule ignored these entirely.
+        $loan = LoanGiven::factory()->for($this->user)->for($this->account)
+            ->create(['status' => 'active', 'referrer_id' => $referrer->id]);
+
+        $this->makeReferredPayment($loan, '2026-09-10', 660);
+        $this->makeReferredPayment($loan, '2026-10-05', 1120);
+        $this->makeReferredPayment($loan, '2026-11-02', 240);
+
+        $byMonth = $this->service->getReferrerShareOwedByMonth($this->user, 2026);
+
+        $this->assertEquals(660, $byMonth[9]);
+        $this->assertEquals(1120, $byMonth[10]);
+        $this->assertEquals(240, $byMonth[11]);
+        $this->assertEquals(2020, array_sum($byMonth));
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_excludes_kept_commission_and_loans_without_a_referrer()
+    {
+        $referrer = Referrer::create([
+            'user_id' => $this->user->id, 'name' => 'Phides',
+            'default_share_percentage' => 40, 'is_active' => true,
+        ]);
+
+        $referred = LoanGiven::factory()->for($this->user)->for($this->account)
+            ->create(['status' => 'active', 'referrer_id' => $referrer->id]);
+        $plain = LoanGiven::factory()->for($this->user)->for($this->account)
+            ->create(['status' => 'active', 'referrer_id' => null]);
+
+        $this->makeReferredPayment($referred, '2026-10-05', 300);                                  // counts
+        $this->makeReferredPayment($referred, '2026-10-06', 500, ['referrer_commission_kept' => true]); // kept: no
+        $this->makeReferredPayment($plain, '2026-10-07', 900);                                     // no referrer: no
+
+        $owed = $this->service->getReferrerShareOwed(
+            $this->user, Carbon::create(2026, 10, 1), Carbon::create(2026, 10, 31)
+        );
+
+        $this->assertEquals(300, $owed);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_matches_the_by_month_total_with_the_ranged_total()
+    {
+        $referrer = Referrer::create([
+            'user_id' => $this->user->id, 'name' => 'Phides',
+            'default_share_percentage' => 40, 'is_active' => true,
+        ]);
+        $loan = LoanGiven::factory()->for($this->user)->for($this->account)
+            ->create(['status' => 'active', 'referrer_id' => $referrer->id]);
+
+        $this->makeReferredPayment($loan, '2026-09-10', 660);
+        $this->makeReferredPayment($loan, '2026-11-02', 240);
+
+        $this->assertEquals(
+            array_sum($this->service->getReferrerShareOwedByMonth($this->user, 2026)),
+            $this->service->getReferrerShareOwed($this->user, Carbon::create(2026, 1, 1), Carbon::create(2026, 12, 31))
+        );
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

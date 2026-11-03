@@ -3,9 +3,13 @@
 
 use App\Models\Account;
 use App\Models\Category;
+use App\Models\Referrer;
 use App\Models\Transaction;
 use App\Models\Transfer;
 use App\Models\User;
+use App\Services\TransactionRecorder;
+use App\Services\TransactionService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -83,6 +87,101 @@ function makeSanlamAccount(User $user, float $balance = 0): Account
         'initial_balance' => $balance,
         'is_active'       => true,
     ]);
+}
+
+function makeEticaAccount(User $user, float $balance = 0): Account
+{
+    return Account::factory()->create([
+        'user_id'         => $user->id,
+        'type'            => 'savings',
+        'name'            => 'Etica Savings',
+        'current_balance' => $balance,
+        'initial_balance' => $balance,
+        'is_active'       => true,
+    ]);
+}
+
+/** PesaLink SMS to the Etica account at Equity (amount is a display string, e.g. "5,000.00"). */
+function pesalinkEticaSms(string $ref = 'PLK0001', string $amount = '5,000.00'): string
+{
+    return "Pesalink transfer of KES {$amount} to EQUITY BANK KENYA A/c 0180283951027 on 29/05/2026 12:38 processed successfully. Transaction Ref ID: {$ref}";
+}
+
+/** Direct Transaction insert for Account::updateBalance() tests. Adjust columns to your schema. */
+function makeTx(Account $account, Category $category, float $amount, ?string $valueDate = null, ?string $date = null): Transaction
+{
+    return Transaction::forceCreate([
+        'user_id'     => $account->user_id,
+        'account_id'  => $account->id,
+        'category_id' => $category->id,
+        'amount'      => $amount,
+        'date'        => $date ?? now()->toDateString(),
+        'value_date'  => $valueDate,
+        'description' => 'test ' . uniqid(),
+    ]);
+}
+
+function makeSavingsTransfer(Account $to, Account $from, float $amount, ?string $valueDate): Transfer
+{
+    return Transfer::forceCreate([
+        'user_id'         => $to->user_id,
+        'from_account_id' => $from->id,
+        'to_account_id'   => $to->id,
+        'amount'          => $amount,
+        'date'            => now(),
+        'value_date'      => $valueDate,
+        'description'     => 'test transfer ' . uniqid(),
+    ]);
+}
+
+function cashbackSms(string $ref = 'Q3PH3911CC5'): string
+{
+    return "Ref {$ref}. Ksh 5  moved to your wallet  0731xxx277 on 01/08/26 at 08:13 AM Bal: Ksh 0.65. Airtel Money Wallet Bal: Ksh 14452.0";
+}
+
+function makeAirtelFee(User $user, Account $airtel, float $amount, string $date): Transaction
+{
+    $cat = Category::factory()->create(['user_id' => $user->id, 'name' => 'Transaction Fees', 'type' => 'expense']);
+
+    return Transaction::forceCreate([
+        'user_id'            => $user->id,
+        'account_id'         => $airtel->id,
+        'category_id'        => $cat->id,
+        'amount'             => $amount,
+        'date'               => $date,
+        'description'        => 'Transaction fee for TESTFEE',
+        'payment_method'     => 'Airtel Money',
+        'is_transaction_fee' => true,
+    ]);
+}
+
+function makeReferrer(User $user, string $name = 'Phides', ?string $contact = '0713123724'): Referrer
+{
+    // Add any other required columns for your schema
+    return Referrer::forceCreate([
+        'user_id'   => $user->id,
+        'name'      => $name,
+        'contact'   => $contact,
+        'is_active' => true,
+    ]);
+}
+
+function makeFloatAccount(User $user, Referrer $referrer, float $balance = 10000): Account
+{
+    return Account::factory()->create([
+        'user_id'         => $user->id,
+        'type'            => 'referrer_float',
+        'name'            => $referrer->name . ' Float',
+        'referrer_id'     => $referrer->id,
+        'current_balance' => $balance,
+        'initial_balance' => $balance,
+        'is_active'       => true,
+    ]);
+}
+
+function referrerSms(string $sender = 'PHIDES NJERU 0713***724', string $amount = '1,000.00'): string
+{
+    return "UDG880ZSXQ Confirmed. You have received KES{$amount} from {$sender} on 16/4/26 at 2:00 PM. New M-PESA balance is KES6,000.00.";
 }
 
 beforeEach(function () {
@@ -377,7 +476,8 @@ describe('mpesa till payment', function () {
         expect($tx->category->name)->toBe('Groceries');
     });
 
-    it('categorises unknown till as Groceries', function () {
+    // Renamed: previously said "Groceries" but asserted Other Expenses
+    it('categorises unknown till as Other Expenses', function () {
         $user = makeWebhookUser();
         makeMpesaAccount($user);
 
@@ -687,6 +787,366 @@ describe('paybill transfer — sanlam mmf', function () {
     });
 });
 
+// ── Etica interest gate: regression for the 1970-01-01 sentinel bug ───────────
+// Etica is the only account where the webhook sets value_date, so it is the
+// real regression surface for Account::updateBalance()'s interest gate.
+
+describe('etica interest gate — no interest history', function () {
+
+    it('credits a new etica account after a PesaLink deposit', function () {
+        $user = makeWebhookUser();
+        makeBankAccount($user, 100000);
+        $etica = makeEticaAccount($user, 0);
+
+        webhookPost(['user_id' => $user->id, 'sms' => pesalinkEticaSms()])
+            ->assertStatus(201)
+            ->assertJson(['subtype' => 'pesalink_to_savings']);
+
+        $transfer = Transfer::withoutGlobalScopes()->where('user_id', $user->id)->first();
+        expect($transfer->value_date)->not->toBeNull();
+
+        // With the old 1970 sentinel this stayed at 0 forever
+        expect((float) $etica->fresh()->current_balance)->toBe(5000.0);
+    });
+
+    it('credits a new etica account after an M-PESA paybill deposit', function () {
+        $user = makeWebhookUser();
+        makeMpesaAccount($user, 30000);
+        $etica = makeEticaAccount($user, 0);
+
+        webhookPost([
+            'user_id' => $user->id,
+            'sms'     => 'UDR88272FR Confirmed. KES5,000.00 sent to ETICA CAPITAL LTD for account 14468 on 27/4/26 at 9:58 AM New M-PESA balance is KES25,000.00. Transaction cost, KES0.00.',
+        ])->assertStatus(201)
+            ->assertJson(['subtype' => 'account_transfer', 'to' => 'Etica Savings']);
+
+        expect(Transfer::withoutGlobalScopes()->where('user_id', $user->id)->first()->value_date)->not->toBeNull();
+        expect((float) $etica->fresh()->current_balance)->toBe(5000.0);
+    });
+});
+
+// ── Savings balance gating (Account::updateBalance) ──────────────────────────
+// "Released" uses a date 2 days back and "held" 2 days ahead so the tests
+// don't flip around midnight if app and DB timezones differ.
+
+describe('savings balance gating', function () {
+
+    it('releases past-dated transfers when there is no interest history', function () {
+        $user    = makeWebhookUser();
+        $mpesa   = makeMpesaAccount($user);
+        $savings = makeSanlamAccount($user, 0);
+
+        makeSavingsTransfer($savings, $mpesa, 1000, now()->subDays(2)->toDateString());
+        $savings->updateBalance();
+
+        expect((float) $savings->fresh()->current_balance)->toBe(1000.0);
+    });
+
+    it('holds back transfers with a future value date when there is no interest history', function () {
+        $user    = makeWebhookUser();
+        $mpesa   = makeMpesaAccount($user);
+        $savings = makeSanlamAccount($user, 0);
+
+        makeSavingsTransfer($savings, $mpesa, 1000, now()->addDays(2)->toDateString());
+        $savings->updateBalance();
+
+        expect((float) $savings->fresh()->current_balance)->toBe(0.0);
+    });
+
+    it('holds back deposits newer than the last recorded interest date', function () {
+        $user     = makeWebhookUser();
+        $mpesa    = makeMpesaAccount($user);
+        $savings  = makeSanlamAccount($user, 0);
+        $interest = Category::factory()->create(['user_id' => $user->id, 'name' => 'Interest', 'type' => 'income']);
+
+        // Interest posted yesterday → gate is yesterday
+        makeTx($savings, $interest, 10, null, now()->subDay()->toDateString());
+
+        makeSavingsTransfer($savings, $mpesa, 1000, now()->toDateString());          // after gate → held
+        makeSavingsTransfer($savings, $mpesa, 500, now()->subDay()->toDateString()); // on gate → released
+
+        $savings->updateBalance();
+
+        // 10 interest + 500 released; the 1000 is still pending
+        expect((float) $savings->fresh()->current_balance)->toBe(510.0);
+    });
+
+    it('excludes pending income deposits but never the interest itself', function () {
+        $user     = makeWebhookUser();
+        $savings  = makeSanlamAccount($user, 0);
+        $interest = Category::factory()->create(['user_id' => $user->id, 'name' => 'Interest', 'type' => 'income']);
+        $income   = Category::factory()->create(['user_id' => $user->id, 'name' => 'Side Income', 'type' => 'income']);
+
+        makeTx($savings, $interest, 10, null, now()->subDay()->toDateString());
+        makeTx($savings, $income, 2000, now()->toDateString()); // value_date > last interest → pending
+
+        $savings->updateBalance();
+
+        expect((float) $savings->fresh()->current_balance)->toBe(10.0);
+    });
+
+    it('releases past-dated transfers into non-savings accounts', function () {
+        $user  = makeWebhookUser();
+        $bank  = makeBankAccount($user, 0);
+        $mpesa = makeMpesaAccount($user);
+
+        makeSavingsTransfer($bank, $mpesa, 700, now()->subDays(2)->toDateString());
+        $bank->updateBalance();
+
+        expect((float) $bank->fresh()->current_balance)->toBe(700.0);
+    });
+});
+
+// ── PesaLink ──────────────────────────────────────────────────────────────────
+// Fee for KES 5,000: 44 * 1.15 = 50.60
+
+describe('pesalink', function () {
+
+    it('moves money bank → etica and charges the fee to the bank', function () {
+        $user = makeWebhookUser();
+        $bank = makeBankAccount($user, 100000);
+        $acct = makeEticaAccount($user, 0);
+
+        webhookPost(['user_id' => $user->id, 'sms' => pesalinkEticaSms()])
+            ->assertStatus(201)
+            ->assertJson([
+                'status'  => 'created',
+                'subtype' => 'pesalink_to_savings',
+                'amount'  => 5000.0,
+                'fee'     => 50.6,
+                'from'    => 'I&M Bank',
+                'to'      => 'Etica Savings',
+            ]);
+
+        $t = Transfer::withoutGlobalScopes()->where('user_id', $user->id)->first();
+        expect($t->from_account_id)->toBe($bank->id)->and($t->to_account_id)->toBe($acct->id);
+        expect($t->mpesa_reference)->toBe('PLK0001');
+
+        expect(
+            Transaction::withoutGlobalScopes()
+                ->where('account_id', $bank->id)
+                ->where('is_transaction_fee', true)
+                ->where('amount', 50.6)
+                ->exists()
+        )->toBeTrue();
+
+        expect((float) $bank->fresh()->current_balance)->toEqualWithDelta(94949.4, 0.001);
+    });
+
+    it('returns 404 when there is no bank account', function () {
+        $user = makeWebhookUser();
+        makeEticaAccount($user);
+
+        webhookPost(['user_id' => $user->id, 'sms' => pesalinkEticaSms()])
+            ->assertStatus(404)
+            ->assertJson(['error' => 'Bank account not found']);
+    });
+
+    it('falls back to a bank expense when the etica account is missing', function () {
+        $user = makeWebhookUser();
+        $bank = makeBankAccount($user, 100000);
+
+        webhookPost(['user_id' => $user->id, 'sms' => pesalinkEticaSms()])
+            ->assertStatus(201)
+            ->assertJson(['subtype' => 'pesalink_fallback']);
+
+        expect(Transfer::withoutGlobalScopes()->count())->toBe(0);
+        expect(Transaction::withoutGlobalScopes()->where('account_id', $bank->id)->count())->toBe(2); // expense + fee
+        expect((float) $bank->fresh()->current_balance)->toEqualWithDelta(94949.4, 0.001);
+    });
+
+    it('detects a duplicate PesaLink SMS', function () {
+        $user = makeWebhookUser();
+        makeBankAccount($user, 100000);
+        makeEticaAccount($user);
+
+        webhookPost(['user_id' => $user->id, 'sms' => pesalinkEticaSms()])->assertStatus(201);
+        webhookPost(['user_id' => $user->id, 'sms' => pesalinkEticaSms()])
+            ->assertStatus(200)
+            ->assertJson(['status' => 'duplicate', 'reference' => 'PLK0001']);
+
+        expect(Transfer::withoutGlobalScopes()->count())->toBe(1);
+    });
+
+    it('treats PesaLink to another bank as an expense, not a transfer', function () {
+        $user = makeWebhookUser();
+        $bank = makeBankAccount($user, 100000);
+        makeEticaAccount($user);
+
+        webhookPost([
+            'user_id' => $user->id,
+            'sms'     => 'Pesalink transfer of KES 5,000.00 to KCB BANK A/c 1234567890 on 29/05/2026 12:38 processed successfully. Transaction Ref ID: PLK0002',
+        ])->assertStatus(201)
+            ->assertJson(['type' => 'expense', 'subtype' => 'pesalink_outgoing']);
+
+        expect(Transfer::withoutGlobalScopes()->count())->toBe(0);
+        expect((float) $bank->fresh()->current_balance)->toEqualWithDelta(94949.4, 0.001);
+    });
+});
+
+// ── Airtel cashback ───────────────────────────────────────────────────────────
+// Cashback is netted against the nearest preceding fee within 30 days, and that
+// fee must be at least as large as the cashback.
+
+describe('airtel cashback', function () {
+
+    it('reduces the nearest eligible fee by the cashback amount', function () {
+        $user   = makeWebhookUser();
+        $airtel = makeAirtelAccount($user, 1000);
+        $fee    = makeAirtelFee($user, $airtel, 10, '2026-07-20');
+
+        webhookPost(['user_id' => $user->id, 'sms' => cashbackSms()])
+            ->assertStatus(200)
+            ->assertJson([
+                'status'       => 'cashback_applied',
+                'original_fee' => 10.0,
+                'cashback'     => 5.0,
+                'new_fee'      => 5.0,
+            ]);
+
+        $fee->refresh();
+        expect((float) $fee->amount)->toBe(5.0)
+            ->and($fee->description)->toContain('Q3PH3911CC5');
+        expect((float) $airtel->fresh()->current_balance)->toBe(995.0);
+    });
+
+    it('is idempotent — a repeat cashback SMS is a duplicate', function () {
+        $user   = makeWebhookUser();
+        $airtel = makeAirtelAccount($user, 1000);
+        $fee    = makeAirtelFee($user, $airtel, 10, '2026-07-20');
+
+        webhookPost(['user_id' => $user->id, 'sms' => cashbackSms()])->assertStatus(200);
+        webhookPost(['user_id' => $user->id, 'sms' => cashbackSms()])
+            ->assertJson(['status' => 'duplicate']);
+
+        expect((float) $fee->fresh()->amount)->toBe(5.0);
+    });
+
+    it('records income when the only fee is smaller than the cashback', function () {
+        $user   = makeWebhookUser();
+        $airtel = makeAirtelAccount($user, 1000);
+        makeAirtelFee($user, $airtel, 3, '2026-07-20');
+
+        webhookPost(['user_id' => $user->id, 'sms' => cashbackSms()])
+            ->assertStatus(201)
+            ->assertJson(['type' => 'income', 'subtype' => 'airtelcashback']);
+
+        expect((float) $airtel->fresh()->current_balance)->toBe(1002.0); // 1000 + 5 - 3
+    });
+
+    it('records income when the fee is older than 30 days', function () {
+        $user   = makeWebhookUser();
+        $airtel = makeAirtelAccount($user, 1000);
+        makeAirtelFee($user, $airtel, 10, '2026-06-01');
+
+        webhookPost(['user_id' => $user->id, 'sms' => cashbackSms()])
+            ->assertStatus(201)
+            ->assertJson(['type' => 'income']);
+
+        expect((float) $airtel->fresh()->current_balance)->toBe(995.0); // 1000 + 5 - 10
+    });
+
+    it('returns 404 when there is no airtel account', function () {
+        $user = makeWebhookUser();
+
+        webhookPost(['user_id' => $user->id, 'sms' => cashbackSms()])
+            ->assertStatus(404)
+            ->assertJson(['error' => 'No matching account found']);
+    });
+});
+
+// ── Referrer float remittance ─────────────────────────────────────────────────
+
+describe('referrer float remittance', function () {
+
+    it('records money from a referrer as a float → mpesa transfer, not income', function () {
+        $user     = makeWebhookUser();
+        $mpesa    = makeMpesaAccount($user, 5000);
+        $referrer = makeReferrer($user);
+        $float    = makeFloatAccount($user, $referrer, 10000);
+        $fee      = (float) app(TransactionService::class)->mpesaSendMoneyFee(1000.0);
+
+        webhookPost(['user_id' => $user->id, 'sms' => referrerSms()])
+            ->assertStatus(201)
+            ->assertJson([
+                'status'          => 'created',
+                'subtype'         => 'referrer_float_remittance',
+                'amount'          => 1000.0,
+                'interest_linked' => 0.0,
+                'principal'       => 1000.0,
+                'from'            => 'Phides Float',
+                'to'              => 'Mpesa',
+            ]);
+
+        $t = Transfer::withoutGlobalScopes()->where('user_id', $user->id)->first();
+        expect($t->from_account_id)->toBe($float->id)->and($t->to_account_id)->toBe($mpesa->id);
+
+        // fee is charged to the float and linked to the transfer
+        expect(
+            Transaction::withoutGlobalScopes()
+                ->where('account_id', $float->id)
+                ->where('is_transaction_fee', true)
+                ->where('transfer_id', $t->id)
+                ->exists()
+        )->toBeTrue();
+
+        expect((float) $mpesa->fresh()->current_balance)->toBe(6000.0);
+        expect((float) $float->fresh()->current_balance)->toEqualWithDelta(9000.0 - $fee, 0.001);
+    });
+
+    it('still records the remittance when it exceeds the recorded float balance', function () {
+        $user = makeWebhookUser();
+        makeMpesaAccount($user, 5000);
+        $referrer = makeReferrer($user);
+        makeFloatAccount($user, $referrer, 100);
+
+        webhookPost(['user_id' => $user->id, 'sms' => referrerSms()])->assertStatus(201);
+
+        expect(Transfer::withoutGlobalScopes()->count())->toBe(1);
+    });
+
+    it('treats a sender with a mismatched masked phone as ordinary income', function () {
+        $user = makeWebhookUser();
+        makeMpesaAccount($user, 5000);
+        makeFloatAccount($user, makeReferrer($user));
+
+        webhookPost(['user_id' => $user->id, 'sms' => referrerSms('PHIDES NJERU 0799***111')])
+            ->assertStatus(201)
+            ->assertJson(['subtype' => 'receive_money', 'type' => 'income']);
+
+        expect(Transfer::withoutGlobalScopes()->count())->toBe(0);
+    });
+
+    it('does not match a name that only shares a prefix (whole-word match)', function () {
+        $user = makeWebhookUser();
+        makeMpesaAccount($user, 5000);
+        makeFloatAccount($user, makeReferrer($user));
+
+        webhookPost(['user_id' => $user->id, 'sms' => referrerSms('PHIDESON KAMAU 0713***724')])
+            ->assertJson(['subtype' => 'receive_money']);
+
+        expect(Transfer::withoutGlobalScopes()->count())->toBe(0);
+    });
+
+    it('treats a referrer without a float account as ordinary income', function () {
+        $user = makeWebhookUser();
+        makeMpesaAccount($user, 5000);
+        makeReferrer($user); // no float account
+
+        webhookPost(['user_id' => $user->id, 'sms' => referrerSms()])
+            ->assertJson(['subtype' => 'receive_money']);
+    });
+
+    it('returns 404 when the mpesa account is missing', function () {
+        $user = makeWebhookUser();
+        makeFloatAccount($user, makeReferrer($user));
+
+        webhookPost(['user_id' => $user->id, 'sms' => referrerSms()])
+            ->assertStatus(404)
+            ->assertJson(['error' => 'Referrer float or Mpesa account not found']);
+    });
+});
+
 // ── Duplicate detection ───────────────────────────────────────────────────────
 
 describe('duplicate detection', function () {
@@ -732,6 +1192,27 @@ describe('duplicate detection', function () {
         expect((float) $bank->fresh()->current_balance)->toBe(18000.0);
         expect((float) $mpesa->fresh()->current_balance)->toBe(7000.0); // first leg did everything
         expect(Transfer::withoutGlobalScopes()->where('user_id', $user->id)->count())->toBe(1);
+    });
+
+    it('returns duplicate when the recorder hits a unique constraint (race-condition safety net)', function () {
+        $user = makeWebhookUser();
+        makeMpesaAccount($user);
+
+        // 4-argument form (Laravel 10.x+). Drop the first argument on older versions.
+        $this->mock(TransactionRecorder::class, function ($mock) {
+            $mock->shouldReceive('record')->once()->andThrow(
+                new UniqueConstraintViolationException('mysql', 'insert into transactions ...', [], new \Exception('dup'))
+            );
+        });
+
+        webhookPost([
+            'user_id' => $user->id,
+            'sms'     => 'FH6KL9O1RE Confirmed. KES500.00 sent to JOHN DOE 0712345678 on 30/4/26 at 8:23 AM. New M-PESA balance is KES13,000.00. Transaction cost, KES29.00.',
+        ])->assertStatus(200)->assertJson([
+            'status'    => 'duplicate',
+            'reference' => 'FH6KL9O1RE',
+            'note'      => 'Caught by unique constraint',
+        ]);
     });
 });
 
@@ -824,7 +1305,8 @@ describe('I&M bank to mpesa', function () {
         expect((float) $mpesa->fresh()->current_balance)->toBe(7000.0);
     });
 
-    it('uses the bank transaction reference not the mpesa reference', function () {
+    // Renamed: the parser uses the M-PESA ref ($m[5]), not the bank's, and this asserts that
+    it('uses the M-PESA reference for the transfer', function () {
         $user = makeWebhookUser();
         makeBankAccount($user);
         makeMpesaAccount($user);
@@ -880,11 +1362,10 @@ describe('I&M bank to airtel money', function () {
         expect((float) $airtel->fresh()->current_balance)->toBe(1500.0);
     });
 
-    it('falls back to expense on bank when airtel account does not exist', function () {
+    it('returns 404 and creates no transfer when airtel account does not exist', function () {
         $user = makeWebhookUser();
-        $bank = makeBankAccount($user, 10000);
+        makeBankAccount($user, 10000);
 
-        // When airtel account is missing, handleBankToAirtelSelfTransfer returns 404
         webhookPost([
             'user_id' => $user->id,
             'sms'     => 'Bank to Airtel Money Transfer of KES 250.00 to 254731609277 successfully processed. Transaction Ref ID:REFBA005. Airtel Money Ref ID:REFBA006.',
@@ -892,6 +1373,61 @@ describe('I&M bank to airtel money', function () {
             ->assertJson(['error' => 'Bank or Airtel Money account not found']);
 
         expect(Transfer::withoutGlobalScopes()->where('user_id', $user->id)->count())->toBe(0);
+    });
+});
+
+// ── Airtel legs ───────────────────────────────────────────────────────────────
+
+describe('airtel legs', function () {
+
+    it('does not double-count when the Airtel receipt arrives after the bank SMS', function () {
+        $user   = makeWebhookUser();
+        $bank   = makeBankAccount($user, 10000);
+        $airtel = makeAirtelAccount($user, 500);
+
+        webhookPost([
+            'user_id' => $user->id,
+            'sms'     => 'Bank to Airtel Money Transfer of KES 250.00 to 254731609277 successfully processed. Transaction Ref ID:REFBA010. Airtel Money Ref ID:REFBA011.',
+        ])->assertStatus(201);
+
+        // Assumes Airtel's "Airtel Ref" equals the bank SMS's "Airtel Money Ref ID"
+        webhookPost([
+            'user_id' => $user->id,
+            'sms'     => "You've received KES 250.00 from SILAS SEJE. Airtel Ref: REFBA011",
+        ])->assertJson(['status' => 'duplicate']);
+
+        expect((float) $bank->fresh()->current_balance)->toBe(9750.0);
+        expect((float) $airtel->fresh()->current_balance)->toBe(750.0);
+        expect(Transfer::withoutGlobalScopes()->count())->toBe(1);
+    });
+
+    it('ignores the Airtel pochi leg of a self transfer to own mpesa', function () {
+        $user = makeWebhookUser();
+        makeAirtelAccount($user, 1000);
+
+        webhookPost([
+            'user_id' => $user->id,
+            'sms'     => 'AB12CD. Ksh 50 sent to SILAS SEJE 254708745191 on 01/05/26 at 11:25 AM. Fee: Ksh 4. Bal: Ksh 946.0. MPESA ID: UE188204V1',
+        ])->assertStatus(200)->assertJson(['status' => 'ignored']);
+
+        expect(Transaction::withoutGlobalScopes()->count())->toBe(0);
+    });
+
+    it('records an Airtel pochi payment to someone else, keyed on the MPESA ID', function () {
+        $user   = makeWebhookUser();
+        $airtel = makeAirtelAccount($user, 1000);
+
+        webhookPost([
+            'user_id' => $user->id,
+            'sms'     => 'AB12CE. Ksh 50 sent to JANE DOE 254722123456 on 01/05/26 at 11:25 AM. Fee: Ksh 4. Bal: Ksh 946.0. MPESA ID: UE188204V9',
+        ])->assertStatus(201)->assertJson([
+            'bank'      => 'airtel',
+            'subtype'   => 'pochi',
+            'reference' => 'UE188204V9',
+            'fee'       => 4.0,
+        ]);
+
+        expect((float) $airtel->fresh()->current_balance)->toBe(946.0);
     });
 });
 
@@ -965,9 +1501,29 @@ describe('I&M ATM withdrawal', function () {
         ]);
 
         // Bank: 50000 - 10000 (transfer) - 37.95 (fee) = 39962.05
-        expect((float) $bank->fresh()->current_balance)->toBe(39962.05);
+        expect((float) $bank->fresh()->current_balance)->toEqualWithDelta(39962.05, 0.001);
         // Cash: 1000 + 10000 — fee stays on bank
         expect((float) $cash->fresh()->current_balance)->toBe(11000.0);
+    });
+
+    // EXPECTED TO FAIL until MpesaSmsParser derives the ATM reference from the SMS.
+    // Currently: 'ATM-' . date('YmdHis') → a re-delivered SMS gets a new reference,
+    // so the duplicate guard never fires (second transfer + second KES 37.95 fee).
+    // Fix: 'reference' => 'ATM-' . substr(sha1($m[1] . $m[2] . $m[3] . trim($m[4])), 0, 12)
+    it('detects a re-delivered ATM SMS', function () {
+        $user = makeWebhookUser();
+        makeBankAccount($user, 50000);
+        makeCashAccount($user, 0);
+
+        $payload = [
+            'user_id' => $user->id,
+            'sms'     => 'Dear SILAS, you withdrew KES 30,000.00 on 2026-04-25 09:59:05 at I&M BANK KENYATTA KE 2 using I&M 5477********9433.',
+        ];
+
+        webhookPost($payload)->assertStatus(201);
+        webhookPost($payload)->assertStatus(200)->assertJson(['status' => 'duplicate']);
+
+        expect(Transfer::withoutGlobalScopes()->count())->toBe(1);
     });
 });
 

@@ -146,6 +146,119 @@ describe('Creating a loan given', function () {
         $this->assertDatabaseCount('loans_given', 0);
     });
 });
+// ─── Referrer commission accrual ────────────────────────────────────────────
+
+describe('Referrer commission on repayments', function () {
+
+    function referredLoan(User $user, Account $account, float $share = 40): LoanGiven
+    {
+        $referrer = \App\Models\Referrer::create([
+            'user_id' => $user->id, 'name' => 'Phides',
+            'default_share_percentage' => $share, 'is_active' => true,
+        ]);
+
+        return LoanGiven::factory()->create([
+            'user_id' => $user->id, 'account_id' => $account->id,
+            'principal_amount' => 1000, 'balance' => 1000, 'amount_paid' => 0,
+            'referrer_id' => $referrer->id,
+            'referrer_share_percentage' => $share,
+        ]);
+    }
+
+    it('accrues commission on a rollover payment the moment its interest is recognised', function () {
+        $user = User::factory()->create();
+        $account = Account::factory()->create(['user_id' => $user->id, 'type' => 'mpesa', 'current_balance' => 5000]);
+        $loan = referredLoan($user, $account);
+
+        $this->actingAs($user)->post(route('loans-given.payment', $loan), [
+            'payment_account_id' => $account->id,
+            'payment_amount'     => 1000,
+            'interest_portion'   => 400,
+            'payment_date'       => now()->toDateString(),
+        ]);
+
+        $payment = $loan->payments()->first();
+
+        expect((float) $payment->interest_portion)->toBe(400.0)
+            ->and((float) $payment->referrer_commission)->toBe(160.0) // 40% of 400
+            ->and($payment->referrer_commission_kept)->toBeFalse()
+            ->and($payment->referrer_payout_id)->toBeNull()
+            ->and($loan->fresh()->status)->toBe('active'); // active loan, commission still accrues
+    });
+
+    it('grosses the commission up when she kept her share before depositing', function () {
+        $user = User::factory()->create();
+        $account = Account::factory()->create(['user_id' => $user->id, 'type' => 'mpesa', 'current_balance' => 5000]);
+        $loan = referredLoan($user, $account);
+
+        $this->actingAs($user)->post(route('loans-given.payment', $loan), [
+            'payment_account_id'               => $account->id,
+            'payment_amount'                   => 1000,
+            'interest_portion'                 => 300,   // deposited interest is NET of her cut
+            'payment_date'                     => now()->toDateString(),
+            'referrer_deducted_before_deposit' => '1',
+        ]);
+
+        $payment = $loan->payments()->first();
+
+        // 300 * 40 / (100 - 40) = 200
+        expect((float) $payment->referrer_commission)->toBe(200.0)
+            ->and($payment->referrer_commission_kept)->toBeTrue();
+    });
+
+    it('accrues commission on the closing payment from the derived interest', function () {
+        $user = User::factory()->create();
+        $account = Account::factory()->create(['user_id' => $user->id, 'type' => 'mpesa', 'current_balance' => 5000]);
+        $loan = referredLoan($user, $account);
+
+        $this->actingAs($user)->post(route('loans-given.payment', $loan), [
+            'payment_account_id' => $account->id,
+            'payment_amount'     => 1200,   // 200 interest above principal
+            'payment_date'       => now()->toDateString(),
+            'close_loan'         => '1',
+        ]);
+
+        $payment = $loan->payments()->first();
+
+        expect((float) $payment->interest_portion)->toBe(200.0)
+            ->and((float) $payment->referrer_commission)->toBe(80.0);
+    });
+
+    it('does not accrue commission on a loan without a referrer', function () {
+        $user = User::factory()->create();
+        $account = Account::factory()->create(['user_id' => $user->id, 'type' => 'mpesa', 'current_balance' => 5000]);
+        $loan = LoanGiven::factory()->create([
+            'user_id' => $user->id, 'account_id' => $account->id,
+            'principal_amount' => 1000, 'balance' => 1000, 'amount_paid' => 0,
+        ]);
+
+        $this->actingAs($user)->post(route('loans-given.payment', $loan), [
+            'payment_account_id' => $account->id,
+            'payment_amount'     => 1000,
+            'interest_portion'   => 400,
+            'payment_date'       => now()->toDateString(),
+        ]);
+
+        expect((float) $loan->payments()->first()->referrer_commission)->toBe(0.0);
+    });
+
+    it('shows the accrued commission in the Budget page referrer row for the payment month', function () {
+        $user = User::factory()->create();
+        $account = Account::factory()->create(['user_id' => $user->id, 'type' => 'mpesa', 'current_balance' => 5000]);
+        $loan = referredLoan($user, $account);
+
+        $this->actingAs($user)->post(route('loans-given.payment', $loan), [
+            'payment_account_id' => $account->id,
+            'payment_amount'     => 1000,
+            'interest_portion'   => 400,
+            'payment_date'       => now()->toDateString(),
+        ]);
+
+        $owed = $this->actingAs($user)->get(route('budgets.index'))->viewData('referrerOwedByMonth');
+
+        expect((float) $owed[now()->month])->toBe(160.0);
+    });
+});
 
 // ─── Recording payments ─────────────────────────────────────────────────────
 

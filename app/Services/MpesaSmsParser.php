@@ -134,7 +134,8 @@ class MpesaSmsParser
                 'bank' => 'im_bank',
                 'type' => 'expense',
                 'subtype' => 'atm_withdrawal',
-                'reference' => 'ATM-' . date('YmdHis'),
+                // Stable across re-deliveries: same amount + timestamp + location → same ref
+                'reference' => 'ATM-' . substr(sha1($m[1] . '|' . $m[2] . '|' . $m[3] . '|' . trim($m[4])), 0, 12),
                 'amount' => self::parseAmount($m[1]),
                 'location' => trim($m[4]),
                 'date' => self::parseBankDate($m[2], $m[3]),
