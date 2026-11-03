@@ -874,12 +874,7 @@ class ReportDataService
                 ->sum('amount')
             : 0.0;
 
-        $referrerCut = $paidInRange
-            ->filter(fn($l) => $l->referrer_id
-                && $l->referrer_share_percentage !== null
-                && !$l->referrer_payout_id
-                && !$l->referrer_deducted_before_deposit)
-            ->sum(fn($l) => round($l->interest_amount * ($l->referrer_share_percentage / 100), 2));
+        $referrerCut = $this->getReferrerShareOwed($user, $startDate, $endDate);
 
         $cashCollected = (float)LoanGivenPayment::where('user_id', $user->id)
             ->whereBetween('payment_date', [$startDate->toDateString(), $endDate->toDateString()])
@@ -952,40 +947,33 @@ class ReportDataService
             'accounts' => $accounts,
         ];
     }
-    private function referrerOwedLoans(User $user)
+
+    private function unpaidReferrerCommission(User $user)
     {
-        return LoanGiven::with('referrer')
+        return LoanGivenPayment::withoutGlobalScopes()
             ->where('user_id', $user->id)
-            ->where('status', 'paid')
-            ->whereNotNull('referrer_id')
             ->whereNull('referrer_payout_id')
-            ->where(fn($q) => $q->where('referrer_deducted_before_deposit', false)
-                ->orWhereNull('referrer_deducted_before_deposit'));
-    }
-
-// Same rule as ReferrerPayoutController: per-loan % first, referrer default as fallback.
-    private function referrerCutFor(LoanGiven $loan): float
-    {
-        $pct = $loan->referrer_share_percentage ?? $loan->referrer?->default_share_percentage;
-
-        return $pct === null ? 0.0 : round($loan->interest_amount * ($pct / 100), 2);
+            ->where('referrer_commission_kept', false)
+            ->where('referrer_commission', '>', 0)
+            ->whereHas('loanGiven', fn ($q) => $q->withoutGlobalScopes()->whereNotNull('referrer_id'));
     }
 
     public function getReferrerShareOwed(User $user, Carbon $startDate, Carbon $endDate): float
     {
-        return (float) $this->referrerOwedLoans($user)
-            ->whereBetween('repaid_date', [$startDate, $endDate])
-            ->get()
-            ->sum(fn($l) => $this->referrerCutFor($l));
+        return (float) $this->unpaidReferrerCommission($user)
+            ->whereBetween('payment_date', [$startDate->toDateString(), $endDate->toDateString()])
+            ->sum('referrer_commission');
     }
 
     public function getReferrerShareOwedByMonth(User $user, int $year): array
     {
         $byMonth = array_fill(1, 12, 0.0);
 
-        $this->referrerOwedLoans($user)->whereYear('repaid_date', $year)->get()
-            ->each(function ($l) use (&$byMonth) {
-                $byMonth[Carbon::parse($l->repaid_date)->month] += $this->referrerCutFor($l);
+        $this->unpaidReferrerCommission($user)
+            ->whereYear('payment_date', $year)
+            ->get(['payment_date', 'referrer_commission'])
+            ->each(function ($p) use (&$byMonth) {
+                $byMonth[Carbon::parse($p->payment_date)->month] += (float) $p->referrer_commission;
             });
 
         return $byMonth;
