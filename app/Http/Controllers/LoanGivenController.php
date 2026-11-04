@@ -278,8 +278,11 @@ class LoanGivenController extends Controller implements HasMiddleware
                     // table) instead of relying purely on the auto-calculated
                     // one. Leave blank to just use the auto-calculated fee (or
                     // none, for cash/bank disbursements).
-                    'manual_fee' => $validated['transaction_cost']
-                        ?? $this->transactionService->mpesaSendMoneyFee($principalAmount),
+                    // An explicit 0 is a real answer ("no fee"), so test for
+                    // presence rather than truthiness, and send a float.
+                    'manual_fee' => $request->filled('transaction_cost')
+                        ? (float)$validated['transaction_cost']
+                        : (float)$this->transactionService->mpesaSendMoneyFee($principalAmount),
                 ]);
 
                 // Direct link so destroy() never has to guess which transaction to remove.

@@ -240,10 +240,19 @@
             });
 
             feeInput.addEventListener('input', () => {
-                // Typing a value locks it in; clearing the field re-enables auto-calculation.
+                // Typing any value (including 0) locks it in. Clearing the field
+                // does NOT refill it mid-edit, otherwise you can't type over it.
                 feeEdited = feeInput.value.trim() !== '';
-                if (!feeEdited) autoFillFee();
                 checkBalance();
+            });
+
+            // Leaving the field empty and moving away re-enables auto-calculation.
+            feeInput.addEventListener('blur', () => {
+                if (feeInput.value.trim() === '') {
+                    feeEdited = false;
+                    autoFillFee();
+                    checkBalance();
+                }
             });
 
             autoFillFee();
