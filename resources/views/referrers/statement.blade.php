@@ -96,7 +96,7 @@
                     </div>
                 @endif
 
-                @include('referrers.partials.ledger', [
+                @include('referrers.partials.ledger-table', [
                     'months'       => $commission['months'],
                     'mode'         => 'balance',
                     'balanceLabel' => 'Owed',
@@ -112,7 +112,7 @@
                     <p class="text-sm text-gray-500 mb-2">
                         Loans written off and charged to {{ $referrer->name }}, and what each payout has deducted so far.
                     </p>
-                    @include('referrers.partials.ledger', [
+                    @include('referrers.partials.ledger-table', [
                         'months'       => $recovery['months'],
                         'mode'         => 'balance',
                         'balanceLabel' => 'She owes',
@@ -172,7 +172,7 @@
                     </div>
 
                     <h4 class="text-md font-semibold text-gray-800 mt-6">Principal collected</h4>
-                    @include('referrers.partials.ledger', [
+                    @include('referrers.partials.ledger-table', [
                         'months'       => $principal['months'],
                         'mode'         => 'balance',
                         'balanceLabel' => 'Net collected',
@@ -184,7 +184,7 @@
                     ])
 
                     <h4 class="text-md font-semibold text-gray-800 mt-8">Interest</h4>
-                    @include('referrers.partials.ledger', [
+                    @include('referrers.partials.ledger-table', [
                         'months'       => $interest['months'],
                         'mode'         => 'balance',
                         'balanceLabel' => 'Interest held',
@@ -201,7 +201,7 @@
                             <span class="text-sm font-normal text-gray-500">(every movement, unfiltered)</span>
                         </summary>
                         <div class="mt-3">
-                            @include('referrers.partials.ledger', [
+                            @include('referrers.partials.ledger-table', [
                                 'months'       => $float['months'],
                                 'mode'         => 'balance',
                                 'balanceLabel' => 'Balance',
@@ -224,7 +224,7 @@
                         <span class="text-sm font-normal text-gray-500">({{ $movements['count'] }} movements, on every account)</span>
                     </summary>
                     <div class="mt-3">
-                        @include('referrers.partials.ledger', [
+                        @include('referrers.partials.ledger-table', [
                             'months'     => $movements['months'],
                             'mode'       => 'movements',
                             'kindStyles' => $kindStyles,
