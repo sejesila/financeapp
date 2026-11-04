@@ -35,17 +35,26 @@
                     @if($unpaidLoans->isEmpty())
                         <div class="bg-blue-50 border-l-4 border-blue-400 p-4">
                             <p class="text-sm text-blue-700">
-                                No unpaid referred loans for {{ $referrer->name }} — either nothing's closed yet,
+                                No unpaid commission for {{ $referrer->name }} — either nothing's been earned yet,
                                 or everything's already been paid out or retained before depositing.
                             </p>
                         </div>
+
+                        @if($recoveryOwed > 0)
+                            <div class="mt-4 bg-rose-50 border-l-4 border-rose-400 p-4">
+                                <p class="text-sm text-rose-800">
+                                    {{ $referrer->name }} still owes KES {{ number_format($recoveryOwed, 0) }} from written-off
+                                    loans. It will be deducted from her commission as soon as some is earned.
+                                </p>
+                            </div>
+                        @endif
                     @else
-                        <!-- Unpaid loans reference table -->
+                        <!-- Unpaid commission reference table -->
                         <div class="bg-purple-50 border-l-4 border-purple-400 p-4 mb-6">
                             <p class="text-sm text-purple-800 mb-3">
-                                {{ $unpaidLoans->count() }} closed loan{{ $unpaidLoans->count() > 1 ? 's' : '' }}
+                                {{ $unpaidLoans->count() }} loan{{ $unpaidLoans->count() > 1 ? 's' : '' }}
                                 referred by
-                                {{ $referrer->name }} with interest not yet paid out or retained upfront.
+                                {{ $referrer->name }} with commission not yet paid out or retained upfront.
                                 Total interest across all of them: <span
                                     class="font-medium">KES {{ number_format($totalInterest, 0) }}</span>
                                 &mdash; their combined cut at each loan's own share rate: <span
@@ -56,10 +65,10 @@
                                     <thead>
                                     <tr>
                                         <th class="px-3 py-2 text-left font-medium text-purple-700">Borrower</th>
-                                        <th class="px-3 py-2 text-left font-medium text-purple-700">Interest</th>
+                                        <th class="px-3 py-2 text-left font-medium text-purple-700">Unpaid Interest</th>
                                         <th class="px-3 py-2 text-left font-medium text-purple-700">Share %</th>
                                         <th class="px-3 py-2 text-left font-medium text-purple-700">Cut</th>
-                                        <th class="px-3 py-2 text-left font-medium text-purple-700">Repaid Date</th>
+                                        <th class="px-3 py-2 text-left font-medium text-purple-700">First Payment</th>
                                     </tr>
                                     </thead>
                                     <tbody class="divide-y divide-purple-100">
@@ -67,26 +76,64 @@
                                         <tr>
                                             <td class="px-3 py-2 text-gray-800">{{ $loan->borrower_name }}</td>
                                             <td class="px-3 py-2 text-gray-800">
-                                                KES {{ number_format($loan->interest_amount, 0) }}</td>
+                                                KES {{ number_format($loan->unpaid_interest, 0) }}</td>
                                             <td class="px-3 py-2 text-gray-600">{{ number_format($loan->computed_share_percentage, 1) }}
                                                 %
                                             </td>
                                             <td class="px-3 py-2 text-gray-800 font-medium">
                                                 KES {{ number_format($loan->computed_cut, 0) }}</td>
-                                            <td class="px-3 py-2 text-gray-600">{{ $loan->repaid_date?->format('M d, Y') }}</td>
+                                            <td class="px-3 py-2 text-gray-600">{{ $loan->unpaid_payments->min('payment_date')?->format('M d, Y') }}</td>
                                         </tr>
                                     @endforeach
                                     </tbody>
                                 </table>
                             </div>
                             <p class="mt-2 text-xs text-purple-700">
-                                Only loans with a repaid date inside the period you pick below will actually be included
+                                Only payments dated inside the period you pick below will actually be included
                                 in this payout.
                                 Each loan's cut is computed at its own share percentage, so the payout total may not
                                 equal a single flat rate applied to the interest total.
-
                             </p>
                         </div>
+
+                        {{-- Write-off recovery preview. $recoveryOwed / $recoveryDeduction / $netPayable
+                             come from ReferrerPayoutController@create and are based on ALL unpaid
+                             commission; the real figures are recalculated for the chosen period. --}}
+                        @if($recoveryOwed > 0)
+                            <div class="bg-rose-50 border-l-4 border-rose-400 p-4 mb-6">
+                                <p class="text-sm font-medium text-rose-800 mb-2">
+                                    Written-off loans to recover from {{ $referrer->name }}
+                                </p>
+                                <dl class="text-sm space-y-1 max-w-md">
+                                    <div class="flex justify-between">
+                                        <dt class="text-gray-600">Still owed from write-offs</dt>
+                                        <dd class="font-medium text-gray-900">KES {{ number_format($recoveryOwed, 0) }}</dd>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <dt class="text-gray-600">Commission (all unpaid)</dt>
+                                        <dd class="font-medium text-gray-900">KES {{ number_format($totalCut, 0) }}</dd>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <dt class="text-gray-600">Less: write-off recovery</dt>
+                                        <dd class="font-medium text-rose-700">&minus; KES {{ number_format($recoveryDeduction, 0) }}</dd>
+                                    </div>
+                                    <div class="flex justify-between pt-1 border-t border-rose-200">
+                                        <dt class="font-medium text-gray-800">Net paid in cash</dt>
+                                        <dd class="font-bold text-gray-900">KES {{ number_format($netPayable, 0) }}</dd>
+                                    </div>
+                                </dl>
+                                <p class="mt-2 text-xs text-rose-700">
+                                    @if($recoveryOwed > $totalCut)
+                                        Her commission doesn't cover the full amount, so KES {{ number_format($recoveryOwed - $recoveryDeduction, 0) }}
+                                        carries forward and comes off future commissions.
+                                    @else
+                                        Her commission covers the full amount owed.
+                                    @endif
+                                    Figures are for all unpaid commission; the actual deduction is recalculated for the
+                                    period you pick below.
+                                </p>
+                            </div>
+                        @endif
 
                         <form method="POST" action="{{ route('referrer-payouts.store', $referrer->id) }}"
                               class="space-y-6">
@@ -140,6 +187,10 @@
                                                     KES {{ number_format($floatAccount->current_balance, 0) }}). Her commission comes out of
                                                     money she's holding for you, so each loan's cut is also marked as settled on the
                                                     Reconcile Float page. What she still owes you drops by the same amount.
+                                                    @if($recoveryDeduction > 0)
+                                                        Only the net cash amount leaves her float; the part deducted for written-off
+                                                        loans stays in the float and becomes yours to reconcile.
+                                                    @endif
                                                 </p>
                                             </div>
                                         </template>
@@ -159,11 +210,13 @@
 
                             <div class="bg-amber-50 border-l-4 border-amber-400 p-4">
                                 <p class="text-sm text-amber-800">
-                                    ⚠️ The final payout amount is recalculated from loans whose repaid date falls
+                                    ⚠️ The final payout amount is recalculated from payments dated
                                     between
                                     the two dates above, each at its own share rate — not a flat total from the
                                     reference
-                                    table shown earlier. Double-check the period covers the loans you intend to pay for.
+                                    table shown earlier. @if($recoveryOwed > 0) Any write-off recovery is deducted from that
+                                    total before the cash is paid out. @endif
+                                    Double-check the period covers the payments you intend to pay for.
                                 </p>
                             </div>
 

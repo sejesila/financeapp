@@ -1,4 +1,10 @@
 <x-app-layout>
+    @php
+        // Write-off charge against the referrer, if this loan has one.
+        // Needs LoanGiven::referrerRecovery() (hasOne) — see notes.
+        $recovery = $loanGiven->status === 'written_off' ? $loanGiven->referrerRecovery : null;
+    @endphp
+
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             @if(session('success'))
@@ -243,6 +249,33 @@
                                             KES {{ number_format($loanGiven->surplus_received, 0) }}</dd>
                                     </div>
                                 @endif
+
+                                {{-- Write-off charged to the referrer: recovered from her commission at each payout. --}}
+                                @if($recovery)
+                                    <div class="flex justify-between items-start py-2 border-b border-gray-100">
+                                        <dt class="text-sm font-medium text-gray-500 shrink-0">Charged to Referrer</dt>
+                                        <dd class="text-sm text-gray-900 text-right">
+                                            KES {{ number_format($recovery->amount, 0) }}
+                                            <span class="block text-xs text-gray-400">
+                                                Deducted from {{ $loanGiven->referrer?->name }}'s commission at each payout
+                                            </span>
+                                        </dd>
+                                    </div>
+                                    <div class="flex justify-between py-2 border-b border-gray-100">
+                                        <dt class="text-sm font-medium text-gray-500">Recovered So Far</dt>
+                                        <dd class="text-sm text-green-600 font-medium">
+                                            KES {{ number_format($recovery->recovered, 0) }}</dd>
+                                    </div>
+                                    <div class="flex justify-between py-2 border-b border-gray-100">
+                                        <dt class="text-sm font-medium text-gray-500">Still to Recover</dt>
+                                        <dd class="text-sm font-bold {{ $recovery->outstanding > 0 ? 'text-amber-600' : 'text-gray-500' }}">
+                                            KES {{ number_format($recovery->outstanding, 0) }}
+                                            @if($recovery->status === 'settled')
+                                                <span class="text-xs font-normal text-gray-400">(settled)</span>
+                                            @endif
+                                        </dd>
+                                    </div>
+                                @endif
                             </dl>
                         </div>
                     </div>
@@ -350,7 +383,11 @@
                                 </svg>
                                 Close as Fully Repaid
                             </button>
+                        @endif
 
+                        {{-- Defaulted and written-off loans can be changed too, so a defaulted loan
+                             can later be written off (and charged to the referrer). --}}
+                        @if(in_array($loanGiven->status, ['active', 'defaulted', 'written_off']))
                             <button type="button" onclick="document.getElementById('changeStatusModal').showModal()"
                                     class="inline-flex items-center px-4 py-2 bg-yellow-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-yellow-700 focus:bg-yellow-700 active:bg-yellow-900 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 transition ease-in-out duration-150">
                                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -555,7 +592,7 @@
     @endif
 
     <!-- Change Status Modal -->
-    @if($loanGiven->status === 'active')
+    @if(in_array($loanGiven->status, ['active', 'defaulted', 'written_off']))
         <dialog id="changeStatusModal" class="rounded-lg shadow-xl w-full max-w-md">
             <div class="p-6">
                 <div class="flex items-center justify-between mb-4">
@@ -568,23 +605,73 @@
                         </svg>
                     </button>
                 </div>
-                <form method="POST" action="{{ route('loans-given.status', $loanGiven->id) }}">
+                <form method="POST" action="{{ route('loans-given.status', $loanGiven->id) }}"
+                      x-data="{ status: '' }">
                     @csrf
                     @method('PUT')
                     <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-700 mb-2">Select new status</label>
-                        <select name="status"
+                        <select name="status" x-model="status"
                                 class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
                                 required>
                             <option value="">Choose...</option>
-                            <option value="defaulted">Defaulted</option>
-                            <option value="written_off">Written Off</option>
+                            @foreach(['active' => 'Active (reopen)', 'defaulted' => 'Defaulted', 'written_off' => 'Written Off'] as $value => $label)
+                                @if($value !== $loanGiven->status)
+                                    <option value="{{ $value }}">{{ $label }}</option>
+                                @endif
+                            @endforeach
                         </select>
                         <p class="mt-2 text-sm text-gray-500">
                             <span class="font-medium">Defaulted:</span> Borrower has failed to repay<br>
                             <span class="font-medium">Written Off:</span> Loan considered uncollectible
                         </p>
+
+                        @if($recovery)
+                            <p class="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                                KES {{ number_format($recovery->amount, 0) }} of this write-off is charged to
+                                {{ $loanGiven->referrer?->name }} (KES {{ number_format($recovery->recovered, 0) }} recovered so far).
+                                Moving the loan out of "Written Off" removes the charge, unless part of it has already
+                                been recovered from her commission — then the change is blocked.
+                            </p>
+                        @endif
                     </div>
+
+                    {{-- Charge the write-off to the referrer's commission. Only relevant when the loan has a referrer. --}}
+                    @if($loanGiven->referrer)
+                        <div x-show="status === 'written_off'" x-cloak x-data="{ charge: false }"
+                             class="mb-4 border border-purple-200 bg-purple-50 rounded-lg p-4 space-y-3">
+                            <label class="flex items-start">
+                                <input type="checkbox" name="charge_referrer" value="1" x-model="charge"
+                                       :disabled="status !== 'written_off'"
+                                       class="mt-0.5 rounded border-gray-300 text-purple-600 shadow-sm focus:border-purple-300 focus:ring focus:ring-purple-200 focus:ring-opacity-50">
+                                <span class="ml-2 text-sm text-gray-800">
+                                    Charge this write-off to {{ $loanGiven->referrer->name }}
+                                </span>
+                            </label>
+
+                            <div x-show="charge" x-cloak>
+                                <label for="recovery_amount" class="block text-xs font-medium text-gray-700">
+                                    Amount to charge (KES)
+                                </label>
+                                <input type="number" step="0.01" min="0.01" max="{{ $loanGiven->balance }}"
+                                       id="recovery_amount" name="recovery_amount"
+                                       placeholder="{{ number_format($loanGiven->balance, 2, '.', '') }}"
+                                       :disabled="status !== 'written_off' || !charge"
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-300 focus:ring focus:ring-purple-200 focus:ring-opacity-50">
+                                <p class="mt-1 text-xs text-gray-500">
+                                    Leave blank to charge the full unrecovered balance
+                                    (KES {{ number_format($loanGiven->balance, 0) }}).
+                                </p>
+                            </div>
+
+                            <p class="text-xs text-purple-800" x-show="charge" x-cloak>
+                                The amount comes off her unpaid commission at her next payout. If her commission is
+                                less than what's owed, the remainder is carried forward and deducted from future
+                                commissions until it's covered.
+                            </p>
+                        </div>
+                    @endif
+
                     <div class="flex justify-end space-x-3">
                         <button type="button" onclick="document.getElementById('changeStatusModal').close()"
                                 class="px-4 py-2 bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-gray-800 uppercase tracking-widest hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition ease-in-out duration-150">

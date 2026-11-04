@@ -12,8 +12,8 @@ class ReferrerPayout extends Model
 
     protected $fillable = [
         'user_id', 'referrer_id', 'period_start', 'period_end',
-        'total_interest', 'share_percentage', 'amount_paid',
-        'account_id', 'transaction_id', 'paid_date',
+        'total_interest', 'share_percentage', 'gross_commission', 'recovery_deducted',
+        'amount_paid', 'account_id', 'transaction_id', 'paid_date',
     ];
 
     protected $casts = [
@@ -23,6 +23,8 @@ class ReferrerPayout extends Model
         'share_percentage' => 'decimal:2',
         'amount_paid'      => 'decimal:2',
         'paid_date'        => 'date',
+        'gross_commission'  => 'decimal:2',
+        'recovery_deducted' => 'decimal:2',
     ];
 
     protected static function booted()
@@ -50,5 +52,10 @@ class ReferrerPayout extends Model
     public function loans()
     {
         return $this->hasMany(LoanGiven::class, 'referrer_payout_id');
+    }
+    // ReferrerPayout
+    public function recoveryApplications()
+    {
+        return $this->hasMany(ReferrerRecoveryApplication::class, 'referrer_payout_id');
     }
 }

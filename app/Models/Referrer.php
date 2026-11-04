@@ -290,4 +290,44 @@ class Referrer extends Model
             'max_total'  => min($cash, $interest + $principal),
         ];
     }
+    public function recoveries() { return $this->hasMany(ReferrerRecovery::class); }
+
+    public function openRecoveries()
+    {
+        return $this->recoveries()->where('status', 'open')->orderBy('id')->get();
+    }
+
+    public function recoveryOutstanding(): float
+    {
+        return round((float)$this->recoveries()->where('status', 'open')
+            ->selectRaw('COALESCE(SUM(amount - recovered),0) as o')->value('o'), 2);
+    }
+
+    /** Consume open recoveries oldest-first against $available. Returns amount deducted. */
+    public function applyRecoveries(ReferrerPayout $payout, float $available): float
+    {
+        $deducted = 0.0;
+
+        foreach ($this->openRecoveries() as $rec) {
+            $left = round($available - $deducted, 2);
+            if ($left <= 0.005) break;
+
+            $take = round(min($left, $rec->outstanding), 2);
+            if ($take <= 0) continue;
+
+            $rec->recovered = round((float)$rec->recovered + $take, 2);
+            if ($rec->outstanding <= 0.01) $rec->status = 'settled';
+            $rec->save();
+
+            ReferrerRecoveryApplication::create([
+                'referrer_recovery_id' => $rec->id,
+                'referrer_payout_id'   => $payout->id,
+                'amount'               => $take,
+            ]);
+
+            $deducted = round($deducted + $take, 2);
+        }
+
+        return $deducted;
+    }
 }

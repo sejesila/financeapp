@@ -1,9 +1,7 @@
 <x-app-layout>
     @php
-        $money = fn ($v) => $v > 0 ? number_format($v, 0) : '';
-
-        // Colour key shared by every table below. Full class names are spelled out
-        // here so Tailwind picks them up.
+        // Colour key for the float and "everything" tables. Full class names are
+        // spelled out so Tailwind picks them up.
         $kindStyles = [
             'principal'   => ['label' => 'Principal',        'row' => 'bg-indigo-50',  'border' => 'border-indigo-400',  'badge' => 'bg-indigo-100 text-indigo-800'],
             'interest'    => ['label' => 'Interest',         'row' => 'bg-green-50',   'border' => 'border-green-400',   'badge' => 'bg-green-100 text-green-800'],
@@ -13,33 +11,58 @@
             'commission'  => ['label' => 'Commission',       'row' => 'bg-purple-50',  'border' => 'border-purple-400',  'badge' => 'bg-purple-100 text-purple-800'],
             'fee'         => ['label' => 'Fee',              'row' => 'bg-gray-50',    'border' => 'border-gray-300',    'badge' => 'bg-gray-200 text-gray-700'],
         ];
+
+        // Commission ledger and write-off recovery ledger use their own kinds.
+        $commissionStyles = [
+            'earned'    => ['label' => 'Earned',      'row' => 'bg-green-50',  'border' => 'border-green-400',  'badge' => 'bg-green-100 text-green-800'],
+            'paid'      => ['label' => 'Paid out',    'row' => 'bg-orange-50', 'border' => 'border-orange-400', 'badge' => 'bg-orange-100 text-orange-800'],
+            'kept'      => ['label' => 'Kept by her', 'row' => 'bg-blue-50',   'border' => 'border-blue-400',   'badge' => 'bg-blue-100 text-blue-800'],
+            'charged'   => ['label' => 'Written off', 'row' => 'bg-rose-50',   'border' => 'border-rose-400',   'badge' => 'bg-rose-100 text-rose-800'],
+            'recovered' => ['label' => 'Recovered',   'row' => 'bg-teal-50',   'border' => 'border-teal-400',   'badge' => 'bg-teal-100 text-teal-800'],
+        ];
+
+        // How many months to render (newest first). ?months=3|6|12|all — default 6.
+        $monthsParam = request('months');
+        $limit = $monthsParam === 'all'
+            ? null
+            : (is_numeric($monthsParam) ? max(1, (int) $monthsParam) : 6);
+
+        $recovery = $commission['recovery'] ?? null;
     @endphp
 
     <div class="py-12">
         <div class="max-w-5xl mx-auto sm:px-6 lg:px-8 space-y-8">
 
-            <div class="flex items-center justify-between">
+            <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h2 class="text-2xl font-semibold text-gray-800"> Statement </h2>
                     <p class="text-sm text-gray-500 mt-1">
                         Every credit and debit (going out), in order.
                     </p>
                 </div>
-                <a href="{{ route('referrers.show', $referrer->id) }}"
-                   class="inline-flex items-center px-4 py-2 bg-gray-800 rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 transition">
-                    Back
-                </a>
+                <div class="flex flex-wrap items-center gap-3">
+                    {{-- Range: how much history to render. Balances stay correct either way. --}}
+                    <div class="inline-flex overflow-hidden rounded-md border border-gray-300 text-xs">
+                        @foreach(['3' => '3 mo', '6' => '6 mo', '12' => '12 mo', 'all' => 'All'] as $value => $label)
+                            @php $active = ($value === 'all' && $limit === null) || ($limit !== null && (string) $limit === (string) $value); @endphp
+                            <a href="{{ request()->fullUrlWithQuery(['months' => $value]) }}"
+                               class="px-3 py-1.5 {{ $active ? 'bg-gray-800 text-white' : 'bg-white text-gray-700 hover:bg-gray-50' }}">
+                                {{ $label }}
+                            </a>
+                        @endforeach
+                    </div>
+                    <a href="{{ route('referrers.show', $referrer->id) }}"
+                       class="inline-flex items-center px-4 py-2 bg-gray-800 rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 transition">
+                        Back
+                    </a>
+                </div>
             </div>
 
             {{-- ───────────── Commission ───────────── --}}
             <div class="bg-white shadow-xl sm:rounded-lg p-6">
                 <h3 class="text-lg font-semibold text-gray-800">Commission earned</h3>
-{{--                <p class="text-sm text-gray-500 mb-4">--}}
-{{--                    Credit = commission earned on a closed loan. Debit = paid to her, or kept by her before depositing.--}}
-{{--                    The balance is what you still owe her.--}}
-{{--                </p>--}}
 
-                <div class="grid grid-cols-3 gap-4 mb-4 text-sm">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 mt-3 text-sm">
                     <div class="bg-gray-50 rounded-lg p-3">
                         <div class="text-gray-500">Earned</div>
                         <div class="text-lg font-semibold text-green-700">KES {{ number_format($commission['total_earned'], 0) }}</div>
@@ -54,7 +77,52 @@
                     </div>
                 </div>
 
-                @include('referrers.partials.ledger-table', ['months' => $commission['months'], 'balanceLabel' => 'Owed', 'empty' => 'No closed loans with commission yet.'])
+                @if($recovery && $recovery['has'])
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 text-sm">
+                        <div class="bg-rose-50 rounded-lg p-3">
+                            <div class="text-gray-500">She owes you (write-offs)</div>
+                            <div class="text-lg font-semibold text-rose-800">KES {{ number_format($recovery['outstanding'], 0) }}</div>
+                            <div class="text-xs text-gray-400 mt-1">
+                                charged {{ number_format($recovery['charged'], 0) }} · recovered {{ number_format($recovery['recovered'], 0) }}
+                            </div>
+                        </div>
+                        <div class="bg-indigo-50 rounded-lg p-3">
+                            <div class="text-gray-500">
+                                {{ $commission['net_owed'] >= 0 ? 'Net you owe her' : 'Net she owes you' }}
+                            </div>
+                            <div class="text-lg font-semibold text-indigo-800">KES {{ number_format(abs($commission['net_owed']), 0) }}</div>
+                            <div class="text-xs text-gray-400 mt-1">commission owed less write-off recovery</div>
+                        </div>
+                    </div>
+                @endif
+
+                @include('referrers.partials.ledger', [
+                    'months'       => $commission['months'],
+                    'mode'         => 'balance',
+                    'balanceLabel' => 'Owed',
+                    'creditLabel'  => 'Earned',
+                    'debitLabel'   => 'Paid / kept',
+                    'kindStyles'   => $commissionStyles,
+                    'limit'        => $limit,
+                    'empty'        => 'No commission yet.',
+                ])
+
+                @if($recovery && $recovery['has'])
+                    <h4 class="text-md font-semibold text-gray-800 mt-8">Write-off recoveries</h4>
+                    <p class="text-sm text-gray-500 mb-2">
+                        Loans written off and charged to {{ $referrer->name }}, and what each payout has deducted so far.
+                    </p>
+                    @include('referrers.partials.ledger', [
+                        'months'       => $recovery['months'],
+                        'mode'         => 'balance',
+                        'balanceLabel' => 'She owes',
+                        'creditLabel'  => 'Charged',
+                        'debitLabel'   => 'Recovered',
+                        'kindStyles'   => $commissionStyles,
+                        'limit'        => $limit,
+                        'empty'        => 'No write-offs charged.',
+                    ])
+                @endif
             </div>
 
             {{-- ───────────── Float ───────────── --}}
@@ -83,7 +151,7 @@
                         $principalInFloat = (float) $float['current_balance'] - (float) $interest['closing'];
                     @endphp
 
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm mt-3">
                         <div class="bg-indigo-50 rounded-lg p-3">
                             <div class="text-gray-500">Principal in the float now</div>
                             <div class="text-lg font-semibold text-gray-900">KES {{ number_format($principalInFloat, 0) }}</div>
@@ -102,32 +170,28 @@
                             <div class="text-xs text-gray-400 mt-1">everything in the account</div>
                         </div>
                     </div>
-{{--                    <p class="text-xs text-gray-400 mt-2 mb-6">--}}
-{{--                        She re-lends repayments, so the principal in her float is what's left of the account after interest. It reflects--}}
-{{--                        the capital you put in, loans she gave out and fees. Every movement is in the full activity at the bottom.--}}
-{{--                    </p>--}}
 
                     <h4 class="text-md font-semibold text-gray-800 mt-6">Principal collected</h4>
-{{--                    <p class="text-sm text-gray-500 mb-2">--}}
-{{--                        Principal received on fully or partly paid loans that landed in her float, less principal she has sent back to you.--}}
-{{--                        Collected KES {{ number_format($principal['credits'], 0) }} · sent back KES {{ number_format($principal['debits'], 0) }}.--}}
-{{--                        This is a running tally of what came in and went back, not what she holds.--}}
-{{--                    </p>--}}
-                    @include('referrers.partials.ledger-table', [
+                    @include('referrers.partials.ledger', [
                         'months'       => $principal['months'],
+                        'mode'         => 'balance',
                         'balanceLabel' => 'Net collected',
+                        'creditLabel'  => 'In',
+                        'debitLabel'   => 'Out',
                         'kindStyles'   => $kindStyles,
+                        'limit'        => $limit,
                         'empty'        => 'No principal received yet.',
                     ])
 
                     <h4 class="text-md font-semibold text-gray-800 mt-8">Interest</h4>
-{{--                    <p class="text-sm text-gray-500 mb-2">--}}
-{{--                        Interest earned on partially or fully paid loans, less her commission and any interest she has sent back.--}}
-{{--                    </p>--}}
-                    @include('referrers.partials.ledger-table', [
+                    @include('referrers.partials.ledger', [
                         'months'       => $interest['months'],
+                        'mode'         => 'balance',
                         'balanceLabel' => 'Interest held',
+                        'creditLabel'  => 'In',
+                        'debitLabel'   => 'Out',
                         'kindStyles'   => $kindStyles,
+                        'limit'        => $limit,
                         'empty'        => 'No interest movements yet.',
                     ])
 
@@ -137,15 +201,14 @@
                             <span class="text-sm font-normal text-gray-500">(every movement, unfiltered)</span>
                         </summary>
                         <div class="mt-3">
-                            <div class="flex flex-wrap gap-2 text-xs mb-3">
-                                @foreach($kindStyles as $s)
-                                    <span class="rounded px-2 py-0.5 {{ $s['badge'] }}">{{ $s['label'] }}</span>
-                                @endforeach
-                            </div>
-                            @include('referrers.partials.ledger-table', [
+                            @include('referrers.partials.ledger', [
                                 'months'       => $float['months'],
-                                'kindStyles'   => $kindStyles,
+                                'mode'         => 'balance',
                                 'balanceLabel' => 'Balance',
+                                'creditLabel'  => 'In',
+                                'debitLabel'   => 'Out',
+                                'kindStyles'   => $kindStyles,
+                                'limit'        => $limit,
                                 'empty'        => 'No movements on the float account yet.',
                             ])
                         </div>
@@ -160,21 +223,15 @@
                         Everything
                         <span class="text-sm font-normal text-gray-500">({{ $movements['count'] }} movements, on every account)</span>
                     </summary>
-{{--                    <p class="text-sm text-gray-500 mt-2 mb-4">--}}
-{{--                        Her float account, transfers in and out of it, and every disbursement, repayment, interest and commission--}}
-{{--                        tied to loans she referred, on whichever account it landed. In and Out are from the point of view of the--}}
-{{--                        account shown, so they don't add up to one balance. Use the filter to see only what never passed through her float.--}}
-{{--                    </p>--}}
-                    <div class="flex flex-wrap gap-2 text-xs mb-3">
-                        @foreach($kindStyles as $s)
-                            <span class="rounded px-2 py-0.5 {{ $s['badge'] }}">{{ $s['label'] }}</span>
-                        @endforeach
+                    <div class="mt-3">
+                        @include('referrers.partials.ledger', [
+                            'months'     => $movements['months'],
+                            'mode'       => 'movements',
+                            'kindStyles' => $kindStyles,
+                            'limit'      => $limit,
+                            'empty'      => 'No movements found.',
+                        ])
                     </div>
-                    @include('referrers.partials.movements-table', [
-                        'kindStyles' => $kindStyles,
-                        'months' => $movements['months'],
-                        'empty'  => 'No movements found.',
-                    ])
                 </details>
             </div>
         </div>

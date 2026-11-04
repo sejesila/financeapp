@@ -62,6 +62,11 @@ $outstandingPayable  = round((float) $unpaidPayments->sum('referrer_commission')
 $retainedTotal       = (float) $allPayments->where('referrer_commission_kept', true)->sum('referrer_commission');
 $paidOutTotal        = ($referrer->payouts ?? collect())->sum('amount_paid');
 $floatLimits = $referrer->floatAccount ? $referrer->floatReconcileLimits() : null;
+
+// Write-offs charged to her, recovered from her commission at each payout.
+$recoveriesByLoan    = $referrer->recoveries()->get()->keyBy('loan_given_id');
+$recoveryOutstanding = $referrer->recoveryOutstanding();
+$netOwedNow          = max(0, round($outstandingPayable - $recoveryOutstanding, 2));
                     @endphp
 
                     <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mb-6">
@@ -76,6 +81,11 @@ $floatLimits = $referrer->floatAccount ? $referrer->floatReconcileLimits() : nul
                         <div class="bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg border border-amber-200 p-3 sm:p-4">
                             <p class="text-xs sm:text-sm font-medium text-gray-500">Owed Now</p>
                             <p class="text-base sm:text-lg font-semibold text-gray-900">KES {{ number_format($outstandingPayable, 0) }}</p>
+                            @if($recoveryOutstanding > 0)
+                                <p class="text-[10px] sm:text-xs leading-tight text-gray-500">
+                                    KES {{ number_format($netOwedNow, 0) }} after write-off recovery
+                                </p>
+                            @endif
                         </div>
                         <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200 p-3 sm:p-4">
                             <p class="text-xs sm:text-sm font-medium text-gray-500">Retained Before Deposit</p>
@@ -85,6 +95,15 @@ $floatLimits = $referrer->floatAccount ? $referrer->floatReconcileLimits() : nul
                             <p class="text-xs sm:text-sm font-medium text-gray-500">Paid Out (Batches)</p>
                             <p class="text-base sm:text-lg font-semibold text-gray-900">KES {{ number_format($paidOutTotal, 0) }}</p>
                         </div>
+                        @if($recoveryOutstanding > 0)
+                            <div class="bg-gradient-to-br from-rose-50 to-rose-100 rounded-lg border border-rose-200 p-3 sm:p-4">
+                                <p class="text-xs sm:text-sm font-medium text-gray-500">Write-off Recovery Owed</p>
+                                <p class="text-base sm:text-lg font-semibold text-gray-900">KES {{ number_format($recoveryOutstanding, 0) }}</p>
+                                <p class="text-[10px] sm:text-xs leading-tight text-gray-500">
+                                    Deducted from her commission at each payout
+                                </p>
+                            </div>
+                        @endif
                         @if($floatLimits)
                             <div class="bg-gradient-to-br from-teal-50 to-teal-100 rounded-lg border border-teal-200 p-3 sm:p-4">
                                 <p class="text-xs sm:text-sm font-medium text-gray-500">Reconcilable Now</p>
@@ -97,7 +116,7 @@ $floatLimits = $referrer->floatAccount ? $referrer->floatReconcileLimits() : nul
                     </div>
                 </div>
             </div>
-                @include('referrers.partials.loan-stats')
+            @include('referrers.partials.loan-stats')
 
             <!-- Referred Loans -->
             <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg mb-6">
@@ -152,7 +171,13 @@ $floatLimits = $referrer->floatAccount ? $referrer->floatReconcileLimits() : nul
                                             @endif
                                         </td>
                                         <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
-                                            @if($loan->status !== 'paid')
+                                            @if($loan->status === 'written_off' && isset($recoveriesByLoan[$loan->id]))
+                                                @php $rec = $recoveriesByLoan[$loan->id]; @endphp
+                                                <span class="text-rose-600">Charged KES {{ number_format($rec->amount, 0) }}</span>
+                                                <span class="block text-[10px] sm:text-xs text-gray-400">
+                                                    {{ $rec->status === 'settled' ? 'fully recovered' : 'KES ' . number_format($rec->recovered, 0) . ' recovered' }}
+                                                </span>
+                                            @elseif($loan->status !== 'paid')
                                                 <span class="text-gray-400">Not yet closed</span>
                                             @elseif($loan->referrer_deducted_before_deposit)
                                                 <span class="text-blue-600">Retained upfront (KES {{ number_format($loan->referrer_retained_amount, 0) }})</span>
@@ -173,6 +198,61 @@ $floatLimits = $referrer->floatAccount ? $referrer->floatReconcileLimits() : nul
                     @endif
                 </div>
             </div>
+
+            <!-- Write-off Recoveries -->
+            @if($recoveriesByLoan->isNotEmpty())
+                <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg mb-6">
+                    <div class="p-4 sm:p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-base sm:text-lg font-medium text-gray-900">Write-off Recoveries</h3>
+                            <span class="text-xs sm:text-sm text-gray-500">
+                                <span class="font-medium text-rose-600">KES {{ number_format($recoveryOutstanding, 0) }}</span> still to recover
+                            </span>
+                        </div>
+                        <p class="text-xs text-gray-500 mb-3">
+                            Written-off loans charged to {{ $referrer->name }}. Each payout deducts from her commission,
+                            oldest first, until these are covered.
+                        </p>
+                        <div class="overflow-x-auto border border-gray-200 rounded-lg">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-3 sm:px-6 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">Borrower</th>
+                                    <th class="px-3 sm:px-6 py-3 text-right text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">Charged</th>
+                                    <th class="px-3 sm:px-6 py-3 text-right text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">Recovered</th>
+                                    <th class="px-3 sm:px-6 py-3 text-right text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">Outstanding</th>
+                                    <th class="px-3 sm:px-6 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                @foreach($recoveriesByLoan as $rec)
+                                    @php $recLoan = $referredLoans->firstWhere('id', $rec->loan_given_id); @endphp
+                                    <tr>
+                                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900">
+                                            @if($recLoan)
+                                                <a href="{{ route('loans-given.show', $recLoan->id) }}" class="text-indigo-600 hover:text-indigo-900">{{ $recLoan->borrower_name }}</a>
+                                            @else
+                                                Loan #{{ $rec->loan_given_id }}
+                                            @endif
+                                        </td>
+                                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500 text-right">KES {{ number_format($rec->amount, 0) }}</td>
+                                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-green-600 text-right">KES {{ number_format($rec->recovered, 0) }}</td>
+                                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-right {{ $rec->outstanding > 0 ? 'text-rose-600' : 'text-gray-400' }}">KES {{ number_format($rec->outstanding, 0) }}</td>
+                                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
+                                            @if($rec->status === 'settled')
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Settled</span>
+                                            @else
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-rose-100 text-rose-800">Open</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            @endif
 
             <!-- Payout History -->
             @php
@@ -243,6 +323,12 @@ $floatLimits = $referrer->floatAccount ? $referrer->floatReconcileLimits() : nul
                                         </td>
                                         <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-green-600 text-right">
                                             KES {{ number_format($payout->amount_paid, 0) }}
+                                            @if(($payout->recovery_deducted ?? 0) > 0)
+                                                <span class="block text-[10px] sm:text-xs font-normal text-rose-600">
+                                                    commission KES {{ number_format($payout->gross_commission, 0) }}
+                                                    &minus; KES {{ number_format($payout->recovery_deducted, 0) }} write-off
+                                                </span>
+                                            @endif
                                         </td>
                                     </tr>
 

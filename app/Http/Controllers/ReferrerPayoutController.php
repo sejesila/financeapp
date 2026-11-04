@@ -50,6 +50,9 @@ class ReferrerPayoutController extends Controller
 
         $totalInterest = round((float) $unpaidPayments->sum('interest_portion'), 2);
         $totalCut      = round((float) $unpaidPayments->sum('referrer_commission'), 2);
+        $recoveryOwed      = $referrer->recoveryOutstanding();
+        $recoveryDeduction = round(min($totalCut, $recoveryOwed), 2);
+        $netPayable        = round($totalCut - $recoveryDeduction, 2);
 
         $accounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
@@ -59,7 +62,7 @@ class ReferrerPayoutController extends Controller
         $floatAccount = $referrer->floatAccount;
 
         return view('referrer-payouts.create', compact(
-            'referrer', 'unpaidLoans', 'unpaidPayments', 'totalInterest', 'totalCut', 'accounts', 'floatAccount'
+            'referrer', 'unpaidLoans', 'unpaidPayments', 'totalInterest', 'totalCut', 'accounts', 'floatAccount','recoveryOwed', 'recoveryDeduction', 'netPayable'
         ));
     }
 
@@ -89,83 +92,93 @@ class ReferrerPayoutController extends Controller
             return back()->with('error', 'No unpaid commission found in that period.');
         }
 
-        $totalInterest = round((float) $payments->sum('interest_portion'), 2);
-        $amountPaid    = round((float) $payments->sum('referrer_commission'), 2);
+        $totalInterest   = round((float) $payments->sum('interest_portion'), 2);
+        $grossCommission = round((float) $payments->sum('referrer_commission'), 2);
 
-        // Informational only: the blended share this batch worked out to.
-        $effectiveSharePercentage = $totalInterest > 0
-            ? round(($amountPaid / $totalInterest) * 100, 2)
-            : 0;
-
-        if ($amountPaid <= 0) {
+        if ($grossCommission <= 0) {
             return back()->with('error', 'Computed payout amount is zero — nothing to pay.');
         }
 
-        $fee = in_array($account->type, ['mpesa', 'airtel_money'])
-            ? app(TransactionService::class)->mpesaSendMoneyFee($amountPaid)
-            : 0;
+// Write-off recoveries come off the top, oldest first; any remainder carries forward.
+        $recoveryOwed      = $referrer->recoveryOutstanding();
+        $recoveryDeduction = round(min($grossCommission, $recoveryOwed), 2);
+        $amountPaid        = round($grossCommission - $recoveryDeduction, 2); // actual cash out
 
-        if (round((float) $account->current_balance, 2) < round($amountPaid + $fee, 2)) {
+        $effectiveSharePercentage = $totalInterest > 0
+            ? round(($grossCommission / $totalInterest) * 100, 2) : 0;
+
+        $fee = ($amountPaid > 0 && in_array($account->type, ['mpesa', 'airtel_money']))
+            ? app(TransactionService::class)->mpesaSendMoneyFee($amountPaid) : 0;
+
+        if ($amountPaid > 0 && round((float) $account->current_balance, 2) < round($amountPaid + $fee, 2)) {
             return back()->with('error', "Insufficient balance in {$account->name}: need KES "
                 . number_format($amountPaid + $fee, 2) . " (payout {$amountPaid} + fee {$fee}).");
         }
 
-        // Paying out of HER OWN float: the same amount must be marked settled in
-        // float reconciliation, or her cut would still count as owed back to us.
         $paidFromFloat = $referrer->floatAccount && $referrer->floatAccount->id === $account->id;
         $pendingByLoan = $paidFromFloat ? $referrer->pendingFloatInterestByLoan() : collect();
 
         DB::beginTransaction();
 
         try {
-            $commissionCategory = Category::where('user_id', Auth::id())
-                ->where('name', 'Referrer Commission')
-                ->first() ?: Category::create([
-                'user_id' => Auth::id(), 'parent_id' => null,
-                'name' => 'Referrer Commission', 'type' => 'expense', 'is_active' => true,
-            ]);
+            $transaction = null;
 
-            $transaction = app(TransactionService::class)->createTransaction([
-                'account_id'        => $account->id,
-                'category_id'       => $commissionCategory->id,
-                'amount'            => $amountPaid,
-                'date'              => $validated['paid_date'],
-                'description'       => "Referrer commission to {$referrer->name} ({$validated['period_start']} to {$validated['period_end']})",
-                'mobile_money_type' => 'send_money',
-            ]);
+            if ($amountPaid > 0) {
+                $commissionCategory = Category::where('user_id', Auth::id())
+                    ->where('name', 'Referrer Commission')->first()
+                    ?: Category::create([
+                        'user_id' => Auth::id(), 'parent_id' => null,
+                        'name' => 'Referrer Commission', 'type' => 'expense', 'is_active' => true,
+                    ]);
+
+                $transaction = app(TransactionService::class)->createTransaction([
+                    'account_id'        => $account->id,
+                    'category_id'       => $commissionCategory->id,
+                    'amount'            => $amountPaid,
+                    'date'              => $validated['paid_date'],
+                    'description'       => "Referrer commission to {$referrer->name} ({$validated['period_start']} to {$validated['period_end']})"
+                        . ($recoveryDeduction > 0 ? " — net of KES {$recoveryDeduction} write-off recovery" : ''),
+                    'mobile_money_type' => 'send_money',
+                ]);
+            }
 
             $payout = ReferrerPayout::create([
-                'user_id' => Auth::id(),
-                'referrer_id' => $referrer->id,
-                'period_start' => $validated['period_start'],
-                'period_end' => $validated['period_end'],
-                'total_interest' => $totalInterest,
-                'share_percentage' => $effectiveSharePercentage,
-                'amount_paid' => $amountPaid,
-                'account_id' => $account->id,
-                'transaction_id' => $transaction->id,
-                'paid_date' => $validated['paid_date'],
+                'user_id'           => Auth::id(),
+                'referrer_id'       => $referrer->id,
+                'period_start'      => $validated['period_start'],
+                'period_end'        => $validated['period_end'],
+                'total_interest'    => $totalInterest,
+                'share_percentage'  => $effectiveSharePercentage,
+                'gross_commission'  => $grossCommission,
+                'recovery_deducted' => $recoveryDeduction,
+                'amount_paid'       => $amountPaid,
+                'account_id'        => $account->id,
+                'transaction_id'    => $transaction?->id,
+                'paid_date'         => $validated['paid_date'],
             ]);
 
-            // Stamp the payments (not the loans) as paid. Their commission is now frozen.
+            if ($recoveryDeduction > 0) {
+                $referrer->applyRecoveries($payout, $recoveryDeduction);
+            }
+
             LoanGivenPayment::whereIn('id', $payments->pluck('id'))
                 ->update(['referrer_payout_id' => $payout->id]);
 
             $settledInFloat = 0;
 
-            if ($paidFromFloat) {
-                foreach ($payments->groupBy('loan_given_id') as $loanId => $group) {
-                    $cut = round((float) $group->sum('referrer_commission'), 2);
+            // Only the cash that actually left her float is "settled" there. The deducted
+            // part stays in the float and becomes yours to reconcile.
+            if ($paidFromFloat && $amountPaid > 0) {
+                $scale = $amountPaid / $grossCommission;
 
-                    // Never settle more than is actually pending in the float for that loan.
+                foreach ($payments->groupBy('loan_given_id') as $loanId => $group) {
+                    $cut    = round((float) $group->sum('referrer_commission') * $scale, 2);
                     $settle = min($cut, (float) ($pendingByLoan[$loanId] ?? 0));
 
                     if ($settle > 0.01) {
                         ReferrerFloatReconciliation::create([
-                            'user_id' => Auth::id(),
-                            'loan_given_id' => $loanId,
-                            'transfer_id' => null,
-                            'referrer_payout_id' => $payout->id,
+                            'user_id' => Auth::id(), 'loan_given_id' => $loanId,
+                            'transfer_id' => null, 'referrer_payout_id' => $payout->id,
                             'amount' => $settle,
                         ]);
                         $settledInFloat += $settle;
@@ -177,9 +190,18 @@ class ReferrerPayoutController extends Controller
             $account->updateBalance();
 
             $loanCount = $payments->pluck('loan_given_id')->unique()->count();
-            $msg = "Paid KES " . number_format($amountPaid, 0) . " to {$referrer->name} "
-                . "for {$payments->count()} payment(s) across {$loanCount} loan(s).";
-            if ($paidFromFloat) {
+
+            $msg = "Commission KES " . number_format($grossCommission, 0) . " for {$referrer->name} "
+                . "({$payments->count()} payment(s), {$loanCount} loan(s)): "
+                . "KES " . number_format($recoveryDeduction, 0) . " applied to written-off loans, "
+                . "KES " . number_format($amountPaid, 0) . " paid out.";
+
+            $left = $referrer->recoveryOutstanding();
+            if ($left > 0) {
+                $msg .= " KES " . number_format($left, 0) . " still to recover from future commissions.";
+            }
+
+            if ($paidFromFloat && $amountPaid > 0) {
                 $msg .= " Taken from her float; KES " . number_format($settledInFloat, 0)
                     . " marked as settled in float reconciliation.";
             }

@@ -8,6 +8,7 @@ use App\Models\LoanGivenPayment;
 use App\Models\Referrer;
 use App\Models\ReferrerFloatReconciliation;
 use App\Models\ReferrerPayout;
+use App\Models\ReferrerRecovery;
 use App\Models\Transaction;
 use App\Models\Transfer;
 use Carbon\Carbon;
@@ -23,7 +24,8 @@ use Illuminate\Support\Collection;
  *                              landed in her float, less principal she sent back
  *                            • interest: interest earned on partially or fully
  *                              paid loans, less commission paid / interest sent back
- *  2. commissionLedger() – her referral cut: earned vs. paid/kept vs. still owed.
+ *  2. commissionLedger() – her referral cut: earned vs. paid/kept vs. still owed,
+ *                          plus the write-off recoveries charged against it.
  */
 class ReferrerLedgerService
 {
@@ -458,7 +460,8 @@ class ReferrerLedgerService
 
     // ── 2. COMMISSION LEDGER ────────────────────────────────────────────────
     // Credit = commission she has earned. Debit = commission paid or kept.
-    // Balance = what you still owe her.
+    // Balance = what you still owe her (before write-off recoveries, which are
+    // shown separately in 'recovery' and netted in 'net_owed').
 
     public function commissionLedger(Referrer $referrer): array
     {
@@ -486,6 +489,7 @@ class ReferrerLedgerService
                 'title'  => "Earned: {$name}",
                 'credit' => $cut,
                 'debit'  => 0,
+                'kind'   => 'earned',
             ]);
 
             if ($p->referrer_commission_kept) {
@@ -495,6 +499,7 @@ class ReferrerLedgerService
                     'title'  => "Kept: {$name}",
                     'credit' => 0,
                     'debit'  => $cut,
+                    'kind'   => 'kept',
                 ]);
             } elseif ($p->referrer_payout_id && ($payout = $payouts->get($p->referrer_payout_id))) {
                 $paidOn = Carbon::parse($payout->paid_date);
@@ -505,6 +510,81 @@ class ReferrerLedgerService
                     'title'  => "Paid: {$name}",
                     'credit' => 0,
                     'debit'  => $cut,
+                    'kind'   => 'paid',
+                ]);
+            }
+        }
+
+        $rows = $rows->sortBy('sort')->values();
+        $running = 0.0;
+
+        $rows = $rows->map(function ($row) use (&$running) {
+            $running += $row['credit'] - $row['debit'];
+            $row['balance'] = round($running, 2);
+            return $row;
+        });
+
+        $recovery = $this->recoveryLedger($referrer);
+
+        return [
+            'rows' => $rows,
+            'months' => $this->groupByMonth($rows),
+            'total_earned' => $rows->sum('credit'),
+            'total_settled' => $rows->sum('debit'),
+            'still_owed' => round($running, 2),
+            // Write-offs charged to her. Negative net_owed means she owes you.
+            'recovery' => $recovery,
+            'net_owed' => round($running - $recovery['outstanding'], 2),
+        ];
+    }
+
+    // ── 2b. WRITE-OFF RECOVERY LEDGER ───────────────────────────────────────
+    // Credit = a written-off loan charged to her. Debit = amount recovered from
+    // a payout. Balance = what she still owes you for write-offs.
+
+    private function recoveryLedger(Referrer $referrer): array
+    {
+        $recoveries = ReferrerRecovery::with(['loanGiven', 'applications.payout'])
+            ->where('referrer_id', $referrer->id)
+            ->orderBy('id')
+            ->get();
+
+        if ($recoveries->isEmpty()) {
+            return [
+                'has' => false,
+                'rows' => collect(),
+                'months' => collect(),
+                'charged' => 0.0,
+                'recovered' => 0.0,
+                'outstanding' => 0.0,
+            ];
+        }
+
+        $rows = collect();
+
+        foreach ($recoveries as $rec) {
+            $name = $rec->loanGiven?->borrower_name ?? 'borrower';
+            $on   = Carbon::parse($rec->created_at);
+
+            $rows->push([
+                'date'   => $on,
+                'sort'   => [$on->format('Y-m-d'), 1, $rec->id],
+                'title'  => "Written off: {$name}",
+                'credit' => (float) $rec->amount,
+                'debit'  => 0,
+                'kind'   => 'charged',
+            ]);
+
+            foreach ($rec->applications as $app) {
+                $paidOn = Carbon::parse($app->payout?->paid_date ?? $app->created_at);
+
+                $rows->push([
+                    'date'   => $paidOn,
+                    'sort'   => [$paidOn->format('Y-m-d'), 2, $app->id],
+                    'title'  => "Recovered via payout #{$app->referrer_payout_id}: {$name}",
+                    'credit' => 0,
+                    'debit'  => (float) $app->amount,
+                    'kind'   => 'recovered',
                 ]);
             }
         }
@@ -519,11 +599,12 @@ class ReferrerLedgerService
         });
 
         return [
+            'has' => true,
             'rows' => $rows,
             'months' => $this->groupByMonth($rows),
-            'total_earned' => $rows->sum('credit'),
-            'total_settled' => $rows->sum('debit'),
-            'still_owed' => round($running, 2),
+            'charged' => round((float) $recoveries->sum('amount'), 2),
+            'recovered' => round((float) $recoveries->sum('recovered'), 2),
+            'outstanding' => round((float) $recoveries->sum(fn ($r) => $r->outstanding), 2),
         ];
     }
 

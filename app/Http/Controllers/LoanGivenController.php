@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\LoanGiven;
 use App\Models\LoanGivenPayment;
 use App\Models\Referrer;
+use App\Models\ReferrerRecovery;
 use App\Models\Transaction;
 use App\Services\LoanBookStatsService;
 use App\Services\TransactionService;
@@ -1001,18 +1002,58 @@ class LoanGivenController extends Controller implements HasMiddleware
             $this->authorize('makePayment', $loanGiven);
 
             $validated = $request->validate([
-                'status' => 'required|in:defaulted,written_off,active',
+                'status'          => 'required|in:defaulted,written_off,active',
+                'charge_referrer' => 'nullable|boolean',
+                'recovery_amount' => 'nullable|numeric|min:0.01',
             ]);
 
             if ($loanGiven->status === 'paid') {
                 return back()->with('error', 'Cannot change status of a fully paid loan');
             }
 
-            $loanGiven->status = $validated['status'];
-            $loanGiven->save();
+            $wasWrittenOff = $loanGiven->status === 'written_off';
+            $note = '';
+
+            DB::transaction(function () use ($validated, $loanGiven, $request, $wasWrittenOff, &$note) {
+                // Leaving written_off: drop the charge, unless commissions already paid it down.
+                if ($wasWrittenOff && $validated['status'] !== 'written_off') {
+                    $rec = ReferrerRecovery::where('loan_given_id', $loanGiven->id)->first();
+                    if ($rec) {
+                        if ((float)$rec->recovered > 0) {
+                            throw new Exception('Part of this write-off was already recovered from the referrer\'s commission, so it can\'t be reverted.');
+                        }
+                        $rec->delete();
+                    }
+                }
+
+                $loanGiven->status = $validated['status'];
+                $loanGiven->save();
+
+                if ($validated['status'] === 'written_off'
+                    && $loanGiven->referrer_id
+                    && $request->boolean('charge_referrer')) {
+
+                    $loss   = (float)$loanGiven->balance; // unrecovered principal
+                    $amount = min($loss, (float)($validated['recovery_amount'] ?? $loss));
+
+                    if ($amount > 0) {
+                        ReferrerRecovery::updateOrCreate(
+                            ['loan_given_id' => $loanGiven->id],
+                            [
+                                'user_id'     => Auth::id(),
+                                'referrer_id' => $loanGiven->referrer_id,
+                                'amount'      => round($amount, 2),
+                            ]
+                        );
+                        $note = ' KES ' . number_format($amount, 0)
+                            . ' will be deducted from ' . $loanGiven->referrer->name
+                            . '\'s commission, now and from future payouts until covered.';
+                    }
+                }
+            });
 
             return redirect()->route('loans-given.show', $loanGiven->id)
-                ->with('success', 'Loan status updated to ' . str_replace('_', ' ', $validated['status']) . '.');
+                ->with('success', 'Loan status updated to ' . str_replace('_', ' ', $validated['status']) . '.' . $note);
 
         } catch (ValidationException|AuthorizationException $e) {
             throw $e;
