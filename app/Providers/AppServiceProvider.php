@@ -1,9 +1,11 @@
 <?php
 namespace App\Providers;
 use App\Models\Transaction;
+use App\Models\Transfer;
 use App\Models\User;
 use App\Observers\TransactionObserver;
 use App\Observers\UserObserver;
+use App\Services\ReferrerFloatAllocator;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Browsershot\Browsershot;
 use Spatie\LaravelPdf\Facades\Pdf;
@@ -23,6 +25,9 @@ class AppServiceProvider extends ServiceProvider
     {
         User::observe(UserObserver::class);
         Transaction::observe(TransactionObserver::class);
+        Transfer::created(function ($transfer) {
+            app(ReferrerFloatAllocator::class)->allocate($transfer);
+        });
 
         Pdf::default()->withBrowsershot(function (Browsershot $browsershot) {
             $chromePath = glob('/home/farmpedia-finance/.cache/puppeteer/chrome/linux-*/chrome-linux64/chrome')[0]

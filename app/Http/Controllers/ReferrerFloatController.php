@@ -62,7 +62,6 @@ class ReferrerFloatController extends Controller
     }
 
     // ── reconcile ───────────────────────────────────────────────────────────
-
     public function reconcile(Request $request, Referrer $referrer)
     {
         try {
@@ -184,13 +183,21 @@ class ReferrerFloatController extends Controller
                     ->where('user_id', Auth::id())
                     ->max('id') ?? 0;
 
-                $this->transferService->execute(
-                    $floatAccount,
-                    $destination,
-                    $total,
-                    $validated['date'],
-                    $validated['description'] ?: "Float remittance from {$referrer->name}",
-                );
+                // This page records its own rows below, so switch the automatic
+                // allocator off for this one transfer.
+                \App\Services\ReferrerFloatAllocator::$suspended = true;
+
+                try {
+                    $this->transferService->execute(
+                        $floatAccount,
+                        $destination,
+                        $total,
+                        $validated['date'],
+                        $validated['description'] ?: "Float remittance from {$referrer->name}",
+                    );
+                } finally {
+                    \App\Services\ReferrerFloatAllocator::$suspended = false;
+                }
 
                 $transfer = Transfer::withoutGlobalScopes()
                     ->where('user_id', Auth::id())

@@ -231,6 +231,7 @@ class TransferRecorder
             'to'      => $cashAccount->name,
         ], 201);
     }
+
     /**
      * Is the sender of a "You have received…" SMS one of this user's
      * referrers (with a float account)? Matches on the referrer's name as a
@@ -287,9 +288,9 @@ class TransferRecorder
     /**
      * Money received from a referrer is her float being remitted to you, not
      * income: record it as a Transfer float → M-Pesa, charge the M-Pesa
-     * send-money fee to the float (same rule as TransferService), and link
-     * the interest part to the loans' pending float interest. Whatever is
-     * left over is principal and stays unlinked.
+     * send-money fee to the float (same rule as TransferService), and let
+     * ReferrerFloatAllocator (Transfer::created hook) split it: all interest
+     * held first, then the remainder as principal.
      */
     public function referrerFloatToMpesa(User $user, array $parsed, Referrer $referrer): JsonResponse
     {
@@ -330,6 +331,7 @@ class TransferRecorder
         DB::transaction(function () use (
             $user, $parsed, $referrer, $floatAccount, $mpesaAccount, $amount, $fee, &$interestLinked
         ) {
+            // The Transfer::created hook runs ReferrerFloatAllocator here.
             $transfer = Transfer::create([
                 'user_id'         => $user->id,
                 'from_account_id' => $floatAccount->id,
@@ -356,28 +358,12 @@ class TransferRecorder
                 ]);
             }
 
-            // Interest first (paid loans only, net of her unpaid commission),
-            // oldest closed loan first. The rest of the transfer is principal.
-            $remaining = $amount;
-
-            foreach ($referrer->reconcilableFloatInterestByLoan() as $loanId => $reconcilable) {
-                if ($remaining <= 0) {
-                    break;
-                }
-
-                $portion = min($remaining, (float) $reconcilable);
-
-                ReferrerFloatReconciliation::create([
-                    'user_id'       => $user->id,
-                    'loan_given_id' => $loanId,
-                    'transfer_id'   => $transfer->id,
-                    'amount'        => $portion,
-                ]);
-
-                $remaining -= $portion;
-            }
-
-            $interestLinked = $amount - $remaining;
+            // Interest-first allocation is done by ReferrerFloatAllocator.
+            // Read back what it recorded for the response and the log.
+            $interestLinked = (float) ReferrerFloatReconciliation::withoutGlobalScopes()
+                ->where('transfer_id', $transfer->id)
+                ->where('component', 'interest')
+                ->sum('amount');
 
             $floatAccount->updateBalance();
             $mpesaAccount->updateBalance();
@@ -811,6 +797,7 @@ class TransferRecorder
             'to'      => $mpesaAccount->name,
         ], 201);
     }
+
     private function attemptClientFundAutoMatch(Transfer $transfer, User $user, Account $fromAccount, float $amount): void
     {
         $candidateFund = ClientFund::where('user_id', $user->id)
