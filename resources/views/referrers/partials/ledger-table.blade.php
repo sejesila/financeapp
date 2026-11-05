@@ -3,6 +3,10 @@
     One component for every statement table. Replaces ledger-table.blade.php and
     movements-table.blade.php (both can be deleted once statement.blade.php uses this).
 
+    Responsive: below the `sm` breakpoint each entry is a stacked card
+    (date + amount on the first line, description below, balance last).
+    From `sm` up it is the normal column grid.
+
     Params
       months        Collection of months from ReferrerLedgerService (groupByMonth / allMovements)
       mode          'balance'   -> Date | What happened | Credit | Debit | Running balance
@@ -22,10 +26,10 @@
     $debitLabel   = $debitLabel ?? 'Debit';
     $balanceLabel = $balanceLabel ?? 'Balance';
 
-    // Full class strings so Tailwind can see them.
+    // Full class strings so Tailwind can see them. Only used from `sm` up.
     $cols = $mode === 'balance'
-        ? 'grid-cols-[5rem_minmax(0,1fr)_6rem_6rem_7rem]'
-        : 'grid-cols-[5rem_10rem_minmax(0,1fr)_6rem_6rem]';
+        ? 'sm:grid-cols-[5rem_minmax(0,1fr)_6rem_6rem_7rem]'
+        : 'sm:grid-cols-[5rem_10rem_minmax(0,1fr)_6rem_6rem]';
 
     $hiddenMonths   = 0;
     $broughtForward = null;
@@ -192,9 +196,10 @@
 
     <div x-data="statementLedger('{{ $uid }}')">
 
-        {{-- Toolbar + column headings stay pinned while you scroll a long statement.
-             If your top nav is sticky, change top-0 to match its height (e.g. top-16). --}}
-        <div class="sticky top-0 z-10 bg-white">
+        {{-- Toolbar + column headings are pinned while scrolling on larger screens only.
+             On phones the toolbar would eat too much of the viewport, so it scrolls normally.
+             If your top nav is sticky, change sm:top-0 to match its height (e.g. sm:top-16). --}}
+        <div class="bg-white sm:sticky sm:top-0 sm:z-10">
             <div class="flex flex-wrap items-center gap-2 pb-2 text-sm">
                 <input type="search" x-model.debounce.200ms="q" placeholder="Search borrower or description…"
                        class="w-full sm:w-64 rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
@@ -213,7 +218,7 @@
                     </label>
                 @endif
 
-                <span class="ml-auto flex flex-wrap items-center gap-2 text-xs">
+                <span class="flex w-full flex-wrap items-center gap-2 text-xs sm:ml-auto sm:w-auto">
                     <template x-if="months.length > 3">
                         <select @change="jump($event.target.value); $event.target.value = ''"
                                 class="rounded-md border-gray-300 py-1 text-xs shadow-sm">
@@ -241,8 +246,9 @@
                 <button type="button" @click="clear()" class="ml-auto underline">Clear filters</button>
             </div>
 
+            {{-- Column headings: desktop only (phones use stacked cards) --}}
             @if($mode === 'balance')
-                <div class="grid {{ $cols }} gap-x-3 rounded-t-lg border border-gray-200 bg-gray-50 py-2 text-xs font-medium text-gray-500">
+                <div class="hidden sm:grid {{ $cols }} gap-x-3 rounded-t-lg border border-gray-200 bg-gray-50 py-2 text-xs font-medium text-gray-500">
                     <div class="pl-4">Date</div>
                     <div>What happened</div>
                     <div class="text-right">{{ $creditLabel }}</div>
@@ -250,7 +256,7 @@
                     <div class="pr-4 text-right">{{ $balanceLabel }}</div>
                 </div>
             @else
-                <div class="grid {{ $cols }} gap-x-3 rounded-t-lg border border-gray-200 bg-gray-50 py-2 text-xs font-medium text-gray-500">
+                <div class="hidden sm:grid {{ $cols }} gap-x-3 rounded-t-lg border border-gray-200 bg-gray-50 py-2 text-xs font-medium text-gray-500">
                     <div class="pl-4">Date</div>
                     <div>Account</div>
                     <div>What happened</div>
@@ -260,7 +266,7 @@
             @endif
         </div>
 
-        <div class="rounded-b-lg border border-t-0 border-gray-200">
+        <div class="overflow-hidden rounded-lg border border-gray-200 sm:rounded-t-none sm:border-t-0">
             <p x-show="filtering && view.length === 0" x-cloak class="px-4 py-6 text-center text-sm text-gray-500">
                 Nothing matches those filters.
             </p>
@@ -268,19 +274,19 @@
             <template x-for="m in view" :key="m.label">
                 <div :id="monthId(m)" class="border-t border-gray-200 first:border-t-0">
 
-                    {{-- Month header: click to open / close --}}
+                    {{-- Month header: click to open / close. Wraps onto two lines on phones. --}}
                     <button type="button" @click="toggle(m)"
-                            class="flex w-full items-center justify-between gap-3 bg-gray-100 px-4 py-2.5 text-left hover:bg-gray-200">
+                            class="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 bg-gray-100 px-4 py-2.5 text-left hover:bg-gray-200">
                         <span class="flex min-w-0 items-center gap-2">
                             <svg class="h-3 w-3 shrink-0 text-gray-400 transition-transform" :class="{ 'rotate-90': isOpen(m) }"
                                  fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                             </svg>
-                            <span class="text-sm font-semibold text-gray-800" x-text="m.label"></span>
-                            <span class="text-xs text-gray-500"
+                            <span class="whitespace-nowrap text-sm font-semibold text-gray-800" x-text="m.label"></span>
+                            <span class="whitespace-nowrap text-xs text-gray-500"
                                   x-text="filtering ? m.rows.length + ' of ' + m.total : m.total + (m.total === 1 ? ' entry' : ' entries')"></span>
                         </span>
-                        <span class="flex items-center gap-4 whitespace-nowrap text-xs">
+                        <span class="flex flex-wrap items-center gap-x-4 gap-y-0.5 whitespace-nowrap pl-5 text-xs sm:pl-0">
                             <span x-show="m.credits > 0" class="text-green-700" x-text="'+ ' + fmt(m.credits)"></span>
                             <span x-show="m.debits > 0" class="text-red-700" x-text="'− ' + fmt(m.debits)"></span>
                             <span x-show="mode === 'balance' && !filtering" class="font-medium text-gray-700"
@@ -294,32 +300,74 @@
                              x-text="newest ? 'Closing balance ' + fmt(m.closing) : 'Opening balance ' + fmt(m.opening)"></div>
 
                         <template x-for="r in rowsOf(m)" :key="r.i">
-                            @if($mode === 'balance')
-                                <div class="grid {{ $cols }} items-start gap-x-3 border-t border-gray-100 text-sm" :class="rowClass(r)">
-                                    <div class="whitespace-nowrap border-l-4 py-2 pl-3 text-gray-600" :class="edge(r)" x-text="r.d"></div>
-                                    <div class="min-w-0 break-words py-2 text-gray-900" x-text="r.t"></div>
-                                    <div class="whitespace-nowrap py-2 text-right text-green-700" x-text="r.c > 0 ? '+ ' + fmt(r.c) : ''"></div>
-                                    <div class="whitespace-nowrap py-2 text-right text-red-700" x-text="r.x > 0 ? '− ' + fmt(r.x) : ''"></div>
-                                    <div class="whitespace-nowrap py-2 pr-4 text-right font-medium tabular-nums text-gray-900" x-text="fmt(r.b)"></div>
-                                </div>
-                            @else
-                                <div class="grid {{ $cols }} items-start gap-x-3 border-t border-gray-100 text-sm" :class="rowClass(r)">
-                                    <div class="whitespace-nowrap border-l-4 py-2 pl-3 text-gray-600" :class="edge(r)" x-text="r.d"></div>
-                                    <div class="min-w-0 break-words py-2 text-gray-700">
-                                        <span x-text="r.a"></span>
-                                        <span x-show="r.fl" class="ml-1 inline-block rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">float</span>
+                            <div>
+                                @if($mode === 'balance')
+                                    {{-- Phone: stacked card --}}
+                                    <div class="border-l-4 border-t border-t-gray-100 px-3 py-2 text-sm sm:hidden" :class="rowClass(r) + ' ' + edge(r)">
+                                        <div class="flex items-start justify-between gap-3">
+                                            <span class="whitespace-nowrap text-xs text-gray-500" x-text="r.d"></span>
+                                            <span class="flex flex-col items-end whitespace-nowrap font-medium">
+                                            <span x-show="r.c > 0" class="text-green-700" x-text="'+ ' + fmt(r.c)"></span>
+                                            <span x-show="r.x > 0" class="text-red-700" x-text="'− ' + fmt(r.x)"></span>
+                                        </span>
+                                        </div>
+                                        <div class="mt-0.5 break-words text-gray-900" x-text="r.t"></div>
+                                        <div class="mt-0.5 text-xs text-gray-500">
+                                            Balance <span class="font-medium tabular-nums text-gray-700" x-text="fmt(r.b)"></span>
+                                        </div>
                                     </div>
-                                    <div class="min-w-0 break-words py-2 text-gray-900">
-                                        <span x-text="r.t"></span>
-                                        <span x-show="r.k && styles[r.k]" class="ml-1 inline-block rounded px-1.5 py-0.5 text-xs"
-                                              :class="badgeClass(r)" x-text="badgeText(r)"></span>
-                                        <span x-show="r.u" class="ml-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">matched by name</span>
-                                        <span x-show="r.n" class="block text-xs text-gray-400" x-text="r.n"></span>
+
+                                    {{-- Desktop: grid row --}}
+                                    <div class="hidden items-start gap-x-3 border-t border-gray-100 text-sm sm:grid {{ $cols }}" :class="rowClass(r)">
+                                        <div class="whitespace-nowrap border-l-4 py-2 pl-3 text-gray-600" :class="edge(r)" x-text="r.d"></div>
+                                        <div class="min-w-0 break-words py-2 text-gray-900" x-text="r.t"></div>
+                                        <div class="whitespace-nowrap py-2 text-right text-green-700" x-text="r.c > 0 ? '+ ' + fmt(r.c) : ''"></div>
+                                        <div class="whitespace-nowrap py-2 text-right text-red-700" x-text="r.x > 0 ? '− ' + fmt(r.x) : ''"></div>
+                                        <div class="whitespace-nowrap py-2 pr-4 text-right font-medium tabular-nums text-gray-900" x-text="fmt(r.b)"></div>
                                     </div>
-                                    <div class="whitespace-nowrap py-2 text-right text-green-700" x-text="r.c > 0 ? '+ ' + fmt(r.c) : ''"></div>
-                                    <div class="whitespace-nowrap py-2 pr-4 text-right text-red-700" x-text="r.x > 0 ? '− ' + fmt(r.x) : ''"></div>
-                                </div>
-                            @endif
+                                @else
+                                    {{-- Phone: stacked card --}}
+                                    <div class="border-l-4 border-t border-t-gray-100 px-3 py-2 text-sm sm:hidden" :class="rowClass(r) + ' ' + edge(r)">
+                                        <div class="flex items-start justify-between gap-3">
+                                        <span class="min-w-0 text-xs text-gray-500">
+                                            <span x-text="r.d"></span>
+                                            <span>·</span>
+                                            <span x-text="r.a"></span>
+                                            <span x-show="r.fl" class="ml-1 inline-block rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">float</span>
+                                        </span>
+                                            <span class="flex flex-col items-end whitespace-nowrap font-medium">
+                                            <span x-show="r.c > 0" class="text-green-700" x-text="'+ ' + fmt(r.c)"></span>
+                                            <span x-show="r.x > 0" class="text-red-700" x-text="'− ' + fmt(r.x)"></span>
+                                        </span>
+                                        </div>
+                                        <div class="mt-0.5 break-words text-gray-900">
+                                            <span x-text="r.t"></span>
+                                            <span x-show="r.k && styles[r.k]" class="ml-1 inline-block rounded px-1.5 py-0.5 text-xs"
+                                                  :class="badgeClass(r)" x-text="badgeText(r)"></span>
+                                            <span x-show="r.u" class="ml-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">matched by name</span>
+                                        </div>
+                                        <div x-show="r.n" class="mt-0.5 break-words text-xs text-gray-400" x-text="r.n"></div>
+                                    </div>
+
+                                    {{-- Desktop: grid row --}}
+                                    <div class="hidden items-start gap-x-3 border-t border-gray-100 text-sm sm:grid {{ $cols }}" :class="rowClass(r)">
+                                        <div class="whitespace-nowrap border-l-4 py-2 pl-3 text-gray-600" :class="edge(r)" x-text="r.d"></div>
+                                        <div class="min-w-0 break-words py-2 text-gray-700">
+                                            <span x-text="r.a"></span>
+                                            <span x-show="r.fl" class="ml-1 inline-block rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">float</span>
+                                        </div>
+                                        <div class="min-w-0 break-words py-2 text-gray-900">
+                                            <span x-text="r.t"></span>
+                                            <span x-show="r.k && styles[r.k]" class="ml-1 inline-block rounded px-1.5 py-0.5 text-xs"
+                                                  :class="badgeClass(r)" x-text="badgeText(r)"></span>
+                                            <span x-show="r.u" class="ml-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">matched by name</span>
+                                            <span x-show="r.n" class="block text-xs text-gray-400" x-text="r.n"></span>
+                                        </div>
+                                        <div class="whitespace-nowrap py-2 text-right text-green-700" x-text="r.c > 0 ? '+ ' + fmt(r.c) : ''"></div>
+                                        <div class="whitespace-nowrap py-2 pr-4 text-right text-red-700" x-text="r.x > 0 ? '− ' + fmt(r.x) : ''"></div>
+                                    </div>
+                                @endif
+                            </div>
                         </template>
 
                         <button type="button" x-show="moreCount(m) > 0" x-cloak @click="expanded[m.label] = true"
