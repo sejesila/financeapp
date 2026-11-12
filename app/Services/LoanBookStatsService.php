@@ -59,11 +59,32 @@ class LoanBookStatsService
         $totalOutstanding = $active->sum('outstanding_amount');
 
         $disbursementIds = $disbursedInRange->pluck('disbursement_transaction_id')->filter()->values();
-        $totalTransactionCosts = $disbursementIds->isNotEmpty()
-            ? Transaction::where('is_transaction_fee', true)
+        $disbursementFees = $disbursementIds->isNotEmpty()
+            ? (float) Transaction::where('is_transaction_fee', true)
                 ->whereIn('fee_for_transaction_id', $disbursementIds)
                 ->sum('amount')
-            : 0;
+            : 0.0;
+
+        // NEW: fees charged on referrer-float transfers (the referrer sending money
+        // back to you). These sit on the float account, linked to a Transfer, so
+        // they never match the disbursement query above. Attributed by transfer
+        // date and always to the referred group.
+        $userId = $loans->first()?->user_id;
+
+        $remittanceFees = $userId
+            ? (float) Transaction::where('is_transaction_fee', true)
+                ->whereNotNull('transfer_id')
+                ->whereIn('account_id', \App\Models\Account::withoutGlobalScopes()
+                    ->where('user_id', $userId)
+                    ->where('type', 'referrer_float')
+                    ->pluck('id'))
+                ->when($start, fn ($q) => $q->whereDate('date', '>=', $start))
+                ->when($end,   fn ($q) => $q->whereDate('date', '<=', $end))
+                ->sum('amount')
+            : 0.0;
+
+        // NEW: headline card = disbursement + remittance fees
+        $totalTransactionCosts = $disbursementFees + $remittanceFees;
 
         // Unpaid, not-kept commission, attributed by payment date, the same basis
         // as $totalInterest above. Paid-out commission is already an expense
@@ -94,7 +115,8 @@ class LoanBookStatsService
         // ── Transaction costs vs gross profit, referred vs unreferred ──────
         // Same rules as the headline cards: interest by payment date + legacy
         // residual on loans closed in the period; costs = disbursement fees on
-        // loans disbursed in the period.
+        // loans disbursed in the period, plus (referred only) remittance fees
+        // on float transfers made in the period.
         $loansById = $loans->keyBy('id');
 
         $feeByDisbursement = $disbursementIds->isNotEmpty()
@@ -118,31 +140,38 @@ class LoanBookStatsService
             $costs = $disbursedInRange->filter($inGroup)
                 ->sum(fn ($l) => (float) ($feeByDisbursement[$l->disbursement_transaction_id] ?? 0));
 
+            // NEW: remittance fees belong to the referred group only
+            $groupRemittance = $wantReferred ? $remittanceFees : 0.0;
+            $costs += $groupRemittance;
+
             $cut = $wantReferred ? (float) $referrerCut : 0.0;
 
             $costBySource[$key] = [
-                'loans'         => $disbursedInRange->filter($inGroup)->count(),
-                'interest'      => (float) $interest,
-                'costs'         => (float) $costs,
-                'cost_pct'      => $interest > 0 ? round($costs / $interest * 100, 1) : null,
-                'referrer_cut'  => $cut,
-                'net'           => (float) $interest - $costs,         // after costs
-                'net_after_cut' => (float) $interest - $costs - $cut,  // after costs + referrer share
+                'loans'           => $disbursedInRange->filter($inGroup)->count(),
+                'interest'        => (float) $interest,
+                'costs'           => (float) $costs,
+                'remittance_fees' => (float) $groupRemittance, // NEW
+                'cost_pct'        => $interest > 0 ? round($costs / $interest * 100, 1) : null,
+                'referrer_cut'    => $cut,
+                'net'             => (float) $interest - $costs,         // after costs
+                'net_after_cut'   => (float) $interest - $costs - $cut,  // after costs + referrer share
             ];
         }
 
         $allInterest = $costBySource['referred']['interest'] + $costBySource['unreferred']['interest'];
         $allCosts    = $costBySource['referred']['costs'] + $costBySource['unreferred']['costs'];
         $costBySource['total'] = [
-            'interest' => $allInterest,
-            'costs'    => $allCosts,
-            'cost_pct' => $allInterest > 0 ? round($allCosts / $allInterest * 100, 1) : null,
+            'interest'        => $allInterest,
+            'costs'           => $allCosts,
+            'remittance_fees' => $remittanceFees, // NEW
+            'cost_pct'        => $allInterest > 0 ? round($allCosts / $allInterest * 100, 1) : null,
         ];
 
         return compact(
             'totalPrincipal', 'totalRepaid', 'totalInterest', 'avgInterestRate', 'repaymentRate',
             'totalOutstanding', 'totalReceivedAllTime', 'totalTransactionCosts', 'netInterest',
-            'referrerCut', 'repaidCount', 'disbursedCount', 'loanYield', 'costBySource'
+            'referrerCut', 'repaidCount', 'disbursedCount', 'loanYield', 'costBySource',
+            'remittanceFees' // NEW
         );
     }
 }
