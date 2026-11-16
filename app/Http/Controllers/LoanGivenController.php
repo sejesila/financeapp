@@ -259,31 +259,23 @@ class LoanGivenController extends Controller implements HasMiddleware
 
                 $loanCategory = $this->firstOrCreateCategory('Friend Loan Given', 'expense');
 
-                // Routed through TransactionService instead of built by hand — this
-                // disbursement gets the exact same fee handling as every other
-                // transaction: auto-calculated from the real M-Pesa/Airtel tier
-                // tables when the account is mobile money, linked via
-                // is_transaction_fee/fee_for_transaction_id, and included in
-                // TransactionStatsService::feeTotals(). The balance check
-                // (principal + fee must be available) also happens inside here,
-                // same as it does for every other transaction.
-                $transaction = $this->transactionService->createTransaction([
+                $transactionData = [
                     'account_id' => $validated['account_id'],
                     'category_id' => $loanCategory->id,
                     'amount' => $principalAmount,
                     'date' => $disbursedDate,
                     'description' => "Loan disbursed to {$validated['borrower_name']}",
-                    // Lets the user type in the real fee (e.g. a bank transfer
-                    // charge, or an M-Pesa charge that differs from the tier
-                    // table) instead of relying purely on the auto-calculated
-                    // one. Leave blank to just use the auto-calculated fee (or
-                    // none, for cash/bank disbursements).
-                    // An explicit 0 is a real answer ("no fee"), so test for
-                    // presence rather than truthiness, and send a float.
-                    'manual_fee' => $request->filled('transaction_cost')
-                        ? (float)$validated['transaction_cost']
-                        : (float)$this->transactionService->mpesaSendMoneyFee($principalAmount),
-                ]);
+                ];
+
+                // Only override the fee when the user actually typed something
+                // (including an explicit 0). When the field is blank we pass nothing,
+                // and TransactionService decides: tier table for M-Pesa/Airtel,
+                // no fee for bank/cash. filled() is true for "0", so 0 is respected.
+                if ($request->filled('transaction_cost')) {
+                    $transactionData['manual_fee'] = (float)$validated['transaction_cost'];
+                }
+
+                $transaction = $this->transactionService->createTransaction($transactionData);
 
                 // Direct link so destroy() never has to guess which transaction to remove.
                 $loan->disbursement_transaction_id = $transaction->id;
@@ -330,7 +322,6 @@ class LoanGivenController extends Controller implements HasMiddleware
             return back()->with('error', 'Failed to record loan: ' . $e->getMessage())->withInput();
         }
     }
-
     // ── store ─────────────────────────────────────────────────────────────────
 
     public function create()

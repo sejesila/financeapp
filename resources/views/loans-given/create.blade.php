@@ -73,6 +73,7 @@
                                     @foreach($accounts as $account)
                                         <option value="{{ $account->id }}"
                                                 data-balance="{{ $account->current_balance }}"
+                                                data-type="{{ $account->type }}"
                                             {{ old('account_id') == $account->id ? 'selected' : '' }}>
                                             {{ $account->name }} (KES {{ number_format($account->current_balance, 0) }})
                                         </option>
@@ -96,15 +97,17 @@
                                 @enderror
                             </div>
 
-                            <!-- Transaction Cost (e.g. M-Pesa charge) — separate from principal -->
+                            <!-- Transaction Cost (e.g. M-Pesa or bank charge) — optional, separate from principal -->
                             <div>
-                                <label for="transaction_cost" class="block text-sm font-medium text-gray-700">Transaction Cost (KES)</label>
+                                <label for="transaction_cost" class="block text-sm font-medium text-gray-700">Transaction Cost (KES) <span class="text-gray-400 font-normal">(optional)</span></label>
                                 <input type="number" step="0.01" min="0" id="transaction_cost" name="transaction_cost"
                                        value="{{ old('transaction_cost') }}"
                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 @error('transaction_cost') border-red-500 @enderror">
-                                {{-- Auto-calculated from M-Pesa send money rates based on the principal. You can overwrite it;
-                                     clear the field to go back to the automatic value. Recorded as its own expense and never
-                                     added to what the borrower owes. --}}
+                                {{-- M-Pesa accounts: auto-filled from the send money rates based on the principal.
+                                     Bank / cash accounts: left blank, which means no fee.
+                                     You can type any value, including 0, to override. Clearing the field goes back to
+                                     the automatic behaviour. Recorded as its own expense and never added to what the
+                                     borrower owes. --}}
                                 @error('transaction_cost')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                 @enderror
@@ -163,13 +166,6 @@
                             @enderror
                         </div>
 
-                        {{-- Info note removed from UI to keep the form minimal. Original text:
-                             No interest rate needed here. Just record what you're lending out. When repayments
-                             come in and you close the loan out, the interest and rate are calculated automatically
-                             from whatever total amount you actually received.
-                             The transaction cost above is pre-filled from M-Pesa send money rates — it's tracked
-                             as its own expense, separately from the principal. --}}
-
                         <div class="flex items-center space-x-4">
                             <button type="submit" class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 focus:bg-indigo-700 active:bg-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
                                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -206,8 +202,22 @@
                 return tier ? tier.cost : tiers[tiers.length - 1].cost;
             }
 
+            function isMpesaSelected() {
+                const opt = accountSelect.options[accountSelect.selectedIndex];
+                return !!opt && opt.getAttribute('data-type') === 'mpesa';
+            }
+
             function autoFillFee() {
                 if (feeEdited) return;
+
+                // Bank / cash (and Airtel, which the server auto-calculates):
+                // no pre-filled fee. Blank means "use the automatic value", which
+                // for bank and cash is no fee at all.
+                if (!isMpesaSelected()) {
+                    feeInput.value = '';
+                    return;
+                }
+
                 const amount = parseFloat(principalInput.value) || 0;
                 feeInput.value = mpesaSendMoneyFee(amount);
             }
@@ -232,7 +242,10 @@
                 }
             }
 
-            accountSelect.addEventListener('change', checkBalance);
+            accountSelect.addEventListener('change', () => {
+                autoFillFee();
+                checkBalance();
+            });
 
             principalInput.addEventListener('input', () => {
                 autoFillFee();
