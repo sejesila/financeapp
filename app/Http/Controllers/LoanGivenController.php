@@ -257,15 +257,51 @@ class LoanGivenController extends Controller implements HasMiddleware
             $this->authorize('view', $account);
 
             $principalAmount = (float)$validated['principal_amount'];
+            $disbursedDate = Carbon::parse($validated['disbursed_date']);
 
             $expectedInterestAmount = $expectedInterestRate !== null
                 ? round($principalAmount * ((float)$expectedInterestRate / 100), 2)
                 : 0;
 
+            // ── Build the disbursement payload and settle the fee up front ────────
+            $loanCategory = $this->firstOrCreateCategory('Friend Loan Given', 'expense');
+
+            $transactionData = [
+                'account_id' => $validated['account_id'],
+                'category_id' => $loanCategory->id,
+                'amount' => $principalAmount,
+                'date' => $disbursedDate,
+                'description' => "Loan disbursed to {$validated['borrower_name']}",
+            ];
+
+            // Fee rules:
+            //  - user typed something (including 0)  -> use exactly that
+            //  - blank on a mandatory-fee account (M-Pesa / Phides') -> auto tier fee
+            //  - blank on anything else (bank, cash, Airtel) -> pass nothing; the service decides
+            if ($request->filled('transaction_cost')) {
+                $transactionData['manual_fee'] = (float)$validated['transaction_cost'];
+            } elseif ($this->feeIsMandatory($account)) {
+                $transactionData['manual_fee'] = $this->transactionService->mpesaSendMoneyFee($principalAmount);
+            }
+
+            // ── Balance pre-check BEFORE any insert, so a rejection burns no loan ID ──
+            // Same rule createTransaction() enforces, evaluated early. The service still
+            // re-checks under a row lock, so this is a guard, not a replacement.
+            $fee = $this->transactionService->estimateFee($transactionData, $account, $loanCategory);
+            $required = $principalAmount + $fee;
+
+            if (round($required * 100) > round((float)$account->current_balance * 100)) {
+                throw ValidationException::withMessages([
+                    'principal_amount' => "Insufficient balance in {$account->name}. "
+                        . "Available: KES " . number_format($account->current_balance, 2) . ", "
+                        . "required: KES " . number_format($required, 2)
+                        . ($fee > 0 ? " (principal + KES " . number_format($fee, 2) . " fee)." : "."),
+                ]);
+            }
+
             DB::beginTransaction();
 
             try {
-                $disbursedDate = Carbon::parse($validated['disbursed_date']);
                 $dueDate = ($validated['due_date'] ?? null)
                     ? Carbon::parse($validated['due_date'])
                     : $disbursedDate->copy()->addDays(30);
@@ -289,28 +325,9 @@ class LoanGivenController extends Controller implements HasMiddleware
                     'expected_interest_amount' => $expectedInterestAmount,
                 ]);
 
-                $loanCategory = $this->firstOrCreateCategory('Friend Loan Given', 'expense');
-
-                $transactionData = [
-                    'account_id' => $validated['account_id'],
-                    'category_id' => $loanCategory->id,
-                    'amount' => $principalAmount,
-                    'date' => $disbursedDate,
-                    'description' => "Loan disbursed to {$validated['borrower_name']}",
-                ];
-
-                // Fee rules:
-                //  - user typed something (including 0)  -> use exactly that
-                //  - blank on a mandatory-fee account (M-Pesa / Phides') -> auto tier fee
-                //  - blank on anything else (bank, cash) -> pass nothing; the service decides (no fee)
-                if ($request->filled('transaction_cost')) {
-                    $transactionData['manual_fee'] = (float)$validated['transaction_cost'];
-                } elseif ($this->feeIsMandatory($account)) {
-                    $transactionData['manual_fee'] = $this->transactionService->mpesaSendMoneyFee($principalAmount);
-                }
-
                 $transaction = $this->transactionService->createTransaction($transactionData);
 
+                // Direct link so destroy() never has to guess which transaction to remove.
                 $loan->disbursement_transaction_id = $transaction->id;
                 $loan->save();
 

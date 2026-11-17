@@ -181,6 +181,21 @@ class TransactionService
         return (float) end($tiers)['cost'];
     }
     /**
+     * The fee createTransaction() would charge for this payload, without creating anything.
+     * Lets callers (e.g. the loan form) check the balance BEFORE inserting rows, so a
+     * rejected request never consumes an auto-increment ID.
+     */
+    public function estimateFee(array $data, Account $account, Category $category): float
+    {
+        $isMobileMoney = in_array($account->type, ['mpesa', 'airtel_money']);
+
+        $transactionType = $isMobileMoney
+            ? ($data['mobile_money_type'] ?? 'send_money')
+            : 'send_money';
+
+        return $this->resolveTransactionCost($data, $account, $transactionType, $category);
+    }
+    /**
      * Fee resolution for a transaction. If the caller supplied an explicit
      * 'manual_fee' (e.g. loan disbursement letting the user type in the real
      * M-Pesa charge, or a fee for an account type the tier tables don't cover),
