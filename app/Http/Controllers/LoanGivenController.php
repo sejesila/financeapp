@@ -186,6 +186,40 @@ class LoanGivenController extends Controller implements HasMiddleware
     }
 
     // ── create ────────────────────────────────────────────────────────────────
+    public function create()
+    {
+        try {
+            $this->authorize('create', LoanGiven::class);
+
+            $accounts = Account::where('user_id', Auth::id())
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get();
+
+            $referrers = Referrer::where('is_active', true)
+                ->orderBy('name')
+                ->get();
+
+            $sendMoneyTiers = $this->transactionService->mpesaSendMoneyTiers();
+
+            // IDs of accounts whose fee is mandatory + auto-filled (single source of truth for the form).
+            $feeRequiredAccountIds = $accounts
+                ->filter(fn($a) => $this->feeIsMandatory($a))
+                ->pluck('id')
+                ->values();
+
+            return view('loans-given.create', compact('accounts', 'referrers', 'sendMoneyTiers', 'feeRequiredAccountIds'));
+
+        } catch (ValidationException|AuthorizationException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            Log::error('LoanGivenController@create failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return redirect()->route('loans-given.index')->with('error', 'Could not open the new loan form: ' . $e->getMessage());
+        }
+    }
+
+
+    // ── store ─────────────────────────────────────────────────────────────────
 
     public function store(Request $request)
     {
@@ -214,8 +248,6 @@ class LoanGivenController extends Controller implements HasMiddleware
                 $this->authorize('view', $referrer);
                 $referrerSharePercentage = $validated['referrer_share_percentage'] ?? $referrer->default_share_percentage;
 
-                // Only fall back to the referrer's default when the user didn't type
-                // one in themselves — an explicit rate always wins.
                 if ($expectedInterestRate === null) {
                     $expectedInterestRate = $referrer->default_interest_rate;
                 }
@@ -267,17 +299,18 @@ class LoanGivenController extends Controller implements HasMiddleware
                     'description' => "Loan disbursed to {$validated['borrower_name']}",
                 ];
 
-                // Only override the fee when the user actually typed something
-                // (including an explicit 0). When the field is blank we pass nothing,
-                // and TransactionService decides: tier table for M-Pesa/Airtel,
-                // no fee for bank/cash. filled() is true for "0", so 0 is respected.
+                // Fee rules:
+                //  - user typed something (including 0)  -> use exactly that
+                //  - blank on a mandatory-fee account (M-Pesa / Phides') -> auto tier fee
+                //  - blank on anything else (bank, cash) -> pass nothing; the service decides (no fee)
                 if ($request->filled('transaction_cost')) {
                     $transactionData['manual_fee'] = (float)$validated['transaction_cost'];
+                } elseif ($this->feeIsMandatory($account)) {
+                    $transactionData['manual_fee'] = $this->transactionService->mpesaSendMoneyFee($principalAmount);
                 }
 
                 $transaction = $this->transactionService->createTransaction($transactionData);
 
-                // Direct link so destroy() never has to guess which transaction to remove.
                 $loan->disbursement_transaction_id = $transaction->id;
                 $loan->save();
 
@@ -322,33 +355,7 @@ class LoanGivenController extends Controller implements HasMiddleware
             return back()->with('error', 'Failed to record loan: ' . $e->getMessage())->withInput();
         }
     }
-    // ── store ─────────────────────────────────────────────────────────────────
 
-    public function create()
-    {
-        try {
-            $this->authorize('create', LoanGiven::class);
-
-            $accounts = Account::where('user_id', Auth::id())
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get();
-
-            $referrers = Referrer::where('is_active', true)
-                ->orderBy('name')
-                ->get();
-
-            $sendMoneyTiers = $this->transactionService->mpesaSendMoneyTiers();
-
-            return view('loans-given.create', compact('accounts', 'referrers', 'sendMoneyTiers'));
-
-        } catch (ValidationException|AuthorizationException $e) {
-            throw $e;
-        } catch (Throwable $e) {
-            Log::error('LoanGivenController@create failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
-            return redirect()->route('loans-given.index')->with('error', 'Could not open the new loan form: ' . $e->getMessage());
-        }
-    }
 
     // ── show ──────────────────────────────────────────────────────────────────
 
@@ -384,6 +391,15 @@ class LoanGivenController extends Controller implements HasMiddleware
             'type'      => $type,
             'is_active' => true,
         ]);
+    }
+    /**
+     * Accounts where the send-money fee is always charged, so the form must
+     * auto-fill it and can't leave it blank: M-Pesa accounts and Phides'.
+     */
+    private function feeIsMandatory(Account $account): bool
+    {
+        return $account->type === 'mpesa'
+            || stripos($account->name, 'phides') !== false;
     }
 
     // ── payment form ──────────────────────────────────────────────────────────

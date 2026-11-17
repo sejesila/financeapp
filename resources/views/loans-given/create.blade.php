@@ -73,7 +73,7 @@
                                     @foreach($accounts as $account)
                                         <option value="{{ $account->id }}"
                                                 data-balance="{{ $account->current_balance }}"
-                                                data-type="{{ $account->type }}"
+                                                data-fee-required="{{ $feeRequiredAccountIds->contains($account->id) ? '1' : '0' }}"
                                             {{ old('account_id') == $account->id ? 'selected' : '' }}>
                                             {{ $account->name }} (KES {{ number_format($account->current_balance, 0) }})
                                         </option>
@@ -97,17 +97,20 @@
                                 @enderror
                             </div>
 
-                            <!-- Transaction Cost (e.g. M-Pesa or bank charge) — optional, separate from principal -->
+                            <!-- Transaction Cost — required + auto-filled for M-Pesa / Phides', optional otherwise -->
                             <div>
-                                <label for="transaction_cost" class="block text-sm font-medium text-gray-700">Transaction Cost (KES) <span class="text-gray-400 font-normal">(optional)</span></label>
+                                <label for="transaction_cost" class="block text-sm font-medium text-gray-700">
+                                    Transaction Cost (KES)
+                                    <span id="fee_required_star" class="text-red-600" style="display: none;">*</span>
+                                    <span id="fee_optional_tag" class="text-gray-400 font-normal">(optional)</span>
+                                </label>
                                 <input type="number" step="0.01" min="0" id="transaction_cost" name="transaction_cost"
                                        value="{{ old('transaction_cost') }}"
                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 @error('transaction_cost') border-red-500 @enderror">
-                                {{-- M-Pesa accounts: auto-filled from the send money rates based on the principal.
-                                     Bank / cash accounts: left blank, which means no fee.
-                                     You can type any value, including 0, to override. Clearing the field goes back to
-                                     the automatic behaviour. Recorded as its own expense and never added to what the
-                                     borrower owes. --}}
+                                {{-- M-Pesa / Phides' accounts: required, auto-filled from the send money rates based on the
+                                     principal. You can still overwrite it (0 included); clearing it refills the automatic value.
+                                     Bank / cash accounts: optional, blank means no fee. Recorded as its own expense and never
+                                     added to what the borrower owes. --}}
                                 @error('transaction_cost')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                 @enderror
@@ -188,6 +191,8 @@
             const accountSelect = document.getElementById('account_id');
             const principalInput = document.getElementById('principal_amount');
             const feeInput = document.getElementById('transaction_cost');
+            const feeStar = document.getElementById('fee_required_star');
+            const feeOptionalTag = document.getElementById('fee_optional_tag');
             const hint = document.getElementById('account_balance_hint');
 
             // M-Pesa "send money" tiers, passed from TransactionService (single source of truth).
@@ -202,18 +207,25 @@
                 return tier ? tier.cost : tiers[tiers.length - 1].cost;
             }
 
-            function isMpesaSelected() {
+            // True for M-Pesa / Phides' accounts (decided server-side by feeIsMandatory()).
+            function isFeeRequired() {
                 const opt = accountSelect.options[accountSelect.selectedIndex];
-                return !!opt && opt.getAttribute('data-type') === 'mpesa';
+                return !!opt && opt.getAttribute('data-fee-required') === '1';
+            }
+
+            // Required accounts: field is mandatory. Others: optional.
+            function syncFeeRequirement() {
+                const required = isFeeRequired();
+                feeInput.required = required;
+                feeStar.style.display = required ? '' : 'none';
+                feeOptionalTag.style.display = required ? 'none' : '';
             }
 
             function autoFillFee() {
                 if (feeEdited) return;
 
-                // Bank / cash (and Airtel, which the server auto-calculates):
-                // no pre-filled fee. Blank means "use the automatic value", which
-                // for bank and cash is no fee at all.
-                if (!isMpesaSelected()) {
+                // Bank / cash: no automatic fee, leave blank (blank = no fee).
+                if (!isFeeRequired()) {
                     feeInput.value = '';
                     return;
                 }
@@ -243,6 +255,9 @@
             }
 
             accountSelect.addEventListener('change', () => {
+                // A different account means a different fee rule, so re-evaluate from scratch.
+                feeEdited = false;
+                syncFeeRequirement();
                 autoFillFee();
                 checkBalance();
             });
@@ -259,7 +274,8 @@
                 checkBalance();
             });
 
-            // Leaving the field empty and moving away re-enables auto-calculation.
+            // Leaving the field empty and moving away re-enables auto-calculation
+            // (for M-Pesa / Phides' that refills the tier fee; for others it stays blank).
             feeInput.addEventListener('blur', () => {
                 if (feeInput.value.trim() === '') {
                     feeEdited = false;
@@ -268,6 +284,7 @@
                 }
             });
 
+            syncFeeRequirement();
             autoFillFee();
             checkBalance();
 
