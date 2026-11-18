@@ -166,6 +166,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/{loanGiven}/rollover', [LoanGivenController::class, 'confirmRollover'])
             ->name('rollover');
     });
+    Route::get('borrowers-monthly', [BorrowerController::class, 'monthly'])->name('borrowers.monthly');
     // Borrowers
 // ======================================================================
 

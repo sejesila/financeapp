@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Borrower;
 use App\Models\LoanGiven;
+use App\Services\BorrowerMonthlyStatsService;
 use App\Services\BorrowerStatsService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -99,5 +100,11 @@ class BorrowerController extends Controller implements HasMiddleware
 
         return redirect()->route('borrowers.show', $borrower)
             ->with('success', "Merged {$source->name} into {$borrower->name}.");
+    }
+    public function monthly(Request $request, BorrowerMonthlyStatsService $service)
+    {
+        $months = min(36, max(3, (int) $request->get('months', 12)));
+
+        return view('borrowers.monthly', $service->compute($months) + ['months' => $months]);
     }
 }
