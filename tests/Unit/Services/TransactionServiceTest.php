@@ -43,7 +43,10 @@ dataset('mpesa_send_money_fees', [
     'low tier (101 KES)'    => [101,   'send_money', 7],
     'mid tier (1000 KES)'   => [1000,  'send_money', 13],
     'high tier (5000 KES)'  => [5000,  'send_money', 57],
-    'max tier (50001 KES)'  => [50001, 'send_money', 112],
+    'tier edge (20001 KES)' => [20001, 'send_money', 108],
+    'tier edge (35001 KES)' => [35001, 'send_money', 108],
+    'max tier (50001 KES)'  => [50001, 'send_money', 108],
+    'limit (250000 KES)'    => [250000, 'send_money', 108],
 ]);
 
 it('calculates correct M-Pesa send_money fee', function (int $amount, string $type, int $expectedFee) {
@@ -66,6 +69,37 @@ it('calculates correct M-Pesa send_money fee', function (int $amount, string $ty
     $feeAmount = $transaction->feeTransaction?->amount ?? 0;
     expect((float) $feeAmount)->toBe((float) $expectedFee);
 })->with('mpesa_send_money_fees');
+
+// ─── Airtel Money Fee Tiers (send_money) ─────────────────────────────────────
+
+dataset('airtel_send_money_fees', [
+    'below 10 KES (5)'      => [5,      0],
+    'free tier (100 KES)'   => [100,    0],
+    'low tier (101 KES)'    => [101,    7],
+    'high tier (5000 KES)'  => [5000,   57],
+    'tier edge (35001 KES)' => [35001,  108],
+    'limit (250000 KES)'    => [250000, 108],
+]);
+
+it('calculates correct Airtel Money send_money fee', function (int $amount, int $expectedFee) {
+    $user     = User::factory()->create();
+    Auth::login($user);
+
+    $account  = Account::factory()->create(['user_id' => $user->id, 'type' => 'airtel_money', 'current_balance' => 999999]);
+    $category = expenseCategory($user);
+
+    $transaction = makeService()->createTransaction([
+        'user_id'           => $user->id,
+        'date'              => now()->toDateString(),
+        'description'       => 'Airtel test',
+        'amount'            => $amount,
+        'category_id'       => $category->id,
+        'account_id'        => $account->id,
+        'mobile_money_type' => 'send_money',
+    ]);
+
+    expect((float) ($transaction->feeTransaction?->amount ?? 0))->toBe((float) $expectedFee);
+})->with('airtel_send_money_fees');
 
 // ─── M-Pesa PayBill Fees ──────────────────────────────────────────────────────
 

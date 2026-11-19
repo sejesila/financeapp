@@ -98,12 +98,19 @@ class TransactionService
             }
         }
 
+        // Below the first tier there is no applicable charge; above the last
+        // tier the last tier's cost applies.
+        if ($amount < ($costs[0]['min'] ?? 0)) {
+            return 0;
+        }
+
         return end($costs)['cost'] ?? 0;
     }
 
     private function getMpesaTransactionCosts(): array
     {
         return [
+            // Matches the published M-Pesa tariff (updated Aug 2026): 108 flat from 20,001 to 250,000.
             'send_money' => [
                 ['min' => 1,      'max' => 100,    'cost' => 0],
                 ['min' => 101,    'max' => 500,    'cost' => 7],
@@ -116,11 +123,7 @@ class TransactionService
                 ['min' => 7501,   'max' => 10000,  'cost' => 90],
                 ['min' => 10001,  'max' => 15000,  'cost' => 100],
                 ['min' => 15001,  'max' => 20000,  'cost' => 105],
-                ['min' => 20001,  'max' => 35000,  'cost' => 108],
-                ['min' => 35001,  'max' => 50000,  'cost' => 110],
-                ['min' => 50001,  'max' => 150000, 'cost' => 112],
-                ['min' => 150001, 'max' => 250000, 'cost' => 115],
-                ['min' => 250001, 'max' => 500000, 'cost' => 117],
+                ['min' => 20001,  'max' => 250000, 'cost' => 108],
             ],
             'paybill' => [
                 ['min' => 1,     'max' => 100,     'cost' => 0],
@@ -216,8 +219,9 @@ class TransactionService
     private function getAirtelMoneyTransactionCosts(): array
     {
         return [
+            // Matches the published Airtel Money tariff: free up to 100, 108 flat from 20,001 upward.
             'send_money' => [
-                ['min' => 10,    'max' => 100,    'cost' => 0],
+                ['min' => 1,     'max' => 100,    'cost' => 0],
                 ['min' => 101,   'max' => 500,    'cost' => 7],
                 ['min' => 501,   'max' => 1000,   'cost' => 13],
                 ['min' => 1001,  'max' => 1500,   'cost' => 23],
@@ -228,7 +232,7 @@ class TransactionService
                 ['min' => 7501,  'max' => 10000,  'cost' => 90],
                 ['min' => 10001, 'max' => 15000,  'cost' => 100],
                 ['min' => 15001, 'max' => 20000,  'cost' => 105],
-                ['min' => 20001, 'max' => 35000,  'cost' => 108],
+                ['min' => 20001, 'max' => 250000, 'cost' => 108],
             ],
 
             'paybill' => [

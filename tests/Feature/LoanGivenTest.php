@@ -93,7 +93,9 @@ describe('Creating a loan given', function () {
                 'principal_amount' => 500,
                 'disbursed_date'   => now()->toDateString(),
             ])
-            ->assertSessionHas('error');
+            // The balance pre-check in store() throws a ValidationException on
+            // principal_amount (before any insert), not a session 'error' flash.
+            ->assertSessionHasErrors('principal_amount');
 
         $this->assertDatabaseCount('loans_given', 0);
         $this->assertDatabaseCount('transactions', 0);

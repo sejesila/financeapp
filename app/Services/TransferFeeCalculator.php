@@ -56,6 +56,11 @@ class TransferFeeCalculator
 
     // ── Fee schedules ─────────────────────────────────────────────────────────
 
+    /**
+     * Agent withdrawal fee (M-Pesa schedule, currently also applied to Airtel Money).
+     * Withdrawals below KES 50 are not offered by M-Pesa agents ("N/A" in the tariff);
+     * they return 0 here and should be rejected by form validation.
+     */
     private function withdrawalFee(float $amount, string $accountType): float
     {
         $tiers = [
@@ -124,13 +129,23 @@ class TransferFeeCalculator
         return round($base + ($base * 0.15), 2);
     }
 
+    /**
+     * Finds the fee for an amount. Below the first tier's minimum there is no
+     * applicable charge (0); above the last tier's maximum the last tier's
+     * cost applies.
+     */
     private function lookupTier(array $tiers, float $amount): float
     {
         foreach ($tiers as $tier) {
             if ($amount >= $tier['min'] && $amount <= $tier['max']) {
-                return $tier['cost'];
+                return (float) $tier['cost'];
             }
         }
+
+        if ($amount < ($tiers[0]['min'] ?? 0)) {
+            return 0.0;
+        }
+
         return (float) (end($tiers)['cost'] ?? 0);
     }
 
@@ -147,6 +162,7 @@ class TransferFeeCalculator
 
         return "{$prefix}: Transfer to {$to->name}";
     }
+
     private function sendMoneyFee(float $amount): float
     {
         $tiers = [
