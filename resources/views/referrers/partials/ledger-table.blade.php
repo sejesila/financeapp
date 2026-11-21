@@ -16,12 +16,14 @@
       creditLabel   balance mode only (default "Credit")
       debitLabel    balance mode only (default "Debit")
       kindStyles    optional [kind => ['label','row','border','badge']] for tints + filter chips
-      limit         optional int: only render the newest N months (rest are summarised)
+      since         optional Carbon: only rows dated on/after this are rendered; older rows are
+                    summarised in a banner (with the balance brought forward in balance mode).
+                    Pass null to render everything.
 --}}
 @php
     $mode         = $mode ?? 'balance';
     $styles       = $kindStyles ?? [];
-    $limit        = $limit ?? null;
+    $since        = $since ?? null;
     $creditLabel  = $creditLabel ?? 'Credit';
     $debitLabel   = $debitLabel ?? 'Debit';
     $balanceLabel = $balanceLabel ?? 'Balance';
@@ -31,14 +33,39 @@
         ? 'sm:grid-cols-[5rem_minmax(0,1fr)_6rem_6rem_7rem]'
         : 'sm:grid-cols-[5rem_10rem_minmax(0,1fr)_6rem_6rem]';
 
-    $hiddenMonths   = 0;
+    // ── Date cutoff ────────────────────────────────────────────────────────
+    // Rows are only sliced for display; running balances were computed over the
+    // full history in the service, so they stay correct.
+    $hiddenCount    = 0;
     $broughtForward = null;
 
-    if ($limit && $months->count() > $limit) {
-        $hiddenMonths = $months->count() - $limit;
-        $months       = $months->slice(-$limit)->values();
+    if ($since) {
+        $months = $months->map(function ($m) use ($since, &$hiddenCount) {
+            $rows = collect($m['rows']);
+            $keep = $rows->filter(fn ($r) => $r['date']->gte($since))->values();
 
-        if ($mode === 'balance') {
+            $hiddenCount += $rows->count() - $keep->count();
+
+            if ($keep->isEmpty()) {
+                return null;
+            }
+
+            if ($keep->count() === $rows->count()) {
+                return $m;
+            }
+
+            // Month straddles the cutoff: recompute its opening from the first kept row.
+            $first     = $keep->first();
+            $m['rows'] = $keep;
+
+            if (isset($first['balance'])) {
+                $m['opening'] = round($first['balance'] - $first['credit'] + $first['debit'], 2);
+            }
+
+            return $m;
+        })->filter()->values();
+
+        if ($mode === 'balance' && $months->isNotEmpty()) {
             $broughtForward = $months->first()['opening'] ?? null;
         }
     }
@@ -178,19 +205,26 @@
 @endonce
 
 @if($months->isEmpty())
-    <p class="text-sm text-gray-500">{{ $empty ?? 'Nothing to show yet.' }}</p>
+    <p class="text-sm text-gray-500">
+        @if($hiddenCount > 0)
+            No activity in the last 30 days.
+            <a href="{{ request()->fullUrlWithQuery(['range' => 'all']) }}" class="text-indigo-600 underline">Show all data</a>
+        @else
+            {{ $empty ?? 'Nothing to show yet.' }}
+        @endif
+    </p>
 @else
     <script type="application/json" id="{{ $uid }}-data">{!! json_encode($payload, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) !!}</script>
 
-    @if($hiddenMonths > 0)
+    @if($hiddenCount > 0)
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
             <span>
-                {{ $hiddenMonths }} earlier month{{ $hiddenMonths > 1 ? 's' : '' }} not shown.
+                {{ $hiddenCount }} older {{ $hiddenCount === 1 ? 'entry' : 'entries' }} hidden (before {{ $since->format('M j, Y') }}).
                 @if($broughtForward !== null)
                     Balance brought forward: <strong>KES {{ number_format($broughtForward, 0) }}</strong>.
                 @endif
             </span>
-            <a href="{{ request()->fullUrlWithQuery(['months' => 'all']) }}" class="font-medium underline">Show all months</a>
+            <a href="{{ request()->fullUrlWithQuery(['range' => 'all']) }}" class="font-medium underline">Show all data</a>
         </div>
     @endif
 
@@ -307,9 +341,9 @@
                                         <div class="flex items-start justify-between gap-3">
                                             <span class="whitespace-nowrap text-xs text-gray-500" x-text="r.d"></span>
                                             <span class="flex flex-col items-end whitespace-nowrap font-medium">
-                                            <span x-show="r.c > 0" class="text-green-700" x-text="'+ ' + fmt(r.c)"></span>
-                                            <span x-show="r.x > 0" class="text-red-700" x-text="'− ' + fmt(r.x)"></span>
-                                        </span>
+                                                <span x-show="r.c > 0" class="text-green-700" x-text="'+ ' + fmt(r.c)"></span>
+                                                <span x-show="r.x > 0" class="text-red-700" x-text="'− ' + fmt(r.x)"></span>
+                                            </span>
                                         </div>
                                         <div class="mt-0.5 break-words text-gray-900" x-text="r.t"></div>
                                         <div class="mt-0.5 text-xs text-gray-500">
@@ -329,16 +363,16 @@
                                     {{-- Phone: stacked card --}}
                                     <div class="border-l-4 border-t border-t-gray-100 px-3 py-2 text-sm sm:hidden" :class="rowClass(r) + ' ' + edge(r)">
                                         <div class="flex items-start justify-between gap-3">
-                                        <span class="min-w-0 text-xs text-gray-500">
-                                            <span x-text="r.d"></span>
-                                            <span>·</span>
-                                            <span x-text="r.a"></span>
-                                            <span x-show="r.fl" class="ml-1 inline-block rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">float</span>
-                                        </span>
+                                            <span class="min-w-0 text-xs text-gray-500">
+                                                <span x-text="r.d"></span>
+                                                <span>·</span>
+                                                <span x-text="r.a"></span>
+                                                <span x-show="r.fl" class="ml-1 inline-block rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">float</span>
+                                            </span>
                                             <span class="flex flex-col items-end whitespace-nowrap font-medium">
-                                            <span x-show="r.c > 0" class="text-green-700" x-text="'+ ' + fmt(r.c)"></span>
-                                            <span x-show="r.x > 0" class="text-red-700" x-text="'− ' + fmt(r.x)"></span>
-                                        </span>
+                                                <span x-show="r.c > 0" class="text-green-700" x-text="'+ ' + fmt(r.c)"></span>
+                                                <span x-show="r.x > 0" class="text-red-700" x-text="'− ' + fmt(r.x)"></span>
+                                            </span>
                                         </div>
                                         <div class="mt-0.5 break-words text-gray-900">
                                             <span x-text="r.t"></span>

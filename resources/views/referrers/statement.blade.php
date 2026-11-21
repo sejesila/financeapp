@@ -21,11 +21,10 @@
             'recovered' => ['label' => 'Recovered',   'row' => 'bg-teal-50',   'border' => 'border-teal-400',   'badge' => 'bg-teal-100 text-teal-800'],
         ];
 
-        // How many months to render (newest first). ?months=3|6|12|all — default 6.
-        $monthsParam = request('months');
-        $limit = $monthsParam === 'all'
-            ? null
-            : (is_numeric($monthsParam) ? max(1, (int) $monthsParam) : 6);
+        // Default: only the last 30 days are shown. ?range=all shows everything.
+        // Balances stay correct either way (they are computed over the full history).
+        $showAll = request('range') === 'all';
+        $since   = $showAll ? null : now()->subDays(30)->startOfDay();
 
         $recovery = $commission['recovery'] ?? null;
     @endphp
@@ -38,14 +37,15 @@
                     <h2 class="text-2xl font-semibold text-gray-800"> Statement </h2>
                     <p class="text-sm text-gray-500 mt-1">
                         Every credit and debit (going out), in order.
+                        {{ $showAll ? 'Showing all data.' : 'Showing the last 30 days.' }}
                     </p>
                 </div>
                 <div class="flex flex-wrap items-center gap-3">
-                    {{-- Range: how much history to render. Balances stay correct either way. --}}
+                    {{-- Range: last 30 days, or everything. --}}
                     <div class="inline-flex overflow-hidden rounded-md border border-gray-300 text-xs">
-                        @foreach(['3' => '3 mo', '6' => '6 mo', '12' => '12 mo', 'all' => 'All'] as $value => $label)
-                            @php $active = ($value === 'all' && $limit === null) || ($limit !== null && (string) $limit === (string) $value); @endphp
-                            <a href="{{ request()->fullUrlWithQuery(['months' => $value]) }}"
+                        @foreach(['30' => 'Last 30 days', 'all' => 'Show all data'] as $value => $label)
+                            @php $active = ($value === 'all') === $showAll; @endphp
+                            <a href="{{ request()->fullUrlWithQuery(['range' => $value]) }}"
                                class="px-3 py-1.5 {{ $active ? 'bg-gray-800 text-white' : 'bg-white text-gray-700 hover:bg-gray-50' }}">
                                 {{ $label }}
                             </a>
@@ -96,14 +96,14 @@
                     </div>
                 @endif
 
-                @include('referrers.partials.ledger-table', [
+                @include('referrers.partials.ledger', [
                     'months'       => $commission['months'],
                     'mode'         => 'balance',
                     'balanceLabel' => 'Owed',
                     'creditLabel'  => 'Earned',
                     'debitLabel'   => 'Paid / kept',
                     'kindStyles'   => $commissionStyles,
-                    'limit'        => $limit,
+                    'since'        => $since,
                     'empty'        => 'No commission yet.',
                 ])
 
@@ -112,14 +112,14 @@
                     <p class="text-sm text-gray-500 mb-2">
                         Loans written off and charged to {{ $referrer->name }}, and what each payout has deducted so far.
                     </p>
-                    @include('referrers.partials.ledger-table', [
+                    @include('referrers.partials.ledger', [
                         'months'       => $recovery['months'],
                         'mode'         => 'balance',
                         'balanceLabel' => 'She owes',
                         'creditLabel'  => 'Charged',
                         'debitLabel'   => 'Recovered',
                         'kindStyles'   => $commissionStyles,
-                        'limit'        => $limit,
+                        'since'        => $since,
                         'empty'        => 'No write-offs charged.',
                     ])
                 @endif
@@ -172,26 +172,26 @@
                     </div>
 
                     <h4 class="text-md font-semibold text-gray-800 mt-6">Principal collected</h4>
-                    @include('referrers.partials.ledger-table', [
+                    @include('referrers.partials.ledger', [
                         'months'       => $principal['months'],
                         'mode'         => 'balance',
                         'balanceLabel' => 'Net collected',
                         'creditLabel'  => 'In',
                         'debitLabel'   => 'Out',
                         'kindStyles'   => $kindStyles,
-                        'limit'        => $limit,
+                        'since'        => $since,
                         'empty'        => 'No principal received yet.',
                     ])
 
                     <h4 class="text-md font-semibold text-gray-800 mt-8">Interest</h4>
-                    @include('referrers.partials.ledger-table', [
+                    @include('referrers.partials.ledger', [
                         'months'       => $interest['months'],
                         'mode'         => 'balance',
                         'balanceLabel' => 'Interest held',
                         'creditLabel'  => 'In',
                         'debitLabel'   => 'Out',
                         'kindStyles'   => $kindStyles,
-                        'limit'        => $limit,
+                        'since'        => $since,
                         'empty'        => 'No interest movements yet.',
                     ])
 
@@ -201,14 +201,14 @@
                             <span class="text-sm font-normal text-gray-500">(every movement, unfiltered)</span>
                         </summary>
                         <div class="mt-3">
-                            @include('referrers.partials.ledger-table', [
+                            @include('referrers.partials.ledger', [
                                 'months'       => $float['months'],
                                 'mode'         => 'balance',
                                 'balanceLabel' => 'Balance',
                                 'creditLabel'  => 'In',
                                 'debitLabel'   => 'Out',
                                 'kindStyles'   => $kindStyles,
-                                'limit'        => $limit,
+                                'since'        => $since,
                                 'empty'        => 'No movements on the float account yet.',
                             ])
                         </div>
@@ -221,14 +221,14 @@
                 <details>
                     <summary class="cursor-pointer text-lg font-semibold text-gray-800">
                         Everything
-                        <span class="text-sm font-normal text-gray-500">({{ $movements['count'] }} movements, on every account)</span>
+                        <span class="text-sm font-normal text-gray-500">({{ $movements['count'] }} movements in total, on every account)</span>
                     </summary>
                     <div class="mt-3">
-                        @include('referrers.partials.ledger-table', [
+                        @include('referrers.partials.ledger', [
                             'months'     => $movements['months'],
                             'mode'       => 'movements',
                             'kindStyles' => $kindStyles,
-                            'limit'      => $limit,
+                            'since'      => $since,
                             'empty'      => 'No movements found.',
                         ])
                     </div>
