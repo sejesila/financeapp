@@ -96,7 +96,7 @@
                     </div>
                 @endif
 
-                @include('referrers.partials.ledger', [
+                @include('referrers.partials.ledger-table', [
                     'months'       => $commission['months'],
                     'mode'         => 'balance',
                     'balanceLabel' => 'Owed',
