@@ -121,17 +121,25 @@
         </div>
 
         {{-- Summary Cards --}}
+        {{-- Each card compares to the previous period. For income, net and interest an
+             increase is good (green); for expenses an increase is bad (red). --}}
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             <x-report-card
                 title="Total Income"
                 :value="$totalIncome"
-                color="green"/>
+                color="green">
+                @if($incomeChange !== null)
+                    <p class="text-xs mt-1 {{ $incomeChange >= 0 ? 'text-green-500' : 'text-red-500' }}">
+                        {{ $incomeChange >= 0 ? '↑' : '↓' }} {{ abs($incomeChange) }}% vs previous
+                    </p>
+                @endif
+            </x-report-card>
 
             <x-report-card
                 title="Total Expenses"
                 :value="$totalExpenses"
                 color="red">
-                @if($previousExpenses > 0)
+                @if($expenseChange !== null)
                     <p class="text-xs mt-1 {{ $expenseChange > 0 ? 'text-red-500' : 'text-green-500' }}">
                         {{ $expenseChange > 0 ? '↑' : '↓' }} {{ abs($expenseChange) }}% vs previous
                     </p>
@@ -141,8 +149,15 @@
             <x-report-card
                 title="Net Cash Flow"
                 :value="$netCashFlow"
-                :color="$netCashFlow >= 0 ? 'blue' : 'orange'"
-                subtitle="{{ $netCashFlow >= 0 ? 'Surplus' : 'Deficit' }}"/>
+                :color="$netCashFlow >= 0 ? 'blue' : 'orange'">
+                <p class="text-xs mt-1 text-gray-500">{{ $netCashFlow >= 0 ? 'Surplus' : 'Deficit' }}</p>
+                @if($netChange !== null)
+                    <p class="text-xs mt-0.5 {{ $netChange >= 0 ? 'text-green-500' : 'text-red-500' }}">
+                        {{ $netChange >= 0 ? '↑' : '↓' }} {{ abs($netChange) }}% vs previous
+                    </p>
+                @endif
+            </x-report-card>
+
             <x-report-card
                 title="Interest Income This Period"
                 :value="$interestIncome['total']"
@@ -151,6 +166,11 @@
                     <p class="text-xs mt-1 text-gray-500">
                         Savings: KES {{ number_format($interestIncome['savings_interest'], 0) }}
                         &bull; Loans given: KES {{ number_format($interestIncome['loan_given_interest'], 0) }}
+                    </p>
+                @endif
+                @if($interestChange !== null)
+                    <p class="text-xs mt-0.5 {{ $interestChange >= 0 ? 'text-green-500' : 'text-red-500' }}">
+                        {{ $interestChange >= 0 ? '↑' : '↓' }} {{ abs($interestChange) }}% vs previous
                     </p>
                 @endif
             </x-report-card>

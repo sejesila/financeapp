@@ -93,7 +93,6 @@ class ReportsController extends Controller
         $previousStartDate = null;
         $previousEndDate = null;
 
-        // Previous-period comparison
         switch ($filter) {
             case 'this_month':
                 $lastMonth = now()->subMonthNoOverflow();
@@ -109,36 +108,52 @@ class ReportsController extends Controller
                 $previousStartDate = now()->subYear()->startOfYear();
                 $previousEndDate = now()->subYear()->endOfYear();
                 break;
+            case 'last_year':
+                $previousStartDate = now()->subYears(2)->startOfYear();
+                $previousEndDate = now()->subYears(2)->endOfYear();
+                break;
+            case 'custom':
+                // Same-length window immediately before the chosen range.
+                $days = $startDate->copy()->startOfDay()->diffInDays($endDate->copy()->startOfDay()) + 1;
+                $previousEndDate = $startDate->copy()->subDay()->endOfDay();
+                $previousStartDate = $previousEndDate->copy()->subDays($days - 1)->startOfDay();
+                break;
         }
 
-        $previousExpenses = 0;
+        $previousIncome = 0.0;
+        $previousExpenses = 0.0;
+        $previousNet = 0.0;
+        $previousInterest = 0.0;
+
+        $reportDataService = app(ReportDataService::class);
 
         if ($previousStartDate) {
-            $previousExpenses = $this->excludeNonSpendingCategories(
-                $this->excludeClientFunds(
-                    Transaction::query()
-                        ->join('categories', 'transactions.category_id', '=', 'categories.id')
-                        ->where('categories.type', 'expense')
-                        ->whereBetween('transactions.date', [$previousStartDate, $previousEndDate])
-                        ->where('transactions.user_id', auth()->id())
-                )
-            )->sum('transactions.amount');
+            $prev = $this->periodTotals($previousStartDate, $previousEndDate);
+            $previousIncome = $prev['income'];
+            $previousExpenses = $prev['expenses'];
+            $previousNet = $previousIncome - $previousExpenses;
+
+            $previousInterest = (float) $reportDataService->getInterestIncomeSummary(
+                auth()->user(), $previousStartDate, $previousEndDate
+            )['total'];
         }
 
-        $expenseChange = $previousExpenses > 0
-            ? round((($totalExpenses - $previousExpenses) / $previousExpenses) * 100, 1)
-            : 0;
+        // Percentage change vs the previous period (null = nothing to compare to).
+        $interestIncome = $reportDataService->getInterestIncomeSummary(
+            auth()->user(), $startDate, $endDate
+        );
+
+        $incomeChange   = $previousStartDate ? $this->percentChange((float) $totalIncome, $previousIncome) : null;
+        $expenseChange  = $previousStartDate ? $this->percentChange((float) $totalExpenses, $previousExpenses) : null;
+        $netChange      = $previousStartDate ? $this->percentChange((float) $netCashFlow, $previousNet) : null;
+        $interestChange = $previousStartDate ? $this->percentChange((float) $interestIncome['total'], $previousInterest) : null;
 
         // Get accounts for the FAB component
         $accounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
-        $reportDataService = app(ReportDataService::class);
         $salarySavingsRate = $reportDataService->getSalarySavingsRate(
-            auth()->user(), $startDate, $endDate
-        );
-        $interestIncome = $reportDataService->getInterestIncomeSummary(
             auth()->user(), $startDate, $endDate
         );
         $referrerShareOwed = $reportDataService->getReferrerShareOwed(auth()->user(), $startDate, $endDate);
@@ -153,13 +168,57 @@ class ReportsController extends Controller
             'totalExpenses',
             'netCashFlow',
             'topCategories',
+            'previousIncome',
             'previousExpenses',
+            'previousNet',
+            'previousInterest',
+            'incomeChange',
             'expenseChange',
+            'netChange',
+            'interestChange',
             'accounts',
             'salarySavingsRate',
             'interestIncome',
             'referrerShareOwed'
         ));
+    }
+
+    /**
+     * Income and expense totals for a period, using exactly the same
+     * exclusions as the main report so the comparison is like-for-like.
+     */
+    private function periodTotals(Carbon $start, Carbon $end): array
+    {
+        $rows = $this->excludeNonSpendingCategories(
+            $this->excludeClientFunds(
+                Transaction::query()
+                    ->join('categories', 'transactions.category_id', '=', 'categories.id')
+                    ->select('categories.type', DB::raw('SUM(transactions.amount) as total'))
+                    ->whereBetween('transactions.date', [$start, $end])
+                    ->where('transactions.user_id', auth()->id())
+            )
+        )
+            ->groupBy('categories.type')
+            ->pluck('total', 'type');
+
+        return [
+            'income'   => (float) ($rows['income'] ?? 0),
+            'expenses' => (float) ($rows['expense'] ?? 0),
+        ];
+    }
+
+    /**
+     * % change from $previous to $current. Uses abs($previous) so a net cash
+     * flow moving from -20k to -10k reads as an improvement (+50%), not -50%.
+     * Returns null when there is no previous figure to compare against.
+     */
+    private function percentChange(float $current, float $previous): ?float
+    {
+        if (abs($previous) < 0.005) {
+            return null;
+        }
+
+        return round((($current - $previous) / abs($previous)) * 100, 1);
     }
 
 
