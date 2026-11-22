@@ -218,7 +218,22 @@ class ReferrerPayoutController extends Controller
     {
         $this->authorize('view', $referrer);
 
-        $referrer->load(['payouts.account', 'payouts.loans']);
+        // Full payouts relation is still used for the "Paid Out" totals;
+        // the paginated lists below are what the tables render.
+        $referrer->load('payouts');
+
+        $loansPage = $referrer->loans()
+            ->with('payments')
+            ->orderByDesc('disbursed_date')
+            ->paginate(10, ['*'], 'loans_page')
+            ->withQueryString();
+
+        $payoutsPage = $referrer->payouts()
+            ->with(['account', 'loans'])
+            ->orderByDesc('paid_date')
+            ->orderByDesc('id')
+            ->paginate(10, ['*'], 'payouts_page')
+            ->withQueryString();
 
         $statsPeriod = $request->get('stats_period', 'this_month');
         [$statsStart, $statsEnd, $statsLabel] = LoanBookStatsService::resolvePeriod(
@@ -233,7 +248,8 @@ class ReferrerPayoutController extends Controller
         $loanStats = $stats->compute($loans, $payments, $statsStart, $statsEnd);
 
         return view('referrers.show', compact(
-            'referrer', 'loanStats', 'statsPeriod', 'statsStart', 'statsEnd', 'statsLabel'
+            'referrer', 'loanStats', 'statsPeriod', 'statsStart', 'statsEnd', 'statsLabel',
+            'loansPage', 'payoutsPage'
         ));
     }
 }

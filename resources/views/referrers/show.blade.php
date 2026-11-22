@@ -47,26 +47,31 @@
                     </div>
 
                     @php
+                        // NOTE: the summary cards below need totals across ALL of the
+                        // referrer's loans and payments, so this block still loads the full
+                        // set. Only the two tables further down are paginated
+                        // ($loansPage / $payoutsPage, passed in from the controller).
+                        //
                         // Eager-load payments so the "interest so far" figure on each
                         // active loan below (payments->sum('interest_portion')) doesn't
                         // run an extra query per row.
-                    $referredLoans = $referrer->loans()->with('payments')->orderByDesc('disbursed_date')->get();
-$allPayments   = $referredLoans->flatMap->payments;
-$unpaidPayments = $allPayments
-    ->whereNull('referrer_payout_id')
-    ->where('referrer_commission_kept', false)
-    ->where('referrer_commission', '>', 0);
+                        $referredLoans = $referrer->loans()->with('payments')->orderByDesc('disbursed_date')->get();
+                        $allPayments   = $referredLoans->flatMap->payments;
+                        $unpaidPayments = $allPayments
+                            ->whereNull('referrer_payout_id')
+                            ->where('referrer_commission_kept', false)
+                            ->where('referrer_commission', '>', 0);
 
-$outstandingInterest = round((float) $unpaidPayments->sum('interest_portion'), 2);
-$outstandingPayable  = round((float) $unpaidPayments->sum('referrer_commission'), 2);
-$retainedTotal       = (float) $allPayments->where('referrer_commission_kept', true)->sum('referrer_commission');
-$paidOutTotal        = ($referrer->payouts ?? collect())->sum('amount_paid');
-$floatLimits = $referrer->floatAccount ? $referrer->floatReconcileLimits() : null;
+                        $outstandingInterest = round((float) $unpaidPayments->sum('interest_portion'), 2);
+                        $outstandingPayable  = round((float) $unpaidPayments->sum('referrer_commission'), 2);
+                        $retainedTotal       = (float) $allPayments->where('referrer_commission_kept', true)->sum('referrer_commission');
+                        $paidOutTotal        = ($referrer->payouts ?? collect())->sum('amount_paid');
+                        $floatLimits = $referrer->floatAccount ? $referrer->floatReconcileLimits() : null;
 
-// Write-offs charged to her, recovered from her commission at each payout.
-$recoveriesByLoan    = $referrer->recoveries()->get()->keyBy('loan_given_id');
-$recoveryOutstanding = $referrer->recoveryOutstanding();
-$netOwedNow          = max(0, round($outstandingPayable - $recoveryOutstanding, 2));
+                        // Write-offs charged to her, recovered from her commission at each payout.
+                        $recoveriesByLoan    = $referrer->recoveries()->get()->keyBy('loan_given_id');
+                        $recoveryOutstanding = $referrer->recoveryOutstanding();
+                        $netOwedNow          = max(0, round($outstandingPayable - $recoveryOutstanding, 2));
                     @endphp
 
                     <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mb-6">
@@ -123,6 +128,7 @@ $netOwedNow          = max(0, round($outstandingPayable - $recoveryOutstanding, 
                 <div class="p-4 sm:p-6">
                     <h3 class="text-base sm:text-lg font-medium text-gray-900 mb-4">Referred Loans</h3>
 
+                    {{-- Empty check uses the full collection, so a page past the end never says "no loans". --}}
                     @if($referredLoans->isEmpty())
                         <div class="bg-blue-50 border-l-4 border-blue-400 p-4">
                             <p class="text-sm text-blue-700">No loans referred by {{ $referrer->name }} yet.</p>
@@ -140,7 +146,7 @@ $netOwedNow          = max(0, round($outstandingPayable - $recoveryOutstanding, 
                                 </tr>
                                 </thead>
                                 <tbody class="bg-white divide-y divide-gray-200">
-                                @foreach($referredLoans as $loan)
+                                @foreach($loansPage as $loan)
                                     <tr>
                                         <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900">{{ $loan->borrower_name }}</td>
                                         <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
@@ -194,6 +200,10 @@ $netOwedNow          = max(0, round($outstandingPayable - $recoveryOutstanding, 
                                 @endforeach
                                 </tbody>
                             </table>
+                        </div>
+
+                        <div class="mt-4">
+                            {{ $loansPage->links() }}
                         </div>
                     @endif
                 </div>
@@ -256,23 +266,25 @@ $netOwedNow          = max(0, round($outstandingPayable - $recoveryOutstanding, 
 
             <!-- Payout History -->
             @php
-                $payouts = ($referrer->payouts ?? collect())
-                    ->sortByDesc(fn ($p) => [$p->paid_date?->timestamp ?? 0, $p->id])
-                    ->values();
+                // Rows to render come from the paginated page; the header totals
+                // are computed across ALL of the referrer's payouts.
+                $payouts      = $payoutsPage;
+                $payoutsCount = $referrer->payouts->count();
+                $payoutsTotal = $referrer->payouts->sum('amount_paid');
             @endphp
             <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg">
                 <div class="p-4 sm:p-6">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-base sm:text-lg font-medium text-gray-900">Payout History</h3>
-                        @if($payouts->isNotEmpty())
+                        @if($payoutsCount > 0)
                             <span class="text-xs sm:text-sm text-gray-500">
-                                {{ $payouts->count() }} payout{{ $payouts->count() > 1 ? 's' : '' }} ·
-                                <span class="font-medium text-green-600">KES {{ number_format($payouts->sum('amount_paid'), 0) }}</span> total
+                                {{ $payoutsCount }} payout{{ $payoutsCount > 1 ? 's' : '' }} ·
+                                <span class="font-medium text-green-600">KES {{ number_format($payoutsTotal, 0) }}</span> total
                             </span>
                         @endif
                     </div>
 
-                    @if($payouts->isEmpty())
+                    @if($payoutsCount === 0)
                         <div class="bg-blue-50 border-l-4 border-blue-400 p-4">
                             <p class="text-sm text-blue-700">No payout batches recorded yet.</p>
                         </div>
@@ -362,6 +374,10 @@ $netOwedNow          = max(0, round($outstandingPayable - $recoveryOutstanding, 
                                     </tbody>
                                 @endforeach
                             </table>
+                        </div>
+
+                        <div class="mt-4">
+                            {{ $payoutsPage->links() }}
                         </div>
                     @endif
                 </div>
