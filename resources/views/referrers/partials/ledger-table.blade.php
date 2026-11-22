@@ -7,6 +7,9 @@
     (date + amount on the first line, description below, balance last).
     From `sm` up it is the normal column grid.
 
+    Transaction fees (kind = 'fee') are drawn smaller and muted: smaller text,
+    tighter padding, grey title.
+
     Params
       months        Collection of months from ReferrerLedgerService (groupByMonth / allMovements)
       mode          'balance'   -> Date | What happened | Credit | Debit | Running balance
@@ -198,7 +201,13 @@
                 rowClass(r) { const s = this.styles[r.k]; return s ? s.row : ''; },
                 edge(r) { const s = this.styles[r.k]; return s ? s.border : 'border-transparent'; },
                 badgeClass(r) { const s = this.styles[r.k]; return s ? s.badge : ''; },
-                badgeText(r) { const s = this.styles[r.k]; return s ? s.label : ''; }
+                badgeText(r) { const s = this.styles[r.k]; return s ? s.label : ''; },
+
+                // Transaction fees render small and muted.
+                isFee(r) { return r.k === 'fee'; },
+                size(r) { return this.isFee(r) ? 'text-xs' : 'text-sm'; },
+                pad(r) { return this.isFee(r) ? 'py-1' : 'py-2'; },
+                tone(r) { return this.isFee(r) ? 'text-gray-500' : 'text-gray-900'; }
             };
         };
     </script>
@@ -337,7 +346,8 @@
                             <div>
                                 @if($mode === 'balance')
                                     {{-- Phone: stacked card --}}
-                                    <div class="border-l-4 border-t border-t-gray-100 px-3 py-2 text-sm sm:hidden" :class="rowClass(r) + ' ' + edge(r)">
+                                    <div class="border-l-4 border-t border-t-gray-100 px-3 sm:hidden"
+                                         :class="rowClass(r) + ' ' + edge(r) + ' ' + size(r) + ' ' + pad(r)">
                                         <div class="flex items-start justify-between gap-3">
                                             <span class="whitespace-nowrap text-xs text-gray-500" x-text="r.d"></span>
                                             <span class="flex flex-col items-end whitespace-nowrap font-medium">
@@ -345,23 +355,25 @@
                                                 <span x-show="r.x > 0" class="text-red-700" x-text="'− ' + fmt(r.x)"></span>
                                             </span>
                                         </div>
-                                        <div class="mt-0.5 break-words text-gray-900" x-text="r.t"></div>
+                                        <div class="mt-0.5 break-words" :class="tone(r)" x-text="r.t"></div>
                                         <div class="mt-0.5 text-xs text-gray-500">
                                             Balance <span class="font-medium tabular-nums text-gray-700" x-text="fmt(r.b)"></span>
                                         </div>
                                     </div>
 
                                     {{-- Desktop: grid row --}}
-                                    <div class="hidden items-start gap-x-3 border-t border-gray-100 text-sm sm:grid {{ $cols }}" :class="rowClass(r)">
-                                        <div class="whitespace-nowrap border-l-4 py-2 pl-3 text-gray-600" :class="edge(r)" x-text="r.d"></div>
-                                        <div class="min-w-0 break-words py-2 text-gray-900" x-text="r.t"></div>
-                                        <div class="whitespace-nowrap py-2 text-right text-green-700" x-text="r.c > 0 ? '+ ' + fmt(r.c) : ''"></div>
-                                        <div class="whitespace-nowrap py-2 text-right text-red-700" x-text="r.x > 0 ? '− ' + fmt(r.x) : ''"></div>
-                                        <div class="whitespace-nowrap py-2 pr-4 text-right font-medium tabular-nums text-gray-900" x-text="fmt(r.b)"></div>
+                                    <div class="hidden items-start gap-x-3 border-t border-gray-100 sm:grid {{ $cols }}"
+                                         :class="rowClass(r) + ' ' + size(r)">
+                                        <div class="whitespace-nowrap border-l-4 pl-3 text-gray-600" :class="edge(r) + ' ' + pad(r)" x-text="r.d"></div>
+                                        <div class="min-w-0 break-words" :class="pad(r) + ' ' + tone(r)" x-text="r.t"></div>
+                                        <div class="whitespace-nowrap text-right text-green-700" :class="pad(r)" x-text="r.c > 0 ? '+ ' + fmt(r.c) : ''"></div>
+                                        <div class="whitespace-nowrap text-right text-red-700" :class="pad(r)" x-text="r.x > 0 ? '− ' + fmt(r.x) : ''"></div>
+                                        <div class="whitespace-nowrap pr-4 text-right font-medium tabular-nums" :class="pad(r) + ' ' + tone(r)" x-text="fmt(r.b)"></div>
                                     </div>
                                 @else
                                     {{-- Phone: stacked card --}}
-                                    <div class="border-l-4 border-t border-t-gray-100 px-3 py-2 text-sm sm:hidden" :class="rowClass(r) + ' ' + edge(r)">
+                                    <div class="border-l-4 border-t border-t-gray-100 px-3 sm:hidden"
+                                         :class="rowClass(r) + ' ' + edge(r) + ' ' + size(r) + ' ' + pad(r)">
                                         <div class="flex items-start justify-between gap-3">
                                             <span class="min-w-0 text-xs text-gray-500">
                                                 <span x-text="r.d"></span>
@@ -374,7 +386,7 @@
                                                 <span x-show="r.x > 0" class="text-red-700" x-text="'− ' + fmt(r.x)"></span>
                                             </span>
                                         </div>
-                                        <div class="mt-0.5 break-words text-gray-900">
+                                        <div class="mt-0.5 break-words" :class="tone(r)">
                                             <span x-text="r.t"></span>
                                             <span x-show="r.k && styles[r.k]" class="ml-1 inline-block rounded px-1.5 py-0.5 text-xs"
                                                   :class="badgeClass(r)" x-text="badgeText(r)"></span>
@@ -384,21 +396,22 @@
                                     </div>
 
                                     {{-- Desktop: grid row --}}
-                                    <div class="hidden items-start gap-x-3 border-t border-gray-100 text-sm sm:grid {{ $cols }}" :class="rowClass(r)">
-                                        <div class="whitespace-nowrap border-l-4 py-2 pl-3 text-gray-600" :class="edge(r)" x-text="r.d"></div>
-                                        <div class="min-w-0 break-words py-2 text-gray-700">
+                                    <div class="hidden items-start gap-x-3 border-t border-gray-100 sm:grid {{ $cols }}"
+                                         :class="rowClass(r) + ' ' + size(r)">
+                                        <div class="whitespace-nowrap border-l-4 pl-3 text-gray-600" :class="edge(r) + ' ' + pad(r)" x-text="r.d"></div>
+                                        <div class="min-w-0 break-words text-gray-700" :class="pad(r)">
                                             <span x-text="r.a"></span>
                                             <span x-show="r.fl" class="ml-1 inline-block rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">float</span>
                                         </div>
-                                        <div class="min-w-0 break-words py-2 text-gray-900">
+                                        <div class="min-w-0 break-words" :class="pad(r) + ' ' + tone(r)">
                                             <span x-text="r.t"></span>
                                             <span x-show="r.k && styles[r.k]" class="ml-1 inline-block rounded px-1.5 py-0.5 text-xs"
                                                   :class="badgeClass(r)" x-text="badgeText(r)"></span>
                                             <span x-show="r.u" class="ml-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">matched by name</span>
                                             <span x-show="r.n" class="block text-xs text-gray-400" x-text="r.n"></span>
                                         </div>
-                                        <div class="whitespace-nowrap py-2 text-right text-green-700" x-text="r.c > 0 ? '+ ' + fmt(r.c) : ''"></div>
-                                        <div class="whitespace-nowrap py-2 pr-4 text-right text-red-700" x-text="r.x > 0 ? '− ' + fmt(r.x) : ''"></div>
+                                        <div class="whitespace-nowrap text-right text-green-700" :class="pad(r)" x-text="r.c > 0 ? '+ ' + fmt(r.c) : ''"></div>
+                                        <div class="whitespace-nowrap pr-4 text-right text-red-700" :class="pad(r)" x-text="r.x > 0 ? '− ' + fmt(r.x) : ''"></div>
                                     </div>
                                 @endif
                             </div>
