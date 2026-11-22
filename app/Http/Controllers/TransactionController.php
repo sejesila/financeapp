@@ -185,8 +185,10 @@ class TransactionController extends Controller
             return redirect()->back()->with('error', 'System-generated transaction fees cannot be edited.');
         }
 
-        // Get form data first
-        $formData = $this->formData();
+        // Get form data first. Pass the transaction's own account so it is always
+        // selectable on the edit form, even when its balance has dropped below 1
+        // (e.g. a 200 expense that took the account to 0).
+        $formData = $this->formData($transaction->account_id);
 
         // Override the default types with the transaction's actual type for editing
         // But also keep the original most-used types for other purposes
@@ -287,9 +289,9 @@ class TransactionController extends Controller
         }
     }
 
-    private function formData(): array
+    private function formData(?int $includeAccountId = null): array
     {
-        $accounts = $this->getActiveAccounts();
+        $accounts = $this->getActiveAccounts($includeAccountId);
 
         return array_merge(
             $this->getCategoriesForForm(),
@@ -381,12 +383,24 @@ class TransactionController extends Controller
         return compact('categoryGroups', 'allCategoriesArray');
     }
 
-    private function getActiveAccounts()
+    /**
+     * Accounts selectable on the forms. Accounts with a balance below 1 are
+     * normally hidden (nothing to spend), but when editing an existing
+     * transaction its own account must stay available, otherwise a transaction
+     * that emptied the account could never be edited.
+     */
+    private function getActiveAccounts(?int $includeAccountId = null)
     {
         return Account::where('user_id', Auth::id())
             ->where('is_active', true)
             ->where('type', '!=', 'savings')
-            ->where('current_balance', '>=', 1)
+            ->where(function ($q) use ($includeAccountId) {
+                $q->where('current_balance', '>=', 1);
+
+                if ($includeAccountId) {
+                    $q->orWhere('id', $includeAccountId);
+                }
+            })
             ->orderBy('name')
             ->get();
     }

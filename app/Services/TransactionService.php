@@ -382,7 +382,9 @@ class TransactionService
         }
 
         return DB::transaction(function () use ($transaction, $data) {
-            $newAccount = Account::findOrFail($data['account_id']);
+            // Lock the target account so the balance check below can't race
+            // with another write.
+            $newAccount = Account::lockForUpdate()->findOrFail($data['account_id']);
             if ($newAccount->user_id !== Auth::id()) {
                 throw new Exception('Unauthorized access to this account.');
             }
@@ -396,6 +398,8 @@ class TransactionService
             $oldAmount      = (float) $transaction->amount;
             $oldCategoryId  = $transaction->category_id;
             $oldBudgetDate  = $transaction->period_date ?? $transaction->date;
+            $oldFee         = (float) ($transaction->feeTransaction?->amount ?? 0);
+            $oldCategoryType = $transaction->category?->type;
 
             $oldAccount     = $transaction->account;
             $accountChanged = $oldAccount->id !== $newAccount->id;
@@ -409,6 +413,34 @@ class TransactionService
                 $transactionType ?? 'send_money',
                 $category
             );
+
+            // Balance check for edits. current_balance already reflects the OLD
+            // version of this transaction, so what is really available to the
+            // edited version is the balance with the old effect undone:
+            //   - old was an expense on the same account: give back amount + fee
+            //   - old was income on the same account: take its amount back out
+            //   - different account: the old effect is on another account, so none
+            if ($category->type === 'expense') {
+                $available = (float) $newAccount->current_balance;
+
+                if (!$accountChanged) {
+                    if ($oldCategoryType === 'expense') {
+                        $available += $oldAmount + $oldFee;
+                    } elseif ($oldCategoryType === 'income') {
+                        $available -= $oldAmount;
+                    }
+                }
+
+                $required = (float) $data['amount'] + $newTransactionCost;
+
+                if ($available < $required) {
+                    throw new Exception(
+                        "Insufficient balance in {$newAccount->name}. " .
+                        "Available: KSh " . number_format($available, 2) . ", " .
+                        "Required: KSh " . number_format($required, 2)
+                    );
+                }
+            }
 
             $transaction->update([
                 'date'              => $data['date'],
