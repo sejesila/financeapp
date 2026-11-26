@@ -219,7 +219,7 @@
                                         <p class="text-xs sm:text-sm font-medium text-gray-500 break-words">Transaction Costs</p>
                                         <p class="text-base sm:text-lg font-semibold text-gray-900">
                                             KES {{ number_format($totalTransactionCosts ?? 0, 0) }}</p>
-                                        <p class="text-[10px] sm:text-xs leading-tight text-gray-500">Fees on disbursement</p>
+                                        <p class="text-[10px] sm:text-xs leading-tight text-gray-500">Disbursement + remittance fees</p>
                                     </div>
                                 </div>
                             </div>
@@ -242,8 +242,8 @@
                                         <p class="text-base sm:text-lg font-semibold text-gray-900">
                                             KES {{ number_format($netInterest ?? 0, 0) }}</p>
                                         <p class="text-[10px] sm:text-xs leading-tight text-gray-500">
-                                            Interest − costs − referrer share owed
-                                            (KES {{ number_format($referrerCut ?? 0, 0) }})
+                                            Interest − costs − referrer share
+                                            (KES {{ number_format($referrerCost ?? 0, 0) }})
                                         </p>
                                     </div>
                                 </div>

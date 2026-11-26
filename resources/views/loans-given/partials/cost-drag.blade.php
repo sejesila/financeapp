@@ -45,8 +45,8 @@
                             KES {{ number_format($r['net'], 0) }}
                             @if($k === 'referred' && $r['referrer_cut'] > 0)
                                 <span class="block text-[10px] font-normal text-purple-600">
-                                    KES {{ number_format($r['net_after_cut'], 0) }} after referrer share owed
-                                </span>
+        KES {{ number_format($r['net_after_cut'], 0) }} after referrer share
+    </span>
                             @endif
                         </td>
                     </tr>

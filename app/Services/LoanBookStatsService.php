@@ -31,6 +31,10 @@ class LoanBookStatsService
      * @param Collection $loans    every LoanGiven in scope (any status), payments need not be loaded
      * @param Collection $payments every LoanGivenPayment belonging to those loans
      */
+    /**
+     * @param Collection $loans    every LoanGiven in scope (any status), payments need not be loaded
+     * @param Collection $payments every LoanGivenPayment belonging to those loans
+     */
     public function compute(Collection $loans, Collection $payments, ?Carbon $start, ?Carbon $end): array
     {
         $inRange = fn ($date) => $date !== null
@@ -65,7 +69,7 @@ class LoanBookStatsService
                 ->sum('amount')
             : 0.0;
 
-        // NEW: fees charged on referrer-float transfers (the referrer sending money
+        // Fees charged on referrer-float transfers (the referrer sending money
         // back to you). These sit on the float account, linked to a Transfer, so
         // they never match the disbursement query above. Attributed by transfer
         // date and always to the referred group.
@@ -83,20 +87,20 @@ class LoanBookStatsService
                 ->sum('amount')
             : 0.0;
 
-        // NEW: headline card = disbursement + remittance fees
+        // Headline card = disbursement + remittance fees
         $totalTransactionCosts = $disbursementFees + $remittanceFees;
 
-        // Unpaid, not-kept commission, attributed by payment date, the same basis
-        // as $totalInterest above. Paid-out commission is already an expense
-        // transaction, and kept commission was never in our deposit, so neither
-        // is subtracted again here.
-        $referrerCut = (float) $payments
-            ->filter(fn ($p) => $inRange($p->payment_date)
-                && !$p->referrer_payout_id
-                && !$p->referrer_commission_kept)
-            ->sum('referrer_commission');
+        // All commission that costs us money (paid + owed), attributed by payment
+        // date, the same basis as $totalInterest above. Kept commission never
+        // reached our deposit, so it is not subtracted.
+        $commissionPayments = $payments->filter(fn ($p) => $inRange($p->payment_date)
+            && !$p->referrer_commission_kept);
 
-        $netInterest = $totalInterest - $totalTransactionCosts - $referrerCut;
+        $referrerCost = (float) $commissionPayments->sum('referrer_commission');
+        $referrerCut  = (float) $commissionPayments->whereNull('referrer_payout_id')
+            ->sum('referrer_commission'); // still owed
+
+        $netInterest = $totalInterest - $totalTransactionCosts - $referrerCost;
 
         $loanYield = $this->yield->compute($loans, $payments, $start, $end, (float) $netInterest);
 
@@ -105,7 +109,7 @@ class LoanBookStatsService
                 && (!$end   || Carbon::parse($p->payment_date)->lte($end->copy()->endOfDay())))
             ->sum('amount');
 
-        $withInterest   = $paidInRange->filter(fn ($l) => $l->interest_amount > 0);
+        $withInterest    = $paidInRange->filter(fn ($l) => $l->interest_amount > 0);
         $avgInterestRate = $withInterest->isNotEmpty() ? $withInterest->avg('interest_rate') : 0;
 
         $disbursedCount = $disbursedInRange->count();
@@ -140,17 +144,17 @@ class LoanBookStatsService
             $costs = $disbursedInRange->filter($inGroup)
                 ->sum(fn ($l) => (float) ($feeByDisbursement[$l->disbursement_transaction_id] ?? 0));
 
-            // NEW: remittance fees belong to the referred group only
+            // Remittance fees belong to the referred group only
             $groupRemittance = $wantReferred ? $remittanceFees : 0.0;
             $costs += $groupRemittance;
 
-            $cut = $wantReferred ? (float) $referrerCut : 0.0;
+            $cut = $wantReferred ? $referrerCost : 0.0;
 
             $costBySource[$key] = [
                 'loans'           => $disbursedInRange->filter($inGroup)->count(),
                 'interest'        => (float) $interest,
                 'costs'           => (float) $costs,
-                'remittance_fees' => (float) $groupRemittance, // NEW
+                'remittance_fees' => (float) $groupRemittance,
                 'cost_pct'        => $interest > 0 ? round($costs / $interest * 100, 1) : null,
                 'referrer_cut'    => $cut,
                 'net'             => (float) $interest - $costs,         // after costs
@@ -163,15 +167,15 @@ class LoanBookStatsService
         $costBySource['total'] = [
             'interest'        => $allInterest,
             'costs'           => $allCosts,
-            'remittance_fees' => $remittanceFees, // NEW
+            'remittance_fees' => $remittanceFees,
             'cost_pct'        => $allInterest > 0 ? round($allCosts / $allInterest * 100, 1) : null,
         ];
 
         return compact(
             'totalPrincipal', 'totalRepaid', 'totalInterest', 'avgInterestRate', 'repaymentRate',
             'totalOutstanding', 'totalReceivedAllTime', 'totalTransactionCosts', 'netInterest',
-            'referrerCut', 'repaidCount', 'disbursedCount', 'loanYield', 'costBySource',
-            'remittanceFees' // NEW
+            'referrerCut', 'referrerCost', 'repaidCount', 'disbursedCount', 'loanYield', 'costBySource',
+            'remittanceFees'
         );
     }
 }
