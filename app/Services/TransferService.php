@@ -515,9 +515,15 @@ readonly class TransferService
         Transfer    $transfer,
     ): void
     {
+        // Referrer float remittance fees are a lending cost, not a personal one.
+        $feeCategoryName = $from->type === 'referrer_float'
+            ? 'Loan Transaction Fees'
+            : 'Transaction Fees';
+
+        // Match on user + name only, so an existing category with a parent isn't duplicated.
         $feeCategory = Category::firstOrCreate(
-            ['user_id' => Auth::id(), 'name' => 'Transaction Fees', 'parent_id' => null],
-            ['type' => 'expense', 'icon' => '💸', 'is_active' => true],
+            ['user_id' => Auth::id(), 'name' => $feeCategoryName],
+            ['parent_id' => null, 'type' => 'expense', 'icon' => '💸', 'is_active' => true],
         );
 
         Transaction::create([
