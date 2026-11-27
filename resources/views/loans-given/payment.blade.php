@@ -83,18 +83,7 @@
                                               d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a4 4 0 10-4-4"></path>
                                     </svg>
                                 </div>
-                                <div class="ml-3">
-                                    <p class="text-sm text-purple-800">
-                                        This loan was referred by
-                                        <span class="font-medium">{{ $loanGiven->referrer->name }}</span>,
-                                        who's owed
-                                        <span class="font-medium">{{ number_format($loanGiven->referrer_share_percentage ?? 0, 1) }}%</span>
-                                        of whatever interest ends up being earned. Their cut is only calculated
-                                        (and shown) once you close this loan as fully repaid — nothing to do
-                                        differently on this payment.
-                                    </p>
-                                </div>
-                            </div>
+                                                         </div>
                         </div>
                     @endif
 
