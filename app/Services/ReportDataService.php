@@ -843,63 +843,35 @@ class ReportDataService
         return $paymentInterest + $residualInterest;
     }
     /**
-     * Loans-given dashboard stats for an arbitrary period. Same bucketing as
-     * LoanGivenController@index: each stat is tied to the date it naturally
-     * belongs to (disbursed_date, payment_date, repaid_date). Outstanding is
-     * always the current snapshot, not period-based.
+     * Loans-given stats for an arbitrary period. Delegates to LoanBookStatsService
+     * so reports and the Loans Given page always use the same rules.
+     * Outstanding is the current snapshot, not period-based.
      */
     private function getLoansGivenStats(User $user, Carbon $startDate, Carbon $endDate): array
     {
-        $inRange = fn($date) => $date !== null
-            && Carbon::parse($date)->between($startDate, $endDate);
+        $loans    = LoanGiven::where('user_id', $user->id)->get();
+        $payments = LoanGivenPayment::where('user_id', $user->id)->get();
 
-        $allLoans    = LoanGiven::where('user_id', $user->id)->get();
-        $activeLoans = $allLoans->where('status', 'active');
-        $paidLoans   = $allLoans->where('status', 'paid');
+        $stats = app(LoanBookStatsService::class)->compute($loans, $payments, $startDate, $endDate);
 
-        $disbursedInRange = $allLoans->filter(fn($l) => $inRange($l->disbursed_date));
-        $paidInRange      = $paidLoans->filter(fn($l) => $inRange($l->repaid_date));
-
-        $principalDisbursed = $disbursedInRange->sum(fn($l) => $l->original_principal);
-        $repaidClosed       = $paidInRange->sum('amount_paid');
-
-        // Same figure the "Interest Income" section already uses (closed loans by
-        // repaid_date + active-loan rollover interest by payment_date).
-        $interestEarned = $this->getLoanGivenInterestIncome($user, $startDate, $endDate);
-
-        $disbursementTxIds = $disbursedInRange->pluck('disbursement_transaction_id')->filter()->values();
-        $transactionCosts  = $disbursementTxIds->isNotEmpty()
-            ? (float)Transaction::where('is_transaction_fee', true)
-                ->whereIn('fee_for_transaction_id', $disbursementTxIds)
-                ->sum('amount')
-            : 0.0;
-
-        $referrerCut = $this->getReferrerShareOwed($user, $startDate, $endDate);
-
-        $cashCollected = (float)LoanGivenPayment::where('user_id', $user->id)
-            ->whereBetween('payment_date', [$startDate->toDateString(), $endDate->toDateString()])
-            ->sum('amount');
-
-        $withInterest = $paidInRange->filter(fn($l) => $l->interest_amount > 0);
-        $avgRate      = $withInterest->isNotEmpty() ? (float)$withInterest->avg('interest_rate') : 0.0;
-
-        $disbursedCount = $disbursedInRange->count();
-        $repaidCount    = $disbursedInRange->where('status', 'paid')->count();
+        $closedCount = $loans->where('status', 'paid')
+            ->filter(fn($l) => $l->repaid_date && Carbon::parse($l->repaid_date)->between($startDate, $endDate))
+            ->count();
 
         return [
-            'principal_disbursed' => (float)$principalDisbursed,
-            'cash_collected'      => $cashCollected,
-            'repaid_closed'       => (float)$repaidClosed,
-            'closed_count'        => $paidInRange->count(),
-            'interest_earned'     => $interestEarned,
-            'transaction_costs'   => $transactionCosts,
-            'referrer_cut'        => (float)$referrerCut,
-            'net_interest'        => $interestEarned - $transactionCosts - $referrerCut,
-            'avg_interest_rate'   => $avgRate,
-            'disbursed_count'     => $disbursedCount,
-            'repaid_count'        => $repaidCount,
-            'repayment_rate'      => $disbursedCount > 0 ? ($repaidCount / $disbursedCount) * 100 : 0.0,
-            'outstanding'         => (float)$activeLoans->sum('outstanding_amount'),
+            'principal_disbursed' => (float)$stats['totalPrincipal'],
+            'cash_collected'      => (float)$stats['totalReceivedAllTime'], // period-filtered despite the name
+            'repaid_closed'       => (float)$stats['totalRepaid'],
+            'closed_count'        => $closedCount,
+            'interest_earned'     => (float)$stats['totalInterest'],
+            'transaction_costs'   => (float)$stats['totalTransactionCosts'], // disbursement + remittance
+            'referrer_cut'        => (float)$stats['referrerCost'],          // paid + owed
+            'net_interest'        => (float)$stats['netInterest'],
+            'avg_interest_rate'   => (float)$stats['avgInterestRate'],
+            'disbursed_count'     => $stats['disbursedCount'],
+            'repaid_count'        => $stats['repaidCount'],
+            'repayment_rate'      => (float)$stats['repaymentRate'],
+            'outstanding'         => (float)$stats['totalOutstanding'],
         ];
     }
 
@@ -1484,7 +1456,7 @@ class ReportDataService
 
         return [
             'disbursed_count' => $disbursed->count(),
-            'disbursed_total' => $disbursed->sum('principal_amount'),
+            'disbursed_total' => $disbursed->sum(fn($l) => $l->original_principal),
             'repayments_count' => $payments->count(),
             'repayments_total' => $payments->sum('amount'),
             'closed_count' => $closedInPeriod->count(),
