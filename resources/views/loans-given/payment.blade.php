@@ -111,7 +111,7 @@
                                     <option value="">Select Account</option>
                                     @foreach($accounts as $account)
                                         <option value="{{ $account->id }}"
-                                                data-type="{{ $account->type }}" {{ old('payment_account_id') == $account->id ? 'selected' : '' }}>
+                                                data-type="{{ $account->type }}" {{ old('payment_account_id', $prefill['account_id'] ?? null) == $account->id ? 'selected' : '' }}>
                                             {{ $account->name }} (KES {{ number_format($account->current_balance, 0) }})
                                         </option>
                                     @endforeach
@@ -125,13 +125,19 @@
                                 <label for="payment_amount" class="block text-sm font-medium text-gray-700">Amount
                                     Received (KES) <span class="text-red-600">*</span></label>
                                 <input type="number" step="0.01" id="payment_amount" name="payment_amount"
-                                       value="{{ old('payment_amount') }}"
+                                       value="{{ old('payment_amount', $prefill['full'] ?? '') }}"
                                        min="0.01"
                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 @error('payment_amount') border-red-500 @enderror"
                                        required>
                                 <div class="mt-1 text-xs text-gray-500">
                                     Outstanding principal: KES {{ number_format($loanGiven->remaining_principal, 0) }}
                                 </div>
+                                @if($prefill)
+                                    <div class="mt-1 text-xs text-purple-600">
+                                        Final payments are auto-filled: principal + {{ $prefill['rate'] + 0 }}% interest
+                                        (KES {{ number_format($prefill['interest'], 0) }}). You can change the amount.
+                                    </div>
+                                @endif
                                 @error('payment_amount')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                 @enderror
@@ -220,7 +226,7 @@
                             <!-- Close loan option -->
                             <div>
                                 <div
-                                    class="border border-amber-200 bg-amber-50 rounded-lg p-4 h-full flex items-center">
+                                    class="border border-amber-200 bg-amber-50 rounded-lg p-4 h-full flex flex-col justify-center">
                                     <div class="flex items-start">
                                         <input type="checkbox" id="close_loan" name="close_loan" value="1"
                                                checked
@@ -349,6 +355,25 @@
                 }
             }
 
+            // Auto-fill the amount (referrer-specific). Stops as soon as the
+            // user types their own figure; clearing the field turns it back on.
+            const prefill = @json($prefill);
+            const keptCheckbox = document.getElementById('referrer_deducted_before_deposit');
+            let amountEdited = @json(old('payment_amount') !== null);
+
+            function refreshAmount() {
+                if (!prefill || amountEdited) return;
+
+                paymentAmountInput.value = closeLoanCheckbox.checked
+                    ? (keptCheckbox?.checked ? prefill.net : prefill.full)
+                    : '';
+                updatePrincipalPreview();
+            }
+
+            paymentAmountInput.addEventListener('input', () => {
+                amountEdited = paymentAmountInput.value !== '';
+            });
+
             paymentAccountSelect.addEventListener('change', refresh);
             closeLoanCheckbox.addEventListener('change', refresh);
             closeLoanCheckbox.addEventListener('change', refreshInterestPortion);
@@ -356,7 +381,10 @@
             paymentAmountInput.addEventListener('input', updatePrincipalPreview);
 
             refresh();
+            closeLoanCheckbox.addEventListener('change', refreshAmount);
+            keptCheckbox?.addEventListener('change', refreshAmount);
             refreshInterestPortion();
+            refreshAmount();
         })();
     </script>
 </x-app-layout>

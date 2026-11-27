@@ -28,6 +28,9 @@ use Throwable;
 class LoanGivenController extends Controller implements HasMiddleware
 {
     use AuthorizesRequests;
+    // Referrer whose repayments get a pre-filled amount and float account.
+    private const AUTOFILL_REFERRER_ID = 1;
+    private const AUTOFILL_DEFAULT_RATE = 15.0;
 
     public function __construct(protected TransactionService $transactionService)
     {
@@ -525,7 +528,29 @@ class LoanGivenController extends Controller implements HasMiddleware
 
             $loanGiven->loadMissing('referrer');
 
-            return view('loans-given.payment', compact('loanGiven', 'accounts'));
+            $prefill = null;
+
+            if ((int) $loanGiven->referrer_id === self::AUTOFILL_REFERRER_ID) {
+                // The loan's own rate wins; 15% applies when it has none.
+                $rate      = (float) ($loanGiven->expected_interest_rate ?? self::AUTOFILL_DEFAULT_RATE);
+                $principal = (float) $loanGiven->remaining_principal;
+                $interest  = round($principal * $rate / 100);
+                $share     = (float) ($loanGiven->referrer_share_percentage ?? 0) / 100;
+
+                $floatAccount = $accounts->first(fn ($a) => $a->type === 'referrer_float'
+                    && (int) $a->referrer_id === self::AUTOFILL_REFERRER_ID);
+
+                $prefill = [
+                    'account_id' => $floatAccount?->id,
+                    'rate'       => $rate,
+                    'interest'   => $interest,
+                    'full'       => round($principal + $interest, 2),
+                    // When the referrer keeps their share before depositing
+                    'net'        => round($principal + $interest * (1 - $share), 2),
+                ];
+            }
+
+            return view('loans-given.payment', compact('loanGiven', 'accounts', 'prefill'));
 
         } catch (ValidationException|AuthorizationException $e) {
             throw $e;
