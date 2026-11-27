@@ -241,7 +241,9 @@
 <body>
 
 @php
-    use Carbon\Carbon;$currency    = 'KES';
+    use Carbon\Carbon;
+
+    $currency    = 'KES';
     $income      = $data['income']              ?? 0;
     $expenses    = $data['expenses']            ?? 0;
     $netFlow     = $data['net_flow']            ?? 0;
@@ -267,7 +269,6 @@
     $txCount      = $data['transaction_count']  ?? 0;
     $savingsBalance = $data['savings_balance'] ?? 0;
     $investmentIncome = $data['investment_income'] ?? ['total' => 0, 'accounts' => []];
-    $loansGivenActivity = $data['loans_given_activity'] ?? ['items' => []];
     $totalInterestIncome = $data['total_interest_income'] ?? $investmentIncome['total'];
 
     $startDate = Carbon::parse($data['start_date']);
@@ -535,34 +536,6 @@
         </table>
     </div>
 @endif
-    {{-- Only loan-given interest exists this period, no savings interest --}}
-    <div class="section">
-        <div class="section-title">Interest Income</div>
-        <table>
-            <thead>
-            <tr>
-                <th>Source</th>
-                <th style="text-align: right;">Interest Earned</th>
-            </tr>
-            </thead>
-            <tbody>
-            @foreach($loansGivenActivity['items'] ?? [] as $item)
-                @if(($item['interest'] ?? 0) > 0)
-                    <tr>
-                        <td style="font-weight: 600;">{{ $item['borrower'] }} <span
-                                style="color:#9CA3AF; font-size:8px;">(loan given)</span></td>
-                        <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($item['interest']) }}</td>
-                    </tr>
-                @endif
-            @endforeach
-            <tr class="total-row">
-                <td>Total</td>
-                <td style="text-align: right; color: #059669;">{{ $currency }} {{ number_format($totalInterestIncome) }}</td>
-            </tr>
-            </tbody>
-        </table>
-    </div>
-@endif
 
 <!-- Loan Activity This Month -->
 @php
@@ -655,7 +628,7 @@
 
         {{-- This table's "Total Outstanding" is the same GROSS sum of active
              loans given used in the net-worth banner above, so it always
-             matches the sum of the rows shown directly below it. --}}
+             matches the sum of the rows shown directly above it. --}}
         @if($activeLoansGiven->isNotEmpty())
             <table>
                 <thead>
@@ -751,7 +724,7 @@
                     <td style="font-weight: 600;">{{ $loan->source }}</td>
                     <td style="text-align: right;">{{ $currency }} {{ number_format($loan->principal_amount) }}</td>
                     <td style="text-align: right; color: #DC2626; font-weight: bold;">{{ $currency }} {{ number_format($loan->balance) }}</td>
-                    <td style="text-align: center; color: #6B7280;">{{ Carbon::parse($loan->due_date)->format('M j, Y') }}</td>
+                    <td style="text-align: center; color: #6B7280;">{{ $loan->due_date ? Carbon::parse($loan->due_date)->format('M j, Y') : '—' }}</td>
                     <td style="text-align: center;"><span class="badge warning">{{ ucfirst($loan->status) }}</span></td>
                 </tr>
             @endforeach
