@@ -503,7 +503,8 @@
 @endif
 
 <!-- Interest Income (Savings + Loans Given) -->
-@if($investmentIncome['total'] > 0)
+@php $loanInterest = $data['loan_given_interest_income'] ?? 0; @endphp
+@if($totalInterestIncome > 0)
     <div class="section">
         <div class="section-title">Interest Income</div>
         <table>
@@ -516,20 +517,16 @@
             <tbody>
             @foreach($investmentIncome['accounts'] as $acct)
                 <tr>
-                    <td style="font-weight: 600;">{{ $acct['name'] }} <span style="color:#9CA3AF; font-size:8px;">(savings)</span>
-                    </td>
+                    <td style="font-weight: 600;">{{ $acct['name'] }} <span style="color:#9CA3AF; font-size:8px;">(savings)</span></td>
                     <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($acct['amount']) }}</td>
                 </tr>
             @endforeach
-            @foreach($loansGivenActivity['items'] ?? [] as $item)
-                @if(($item['interest'] ?? 0) > 0)
-                    <tr>
-                        <td style="font-weight: 600;">{{ $item['borrower'] }} <span
-                                style="color:#9CA3AF; font-size:8px;">(loan given)</span></td>
-                        <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($item['interest']) }}</td>
-                    </tr>
-                @endif
-            @endforeach
+            @if($loanInterest > 0)
+                <tr>
+                    <td style="font-weight: 600;">Loans given</td>
+                    <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($loanInterest) }}</td>
+                </tr>
+            @endif
             <tr class="total-row">
                 <td>Total</td>
                 <td style="text-align: right; color: #059669;">{{ $currency }} {{ number_format($totalInterestIncome) }}</td>
@@ -537,7 +534,7 @@
             </tbody>
         </table>
     </div>
-@elseif($totalInterestIncome > 0)
+@endif
     {{-- Only loan-given interest exists this period, no savings interest --}}
     <div class="section">
         <div class="section-title">Interest Income</div>
@@ -632,8 +629,8 @@
                     <td class="value" style="color: {{ $ls['net_interest'] >= 0 ? '#059669' : '#DC2626' }};">
                         {{ $ls['net_interest'] < 0 ? '-' : '' }}{{ $currency }} {{ number_format(abs($ls['net_interest'])) }}
                         <span style="display:block; font-size:8px; font-weight:normal; color:#9CA3AF;">
-                    after referrer share owed ({{ $currency }} {{ number_format($ls['referrer_cut']) }})
-                </span>
+        after costs and referrer share ({{ $currency }} {{ number_format($ls['referrer_cut']) }})
+    </span>
                     </td>
                 </tr>
                 <tr>
@@ -673,7 +670,7 @@
                 @foreach($activeLoansGiven as $loan)
                     <tr>
                         <td style="font-weight: 600;">{{ $loan->borrower_name }}</td>
-                        <td style="text-align: right;">{{ $currency }} {{ number_format($loan->principal_amount) }}</td>
+                        <td style="text-align: right;">{{ $currency }} {{ number_format($loan->original_principal) }}</td>
                         <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($loan->outstanding_amount) }}</td>
                         <td style="text-align: center; color: #6B7280;">
                             {{ $loan->due_date ? Carbon::parse($loan->due_date)->format('M j, Y') : '—' }}
@@ -697,7 +694,7 @@
 @endphp
 @if(!empty($salarySavings))
     <div class="section">
-        <div class="section-title">Salary Saved to Savings (within 48 hours)</div>
+        <div class="section-title">Salary Saved to Savings (within 72 hours, net of withdrawals within 8 days)</div>
         <table>
             <thead>
             <tr>

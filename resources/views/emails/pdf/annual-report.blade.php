@@ -282,14 +282,10 @@
     $netWorth        = $data['net_worth']       ?? 0;
     $totalLoans      = $data['total_loans']     ?? 0;
     $totalLoansGiven = $data['total_loans_given'] ?? 0;
-    // Net worth is now computed directly from the ledger (see
-    // ReportDataService::generateReport()): pooled account cash + Outstanding
-    // Loans Given (gross, no longer netted against anything) - Active Loans -
-    // money borrowed from client funds and not yet returned. Outstanding
-    // Loans Given is therefore shown GROSS everywhere below, including the
-    // dedicated "Loans Given Activity" table further down, whose own "Total
-    // Outstanding" row must match the sum of the per-borrower rows shown
-    // directly under it anyway.
+    // Net worth is computed in ReportDataService::generateReport(). Outstanding
+    // Loans Given is shown GROSS everywhere below, including the "Loans Given
+    // Activity" table, whose "Total Outstanding" row must match the sum of the
+    // per-borrower rows shown directly above it.
     $totalUnreturnedBorrowed = $data['total_unreturned_borrowed'] ?? 0;
     $totalBal        = $data['total_balance']   ?? 0;
     $txCount         = $data['transaction_count']  ?? 0;
@@ -436,7 +432,7 @@
 @endphp
 @if(!empty($salarySavings))
     <div class="section">
-        <div class="section-title">Salary Saved to Savings (within 48 hours of receipt)</div>
+        <div class="section-title">Salary Saved to Savings (within 72 hours, net of withdrawals within 8 days)</div>
         <table>
             <thead>
             <tr>
@@ -537,8 +533,8 @@
                     <td class="value" style="color: {{ $ls['net_interest'] >= 0 ? '#059669' : '#DC2626' }};">
                         {{ $ls['net_interest'] < 0 ? '-' : '' }}{{ $currency }} {{ number_format(abs($ls['net_interest'])) }}
                         <span style="display:block; font-size:8px; font-weight:normal; color:#9CA3AF;">
-                    after referrer share owed ({{ $currency }} {{ number_format($ls['referrer_cut']) }})
-                </span>
+                            after costs and referrer share ({{ $currency }} {{ number_format($ls['referrer_cut']) }})
+                        </span>
                     </td>
                 </tr>
                 <tr>
@@ -548,8 +544,8 @@
                     <td class="value">
                         {{ number_format($ls['repayment_rate'], 1) }}%
                         <span style="font-weight:normal; color:#9CA3AF; font-size:8px;">
-                    ({{ $ls['repaid_count'] }} of {{ $ls['disbursed_count'] }} disbursed)
-                </span>
+                            ({{ $ls['repaid_count'] }} of {{ $ls['disbursed_count'] }} disbursed)
+                        </span>
                     </td>
                 </tr>
                 <tr>
@@ -563,7 +559,7 @@
 
         {{-- This table's "Total Outstanding" is the same GROSS sum of active
              loans given used in the net-worth banner above, so it always
-             matches the sum of the rows shown directly below it. --}}
+             matches the sum of the rows shown directly above it. --}}
         @if($activeLoansGiven->isNotEmpty())
             <table>
                 <thead>
@@ -578,7 +574,7 @@
                 @foreach($activeLoansGiven as $loan)
                     <tr>
                         <td style="font-weight: 600;">{{ $loan->borrower_name }}</td>
-                        <td style="text-align: right;">{{ $currency }} {{ number_format($loan->principal_amount) }}</td>
+                        <td style="text-align: right;">{{ $currency }} {{ number_format($loan->original_principal) }}</td>
                         <td style="text-align: right; color: #059669; font-weight: bold;">{{ $currency }} {{ number_format($loan->outstanding_amount) }}</td>
                         <td style="text-align: center; color: #6B7280;">
                             {{ $loan->due_date ? \Carbon\Carbon::parse($loan->due_date)->format('M j, Y') : '—' }}
@@ -602,7 +598,7 @@
                     <tr>
                         <th>Borrower</th>
                         <th style="text-align: right;">Principal</th>
-                        <th style="text-align: right;">Interest</th>
+                        <th style="text-align: right;">Lifetime Interest</th>
                         <th style="text-align: center;">Repaid Date</th>
                     </tr>
                     </thead>
@@ -763,9 +759,15 @@
             <tbody>
             @foreach($data['accounts'] as $account)
                 @php
-                    $pct         = $totalBal > 0 ? ($account->balance_as_at / $totalBal) * 100 : 0;
-                    $healthClass = $account->balance_as_at > 0 ? 'success' : ($account->balance_as_at < 0 ? 'danger' : 'neutral');
-                    $healthLabel = $account->balance_as_at > 0 ? 'Healthy' : ($account->balance_as_at < 0 ? 'Negative' : 'Zero');
+                    $pct = $totalBal > 0 ? ($account->balance_as_at / $totalBal) * 100 : 0;
+
+                    if (($account->client_fund_shortfall ?? 0) > 0) {
+                        $healthClass = 'danger';
+                        $healthLabel = 'Funds Shortfall';
+                    } else {
+                        $healthClass = $account->balance_as_at > 0 ? 'success' : ($account->balance_as_at < 0 ? 'danger' : 'neutral');
+                        $healthLabel = $account->balance_as_at > 0 ? 'Healthy' : ($account->balance_as_at < 0 ? 'Negative' : 'Zero');
+                    }
                 @endphp
                 <tr>
                     <td style="font-weight: 600;">{{ $account->name }}</td>
@@ -782,13 +784,28 @@
             </tr>
             </tbody>
         </table>
+
+        @if(($data['total_client_fund_shortfall'] ?? 0) > 0)
+            <div class="alert warning">
+                <strong>Client funds exceed tracked balance</strong> &mdash;
+                {{ $currency }} {{ number_format($data['total_client_fund_shortfall']) }} short.
+                The total deducts this, so the account rows add up to more than the total.
+            </div>
+        @endif
+
+        @if(($data['total_client_funds'] ?? 0) > 0)
+            <p style="font-size: 8px; color: #9CA3AF; margin-top: 4px;">
+                Balances above already exclude {{ $currency }} {{ number_format($data['total_client_funds']) }} in
+                client funds held in trust.
+            </p>
+        @endif
     </div>
 @endif
 
 <!-- Top Spending Categories -->
 @if($data['top_categories']->isNotEmpty())
     <div class="section">
-        <div class="section-title">Annual Spending Breakdown by Category</div>
+        <div class="section-title">Top 5 Spending Categories</div>
         <table>
             <thead>
             <tr>
@@ -834,8 +851,8 @@
                 <tr>
                     <td style="font-weight: 600;">{{ $loan->source }}</td>
                     <td style="text-align: right;">{{ $currency }} {{ number_format($loan->principal_amount) }}</td>
-                    <td style="text-align: right; color: #DC2626; font-weight: bold;">{{ $currency }} {{ number_format($loan->outstanding_amount) }}</td>
-                    <td style="text-align: center; color: #6B7280;">{{ \Carbon\Carbon::parse($loan->due_date)->format('M j, Y') }}</td>
+                    <td style="text-align: right; color: #DC2626; font-weight: bold;">{{ $currency }} {{ number_format($loan->balance) }}</td>
+                    <td style="text-align: center; color: #6B7280;">{{ $loan->due_date ? \Carbon\Carbon::parse($loan->due_date)->format('M j, Y') : '—' }}</td>
                     <td style="text-align: center;"><span class="badge warning">{{ ucfirst($loan->status) }}</span></td>
                 </tr>
             @endforeach
