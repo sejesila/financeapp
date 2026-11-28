@@ -94,7 +94,7 @@
                         </div>
                         <div class="text-right">
                             <p class="text-sm opacity-80">Total Amount</p>
-                            <p class="text-3xl font-bold">KES {{ number_format($order->total_amount, 0) }}</p>
+                            <p class="text-3xl font-bold">{{ number_format($order->total_amount, 0) }}</p>
                         </div>
                     </div>
                 </div>
@@ -116,10 +116,10 @@
                                     </div>
                                     <div class="text-right">
                                         <p class="text-sm text-gray-600 dark:text-gray-400">
-                                            <span class="font-semibold">{{ $item->quantity }}</span> × KES {{ number_format($item->unit_price, 0) }}
+                                            <span class="font-semibold">{{ $item->quantity }}</span> × {{ number_format($item->unit_price, 0) }}
                                         </p>
                                         <p class="font-bold text-indigo-600 dark:text-indigo-400">
-                                            KES {{ number_format($item->subtotal, 0) }}
+                                            {{ number_format($item->subtotal, 0) }}
                                         </p>
                                     </div>
                                 </div>
@@ -133,13 +133,13 @@
                             <div class="flex justify-between items-center">
                                 <span class="text-gray-600 dark:text-gray-400">Subtotal:</span>
                                 <span class="font-semibold text-gray-900 dark:text-white">
-                                    KES {{ number_format($order->total_amount, 0) }}
+                                    {{ number_format($order->total_amount, 0) }}
                                 </span>
                             </div>
                             <div class="flex justify-between items-center text-lg font-bold bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
                                 <span class="text-gray-900 dark:text-white">Total:</span>
                                 <span class="text-indigo-600 dark:text-indigo-400">
-                                    KES {{ number_format($order->total_amount, 0) }}
+                                    {{ number_format($order->total_amount, 0) }}
                                 </span>
                             </div>
                         </div>

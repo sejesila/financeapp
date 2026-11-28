@@ -36,6 +36,6 @@ readonly class TransferFee
             'atm'        => 'ATM Withdrawal',
             default      => 'Transaction',
         };
-        return " ({$label} fee: KES " . number_format($this->amount, 2, '.', ',') . ')';
+        return " ({$label} fee: " . number_format($this->amount, 2, '.', ',') . ')';
     }
 }

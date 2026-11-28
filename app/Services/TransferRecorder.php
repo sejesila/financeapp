@@ -151,7 +151,7 @@ class TransferRecorder
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // ATM Withdrawal — Bank → Cash + fixed ATM fee (KES 33 + 15% excise)
+    // ATM Withdrawal — Bank → Cash + fixed ATM fee (33 + 15% excise)
     // ─────────────────────────────────────────────────────────────────────
 
     public function atmWithdrawal(User $user, array $parsed): JsonResponse
@@ -175,7 +175,7 @@ class TransferRecorder
             return response()->json(['error' => 'Bank or cash account not found'], 404);
         }
 
-        $atmFee = round(33 * 1.15, 2); // KES 37.95 (base KES 33 + 15% excise duty)
+        $atmFee = round(33 * 1.15, 2); // 37.95 (base 33 + 15% excise duty)
 
         DB::transaction(function () use ($user, $parsed, $bankAccount, $cashAccount, $atmFee) {
             $transfer = Transfer::create([

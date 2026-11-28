@@ -155,7 +155,7 @@
 
                             <div class="space-y-0.5">
                                 <h3 class="text-lg sm:text-2xl font-bold savings-balance-amount">
-                                    KES {{ number_format($card['amount'], 0, '.', ',') }}
+                                    {{ number_format($card['amount'], 0, '.', ',') }}
                                 </h3>
                                 <div class="flex items-center gap-2 savings-balance-hidden-placeholder hidden">
                                     <h3 class="text-lg sm:text-2xl font-bold">KES</h3>
@@ -178,7 +178,7 @@
 
                             <div class="space-y-0.5">
                                 <h3 class="text-lg sm:text-2xl font-bold wallet-balance-amount">
-                                    KES {{ number_format($card['amount'], 0, '.', ',') }}
+                                    {{ number_format($card['amount'], 0, '.', ',') }}
                                 </h3>
                                 <div class="flex items-center gap-2 wallet-balance-hidden-placeholder hidden">
                                     <h3 class="text-lg sm:text-2xl font-bold">KES</h3>
@@ -201,7 +201,7 @@
 
                             <div class="space-y-0.5">
                                 <h3 class="text-lg sm:text-2xl font-bold balance-amount">
-                                    KES {{ number_format($card['amount'], 0, '.', ',') }}
+                                    {{ number_format($card['amount'], 0, '.', ',') }}
                                 </h3>
                                 <div class="flex items-center gap-2 balance-hidden hidden">
                                     <h3 class="text-lg sm:text-2xl font-bold">KES</h3>
@@ -219,8 +219,8 @@
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
                 @php
                     $quickStats = [
-                        ['label' => 'Today', 'value' => $totalToday, 'subtitle' => 'KES spent today', 'color' => 'blue', 'icon' => 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', 'hide' => (float) $totalToday == 0],
-                        ['label' => 'This Week', 'value' => $totalThisWeek, 'subtitle' => 'KES this week', 'color' => 'green', 'icon' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', 'hide' => (float) $totalThisWeek == 0],
+                        ['label' => 'Today', 'value' => $totalToday, 'subtitle' => 'spent today', 'color' => 'blue', 'icon' => 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', 'hide' => (float) $totalToday == 0],
+                        ['label' => 'This Week', 'value' => $totalThisWeek, 'subtitle' => 'this week', 'color' => 'green', 'icon' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', 'hide' => (float) $totalThisWeek == 0],
                         ['label' => 'This Month', 'value' => $totalThisMonth, 'subtitle' => 'of ' . number_format($monthlyIncome, 0) . ' income', 'color' => 'purple', 'icon' => 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'],
                         ['label' => 'Remaining', 'value' => $remainingThisMonth, 'subtitle' => ($monthlyIncome > 0 ? round(($remainingThisMonth / $monthlyIncome) * 100) . '% left' : '0%'), 'color' => $remainingThisMonth >= 0 ? 'teal' : 'red', 'icon' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
                     ];
@@ -300,7 +300,7 @@
                                         </span>
                                         <span
                                             class="text-{{ $row['color'] ?? 'gray' }}-600 dark:text-{{ $row['color'] ?? 'gray' }}-400 {{ isset($row['isBold']) || isset($row['plain']) ? 'text-sm sm:text-base font-bold' : 'text-xs sm:text-sm font-semibold' }}">
-                                            {{ isset($row['plain']) ? 'KES ' : (isset($row['color']) && $row['color'] === 'green' ? '+' : (isset($row['color']) && $row['color'] === 'red' && $row['value'] < 0 ? '' : (isset($row['color']) && $row['color'] === 'red' ? '-' : ''))) }}{{ number_format(abs($row['value']), 0) }}
+                                            {{ isset($row['plain']) ? '' : (isset($row['color']) && $row['color'] === 'green' ? '+' : (isset($row['color']) && $row['color'] === 'red' && $row['value'] < 0 ? '' : (isset($row['color']) && $row['color'] === 'red' ? '-' : ''))) }}{{ number_format(abs($row['value']), 0) }}
                                         </span>
                                     </div>
                                     @if(isset($row['progress']))
@@ -390,9 +390,9 @@
 
                                     <div>
                                         <p class="text-[10px] sm:text-xs opacity-70 mb-0.5">Balance</p>
-                                        <p class="text-base sm:text-lg font-bold balance-amount">KES {{ number_format($account->current_balance, 0, '.', ',') }}</p>
+                                        <p class="text-base sm:text-lg font-bold balance-amount">{{ number_format($account->current_balance, 0, '.', ',') }}</p>
                                         <div class="flex items-center gap-2 balance-hidden hidden">
-                                            <p class="text-base sm:text-lg font-bold">KES ••••••</p>
+                                            <p class="text-base sm:text-lg font-bold">••••••</p>
                                         </div>
                                         @if($account->current_balance < 0)
                                             <p class="text-[11px] mt-1 opacity-70 flex items-center gap-1">
@@ -454,10 +454,10 @@
                                     <div class="text-center balance-hidden">
                                         <p class="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 mb-0.5">{{ $stat['label'] }}</p>
                                         <p class="text-sm font-bold text-{{ $stat['color'] }}-600 dark:text-{{ $stat['color'] }}-400 balance-amount">
-                                            KES {{ number_format($stat['value'], 0) }}
+                                            {{ number_format($stat['value'], 0) }}
                                         </p>
                                         <p class="text-sm font-bold text-{{ $stat['color'] }}-600 dark:text-{{ $stat['color'] }}-400 balance-hidden hidden">
-                                            KES ••••••
+                                            ••••••
                                         </p>
                                     </div>
                                 @endforeach
@@ -511,9 +511,9 @@
 
                                     <div>
                                         <p class="text-[10px] sm:text-xs opacity-70 mb-0.5">Balance</p>
-                                        <p class="text-base sm:text-lg font-bold wallet-balance-amount">KES {{ number_format($account->current_balance, 0, '.', ',') }}</p>
+                                        <p class="text-base sm:text-lg font-bold wallet-balance-amount">{{ number_format($account->current_balance, 0, '.', ',') }}</p>
                                         <div class="flex items-center gap-2 wallet-balance-hidden-placeholder hidden">
-                                            <p class="text-base sm:text-lg font-bold">KES ••••••</p>
+                                            <p class="text-base sm:text-lg font-bold">••••••</p>
                                         </div>
                                     </div>
                                 </div>
@@ -611,7 +611,7 @@
                                 <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2.5">
                                     <p class="text-[11px] text-gray-500 dark:text-gray-400">Outstanding</p>
                                     <p class="text-sm sm:text-base font-bold text-indigo-600 dark:text-indigo-400">
-                                        KES {{ number_format($loansGivenOutstanding, 0) }}
+                                        {{ number_format($loansGivenOutstanding, 0) }}
                                     </p>
                                 </div>
                                 <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2.5">
@@ -651,7 +651,7 @@
                                             </p>
                                         </div>
                                         <p class="text-xs sm:text-sm font-bold text-gray-900 dark:text-white whitespace-nowrap">
-                                            KES {{ number_format($loanGiven->outstanding_amount, 0) }}
+                                            {{ number_format($loanGiven->outstanding_amount, 0) }}
                                         </p>
                                     </a>
                                 @endforeach

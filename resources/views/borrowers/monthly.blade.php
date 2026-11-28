@@ -53,8 +53,8 @@
                                     <td class="px-3 sm:px-6 py-3 font-medium text-purple-700">{{ $r['returning'] }}</td>
                                     <td class="px-3 sm:px-6 py-3">{{ $r['active'] }}</td>
                                     <td class="px-3 sm:px-6 py-3">{{ $r['loans'] }}</td>
-                                    <td class="px-3 sm:px-6 py-3 whitespace-nowrap">KES {{ number_format($r['disbursed_new'], 0) }}</td>
-                                    <td class="px-3 sm:px-6 py-3 whitespace-nowrap">KES {{ number_format($r['disbursed_returning'], 0) }}</td>
+                                    <td class="px-3 sm:px-6 py-3 whitespace-nowrap">{{ number_format($r['disbursed_new'], 0) }}</td>
+                                    <td class="px-3 sm:px-6 py-3 whitespace-nowrap">{{ number_format($r['disbursed_returning'], 0) }}</td>
                                     <td class="px-3 sm:px-6 py-3">{{ $r['returning_share'] !== null ? $r['returning_share'] . '%' : '-' }}</td>
                                     <td class="px-3 sm:px-6 py-3 whitespace-nowrap">
                                         {{ $r['retention'] !== null ? $r['retention'] . '% (' . $r['retained'] . ')' : '-' }}

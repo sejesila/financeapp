@@ -91,14 +91,14 @@ class CafeteriaMonthlySpendings extends Model
         }
 
         if ($this->isOverBudget()) {
-            return 'Over budget by KES ' . number_format($this->getAmountOverBudget(), 0);
+            return 'Over budget by ' . number_format($this->getAmountOverBudget(), 0);
         }
 
         if ($remaining < $limit * 0.1) {
-            return 'Only KES ' . number_format($remaining, 0) . ' left';
+            return 'Only ' . number_format($remaining, 0) . ' left';
         }
 
-        return 'KES ' . number_format($remaining, 0) . ' remaining';
+        return '' . number_format($remaining, 0) . ' remaining';
     }
 
     public function getBudgetStatusColor(): string

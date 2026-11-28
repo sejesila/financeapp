@@ -93,13 +93,13 @@
                                 <div class="flex justify-between items-center">
                                     <span class="text-sm text-gray-600 dark:text-gray-400">Previous Balance:</span>
                                     <span
-                                        class="font-semibold text-sm text-gray-900 dark:text-white">KES {{ session('old_balance') }}</span>
+                                        class="font-semibold text-sm text-gray-900 dark:text-white">{{ session('old_balance') }}</span>
                                 </div>
                                 <div class="flex justify-between items-center">
                                     <span class="text-sm text-gray-600 dark:text-gray-400">Transaction:</span>
                                     <span
                                         class="font-semibold text-sm {{ session('transaction_type') === 'expense' ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400' }}">
-                                    {{ session('transaction_type') === 'expense' ? '−' : '+' }} KES {{ session('transaction_amount') }}
+                                    {{ session('transaction_type') === 'expense' ? '−' : '+' }} {{ session('transaction_amount') }}
                                 </span>
                                 </div>
                                 <div
@@ -107,7 +107,7 @@
                                     <span class="text-sm font-bold text-gray-900 dark:text-white">New Balance:</span>
                                     <span
                                         class="font-bold text-lg {{ floatval(str_replace(',', '', session('new_balance'))) < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400' }}">
-                                    KES {{ session('new_balance') }}
+                                    {{ session('new_balance') }}
                                 </span>
                                 </div>
                             </div>
@@ -556,7 +556,7 @@
                     <p class="text-sm font-semibold text-gray-700 dark:text-gray-300">
                         Filtered Total:
                         <span class="text-indigo-600 dark:text-indigo-400 ml-1">
-                KES {{ number_format($filteredTotal, 0) }}
+                {{ number_format($filteredTotal, 0) }}
             </span>
                         <span class="text-xs text-gray-400 dark:text-gray-500 font-normal ml-2">
                 ({{ $transactions->total() }} transactions on {{ $transactions->lastPage() }} {{ Str::plural('page', $transactions->lastPage()) }}, showing page {{ $transactions->currentPage() }})

@@ -81,16 +81,16 @@
                 <div>
                     <p class="text-sm text-gray-600 dark:text-gray-400 uppercase">Total Due</p>
                     <p class="text-lg font-bold text-gray-900 dark:text-gray-100">
-                        KES {{ number_format($loan->total_amount, 0, '.', ',') }}</p>
+                        {{ number_format($loan->total_amount, 0, '.', ',') }}</p>
                 </div>
                 <div>
                     <p class="text-sm text-gray-600 dark:text-gray-400 uppercase">Amount Paid</p>
                     <p class="text-lg font-bold text-green-600 dark:text-green-400">
-                        KES {{ number_format($loan->amount_paid, 0, '.', ',') }}</p>
+                        {{ number_format($loan->amount_paid, 0, '.', ',') }}</p>
                 </div>
                 <div>
                     <p class="text-sm text-gray-600 dark:text-gray-400 uppercase">Balance</p>
-                    <p class="text-lg font-bold text-red-600 dark:text-red-400">KES {{ number_format($loan->balance, 0, '.', ',') }}</p>
+                    <p class="text-lg font-bold text-red-600 dark:text-red-400">{{ number_format($loan->balance, 0, '.', ',') }}</p>
                 </div>
             </div>
 
@@ -99,12 +99,12 @@
                 <div>
                     <p class="text-xs text-gray-600 dark:text-gray-400 uppercase">Remaining Principal</p>
                     <p class="text-base font-bold text-gray-900 dark:text-gray-100">
-                        KES {{ number_format($remainingPrincipal, 0, '.', ',') }}</p>
+                        {{ number_format($remainingPrincipal, 0, '.', ',') }}</p>
                 </div>
                 <div>
                     <p class="text-xs text-gray-600 dark:text-gray-400 uppercase">Remaining Interest/Fees</p>
                     <p class="text-base font-bold text-gray-900 dark:text-gray-100">
-                        KES {{ number_format(max(0, $remainingInterest), 0, '.', ',') }}</p>
+                        {{ number_format(max(0, $remainingInterest), 0, '.', ',') }}</p>
                 </div>
             </div>
 
@@ -153,7 +153,7 @@
                                 data-balance="{{ $account->current_balance }}"
                             {{ old('payment_account_id', $loan->account_id) == $account->id ? 'selected' : '' }}>
                             {{ $account->name }}
-                            (Balance: KES {{ number_format($account->current_balance, 0, '.', ',') }})
+                            (Balance: {{ number_format($account->current_balance, 0, '.', ',') }})
                         </option>
                     @endforeach
                 </select>
@@ -199,7 +199,7 @@
                         {{ $accounts->isEmpty() ? 'disabled' : '' }}
                     >
                 </div>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">Maximum: KES {{ number_format($loan->balance, 0, '.', ',') }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">Maximum: {{ number_format($loan->balance, 0, '.', ',') }}</p>
                 @error('payment_amount')
                 <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                 @enderror
@@ -209,12 +209,12 @@
                     <button type="button" onclick="setPaymentAmount({{ $remainingInterest }})"
                             class="w-full sm:w-auto px-3 py-1 text-xs bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-900/40"
                         {{ $accounts->isEmpty() ? 'disabled' : '' }}>
-                        Interest Only (KES {{ number_format(max(0, $remainingInterest), 0) }})
+                        Interest Only ({{ number_format(max(0, $remainingInterest), 0) }})
                     </button>
                     <button type="button" onclick="setPaymentAmount({{ $loan->balance }})"
                             class="w-full sm:w-auto px-3 py-1 text-xs bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded hover:bg-green-200 dark:hover:bg-green-900/40"
                         {{ $accounts->isEmpty() ? 'disabled' : '' }}>
-                        Full Balance (KES {{ number_format($loan->balance, 0) }})
+                        Full Balance ({{ number_format($loan->balance, 0) }})
                     </button>
                 </div>
             </div>
@@ -242,7 +242,7 @@
                                 readonly
                             >
                         </div>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Remaining interest/fees: KES {{ number_format(max(0, $remainingInterest), 0) }}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Remaining interest/fees: {{ number_format(max(0, $remainingInterest), 0) }}</p>
                         @error('interest_portion')
                         <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                         @enderror
@@ -266,7 +266,7 @@
                                 readonly
                             >
                         </div>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Remaining principal: KES {{ number_format($remainingPrincipal, 0) }}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Remaining principal: {{ number_format($remainingPrincipal, 0) }}</p>
                         @error('principal_portion')
                         <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                         @enderror
@@ -276,7 +276,7 @@
                         <div class="flex justify-between items-center">
                             <span class="text-gray-700 dark:text-gray-300 font-semibold">Total Payment:</span>
                             <span class="font-bold text-xl text-gray-900 dark:text-gray-100" id="total_display">
-                                KES 0
+                                0
                             </span>
                         </div>
                     </div>
@@ -372,7 +372,7 @@
                     minimumFractionDigits: 0,
                     maximumFractionDigits: 0
                 });
-                balanceDisplay.textContent = `Available balance: KES ${formattedBalance}`;
+                balanceDisplay.textContent = `Available balance: ${formattedBalance}`;
                 balanceDisplay.className = 'text-xs text-gray-500 dark:text-gray-400 mt-2';
             }
         }
@@ -400,7 +400,7 @@
             document.getElementById('principal_portion').value = principalPortion.toFixed(2);
 
             const total = interestPortion + principalPortion;
-            document.getElementById('total_display').textContent = `KES ${total.toLocaleString('en-US', {
+            document.getElementById('total_display').textContent = `${total.toLocaleString('en-US', {
                 minimumFractionDigits: 0,
                 maximumFractionDigits: 0
             })}`;
@@ -412,7 +412,7 @@
             const principalPortion = parseFloat(document.getElementById('principal_portion').value) || 0;
             const total = interestPortion + principalPortion;
 
-            document.getElementById('total_display').textContent = `KES ${total.toLocaleString('en-US', {
+            document.getElementById('total_display').textContent = `${total.toLocaleString('en-US', {
                 minimumFractionDigits: 0,
                 maximumFractionDigits: 0
             })}`;

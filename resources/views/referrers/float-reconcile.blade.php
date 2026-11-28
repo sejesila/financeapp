@@ -67,7 +67,7 @@
                         <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4 space-y-1 text-sm">
                             <div class="flex justify-between">
                                 <span class="text-gray-700">{{ $floatAccount->name }} balance (real cash)</span>
-                                <span class="font-semibold text-gray-900">KES {{ number_format($limits['balance'], 0) }}</span>
+                                <span class="font-semibold text-gray-900">{{ number_format($limits['balance'], 0) }}</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-700">
@@ -77,25 +77,25 @@
                                         Less: commission still owed to her
                                     @endif
                                 </span>
-                                <span class="font-semibold {{ $include ? 'text-gray-400' : 'text-red-700' }}">− KES {{ number_format($limits['commission'], 0) }}</span>
+                                <span class="font-semibold {{ $include ? 'text-gray-400' : 'text-red-700' }}">− {{ number_format($limits['commission'], 0) }}</span>
                             </div>
                             <div class="flex justify-between border-t border-blue-200 pt-1">
                                 <span class="font-medium text-gray-800">Most you can reconcile now</span>
-                                <span class="text-lg font-semibold text-gray-900">KES {{ number_format($limits['max_total'], 0) }}</span>
+                                <span class="text-lg font-semibold text-gray-900">{{ number_format($limits['max_total'], 0) }}</span>
                             </div>
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 text-sm">
                             <div class="bg-gray-50 rounded-lg p-3">
                                 <div class="text-gray-500">Interest that's yours</div>
-                                <div class="text-lg font-semibold text-green-700">KES {{ number_format($limits['interest'], 0) }}</div>
+                                <div class="text-lg font-semibold text-green-700">{{ number_format($limits['interest'], 0) }}</div>
                                 <div class="text-xs text-gray-400">
                                     {{ $include ? 'per loan, including her share' : 'per loan, after her commission' }}
                                 </div>
                             </div>
                             <div class="bg-gray-50 rounded-lg p-3">
                                 <div class="text-gray-500">Principal she's holding</div>
-                                <div class="text-lg font-semibold text-indigo-700">KES {{ number_format($limits['principal'], 0) }}</div>
+                                <div class="text-lg font-semibold text-indigo-700">{{ number_format($limits['principal'], 0) }}</div>
                                 <div class="text-xs text-gray-400">one pool: balance less interest held. Re-lent money isn't included</div>
                             </div>
                         </div>
@@ -146,7 +146,7 @@
                                                             </span>
                                                         </td>
                                                         <td class="px-4 py-3 text-sm text-gray-700">
-                                                            KES {{ number_format($loan->pending_float_interest, 0) }}
+                                                            {{ number_format($loan->pending_float_interest, 0) }}
                                                         </td>
                                                         <td class="px-4 py-3">
                                                             <div class="flex items-center gap-2">
@@ -180,7 +180,7 @@
                                                class="w-40 rounded-md border-gray-300 shadow-sm text-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
                                         <button type="button" @click="principal = maxPrincipal"
                                                 class="text-xs text-indigo-600 hover:text-indigo-900 whitespace-nowrap">
-                                            Full (KES {{ number_format($limits['principal'], 0) }})
+                                            Full ({{ number_format($limits['principal'], 0) }})
                                         </button>
                                     </div>
                                 </div>
@@ -188,19 +188,19 @@
                                 <div class="bg-gray-50 rounded-lg p-4 space-y-2">
                                     <div class="flex justify-between items-center text-sm text-gray-600">
                                         <span>Interest</span>
-                                        <span x-text="'KES ' + fRound(interestTotal)"></span>
+                                        <span x-text="'' + fRound(interestTotal)"></span>
                                     </div>
                                     <div class="flex justify-between items-center text-sm text-gray-600">
                                         <span>Principal</span>
-                                        <span x-text="'KES ' + fRound(principalTotal)"></span>
+                                        <span x-text="'' + fRound(principalTotal)"></span>
                                     </div>
                                     <div class="flex justify-between items-center border-t border-gray-200 pt-2">
                                         <span class="text-sm font-medium text-gray-700">Total being reconciled</span>
                                         <span class="text-lg font-semibold" :class="over ? 'text-red-600' : 'text-gray-900'"
-                                              x-text="'KES ' + fRound(total)"></span>
+                                              x-text="'' + fRound(total)"></span>
                                     </div>
                                     <p x-show="over" x-cloak class="text-xs text-red-600">
-                                        Over the most you can reconcile now (KES {{ number_format($limits['max_total'], 0) }}).
+                                        Over the most you can reconcile now ({{ number_format($limits['max_total'], 0) }}).
                                         The transfer fee also has to fit in her balance.
                                     </p>
                                 </div>
@@ -216,7 +216,7 @@
                                             <option value="">Select Account</option>
                                             @foreach($destinationAccounts as $account)
                                                 <option value="{{ $account->id }}" {{ old('destination_account_id') == $account->id ? 'selected' : '' }}>
-                                                    {{ $account->name }} (KES {{ number_format($account->current_balance, 0) }})
+                                                    {{ $account->name }} ({{ number_format($account->current_balance, 0) }})
                                                 </option>
                                             @endforeach
                                         </select>

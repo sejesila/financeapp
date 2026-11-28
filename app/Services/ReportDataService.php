@@ -359,7 +359,7 @@ class ReportDataService
         // that must all agree with each other:
         //   1. The per-account savings (Etica) shortfall check just below.
         //   2. $ownedSavings / net worth further down.
-        //   3. The "excludes KES X" informational footnote.
+        //   3. The "excludes X" informational footnote.
         // Previously (1) and (2) each called a scoped, per-account variant
         // that only counted client funds specifically traceable into that
         // one account — which understated the real liability whenever money
@@ -1164,8 +1164,8 @@ class ReportDataService
         $insights[] = [
             'icon' => '📊',
             'title' => 'Average Daily Spending',
-            'value' => 'KES ' . number_format($avgDaily, 0),
-            'description' => 'You spent an average of KES ' . number_format($avgDaily, 0) . ' per day',
+            'value' => '' . number_format($avgDaily, 0),
+            'description' => 'You spent an average of ' . number_format($avgDaily, 0) . ' per day',
         ];
 
         $periodLabel = match ($type) {
@@ -1193,7 +1193,7 @@ class ReportDataService
                 'icon' => '📈',
                 'title' => 'Spending Increased',
                 'value' => '+' . number_format($changePercent, 1) . '%',
-                'description' => 'You spent KES ' . number_format($change, 0) . ' more than last ' . $periodLabel,
+                'description' => 'You spent ' . number_format($change, 0) . ' more than last ' . $periodLabel,
                 'trend' => 'up',
             ];
         } elseif ($change < 0) {
@@ -1201,7 +1201,7 @@ class ReportDataService
                 'icon' => '📉',
                 'title' => 'Spending Decreased',
                 'value' => number_format($changePercent, 1) . '%',
-                'description' => 'You spent KES ' . number_format(abs($change), 0) . ' less than last ' . $periodLabel,
+                'description' => 'You spent ' . number_format(abs($change), 0) . ' less than last ' . $periodLabel,
                 'trend' => 'down',
             ];
         }
@@ -1215,7 +1215,7 @@ class ReportDataService
             $insights[] = [
                 'icon' => '💸',
                 'title' => 'Biggest Expense',
-                'value' => 'KES ' . number_format($biggestExpense->amount, 0),
+                'value' => '' . number_format($biggestExpense->amount, 0),
                 'description' => $biggestExpense->description . ' (' . $biggestExpense->category->name . ')',
             ];
         }
@@ -1384,7 +1384,7 @@ class ReportDataService
      * (see ClientFundController::returnBorrowed()), and ClientFundController
      * already tracks that separately as "Borrowed (Unreturned)" — it just
      * never made it into this figure. Any caller that subtracts this from an
-     * account balance (net worth, "excludes KES X" footnotes, the per-account
+     * account balance (net worth, "excludes X" footnotes, the per-account
      * shortfall check) was silently treating unreturned borrowed money as if
      * it already belonged to the user.
      *
@@ -1396,7 +1396,7 @@ class ReportDataService
      *
      * Because this method already treats unreturned borrowed money as still
      * owed, every caller downstream (net worth, the per-account shortfall
-     * check, the "excludes KES X" footnotes) automatically gets the correct,
+     * check, the "excludes X" footnotes) automatically gets the correct,
      * non-double-counted figure without needing any separate adjustment for
      * unreturned borrowing.
      *

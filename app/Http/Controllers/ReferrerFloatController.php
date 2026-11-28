@@ -104,8 +104,8 @@ class ReferrerFloatController extends Controller
                     $name = LoanGiven::find($loanId)?->borrower_name ?? "loan #{$loanId}";
 
                     return back()->with('error',
-                        "Interest for {$name} (KES " . number_format($amount, 0)
-                        . ") exceeds what's yours to take (KES " . number_format($available, 0)
+                        "Interest for {$name} (" . number_format($amount, 0)
+                        . ") exceeds what's yours to take (" . number_format($available, 0)
                         . "), after her unpaid commission."
                     )->withInput();
                 }
@@ -117,7 +117,7 @@ class ReferrerFloatController extends Controller
 
             if ($interestTotal > $limits['interest'] + 0.01) {
                 return back()->with('error',
-                    'Interest (KES ' . number_format($interestTotal, 0) . ') is more than the float can release (KES '
+                    'Interest (' . number_format($interestTotal, 0) . ') is more than the float can release ('
                     . number_format($limits['interest'], 0) . ').'
                 )->withInput();
             }
@@ -127,7 +127,7 @@ class ReferrerFloatController extends Controller
 
             if ($principalTotal > $limits['principal'] + 0.01) {
                 return back()->with('error',
-                    'Principal (KES ' . number_format($principalTotal, 0) . ') is more than she is actually holding (KES '
+                    'Principal (' . number_format($principalTotal, 0) . ') is more than she is actually holding ('
                     . number_format($limits['principal'], 0) . '). Money already lent out again is not in the float.'
                 )->withInput();
             }
@@ -140,9 +140,9 @@ class ReferrerFloatController extends Controller
 
             if ($total > $limits['max_total'] + 0.01) {
                 return back()->with('error',
-                    'Total (KES ' . number_format($total, 0) . ') is more than the most you can reconcile now (KES '
-                    . number_format($limits['max_total'], 0) . ' = float balance KES '
-                    . number_format($limits['balance'], 0) . ' minus her unpaid commission KES '
+                    'Total (' . number_format($total, 0) . ') is more than the most you can reconcile now ('
+                    . number_format($limits['max_total'], 0) . ' = float balance '
+                    . number_format($limits['balance'], 0) . ' minus her unpaid commission '
                     . number_format($limits['commission'], 0) . ').'
                 )->withInput();
             }
@@ -226,8 +226,8 @@ class ReferrerFloatController extends Controller
             }
 
             return redirect()->route('referrers.float.index', $referrer)
-                ->with('success', 'KES ' . number_format($total, 0) . ' reconciled: KES '
-                    . number_format($interestTotal, 0) . ' interest, KES '
+                ->with('success', '' . number_format($total, 0) . ' reconciled: '
+                    . number_format($interestTotal, 0) . ' interest, '
                     . number_format($principalTotal, 0) . ' principal.');
 
         } catch (ValidationException $e) {

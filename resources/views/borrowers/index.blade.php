@@ -51,18 +51,18 @@
                         </div>
                         <div class="bg-gradient-to-br from-purple-50 to-purple-100 shadow-sm rounded-lg border border-purple-200 p-3 sm:p-4">
                             <p class="text-xs sm:text-sm font-medium text-gray-500">Interest Earned</p>
-                            <p class="text-base sm:text-lg font-semibold text-gray-900">KES {{ number_format($rows->sum('interest_earned'), 0) }}</p>
+                            <p class="text-base sm:text-lg font-semibold text-gray-900">{{ number_format($rows->sum('interest_earned'), 0) }}</p>
                             <p class="text-[10px] sm:text-xs text-gray-500">All time, all borrowers</p>
                         </div>
                         <div class="bg-gradient-to-br from-blue-50 to-blue-100 shadow-sm rounded-lg border border-blue-200 p-3 sm:p-4">
                             <p class="text-xs sm:text-sm font-medium text-gray-500">Outstanding</p>
-                            <p class="text-base sm:text-lg font-semibold text-gray-900">KES {{ number_format($rows->sum('outstanding'), 0) }}</p>
+                            <p class="text-base sm:text-lg font-semibold text-gray-900">{{ number_format($rows->sum('outstanding'), 0) }}</p>
                             <p class="text-[10px] sm:text-xs text-gray-500">Active loans</p>
                         </div>
                         <div class="bg-gradient-to-br from-red-50 to-red-100 shadow-sm rounded-lg border border-red-200 p-3 sm:p-4">
                             <p class="text-xs sm:text-sm font-medium text-gray-500">High Risk</p>
                             <p class="text-base sm:text-lg font-semibold text-gray-900">{{ $highRisk }}</p>
-                            <p class="text-[10px] sm:text-xs text-gray-500">KES {{ number_format($rows->sum('unrecovered'), 0) }} unrecovered</p>
+                            <p class="text-[10px] sm:text-xs text-gray-500">{{ number_format($rows->sum('unrecovered'), 0) }} unrecovered</p>
                         </div>
                     </div>
 
@@ -110,13 +110,13 @@
                                                 </span>
                                             </td>
                                             <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
-                                                KES {{ number_format($r['total_borrowed'], 0) }}</td>
+                                                {{ number_format($r['total_borrowed'], 0) }}</td>
                                             <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-purple-700">
-                                                KES {{ number_format($r['interest_earned'], 0) }}</td>
+                                                {{ number_format($r['interest_earned'], 0) }}</td>
                                             <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
                                                 {{ $r['avg_days_to_repay'] !== null ? $r['avg_days_to_repay'] . ' days' : '-' }}</td>
                                             <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
-                                                {{ $r['outstanding'] > 0 ? 'KES ' . number_format($r['outstanding'], 0) : '-' }}
+                                                {{ $r['outstanding'] > 0 ? '' . number_format($r['outstanding'], 0) : '-' }}
                                                 @if($r['overdue_now'])
                                                     <span class="ml-1 inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Overdue</span>
                                                 @endif

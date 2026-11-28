@@ -49,24 +49,24 @@
                             <div>
                                 <span class="text-sm font-medium text-gray-700">Principal:</span>
                                 <span
-                                    class="ml-2 text-sm font-semibold text-gray-900">KES {{ number_format($loanGiven->principal_amount, 0) }}</span>
+                                    class="ml-2 text-sm font-semibold text-gray-900">{{ number_format($loanGiven->principal_amount, 0) }}</span>
                             </div>
                             <div>
                                 <span class="text-sm font-medium text-gray-700">Outstanding:</span>
                                 <span
-                                    class="ml-2 text-sm font-bold text-indigo-600">KES {{ number_format($loanGiven->remaining_principal, 0) }}</span>
+                                    class="ml-2 text-sm font-bold text-indigo-600">{{ number_format($loanGiven->remaining_principal, 0) }}</span>
                             </div>
                             <div>
                                 <span class="text-sm font-medium text-gray-700">Received:</span>
                                 <span
-                                    class="ml-2 text-sm text-green-600 font-medium">KES {{ number_format($loanGiven->amount_paid, 0) }}</span>
+                                    class="ml-2 text-sm text-green-600 font-medium">{{ number_format($loanGiven->amount_paid, 0) }}</span>
                             </div>
                         </div>
                         @if($loanGiven->surplus_received > 0)
                             <div class="mt-2 pt-2 border-t border-blue-200">
                                 <span class="text-sm font-medium text-gray-700">Received Above Principal So Far:</span>
                                 <span
-                                    class="ml-2 text-sm text-purple-600 font-medium">KES {{ number_format($loanGiven->surplus_received, 0) }}</span>
+                                    class="ml-2 text-sm text-purple-600 font-medium">{{ number_format($loanGiven->surplus_received, 0) }}</span>
                             </div>
                         @endif
 
@@ -86,7 +86,7 @@
                                     @foreach($accounts as $account)
                                         <option value="{{ $account->id }}"
                                                 data-type="{{ $account->type }}" {{ old('payment_account_id', $prefill['account_id'] ?? null) == $account->id ? 'selected' : '' }}>
-                                            {{ $account->name }} (KES {{ number_format($account->current_balance, 0) }})
+                                            {{ $account->name }} ({{ number_format($account->current_balance, 0) }})
                                         </option>
                                     @endforeach
                                 </select>
@@ -104,12 +104,12 @@
                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 @error('payment_amount') border-red-500 @enderror"
                                        required>
                                 <div class="mt-1 text-xs text-gray-500">
-                                    Outstanding principal: KES {{ number_format($loanGiven->remaining_principal, 0) }}
+                                    Outstanding principal: {{ number_format($loanGiven->remaining_principal, 0) }}
                                 </div>
                                 @if($prefill)
                                     <div class="mt-1 text-xs text-purple-600">
                                         Final payments are auto-filled: principal + {{ $prefill['rate'] + 0 }}% interest
-                                        (KES {{ number_format($prefill['interest'], 0) }}). You can change the amount.
+                                        ({{ number_format($prefill['interest'], 0) }}). You can change the amount.
                                     </div>
                                 @endif
                                 @error('payment_amount')
@@ -128,8 +128,8 @@
                                        value="{{ old('interest_portion') }}"
                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 @error('interest_portion') border-red-500 @enderror">
                                 <p class="mt-1 text-xs text-gray-500" id="principalPortionHint">
-                                    e.g. borrowed KES 4,000, they pay KES 2,500 with KES 600 as interest — KES 1,900
-                                    reduces the principal, leaving KES 2,100 outstanding. Leave blank if this
+                                    e.g. borrowed 4,000, they pay 2,500 with 600 as interest — 1,900
+                                    reduces the principal, leaving 2,100 outstanding. Leave blank if this
                                     payment is pure principal (no interest recognized yet). Any partial payment —
                                     with or without interest specified — pushes the due date 30 days out from
                                     this payment's date, starting a new period on the remaining principal.
@@ -170,7 +170,7 @@
                                             <option
                                                 value="{{ $account->id }}" {{ old('interest_account_id') == $account->id ? 'selected' : '' }}>
                                                 {{ $account->name }}
-                                                (KES {{ number_format($account->current_balance, 0) }})
+                                                ({{ number_format($account->current_balance, 0) }})
                                             </option>
                                         @endif
                                     @endforeach
@@ -321,8 +321,8 @@
                 if (interest > 0) {
                     const principalPortion = Math.max(0, amount - interest);
                     principalPortionHint.textContent =
-                        `KES ${principalPortion.toLocaleString('en-US', {maximumFractionDigits: 0})} of this payment reduces principal; ` +
-                        `KES ${interest.toLocaleString('en-US', {maximumFractionDigits: 0})} is recorded as interest. Due date moves 30 days out from the payment date above.`;
+                        `${principalPortion.toLocaleString('en-US', {maximumFractionDigits: 0})} of this payment reduces principal; ` +
+                        `${interest.toLocaleString('en-US', {maximumFractionDigits: 0})} is recorded as interest. Due date moves 30 days out from the payment date above.`;
                 } else {
                     principalPortionHint.textContent =
                         `This entire payment reduces principal. Due date moves 30 days out from the payment date above.`;

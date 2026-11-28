@@ -11,7 +11,7 @@ use App\Models\Account;
  *   - M-Pesa / Airtel Money → Cash  : withdrawal fee (tiered)
  *   - M-Pesa → Bank                 : PayBill fee (tiered, M-Pesa schedule)
  *   - Airtel Money → Bank           : PayBill fee (free — Airtel schedule)
- *   - Bank → Cash                   : flat ATM fee  (KES 33 + 15% excise = 37.95)
+ *   - Bank → Cash                   : flat ATM fee  (33 + 15% excise = 37.95)
  *   - Everything else               : no fee
  */
 class TransferFeeCalculator
@@ -58,7 +58,7 @@ class TransferFeeCalculator
 
     /**
      * Agent withdrawal fee (M-Pesa schedule, currently also applied to Airtel Money).
-     * Withdrawals below KES 50 are not offered by M-Pesa agents ("N/A" in the tariff);
+     * Withdrawals below 50 are not offered by M-Pesa agents ("N/A" in the tariff);
      * they return 0 here and should be rejected by form validation.
      */
     private function withdrawalFee(float $amount, string $accountType): float
@@ -121,7 +121,7 @@ class TransferFeeCalculator
     }
 
     /**
-     * ATM withdrawal fee: KES 33 base + 15% excise duty = KES 37.95 flat.
+     * ATM withdrawal fee: 33 base + 15% excise duty = 37.95 flat.
      */
     private function atmFee(): float
     {
@@ -156,7 +156,7 @@ class TransferFeeCalculator
         $prefix = match ($feeType) {
             'withdrawal' => ($from->type === 'mpesa' ? 'M-Pesa' : 'Airtel Money') . ' withdrawal fee',
             'paybill'    => ($from->type === 'mpesa' ? 'M-Pesa' : 'Airtel Money') . ' PayBill fee',
-            'atm'        => 'ATM withdrawal fee (KES 33 + 15% excise duty)',
+            'atm'        => 'ATM withdrawal fee (33 + 15% excise duty)',
             default      => 'Transaction fee',
         };
 

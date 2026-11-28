@@ -33,7 +33,7 @@
                     <div class="mb-4 bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 p-3 sm:p-4">
                         <p class="text-sm text-amber-800 dark:text-amber-300">
                             ⚠️ <strong>{{ $shortfallAccount->name }}</strong> is short
-                            KES {{ number_format($shortfall, 0) }} against what client fund
+                            {{ number_format($shortfall, 0) }} against what client fund
                             records say is still outstanding — likely borrowed but never
                             recorded. Open the relevant client below and use
                             <span class="font-medium">"Record Borrowed"</span> to log it.
@@ -49,7 +49,7 @@
                         {{ $clientFilter ? 'Received' : 'Total Received' }}
                     </p>
                     <p class="text-lg sm:text-xl font-bold text-blue-600">
-                        KES {{ number_format($summary['total_received'], 0, '.', ',') }}
+                        {{ number_format($summary['total_received'], 0, '.', ',') }}
                     </p>
                 </div>
                 <div class="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-lg shadow">
@@ -57,7 +57,7 @@
                         {{ $clientFilter ? 'Spent' : 'Total Spent' }}
                     </p>
                     <p class="text-lg sm:text-xl font-bold text-orange-600">
-                        KES {{ number_format($summary['total_spent'], 0, '.', ',') }}
+                        {{ number_format($summary['total_spent'], 0, '.', ',') }}
                     </p>
                 </div>
                 <div class="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-lg shadow">
@@ -65,7 +65,7 @@
                         {{ $clientFilter ? 'Your Profit' : 'Total Profit' }}
                     </p>
                     <p class="text-lg sm:text-xl font-bold text-green-600">
-                        KES {{ number_format($summary['total_profit'], 0, '.', ',') }}
+                        {{ number_format($summary['total_profit'], 0, '.', ',') }}
                     </p>
                 </div>
                 <div class="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-lg shadow">
@@ -73,7 +73,7 @@
                         {{ $clientFilter ? 'Pending Balance' : 'Total Pending' }}
                     </p>
                     <p class="text-lg sm:text-xl font-bold text-purple-600">
-                        KES {{ number_format($summary['total_balance'], 0, '.', ',') }}
+                        {{ number_format($summary['total_balance'], 0, '.', ',') }}
                     </p>
                 </div>
                 <div class="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-lg shadow">
@@ -81,7 +81,7 @@
                         Borrowed (Unreturned)
                     </p>
                     <p class="text-lg sm:text-xl font-bold text-red-600">
-                        KES {{ number_format($summary['total_borrowed'] ?? 0, 0, '.', ',') }}
+                        {{ number_format($summary['total_borrowed'] ?? 0, 0, '.', ',') }}
                     </p>
                 </div>
             </div>
@@ -303,7 +303,7 @@
                             If money that belongs to {{ $clientFilter }} was spent personally
                             (e.g. pooled savings account ran short), log it here. It's applied
                             oldest-fund-first against their outstanding balance
-                            (KES {{ number_format($clientOutstanding, 0) }} available).
+                            ({{ number_format($clientOutstanding, 0) }} available).
                         </p>
                         <form method="POST" action="{{ route('client-funds.reconcile-borrowed') }}"
                               class="grid grid-cols-1 sm:grid-cols-4 gap-2 sm:gap-3 items-end">
@@ -343,7 +343,7 @@
                         <p class="text-xs text-green-600 dark:text-green-400 mb-3">
                             Use this once you've actually deposited real money back — it will be applied
                             against {{ $clientFilter }}'s unreturned borrowed total
-                            (KES {{ number_format($summary['client_unreturned_borrowed'], 0) }} outstanding),
+                            ({{ number_format($summary['client_unreturned_borrowed'], 0) }} outstanding),
                             oldest-borrowed-first.
                         </p>
                         <form method="POST" action="{{ route('client-funds.return-borrowed') }}"
@@ -415,7 +415,7 @@
                                         @endphp
                                         @if($fundBorrowed > 0)
                                             <span class="px-2 py-1 text-xs rounded-full whitespace-nowrap bg-red-100 text-red-700">
-                                                🚩 KES {{ number_format($fundBorrowed, 0) }} borrowed
+                                                🚩 {{ number_format($fundBorrowed, 0) }} borrowed
                                             </span>
                                         @endif
                                     </div>
@@ -429,21 +429,21 @@
                                 <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-x-4 gap-y-2 text-xs sm:text-sm">
                                     <div>
                                         <span class="text-gray-600 dark:text-gray-400">Received:</span>
-                                        <span class="font-semibold ml-1">KES {{ number_format($fund->amount_received, 0, '.', ',') }}</span>
+                                        <span class="font-semibold ml-1">{{ number_format($fund->amount_received, 0, '.', ',') }}</span>
                                     </div>
                                     <div>
                                         <span class="text-gray-600 dark:text-gray-400">Spent:</span>
-                                        <span class="font-semibold text-orange-600 ml-1">KES {{ number_format($fund->amount_spent, 0, '.', ',') }}</span>
+                                        <span class="font-semibold text-orange-600 ml-1">{{ number_format($fund->amount_spent, 0, '.', ',') }}</span>
                                     </div>
                                     @if($fund->type === 'commission')
                                         <div>
                                             <span class="text-gray-600 dark:text-gray-400">Profit:</span>
-                                            <span class="font-semibold text-green-600 ml-1">KES {{ number_format($fund->profit_amount, 0, '.', ',') }}</span>
+                                            <span class="font-semibold text-green-600 ml-1">{{ number_format($fund->profit_amount, 0, '.', ',') }}</span>
                                         </div>
                                     @endif
                                     <div>
                                         <span class="text-gray-600 dark:text-gray-400">Balance:</span>
-                                        <span class="font-bold text-purple-600 ml-1">KES {{ number_format($fund->balance, 0, '.', ',') }}</span>
+                                        <span class="font-bold text-purple-600 ml-1">{{ number_format($fund->balance, 0, '.', ',') }}</span>
                                     </div>
                                 </div>
 

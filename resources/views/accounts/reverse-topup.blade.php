@@ -47,7 +47,7 @@
                     <div class="flex justify-between text-sm border-t dark:border-gray-700 pt-3">
                         <dt class="text-gray-500 dark:text-gray-400">Amount to Reverse</dt>
                         <dd class="font-bold text-red-600 dark:text-red-400 text-base">
-                            −KES {{ number_format($transaction->amount, 0, '.', ',') }}
+                            −{{ number_format($transaction->amount, 0, '.', ',') }}
                         </dd>
                     </div>
                 </dl>

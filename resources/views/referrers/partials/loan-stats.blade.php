@@ -1,13 +1,13 @@
 @php
     $s = $loanStats;
     $cards = [
-        ['Outstanding',        'KES '.number_format($s['totalOutstanding'], 0),        'Active loans only',                         'from-indigo-50 to-indigo-100 border-indigo-200'],
-        ['Principal Disbursed','KES '.number_format($s['totalPrincipal'], 0),          'Loans given in period',                     'from-blue-50 to-blue-100 border-blue-200'],
-        ['Cash Collected',     'KES '.number_format($s['totalReceivedAllTime'], 0),    'Incl. partial payments',                    'from-teal-50 to-teal-100 border-teal-200'],
-        ['Repaid (Closed)',    'KES '.number_format($s['totalRepaid'], 0),             'Principal + interest, closed only',         'from-green-50 to-green-100 border-green-200'],
-        ['Interest Earned',    'KES '.number_format($s['totalInterest'], 0),           'Incl. active rollovers',                    'from-purple-50 to-purple-100 border-purple-200'],
-        ['Transaction Costs',  'KES '.number_format($s['totalTransactionCosts'], 0),   'Fees on disbursement',                      'from-orange-50 to-orange-100 border-orange-200'],
-        ['Net Interest',       'KES '.number_format($s['netInterest'], 0),             'Interest − costs − referrer share owed (KES '.number_format($s['referrerCut'], 0).')', 'from-emerald-50 to-emerald-100 border-emerald-200'],
+        ['Outstanding',        ''.number_format($s['totalOutstanding'], 0),        'Active loans only',                         'from-indigo-50 to-indigo-100 border-indigo-200'],
+        ['Principal Disbursed',''.number_format($s['totalPrincipal'], 0),          'Loans given in period',                     'from-blue-50 to-blue-100 border-blue-200'],
+        ['Cash Collected',     ''.number_format($s['totalReceivedAllTime'], 0),    'Incl. partial payments',                    'from-teal-50 to-teal-100 border-teal-200'],
+        ['Repaid (Closed)',    ''.number_format($s['totalRepaid'], 0),             'Principal + interest, closed only',         'from-green-50 to-green-100 border-green-200'],
+        ['Interest Earned',    ''.number_format($s['totalInterest'], 0),           'Incl. active rollovers',                    'from-purple-50 to-purple-100 border-purple-200'],
+        ['Transaction Costs',  ''.number_format($s['totalTransactionCosts'], 0),   'Fees on disbursement',                      'from-orange-50 to-orange-100 border-orange-200'],
+        ['Net Interest',       ''.number_format($s['netInterest'], 0),             'Interest − costs − referrer share owed ('.number_format($s['referrerCut'], 0).')', 'from-emerald-50 to-emerald-100 border-emerald-200'],
         ['Avg Interest Rate',  number_format($s['avgInterestRate'], 1).' %',           'Closed loans',                              'from-pink-50 to-pink-100 border-pink-200'],
         ['Repayment Rate',     number_format($s['repaymentRate'], 1).' %',             $s['repaidCount'].' of '.$s['disbursedCount'].' loans', 'from-yellow-50 to-yellow-100 border-yellow-200'],
     ];

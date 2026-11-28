@@ -57,15 +57,15 @@
                         </div>
                         <div class="bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg border border-amber-200 p-4">
                             <p class="text-sm font-medium text-gray-500">Owed Now</p>
-                            <p class="text-lg font-semibold text-gray-900">KES {{ number_format($outstandingPayable, 0) }}</p>
+                            <p class="text-lg font-semibold text-gray-900">{{ number_format($outstandingPayable, 0) }}</p>
                         </div>
                         <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200 p-4">
                             <p class="text-sm font-medium text-gray-500">Retained Before Deposit</p>
-                            <p class="text-lg font-semibold text-gray-900">KES {{ number_format($retainedTotal, 0) }}</p>
+                            <p class="text-lg font-semibold text-gray-900">{{ number_format($retainedTotal, 0) }}</p>
                         </div>
                         <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200 p-4">
                             <p class="text-sm font-medium text-gray-500">Paid Out (Batches)</p>
-                            <p class="text-lg font-semibold text-gray-900">KES {{ number_format($paidOutTotal, 0) }}</p>
+                            <p class="text-lg font-semibold text-gray-900">{{ number_format($paidOutTotal, 0) }}</p>
                         </div>
                     </div>
                 </div>
@@ -106,13 +106,13 @@
                                             @endif
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {{ $loan->interest_amount > 0 ? 'KES ' . number_format($loan->interest_amount, 0) : '-' }}
+                                            {{ $loan->interest_amount > 0 ? '' . number_format($loan->interest_amount, 0) : '-' }}
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             @if($loan->status !== 'paid')
                                                 <span class="text-gray-400">Not yet closed</span>
                                             @elseif($loan->referrer_deducted_before_deposit)
-                                                <span class="text-blue-600">Retained upfront (KES {{ number_format($loan->referrer_retained_amount, 0) }})</span>
+                                                <span class="text-blue-600">Retained upfront ({{ number_format($loan->referrer_retained_amount, 0) }})</span>
                                             @elseif($loan->referrer_payout_id)
                                                 <span class="text-green-600">Paid out (#{{ $loan->referrer_payout_id }})</span>
                                             @else
@@ -158,9 +158,9 @@
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             {{ \Carbon\Carbon::parse($payout->period_start)->format('M d, Y') }} &ndash; {{ \Carbon\Carbon::parse($payout->period_end)->format('M d, Y') }}
                                         </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">KES {{ number_format($payout->total_interest, 0) }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ number_format($payout->total_interest, 0) }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ number_format($payout->share_percentage, 1) }}%</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">KES {{ number_format($payout->amount_paid, 0) }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">{{ number_format($payout->amount_paid, 0) }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ \Carbon\Carbon::parse($payout->paid_date)->format('M d, Y') }}</td>
                                     </tr>
                                 @endforeach

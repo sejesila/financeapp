@@ -18,7 +18,7 @@ class CafeteriaController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        $month = $request->get('month', now()->format('Y-m'));
+        $month = $request->input('month', now()->format('Y-m'));
         $monthDate = Carbon::parse($month . '-01');
 
         $orders = CafeteriaOrder::with('items.menuItem')
@@ -117,7 +117,7 @@ class CafeteriaController extends Controller
             $remaining = $user->getRemainingBudgetThisMonth();
             return back()
                 ->withInput()
-                ->with('error', "Insufficient budget. You only have KES " . number_format($remaining, 0) . " remaining this month. This meal costs KES " . number_format($totalAmount, 0) . ".");
+                ->with('error', "Insufficient budget. You only have " . number_format($remaining, 0) . " remaining this month. This meal costs " . number_format($totalAmount, 0) . ".");
         }
 
         DB::transaction(function () use ($request, $user, $totalAmount) {
@@ -230,7 +230,7 @@ class CafeteriaController extends Controller
             $remaining = $user->getRemainingBudgetThisMonth();
             return back()
                 ->withInput()
-                ->with('error', "Insufficient budget. You only have KES " . number_format($remaining, 0) . " remaining. This change requires KES " . number_format($difference, 0) . " more.");
+                ->with('error', "Insufficient budget. You only have " . number_format($remaining, 0) . " remaining. This change requires " . number_format($difference, 0) . " more.");
         }
 
         DB::transaction(function () use ($request, $order, $user, $oldAmount) {
@@ -300,7 +300,7 @@ class CafeteriaController extends Controller
         $user = Auth::user();
         $user->getCurrentMonthlySpendings()->subtractSpending($amountToRefund);
 
-        return redirect()->route('cafeteria.index')->with('success', 'Meal entry deleted and KES ' . number_format($amountToRefund, 0) . ' refunded to your budget.');
+        return redirect()->route('cafeteria.index')->with('success', 'Meal entry deleted and ' . number_format($amountToRefund, 0) . ' refunded to your budget.');
     }
 
     // ===================== BUDGET INFO =====================
@@ -348,7 +348,7 @@ class CafeteriaController extends Controller
 
         $user->updateMonthlyLimit((float) $request->cafeteria_monthly_limit);
 
-        return back()->with('success', 'Monthly budget limit updated to KES '
+        return back()->with('success', 'Monthly budget limit updated to '
             . number_format($request->cafeteria_monthly_limit, 0) . '.');
     }
 

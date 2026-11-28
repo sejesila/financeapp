@@ -123,7 +123,7 @@
                                             <p class="text-xs text-gray-500 dark:text-gray-400">
                                                 {{ $menuItems[$key]->count() }} item{{ $menuItems[$key]->count() !== 1 ? 's' : '' }}
                                                 &middot;
-                                                KES {{ number_format($menuItems[$key]->min('unit_price'), 0) }}
+                                                {{ number_format($menuItems[$key]->min('unit_price'), 0) }}
                                                 –
                                                 {{ number_format($menuItems[$key]->max('unit_price'), 0) }}
                                             </p>

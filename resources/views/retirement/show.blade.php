@@ -36,9 +36,9 @@
             {{-- Balance --}}
             <div class="bg-gradient-to-r from-slate-600 to-indigo-700 text-white p-4 sm:p-6 rounded-lg shadow-lg">
                 <p class="text-xs sm:text-sm font-semibold">Current balance</p>
-                <p class="text-3xl sm:text-4xl font-bold mt-1">KES {{ number_format($balance, 0, '.', ',') }}</p>
+                <p class="text-3xl sm:text-4xl font-bold mt-1">{{ number_format($balance, 0, '.', ',') }}</p>
                 <p class="text-xs mt-1 opacity-90">
-                    Opening KES {{ number_format($fund->opening_balance, 0) }}
+                    Opening {{ number_format($fund->opening_balance, 0) }}
                     @if($fund->opening_balance_date) as at {{ $fund->opening_balance_date->format('M d, Y') }} @endif
                     + figures recorded below
                 </p>
@@ -48,7 +48,7 @@
                 @foreach([['Employee', $totals->employee], ['Employer', $totals->employer], ['Interest', $totals->interest]] as [$label, $val])
                     <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3">
                         <p class="text-xs text-gray-500">{{ $label }} (since tracking)</p>
-                        <p class="text-lg font-bold text-gray-900 dark:text-white">KES {{ number_format($val, 0) }}</p>
+                        <p class="text-lg font-bold text-gray-900 dark:text-white">{{ number_format($val, 0) }}</p>
                     </div>
                 @endforeach
             </div>

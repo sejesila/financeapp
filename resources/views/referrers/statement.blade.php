@@ -65,15 +65,15 @@
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 mt-3 text-sm">
                     <div class="bg-gray-50 rounded-lg p-3">
                         <div class="text-gray-500">Earned</div>
-                        <div class="text-lg font-semibold text-green-700">KES {{ number_format($commission['total_earned'], 0) }}</div>
+                        <div class="text-lg font-semibold text-green-700">{{ number_format($commission['total_earned'], 0) }}</div>
                     </div>
                     <div class="bg-gray-50 rounded-lg p-3">
                         <div class="text-gray-500">Paid or kept</div>
-                        <div class="text-lg font-semibold text-red-700">KES {{ number_format($commission['total_settled'], 0) }}</div>
+                        <div class="text-lg font-semibold text-red-700">{{ number_format($commission['total_settled'], 0) }}</div>
                     </div>
                     <div class="bg-indigo-50 rounded-lg p-3">
                         <div class="text-gray-500">You still owe her</div>
-                        <div class="text-lg font-semibold text-indigo-800">KES {{ number_format($commission['still_owed'], 0) }}</div>
+                        <div class="text-lg font-semibold text-indigo-800">{{ number_format($commission['still_owed'], 0) }}</div>
                     </div>
                 </div>
 
@@ -81,7 +81,7 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 text-sm">
                         <div class="bg-rose-50 rounded-lg p-3">
                             <div class="text-gray-500">She owes you (write-offs)</div>
-                            <div class="text-lg font-semibold text-rose-800">KES {{ number_format($recovery['outstanding'], 0) }}</div>
+                            <div class="text-lg font-semibold text-rose-800">{{ number_format($recovery['outstanding'], 0) }}</div>
                             <div class="text-xs text-gray-400 mt-1">
                                 charged {{ number_format($recovery['charged'], 0) }} · recovered {{ number_format($recovery['recovered'], 0) }}
                             </div>
@@ -90,7 +90,7 @@
                             <div class="text-gray-500">
                                 {{ $commission['net_owed'] >= 0 ? 'Net you owe her' : 'Net she owes you' }}
                             </div>
-                            <div class="text-lg font-semibold text-indigo-800">KES {{ number_format(abs($commission['net_owed']), 0) }}</div>
+                            <div class="text-lg font-semibold text-indigo-800">{{ number_format(abs($commission['net_owed']), 0) }}</div>
                             <div class="text-xs text-gray-400 mt-1">commission owed less write-off recovery</div>
                         </div>
                     </div>
@@ -112,7 +112,7 @@
                     <p class="text-sm text-gray-500 mb-2">
                         Loans written off and charged to {{ $referrer->name }}, and what each payout has deducted so far.
                     </p>
-                    @include('referrers.partials.ledger', [
+                    @include('referrers.partials.ledger-table', [
                         'months'       => $recovery['months'],
                         'mode'         => 'balance',
                         'balanceLabel' => 'She owes',
@@ -135,8 +135,8 @@
 
                     @if(abs($float['difference']) > 0.5)
                         <div class="mb-4 bg-amber-50 border-l-4 border-amber-400 p-3 text-sm text-amber-800">
-                            This statement adds up to KES {{ number_format($float['closing'], 0) }}, but the account balance shows
-                            KES {{ number_format($float['current_balance'], 0) }} (difference KES {{ number_format($float['difference'], 0) }}).
+                            This statement adds up to {{ number_format($float['closing'], 0) }}, but the account balance shows
+                            {{ number_format($float['current_balance'], 0) }} (difference {{ number_format($float['difference'], 0) }}).
                             Usually that means an opening balance or a transfer isn't being picked up.
                         </div>
                     @endif
@@ -154,19 +154,19 @@
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm mt-3">
                         <div class="bg-indigo-50 rounded-lg p-3">
                             <div class="text-gray-500">Principal in the float now</div>
-                            <div class="text-lg font-semibold text-gray-900">KES {{ number_format($principalInFloat, 0) }}</div>
+                            <div class="text-lg font-semibold text-gray-900">{{ number_format($principalInFloat, 0) }}</div>
                             <div class="text-xs text-gray-400 mt-1">account balance less interest</div>
                         </div>
                         <div class="bg-green-50 rounded-lg p-3">
                             <div class="text-gray-500">Interest held</div>
-                            <div class="text-lg font-semibold text-gray-900">KES {{ number_format($interest['closing'], 0) }}</div>
+                            <div class="text-lg font-semibold text-gray-900">{{ number_format($interest['closing'], 0) }}</div>
                             <div class="text-xs text-gray-400 mt-1">
                                 in {{ number_format($interest['credits'], 0) }} · out {{ number_format($interest['debits'], 0) }}
                             </div>
                         </div>
                         <div class="bg-blue-50 rounded-lg p-3">
                             <div class="text-gray-500">Float account balance</div>
-                            <div class="text-lg font-semibold text-gray-900">KES {{ number_format($float['current_balance'], 0) }}</div>
+                            <div class="text-lg font-semibold text-gray-900">{{ number_format($float['current_balance'], 0) }}</div>
                             <div class="text-xs text-gray-400 mt-1">everything in the account</div>
                         </div>
                     </div>

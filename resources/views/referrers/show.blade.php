@@ -81,29 +81,29 @@
                         </div>
                         <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg border border-slate-200 p-3 sm:p-4">
                             <p class="text-xs sm:text-sm font-medium text-gray-500">Interest Not Yet Paid Out</p>
-                            <p class="text-base sm:text-lg font-semibold text-gray-900">KES {{ number_format($outstandingInterest, 0) }}</p>
+                            <p class="text-base sm:text-lg font-semibold text-gray-900">{{ number_format($outstandingInterest, 0) }}</p>
                         </div>
                         <div class="bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg border border-amber-200 p-3 sm:p-4">
                             <p class="text-xs sm:text-sm font-medium text-gray-500">Owed Now</p>
-                            <p class="text-base sm:text-lg font-semibold text-gray-900">KES {{ number_format($outstandingPayable, 0) }}</p>
+                            <p class="text-base sm:text-lg font-semibold text-gray-900">{{ number_format($outstandingPayable, 0) }}</p>
                             @if($recoveryOutstanding > 0)
                                 <p class="text-[10px] sm:text-xs leading-tight text-gray-500">
-                                    KES {{ number_format($netOwedNow, 0) }} after write-off recovery
+                                    {{ number_format($netOwedNow, 0) }} after write-off recovery
                                 </p>
                             @endif
                         </div>
                         <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200 p-3 sm:p-4">
                             <p class="text-xs sm:text-sm font-medium text-gray-500">Retained Before Deposit</p>
-                            <p class="text-base sm:text-lg font-semibold text-gray-900">KES {{ number_format($retainedTotal, 0) }}</p>
+                            <p class="text-base sm:text-lg font-semibold text-gray-900">{{ number_format($retainedTotal, 0) }}</p>
                         </div>
                         <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200 p-3 sm:p-4">
                             <p class="text-xs sm:text-sm font-medium text-gray-500">Paid Out (Batches)</p>
-                            <p class="text-base sm:text-lg font-semibold text-gray-900">KES {{ number_format($paidOutTotal, 0) }}</p>
+                            <p class="text-base sm:text-lg font-semibold text-gray-900">{{ number_format($paidOutTotal, 0) }}</p>
                         </div>
                         @if($recoveryOutstanding > 0)
                             <div class="bg-gradient-to-br from-rose-50 to-rose-100 rounded-lg border border-rose-200 p-3 sm:p-4">
                                 <p class="text-xs sm:text-sm font-medium text-gray-500">Write-off Recovery Owed</p>
-                                <p class="text-base sm:text-lg font-semibold text-gray-900">KES {{ number_format($recoveryOutstanding, 0) }}</p>
+                                <p class="text-base sm:text-lg font-semibold text-gray-900">{{ number_format($recoveryOutstanding, 0) }}</p>
                                 <p class="text-[10px] sm:text-xs leading-tight text-gray-500">
                                     Deducted from her commission at each payout
                                 </p>
@@ -112,9 +112,9 @@
                         @if($floatLimits)
                             <div class="bg-gradient-to-br from-teal-50 to-teal-100 rounded-lg border border-teal-200 p-3 sm:p-4">
                                 <p class="text-xs sm:text-sm font-medium text-gray-500">Reconcilable Now</p>
-                                <p class="text-base sm:text-lg font-semibold text-gray-900">KES {{ number_format($floatLimits['max_total'], 0) }}</p>
+                                <p class="text-base sm:text-lg font-semibold text-gray-900">{{ number_format($floatLimits['max_total'], 0) }}</p>
                                 <p class="text-[10px] sm:text-xs leading-tight text-gray-500">
-                                    Float KES {{ number_format($floatLimits['balance'], 0) }} less her commission KES {{ number_format($floatLimits['commission'], 0) }}
+                                    Float {{ number_format($floatLimits['balance'], 0) }} less her commission {{ number_format($floatLimits['commission'], 0) }}
                                 </p>
                             </div>
                         @endif
@@ -168,7 +168,7 @@
                                                     : $loan->payments->sum('interest_portion');
                                             @endphp
                                             @if($interestSoFar > 0)
-                                                KES {{ number_format($interestSoFar, 0) }}
+                                                {{ number_format($interestSoFar, 0) }}
                                                 @if($loan->status !== 'paid')
                                                     <span class="text-xs text-gray-400">(so far)</span>
                                                 @endif
@@ -179,14 +179,14 @@
                                         <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
                                             @if($loan->status === 'written_off' && isset($recoveriesByLoan[$loan->id]))
                                                 @php $rec = $recoveriesByLoan[$loan->id]; @endphp
-                                                <span class="text-rose-600">Charged KES {{ number_format($rec->amount, 0) }}</span>
+                                                <span class="text-rose-600">Charged {{ number_format($rec->amount, 0) }}</span>
                                                 <span class="block text-[10px] sm:text-xs text-gray-400">
-                                                    {{ $rec->status === 'settled' ? 'fully recovered' : 'KES ' . number_format($rec->recovered, 0) . ' recovered' }}
+                                                    {{ $rec->status === 'settled' ? 'fully recovered' : '' . number_format($rec->recovered, 0) . ' recovered' }}
                                                 </span>
                                             @elseif($loan->status !== 'paid')
                                                 <span class="text-gray-400">Not yet closed</span>
                                             @elseif($loan->referrer_deducted_before_deposit)
-                                                <span class="text-blue-600">Retained upfront (KES {{ number_format($loan->referrer_retained_amount, 0) }})</span>
+                                                <span class="text-blue-600">Retained upfront ({{ number_format($loan->referrer_retained_amount, 0) }})</span>
                                             @elseif($loan->referrer_payout_id)
                                                 <span class="text-green-600">Paid out (#{{ $loan->referrer_payout_id }})</span>
                                             @else
@@ -216,7 +216,7 @@
                         <div class="flex items-center justify-between mb-4">
                             <h3 class="text-base sm:text-lg font-medium text-gray-900">Write-off Recoveries</h3>
                             <span class="text-xs sm:text-sm text-gray-500">
-                                <span class="font-medium text-rose-600">KES {{ number_format($recoveryOutstanding, 0) }}</span> still to recover
+                                <span class="font-medium text-rose-600">{{ number_format($recoveryOutstanding, 0) }}</span> still to recover
                             </span>
                         </div>
                         <p class="text-xs text-gray-500 mb-3">
@@ -245,9 +245,9 @@
                                                 Loan #{{ $rec->loan_given_id }}
                                             @endif
                                         </td>
-                                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500 text-right">KES {{ number_format($rec->amount, 0) }}</td>
-                                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-green-600 text-right">KES {{ number_format($rec->recovered, 0) }}</td>
-                                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-right {{ $rec->outstanding > 0 ? 'text-rose-600' : 'text-gray-400' }}">KES {{ number_format($rec->outstanding, 0) }}</td>
+                                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500 text-right">{{ number_format($rec->amount, 0) }}</td>
+                                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-green-600 text-right">{{ number_format($rec->recovered, 0) }}</td>
+                                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-right {{ $rec->outstanding > 0 ? 'text-rose-600' : 'text-gray-400' }}">{{ number_format($rec->outstanding, 0) }}</td>
                                         <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
                                             @if($rec->status === 'settled')
                                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Settled</span>
@@ -279,7 +279,7 @@
                         @if($payoutsCount > 0)
                             <span class="text-xs sm:text-sm text-gray-500">
                                 {{ $payoutsCount }} payout{{ $payoutsCount > 1 ? 's' : '' }} ·
-                                <span class="font-medium text-green-600">KES {{ number_format($payoutsTotal, 0) }}</span> total
+                                <span class="font-medium text-green-600">{{ number_format($payoutsTotal, 0) }}</span> total
                             </span>
                         @endif
                     </div>
@@ -330,15 +330,15 @@
                                             {{ $payout->loans->count() }}
                                         </td>
                                         <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500 text-right">
-                                            KES {{ number_format($payout->total_interest, 0) }}
+                                            {{ number_format($payout->total_interest, 0) }}
                                             <span class="block text-[10px] sm:text-xs text-gray-400">{{ number_format($payout->share_percentage, 1) }}% share</span>
                                         </td>
                                         <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-green-600 text-right">
-                                            KES {{ number_format($payout->amount_paid, 0) }}
+                                            {{ number_format($payout->amount_paid, 0) }}
                                             @if(($payout->recovery_deducted ?? 0) > 0)
                                                 <span class="block text-[10px] sm:text-xs font-normal text-rose-600">
-                                                    commission KES {{ number_format($payout->gross_commission, 0) }}
-                                                    &minus; KES {{ number_format($payout->recovery_deducted, 0) }} write-off
+                                                    commission {{ number_format($payout->gross_commission, 0) }}
+                                                    &minus; {{ number_format($payout->recovery_deducted, 0) }} write-off
                                                 </span>
                                             @endif
                                         </td>
@@ -360,11 +360,11 @@
                                                             <span class="text-gray-700">
                                                                 <a href="{{ route('loans-given.show', $loan->id) }}" class="text-indigo-600 hover:text-indigo-900">{{ $loan->borrower_name }}</a>
                                                                 <span class="text-gray-400">
-                                                                    · {{ number_format($sharePct, 0) }}% of KES {{ number_format($loan->interest_amount, 0) }}
+                                                                    · {{ number_format($sharePct, 0) }}% of {{ number_format($loan->interest_amount, 0) }}
                                                                     @if($loan->repaid_date) · closed {{ $loan->repaid_date->format('M d') }} @endif
                                                                 </span>
                                                             </span>
-                                                            <span class="font-medium text-gray-900">KES {{ number_format($cut, 0) }}</span>
+                                                            <span class="font-medium text-gray-900">{{ number_format($cut, 0) }}</span>
                                                         </div>
                                                     @endforeach
                                                 </div>

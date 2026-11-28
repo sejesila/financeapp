@@ -156,7 +156,7 @@
                         </label>
                         <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
                             <p class="text-lg font-semibold text-gray-900 dark:text-white">
-                                KES {{ number_format($account->initial_balance, 0, '.', ',') }}
+                                {{ number_format($account->initial_balance, 0, '.', ',') }}
                             </p>
                             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Initial balance cannot be changed</p>
                         </div>
@@ -169,7 +169,7 @@
                         </label>
                         <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
                             <p class="text-lg font-semibold {{ $account->current_balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
-                                KES {{ number_format($account->current_balance, 0, '.', ',') }}
+                                {{ number_format($account->current_balance, 0, '.', ',') }}
                             </p>
                             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Balance is calculated automatically from transactions</p>
                         </div>

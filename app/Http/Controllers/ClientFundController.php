@@ -650,7 +650,7 @@ class ClientFundController extends Controller
             DB::commit();
 
             return back()->with('success',
-                'Borrowed amount of KES ' . number_format($request->amount, 0) . ' recorded against this client fund.'
+                'Borrowed amount of ' . number_format($request->amount, 0) . ' recorded against this client fund.'
             );
         } catch (Exception $e) {
             DB::rollBack();
@@ -686,7 +686,7 @@ class ClientFundController extends Controller
 
         if ($request->amount > $available) {
             return back()->with('error',
-                "Amount exceeds {$request->client_name}'s outstanding balance of KES " . number_format($available, 0) . '.'
+                "Amount exceeds {$request->client_name}'s outstanding balance of " . number_format($available, 0) . '.'
             );
         }
 
@@ -721,7 +721,7 @@ class ClientFundController extends Controller
             DB::commit();
 
             return back()->with('success',
-                'KES ' . number_format($request->amount, 0) . " recorded as borrowed across {$request->client_name}'s outstanding funds (oldest first)."
+                '' . number_format($request->amount, 0) . " recorded as borrowed across {$request->client_name}'s outstanding funds (oldest first)."
             );
         } catch (Exception $e) {
             DB::rollBack();
@@ -775,7 +775,7 @@ class ClientFundController extends Controller
 
         if ($request->amount > $available) {
             return back()->with('error',
-                "Amount exceeds {$request->client_name}'s unreturned borrowed total of KES " . number_format($available, 0) . '.'
+                "Amount exceeds {$request->client_name}'s unreturned borrowed total of " . number_format($available, 0) . '.'
             );
         }
 
@@ -850,7 +850,7 @@ class ClientFundController extends Controller
             $account->updateBalance();
 
             return back()->with('success',
-                'KES ' . number_format($request->amount, 0)
+                '' . number_format($request->amount, 0)
                 . " returned and applied against {$request->client_name}'s outstanding borrowed balance (oldest first)."
             );
         } catch (Exception $e) {

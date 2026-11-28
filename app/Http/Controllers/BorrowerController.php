@@ -30,7 +30,7 @@ class BorrowerController extends Controller implements HasMiddleware
 
     public function index(Request $request)
     {
-        $sort    = $request->get('sort', 'interest_earned');
+        $sort    = $request->input('sort', 'interest_earned');
         $perPage = 20;
 
         $rows = $this->stats->forAll();
@@ -70,7 +70,7 @@ class BorrowerController extends Controller implements HasMiddleware
     /** Autocomplete for the "new loan" form. */
     public function search(Request $request)
     {
-        return Borrower::where('name', 'like', '%' . $request->get('q') . '%')
+        return Borrower::where('name', 'like', '%' . $request->input('q') . '%')
             ->orderBy('name')->limit(10)->get(['id', 'name', 'contact']);
     }
 
@@ -103,7 +103,7 @@ class BorrowerController extends Controller implements HasMiddleware
     }
     public function monthly(Request $request, BorrowerMonthlyStatsService $service)
     {
-        $months = min(36, max(3, (int) $request->get('months', 12)));
+        $months = min(36, max(3, (int) $request->input('months', 12)));
 
         return view('borrowers.monthly', $service->compute($months) + ['months' => $months]);
     }

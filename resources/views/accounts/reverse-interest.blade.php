@@ -47,7 +47,7 @@
                         <div class="flex justify-between text-sm border-t dark:border-gray-700 pt-3">
                             <dt class="text-gray-500 dark:text-gray-400">Amount to Reverse</dt>
                             <dd class="font-bold text-red-600 dark:text-red-400 text-base">
-                                −KES {{ number_format($entry->amount, 0, '.', ',') }}
+                                −{{ number_format($entry->amount, 0, '.', ',') }}
                             </dd>
                         </div>
                     </dl>
@@ -56,7 +56,7 @@
                         @foreach($entries as $entry)
                             <div class="flex justify-between items-center px-4 py-2.5 text-sm">
                                 <span class="text-gray-600 dark:text-gray-400">{{ $entry->date->format('M d, Y') }}</span>
-                                <span class="font-medium text-gray-900 dark:text-white">KES {{ number_format($entry->amount, 2, '.', ',') }}</span>
+                                <span class="font-medium text-gray-900 dark:text-white">{{ number_format($entry->amount, 2, '.', ',') }}</span>
                             </div>
                         @endforeach
                     </div>
@@ -75,7 +75,7 @@
                         <div class="flex justify-between text-sm border-t dark:border-gray-700 pt-3">
                             <dt class="text-gray-500 dark:text-gray-400">Total Amount to Reverse</dt>
                             <dd class="font-bold text-red-600 dark:text-red-400 text-base">
-                                −KES {{ number_format($entries->sum('amount'), 0, '.', ',') }}
+                                −{{ number_format($entries->sum('amount'), 0, '.', ',') }}
                             </dd>
                         </div>
                     </dl>

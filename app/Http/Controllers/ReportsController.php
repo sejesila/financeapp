@@ -33,7 +33,7 @@ class ReportsController extends Controller
 
     public function index(Request $request)
     {
-        $filter = $request->get('filter', 'this_month');
+        $filter = $request->input('filter', 'this_month');
         $startDate = null;
         $endDate = null;
 // Main date filter
@@ -56,8 +56,8 @@ class ReportsController extends Controller
                 $endDate = now()->subYear()->endOfYear();
                 break;
             case 'custom':
-                $startDate = $request->get('start_date') ? Carbon::parse($request->get('start_date')) : now()->startOfMonth();
-                $endDate = $request->get('end_date') ? Carbon::parse($request->get('end_date')) : now()->endOfMonth();
+                $startDate = $request->input('start_date') ? Carbon::parse($request->input('start_date')) : now()->startOfMonth();
+                $endDate = $request->input('end_date') ? Carbon::parse($request->input('end_date')) : now()->endOfMonth();
                 break;
             default:
                 $startDate = now()->startOfMonth();

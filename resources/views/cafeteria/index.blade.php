@@ -113,14 +113,14 @@
                         [
                             'title' => 'This Week',
                             'amount' => $weekTotal,
-                            'subtitle' => 'KES this week',
+                            'subtitle' => 'this week',
                             'gradient' => 'from-amber-500 to-orange-600',
                             'icon' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'
                         ],
                         [
                             'title' => 'This Month',
                             'amount' => $monthlyTotal,
-                            'subtitle' => 'KES spent',
+                            'subtitle' => 'spent',
                             'gradient' => 'from-yellow-500 to-amber-600',
                             'icon' => 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'
                         ],
@@ -147,7 +147,7 @@
 
                         <div class="space-y-1">
                             <h3 class="text-3xl font-bold">
-                                KES {{ number_format($card['amount'], 0, '.', ',') }}
+                                {{ number_format($card['amount'], 0, '.', ',') }}
                             </h3>
                             <p class="text-sm opacity-80">{{ $card['subtitle'] }}</p>
                         </div>
@@ -242,7 +242,7 @@
                                     <div>
                                         <h4 class="font-bold text-red-800 dark:text-red-200 mb-1">Budget Exceeded!</h4>
                                         <p class="text-sm text-red-700 dark:text-red-300">
-                                            You have spent KES {{ number_format( $monthRecord->getAmountOverBudget(), 0) }} more than your monthly limit of KES {{ number_format($effectiveLimit, 0) }}.
+                                            You have spent {{ number_format( $monthRecord->getAmountOverBudget(), 0) }} more than your monthly limit of {{ number_format($effectiveLimit, 0) }}.
                                         </p>
                                     </div>
                                 </div>
@@ -254,7 +254,7 @@
                                     <div>
                                         <h4 class="font-bold text-orange-800 dark:text-orange-200 mb-1">Budget Critical!</h4>
                                         <p class="text-sm text-orange-700 dark:text-orange-300">
-                                            You've used {{ number_format($percentage, 1) }}% of your monthly budget. Only KES {{ number_format($remaining, 0) }} remaining.
+                                            You've used {{ number_format($percentage, 1) }}% of your monthly budget. Only {{ number_format($remaining, 0) }} remaining.
                                         </p>
                                     </div>
                                 </div>
@@ -266,7 +266,7 @@
                                     <div>
                                         <h4 class="font-bold text-yellow-800 dark:text-yellow-200 mb-1">Budget Warning</h4>
                                         <p class="text-sm text-yellow-700 dark:text-yellow-300">
-                                            You've used {{ number_format($percentage, 1) }}% of your monthly budget. KES {{ number_format($remaining, 0) }} remaining.
+                                            You've used {{ number_format($percentage, 1) }}% of your monthly budget. {{ number_format($remaining, 0) }} remaining.
                                         </p>
                                     </div>
                                 </div>
@@ -278,19 +278,19 @@
                             <div class="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                                 <p class="text-xs text-gray-600 dark:text-gray-400 mb-1 font-medium">Total Spent</p>
                                 <p class="text-2xl font-bold text-gray-900 dark:text-white">
-                                    KES {{ number_format($spent, 0) }}
+                                    {{ number_format($spent, 0) }}
                                 </p>
                             </div>
 
                             <div class="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                                 <p class="text-xs text-gray-600 dark:text-gray-400 mb-1 font-medium">Effective Limit</p>
                                 <p class="text-2xl font-bold text-gray-900 dark:text-white">
-                                    KES {{ number_format($effectiveLimit, 0) }}
+                                    {{ number_format($effectiveLimit, 0) }}
                                 </p>
                                 {{-- Show carryover detail when it is non-zero --}}
                                 @if($carryover != 0)
                                     <p class="text-xs mt-1 {{ $carryover > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400' }}">
-                                        Base KES {{ number_format($limit, 0) }}
+                                        Base {{ number_format($limit, 0) }}
                                         {{ $carryover > 0 ? '+' : '' }}{{ number_format($carryover, 0) }} carried over
                                     </p>
                                 @endif
@@ -300,9 +300,9 @@
                                 <p class="text-xs text-{{ $color }}-700 dark:text-{{ $color }}-300 mb-1 font-medium">Remaining</p>
                                 <p class="text-2xl font-bold text-{{ $color }}-900 dark:text-{{ $color }}-100">
                                     @if($isExceeded)
-                                        -KES {{ number_format($monthRecord->getAmountOverBudget(), 0) }}
+                                        -{{ number_format($monthRecord->getAmountOverBudget(), 0) }}
                                     @else
-                                        KES {{ number_format($remaining, 0) }}
+                                        {{ number_format($remaining, 0) }}
                                     @endif
                                 </p>
                             </div>
@@ -333,7 +333,7 @@
                                 <div>
                                     <p class="text-gray-600 dark:text-gray-400 mb-1">Daily Avg <span class="text-xs font-normal">(working days)</span></p>
                                     <p class="font-bold text-gray-900 dark:text-white">
-                                        KES {{ number_format($spent / $budgetUser->workingDaysElapsedThisMonth(), 0) }}
+                                        {{ number_format($spent / $budgetUser->workingDaysElapsedThisMonth(), 0) }}
                                     </p>
                                 </div>
                                 <div>
@@ -343,7 +343,7 @@
                                             $daysLeft = $budgetUser->workingDaysRemainingThisMonth();
                                         @endphp
                                         {{ $daysLeft > 0
-                                            ? 'KES ' . number_format($remaining / $daysLeft, 0) . ' / day'
+                                            ? '' . number_format($remaining / $daysLeft, 0) . ' / day'
                                             : '—' }}
                                     </p>
                                 </div>
@@ -352,8 +352,8 @@
                                 <p class="mt-3 text-xs {{ $carryover > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400' }} flex items-center gap-1">
                                     {{ $carryover > 0 ? '✅' : '⚠️' }}
                                     {{ $carryover > 0
-                                        ? 'KES ' . number_format($carryover, 0) . ' surplus carried over from last month.'
-                                        : 'KES ' . number_format(abs($carryover), 0) . ' deficit carried over from last month.' }}
+                                        ? '' . number_format($carryover, 0) . ' surplus carried over from last month.'
+                                        : '' . number_format(abs($carryover), 0) . ' deficit carried over from last month.' }}
                                 </p>
                             @endif
                             @if(!$budgetUser->canEditMonthlyLimit())
@@ -482,7 +482,7 @@
                                         </div>
                                     </td>
                                     <td class="px-4 sm:px-6 py-4 text-right text-sm font-bold text-gray-900 dark:text-white whitespace-nowrap">
-                                        KES {{ number_format($order->total_amount, 0) }}
+                                        {{ number_format($order->total_amount, 0) }}
                                     </td>
                                     <td class="px-4 sm:px-6 py-4 text-center whitespace-nowrap">
                                         <a href="{{ route('cafeteria.show', $order) }}"

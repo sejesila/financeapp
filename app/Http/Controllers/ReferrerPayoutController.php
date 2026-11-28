@@ -169,7 +169,7 @@ class ReferrerPayoutController extends Controller
             ? app(TransactionService::class)->mpesaSendMoneyFee($amountPaid) : 0;
 
         if ($amountPaid > 0 && round((float) $account->current_balance, 2) < round($amountPaid + $fee, 2)) {
-            return back()->with('error', "Insufficient balance in {$account->name}: need KES "
+            return back()->with('error', "Insufficient balance in {$account->name}: need "
                 . number_format($amountPaid + $fee, 2) . " (payout {$amountPaid} + fee {$fee}).");
         }
 
@@ -195,7 +195,7 @@ class ReferrerPayoutController extends Controller
                     'amount'            => $amountPaid,
                     'date'              => $validated['paid_date'],
                     'description'       => "Referrer commission to {$referrer->name} ({$validated['period_start']} to {$validated['period_end']})"
-                        . ($recoveryDeduction > 0 ? " — net of KES {$recoveryDeduction} write-off recovery" : ''),
+                        . ($recoveryDeduction > 0 ? " — net of {$recoveryDeduction} write-off recovery" : ''),
                     'mobile_money_type' => 'send_money',
                 ]);
             }
@@ -249,18 +249,18 @@ class ReferrerPayoutController extends Controller
 
             $loanCount = $payments->pluck('loan_given_id')->unique()->count();
 
-            $msg = "Commission KES " . number_format($grossCommission, 0) . " for {$referrer->name} "
+            $msg = "Commission " . number_format($grossCommission, 0) . " for {$referrer->name} "
                 . "({$payments->count()} payment(s), {$loanCount} loan(s)): "
-                . "KES " . number_format($recoveryDeduction, 0) . " applied to written-off loans, "
-                . "KES " . number_format($amountPaid, 0) . " paid out.";
+                . "" . number_format($recoveryDeduction, 0) . " applied to written-off loans, "
+                . "" . number_format($amountPaid, 0) . " paid out.";
 
             $left = $referrer->recoveryOutstanding();
             if ($left > 0) {
-                $msg .= " KES " . number_format($left, 0) . " still to recover from future commissions.";
+                $msg .= " " . number_format($left, 0) . " still to recover from future commissions.";
             }
 
             if ($paidFromFloat && $amountPaid > 0) {
-                $msg .= " Taken from her float; KES " . number_format($settledInFloat, 0)
+                $msg .= " Taken from her float; " . number_format($settledInFloat, 0)
                     . " marked as settled in float reconciliation.";
             }
 
@@ -293,9 +293,9 @@ class ReferrerPayoutController extends Controller
             ->paginate(10, ['*'], 'payouts_page')
             ->withQueryString();
 
-        $statsPeriod = $request->get('stats_period', 'this_month');
+        $statsPeriod = $request->input('stats_period', 'this_month');
         [$statsStart, $statsEnd, $statsLabel] = LoanBookStatsService::resolvePeriod(
-            $statsPeriod, $request->get('stats_start'), $request->get('stats_end')
+            $statsPeriod, $request->input('stats_start'), $request->input('stats_end')
         );
 
         $loans    = $referrer->loans()->get();

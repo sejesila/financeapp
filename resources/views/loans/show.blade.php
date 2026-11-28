@@ -124,7 +124,7 @@
                     <div>
                         <span class="text-sm text-gray-600 dark:text-gray-400">Principal</span>
                         <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                            KES {{ number_format($loan->principal_amount, 0, '.', ',') }}
+                            {{ number_format($loan->principal_amount, 0, '.', ',') }}
                         </p>
                     </div>
 
@@ -132,7 +132,7 @@
                         <div class="pt-2 border-t border-indigo-200 dark:border-indigo-600">
                             <span class="text-sm text-gray-600 dark:text-gray-400">Interest</span>
                             <p class="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                                KES {{ number_format($loan->interest_amount, 0, '.', ',') }}
+                                {{ number_format($loan->interest_amount, 0, '.', ',') }}
                                 @if($loan->interest_rate > 0)
                                     <span class="text-sm text-gray-500 dark:text-gray-400">({{ $loan->interest_rate }}%)</span>
                                 @endif
@@ -143,7 +143,7 @@
                     <div class="pt-2 border-t-2 border-indigo-300 dark:border-indigo-700">
                         <span class="text-sm text-gray-600 dark:text-gray-400">Total Due</span>
                         <p class="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
-                            KES {{ number_format($loan->total_amount, 0, '.', ',') }}
+                            {{ number_format($loan->total_amount, 0, '.', ',') }}
                         </p>
                     </div>
 
@@ -151,13 +151,13 @@
                         <div class="flex justify-between">
                             <span class="text-gray-700 dark:text-gray-300">Paid</span>
                             <span class="font-semibold text-green-600 dark:text-green-400">
-                                KES {{ number_format($loan->amount_paid, 0, '.', ',') }}
+                                {{ number_format($loan->amount_paid, 0, '.', ',') }}
                             </span>
                         </div>
                         <div class="flex justify-between font-bold text-lg">
                             <span class="text-gray-700 dark:text-gray-300">Balance</span>
                             <span class="{{ $loan->balance > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400' }}">
-                                KES {{ number_format($loan->balance, 0, '.', ',') }}
+                                {{ number_format($loan->balance, 0, '.', ',') }}
                             </span>
                         </div>
                     </div>
@@ -199,9 +199,9 @@
                     @foreach($loan->payments as $payment)
                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
                             <td class="px-4 py-2 text-sm text-gray-900 dark:text-gray-100 font-medium">{{ $payment->payment_date->format('M d, Y') }}</td>
-                            <td class="px-4 py-2 text-right text-sm text-gray-900 dark:text-gray-100">KES {{ number_format($payment->principal_portion, 0, '.', ',') }}</td>
-                            <td class="px-4 py-2 text-right text-sm text-gray-900 dark:text-gray-100">KES {{ number_format($payment->interest_portion, 0, '.', ',') }}</td>
-                            <td class="px-4 py-2 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">KES {{ number_format($payment->amount, 0, '.', ',') }}</td>
+                            <td class="px-4 py-2 text-right text-sm text-gray-900 dark:text-gray-100">{{ number_format($payment->principal_portion, 0, '.', ',') }}</td>
+                            <td class="px-4 py-2 text-right text-sm text-gray-900 dark:text-gray-100">{{ number_format($payment->interest_portion, 0, '.', ',') }}</td>
+                            <td class="px-4 py-2 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">{{ number_format($payment->amount, 0, '.', ',') }}</td>
                             <td class="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">{{ $payment->notes ?? '-' }}</td>
                         </tr>
                     @endforeach

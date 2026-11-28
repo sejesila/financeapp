@@ -131,7 +131,7 @@
                                             </p>
                                         </div>
                                         <p class="font-bold text-indigo-600 dark:text-indigo-400">
-                                            KES {{ number_format($item->unit_price, 0) }}
+                                            {{ number_format($item->unit_price, 0) }}
                                         </p>
                                     </div>
                                 </div>
@@ -171,7 +171,7 @@
                                                         class="px-3 py-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300">+</button>
                                             </div>
                                             <span class="text-sm font-semibold text-indigo-600 dark:text-indigo-400 min-w-20 text-right item-subtotal">
-                                                KES {{ number_format($restored->unit_price * ($oldItem['quantity'] ?? 1), 0) }}
+                                                {{ number_format($restored->unit_price * ($oldItem['quantity'] ?? 1), 0) }}
                                             </span>
                                             <button type="button" onclick="removeItem(this)"
                                                     class="remove-btn px-3 py-1 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded hover:bg-red-600 transition-colors">✕</button>
@@ -192,7 +192,7 @@
                     <div class="border-t border-gray-200 dark:border-gray-700 pt-4 flex justify-between items-center">
                         <span class="text-lg font-semibold text-gray-900 dark:text-white">Total:</span>
                         <span class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                            KES <span id="totalAmount">0</span>
+                            <span id="totalAmount">0</span>
                         </span>
                     </div>
                 </div>
@@ -263,7 +263,7 @@
                                onchange="updateTotal()">
                         <button type="button" onclick="increaseQty(this)" class="px-3 py-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300">+</button>
                     </div>
-                    <span class="text-sm font-semibold text-indigo-600 dark:text-indigo-400 min-w-20 text-right item-subtotal">KES ${numberFormat(price)}</span>
+                    <span class="text-sm font-semibold text-indigo-600 dark:text-indigo-400 min-w-20 text-right item-subtotal">${numberFormat(price)}</span>
                     <button type="button" onclick="removeItem(this)" class="remove-btn px-3 py-1 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded hover:bg-red-600 transition-colors">✕</button>
                 </div>
             `;
@@ -309,7 +309,7 @@
                 const price    = parseFloat(row.dataset.price) || 0;
                 const qty      = parseInt(row.querySelector('input[type="number"]').value) || 0;
                 const subtotal = price * qty;
-                row.querySelector('.item-subtotal').textContent = 'KES ' + numberFormat(subtotal);
+                row.querySelector('.item-subtotal').textContent = '' + numberFormat(subtotal);
                 total += subtotal;
             });
             document.getElementById('totalAmount').textContent = numberFormat(total);

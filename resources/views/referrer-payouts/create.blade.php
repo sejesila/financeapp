@@ -43,7 +43,7 @@
                         @if($recoveryOwed > 0)
                             <div class="mt-4 bg-rose-50 border-l-4 border-rose-400 p-4">
                                 <p class="text-sm text-rose-800">
-                                    {{ $referrer->name }} still owes KES {{ number_format($recoveryOwed, 0) }} from written-off
+                                    {{ $referrer->name }} still owes {{ number_format($recoveryOwed, 0) }} from written-off
                                     loans. It will be deducted from her commission as soon as some is earned.
                                 </p>
                             </div>
@@ -56,9 +56,9 @@
                                 referred by
                                 {{ $referrer->name }} with commission not yet paid out or retained upfront.
                                 Total interest across all of them: <span
-                                    class="font-medium">KES {{ number_format($totalInterest, 0) }}</span>
+                                    class="font-medium">{{ number_format($totalInterest, 0) }}</span>
                                 &mdash; their combined cut at each loan's own share rate: <span
-                                    class="font-medium">KES {{ number_format($totalCut, 0) }}</span>.
+                                    class="font-medium">{{ number_format($totalCut, 0) }}</span>.
                             </p>
                             <div class="overflow-x-auto">
                                 <table class="min-w-full divide-y divide-purple-200 text-sm">
@@ -76,12 +76,12 @@
                                         <tr>
                                             <td class="px-3 py-2 text-gray-800">{{ $loan->borrower_name }}</td>
                                             <td class="px-3 py-2 text-gray-800">
-                                                KES {{ number_format($loan->unpaid_interest, 0) }}</td>
+                                                {{ number_format($loan->unpaid_interest, 0) }}</td>
                                             <td class="px-3 py-2 text-gray-600">{{ number_format($loan->computed_share_percentage, 1) }}
                                                 %
                                             </td>
                                             <td class="px-3 py-2 text-gray-800 font-medium">
-                                                KES {{ number_format($loan->computed_cut, 0) }}</td>
+                                                {{ number_format($loan->computed_cut, 0) }}</td>
                                             <td class="px-3 py-2 text-gray-600">{{ $loan->unpaid_payments->min('payment_date')?->format('M d, Y') }}</td>
                                         </tr>
                                     @endforeach
@@ -107,24 +107,24 @@
                                 <dl class="text-sm space-y-1 max-w-md">
                                     <div class="flex justify-between">
                                         <dt class="text-gray-600">Still owed from write-offs</dt>
-                                        <dd class="font-medium text-gray-900">KES {{ number_format($recoveryOwed, 0) }}</dd>
+                                        <dd class="font-medium text-gray-900">{{ number_format($recoveryOwed, 0) }}</dd>
                                     </div>
                                     <div class="flex justify-between">
                                         <dt class="text-gray-600">Commission (all unpaid)</dt>
-                                        <dd class="font-medium text-gray-900">KES {{ number_format($totalCut, 0) }}</dd>
+                                        <dd class="font-medium text-gray-900">{{ number_format($totalCut, 0) }}</dd>
                                     </div>
                                     <div class="flex justify-between">
                                         <dt class="text-gray-600">Less: write-off recovery</dt>
-                                        <dd class="font-medium text-rose-700">&minus; KES {{ number_format($recoveryDeduction, 0) }}</dd>
+                                        <dd class="font-medium text-rose-700">&minus; {{ number_format($recoveryDeduction, 0) }}</dd>
                                     </div>
                                     <div class="flex justify-between pt-1 border-t border-rose-200">
                                         <dt class="font-medium text-gray-800">Net paid in cash</dt>
-                                        <dd class="font-bold text-gray-900">KES {{ number_format($netPayable, 0) }}</dd>
+                                        <dd class="font-bold text-gray-900">{{ number_format($netPayable, 0) }}</dd>
                                     </div>
                                 </dl>
                                 <p class="mt-2 text-xs text-rose-700">
                                     @if($recoveryOwed > $totalCut)
-                                        Her commission doesn't cover the full amount, so KES {{ number_format($recoveryOwed - $recoveryDeduction, 0) }}
+                                        Her commission doesn't cover the full amount, so {{ number_format($recoveryOwed - $recoveryDeduction, 0) }}
                                         carries forward and comes off future commissions.
                                     @else
                                         Her commission covers the full amount owed.
@@ -173,13 +173,13 @@
                                         <option value="">Select Account</option>
                                         <template x-for="a in eligible" :key="a.id">
                                             <option :value="a.id" :selected="a.id === accountId"
-                                                    x-text="a.name + ' (KES ' + money(a.balance) + ')' + (a.isFloat ? ' — her float' : '')"></option>
+                                                    x-text="a.name + ' (' + money(a.balance) + ')' + (a.isFloat ? ' — her float' : '')"></option>
                                         </template>
                                     </select>
                                     @error('account_id')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
 
                                     <p class="mt-1 text-xs text-gray-500">
-                                        Cash to pay for this period: KES <span x-text="money(netCents / 100)"></span>.
+                                        Cash to pay for this period: <span x-text="money(netCents / 100)"></span>.
                                         Only accounts that can cover it (plus any send fee) are listed.
                                     </p>
                                     <p class="mt-1 text-xs text-red-600" x-show="eligible.length === 0" x-cloak>
@@ -191,7 +191,7 @@
                                             <div class="mt-2 bg-teal-50 border-l-4 border-teal-400 p-3">
                                                 <p class="text-xs text-teal-800">
                                                     Paying from {{ $referrer->name }}'s float (currently
-                                                    KES {{ number_format($floatAccount->current_balance, 0) }}). Her commission comes out of
+                                                    {{ number_format($floatAccount->current_balance, 0) }}). Her commission comes out of
                                                     money she's holding for you, so each loan's cut is also marked as settled on the
                                                     Reconcile Float page. What she still owes you drops by the same amount.
                                                     @if($recoveryDeduction > 0)

@@ -112,7 +112,7 @@ class Account extends Model
         // until settlement, but locked out indefinitely, since nothing before
         // 1970 could ever satisfy "value_date <= last_interest_date". A brand
         // new savings account (or any account where interest recording simply
-        // hasn't started yet) would silently show KES 0 available no matter
+        // hasn't started yet) would silently show 0 available no matter
         // how much money had actually been deposited into it. Falling back to
         // CURDATE() instead makes an account with no interest history behave
         // like a normal account (deposits release once value_date <= today),

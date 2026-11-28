@@ -259,7 +259,7 @@
     <p class="salutation">Dear {{ explode(' ', $user->name)[0] }},</p>
 
     {{-- ── RE Line ─────────────────────────────────────────────────────── --}}
-    <p class="re-line">RE: {{ strtoupper($account->name) }} - KES STATEMENT</p>
+    <p class="re-line">RE: {{ strtoupper($account->name) }} - STATEMENT</p>
 
     {{-- ── Intro ───────────────────────────────────────────────────────── --}}
     <p class="intro">

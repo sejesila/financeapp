@@ -65,8 +65,8 @@
                         </button>
                     </div>
                     <p class="text-2xl sm:text-3xl lg:text-4xl font-bold balance-hidden">
-                        <span class="balance-amount hidden">KES {{ number_format($totalBalance, 0, '.', ',') }}</span>
-                        <span class="balance-placeholder">KES ••••••</span>
+                        <span class="balance-amount hidden">{{ number_format($totalBalance, 0, '.', ',') }}</span>
+                        <span class="balance-placeholder">••••••</span>
                     </p>
                     @php $totalAccountCount = $accounts->count(); @endphp
                     <p class="text-xs mt-1 opacity-90">
@@ -85,8 +85,8 @@
                             </button>
                         </div>
                         <p class="text-2xl sm:text-3xl lg:text-4xl font-bold savings-balance-hidden">
-                            <span class="savings-balance-amount hidden">KES {{ number_format($totalSavings, 0, '.', ',') }}</span>
-                            <span class="savings-balance-placeholder">KES ••••••</span>
+                            <span class="savings-balance-amount hidden">{{ number_format($totalSavings, 0, '.', ',') }}</span>
+                            <span class="savings-balance-placeholder">••••••</span>
                         </p>
                         <p class="text-xs mt-1 opacity-90">
                             Across {{ $savingsAccounts->count() }} {{ Str::plural('account', $savingsAccounts->count()) }}
@@ -149,8 +149,8 @@
                                     <div class="mb-3 balance-hidden">
                                         <p class="text-xs text-gray-600 dark:text-gray-400">Available Balance</p>
                                         <p class="text-xl font-bold {{ $account->current_balance >= 0 ? 'text-green-600' : 'text-red-600' }}">
-                                            <span class="balance-amount hidden">KES {{ number_format($account->current_balance, 0, '.', ',') }}</span>
-                                            <span class="balance-placeholder">KES ••••••</span>
+                                            <span class="balance-amount hidden">{{ number_format($account->current_balance, 0, '.', ',') }}</span>
+                                            <span class="balance-placeholder">••••••</span>
                                         </p>
                                     </div>
 
@@ -228,8 +228,8 @@
                                     <div class="mb-3 savings-balance-hidden">
                                         <p class="text-xs text-gray-600 dark:text-gray-400">Saved Amount</p>
                                         <p class="text-xl font-bold text-green-600 dark:text-green-400">
-                                            <span class="savings-balance-amount hidden">KES {{ number_format($account->current_balance, 0, '.', ',') }}</span>
-                                            <span class="savings-balance-placeholder">KES ••••••</span>
+                                            <span class="savings-balance-amount hidden">{{ number_format($account->current_balance, 0, '.', ',') }}</span>
+                                            <span class="savings-balance-placeholder">••••••</span>
                                         </p>
                                     </div>
 
@@ -286,8 +286,8 @@
                                     <div class="mb-3 wallet-balance-hidden">
                                         <p class="text-xs text-gray-600 dark:text-gray-400">Available Balance</p>
                                         <p class="text-xl font-bold {{ $account->current_balance >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600' }}">
-                                            <span class="wallet-balance-amount hidden">KES {{ number_format($account->current_balance, 0, '.', ',') }}</span>
-                                            <span class="wallet-balance-placeholder">KES ••••••</span>
+                                            <span class="wallet-balance-amount hidden">{{ number_format($account->current_balance, 0, '.', ',') }}</span>
+                                            <span class="wallet-balance-placeholder">••••••</span>
                                         </p>
                                     </div>
 
@@ -373,7 +373,7 @@
                                         @endif
                                     </div>
                                     <p class="font-semibold text-purple-600 dark:text-purple-400 text-sm whitespace-nowrap">
-                                        KES {{ number_format($transfer->amount, 0, '.', ',') }}
+                                        {{ number_format($transfer->amount, 0, '.', ',') }}
                                     </p>
                                 </div>
                             @endforeach

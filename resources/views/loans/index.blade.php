@@ -141,7 +141,7 @@
                 <div class="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 p-6 rounded">
                     <h3 class="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">Total Borrowed (Active)</h3>
                     <p class="text-3xl font-bold text-blue-700 dark:text-blue-400">
-                        KES {{ number_format($activeLoans->sum('principal_amount'), 0, '.', ',') }}
+                        {{ number_format($activeLoans->sum('principal_amount'), 0, '.', ',') }}
                     </p>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ $activeLoans->count() }} active loans</p>
                 </div>
@@ -149,7 +149,7 @@
                 <div class="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-6 rounded">
                     <h3 class="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">Total Outstanding</h3>
                     <p class="text-3xl font-bold text-red-700 dark:text-red-400">
-                        KES {{ number_format($activeLoans->sum('balance'), 0, '.', ',') }}
+                        {{ number_format($activeLoans->sum('balance'), 0, '.', ',') }}
                     </p>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Remaining to repay</p>
                 </div>
@@ -157,7 +157,7 @@
                 <div class="bg-green-50 dark:bg-green-900/20 border-l-4 border-green-500 p-6 rounded">
                     <h3 class="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">Total Repaid</h3>
                     <p class="text-3xl font-bold text-green-700 dark:text-green-400">
-                        KES {{ number_format($filteredPaidLoans->sum('amount_paid'), 0, '.', ',') }}
+                        {{ number_format($filteredPaidLoans->sum('amount_paid'), 0, '.', ',') }}
                     </p>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ $periodLabel }}</p>
                 </div>
@@ -165,7 +165,7 @@
                 <div class="bg-orange-50 dark:bg-orange-900/20 border-l-4 border-orange-500 p-6 rounded">
                     <h3 class="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">Interest/Fees Paid</h3>
                     <p class="text-3xl font-bold text-orange-700 dark:text-orange-400">
-                        KES {{ number_format($totalInterestPaid, 0, '.', ',') }}
+                        {{ number_format($totalInterestPaid, 0, '.', ',') }}
                     </p>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ $periodLabel }}</p>
                 </div>

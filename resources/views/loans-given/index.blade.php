@@ -104,11 +104,11 @@
                                     <div class="sm:ml-4 min-w-0">
                                         <p class="text-xs sm:text-sm font-medium text-gray-500 break-words">Outstanding</p>
                                         <p class="text-base sm:text-lg font-semibold text-gray-900">
-                                            KES {{ number_format($totalOutstanding ?? 0, 0) }}</p>
+                                            {{ number_format($totalOutstanding ?? 0, 0) }}</p>
                                         <p class="text-[10px] sm:text-xs leading-tight text-gray-500">Active loans only</p>
                                         @if(($loanYield['at_risk'] ?? 0) > 0)
                                             <p class="text-[10px] sm:text-xs leading-tight text-amber-600 mt-0.5">
-                                                + KES {{ number_format($loanYield['at_risk'], 0) }} in defaulted loans
+                                                + {{ number_format($loanYield['at_risk'], 0) }} in defaulted loans
                                             </p>
                                         @endif
                                     </div>
@@ -130,7 +130,7 @@
                                     <div class="sm:ml-4 min-w-0">
                                         <p class="text-xs sm:text-sm font-medium text-gray-500 break-words">Principal Disbursed</p>
                                         <p class="text-base sm:text-lg font-semibold text-gray-900">
-                                            KES {{ number_format($totalPrincipal ?? 0, 0) }}</p>
+                                            {{ number_format($totalPrincipal ?? 0, 0) }}</p>
                                         <p class="text-[10px] sm:text-xs leading-tight text-gray-500">Active + paid</p>
                                     </div>
                                 </div>
@@ -152,7 +152,7 @@
                                     <div class="sm:ml-4 min-w-0">
                                         <p class="text-xs sm:text-sm font-medium text-gray-500 break-words">Cash Collected</p>
                                         <p class="text-base sm:text-lg font-semibold text-gray-900">
-                                            KES {{ number_format($totalReceivedAllTime ?? 0, 0) }}</p>
+                                            {{ number_format($totalReceivedAllTime ?? 0, 0) }}</p>
                                         <p class="text-[10px] sm:text-xs leading-tight text-gray-500">Incl. partial payments</p>
                                     </div>
                                 </div>
@@ -175,7 +175,7 @@
                                         <p class="text-xs sm:text-sm font-medium text-gray-500 break-words">Repaid (Closed
                                             Loans)</p>
                                         <p class="text-base sm:text-lg font-semibold text-gray-900">
-                                            KES {{ number_format($totalRepaid ?? 0, 0) }}</p>
+                                            {{ number_format($totalRepaid ?? 0, 0) }}</p>
                                         <p class="text-[10px] sm:text-xs leading-tight text-gray-500">Principal + interest, closed only</p>
                                     </div>
                                 </div>
@@ -197,7 +197,7 @@
                                     <div class="sm:ml-4 min-w-0">
                                         <p class="text-xs sm:text-sm font-medium text-gray-500 break-words">Interest Earned</p>
                                         <p class="text-base sm:text-lg font-semibold text-gray-900">
-                                            KES {{ number_format($totalInterest ?? 0, 0) }}</p>
+                                            {{ number_format($totalInterest ?? 0, 0) }}</p>
                                         <p class="text-[10px] sm:text-xs leading-tight text-gray-500">Incl. active rollovers</p>
                                     </div>
                                 </div>
@@ -218,7 +218,7 @@
                                     <div class="sm:ml-4 min-w-0">
                                         <p class="text-xs sm:text-sm font-medium text-gray-500 break-words">Transaction Costs</p>
                                         <p class="text-base sm:text-lg font-semibold text-gray-900">
-                                            KES {{ number_format($totalTransactionCosts ?? 0, 0) }}</p>
+                                            {{ number_format($totalTransactionCosts ?? 0, 0) }}</p>
                                         <p class="text-[10px] sm:text-xs leading-tight text-gray-500">Disbursement + remittance fees</p>
                                     </div>
                                 </div>
@@ -240,10 +240,10 @@
                                     <div class="sm:ml-4 min-w-0">
                                         <p class="text-xs sm:text-sm font-medium text-gray-500 break-words">Net Interest</p>
                                         <p class="text-base sm:text-lg font-semibold text-gray-900">
-                                            KES {{ number_format($netInterest ?? 0, 0) }}</p>
+                                            {{ number_format($netInterest ?? 0, 0) }}</p>
                                         <p class="text-[10px] sm:text-xs leading-tight text-gray-500">
                                             Interest − costs − referrer share
-                                            (KES {{ number_format($referrerCost ?? 0, 0) }})
+                                            ({{ number_format($referrerCost ?? 0, 0) }})
                                         </p>
                                     </div>
                                 </div>
@@ -466,30 +466,30 @@
                                                 <div class="flex justify-between">
                                                     <span class="text-gray-500">Principal:</span>
                                                     <span
-                                                        class="font-medium">KES {{ number_format($loan->original_principal, 0) }}</span>
+                                                        class="font-medium">{{ number_format($loan->original_principal, 0) }}</span>
                                                 </div>
                                                 @if($loan->capitalized_interest > 0)
                                                     <div class="flex justify-between">
                                                         <span class="text-gray-500">Capitalized Interest:</span>
                                                         <span
-                                                            class="font-medium">KES {{ number_format($loan->capitalized_interest, 0) }}</span>
+                                                            class="font-medium">{{ number_format($loan->capitalized_interest, 0) }}</span>
                                                     </div>
                                                 @endif
                                                 <div class="flex justify-between">
                                                     <span class="text-gray-500">Remaining Principal:</span>
                                                     <span
-                                                        class="font-medium">KES {{ number_format($loan->balance, 0) }}</span>
+                                                        class="font-medium">{{ number_format($loan->balance, 0) }}</span>
                                                 </div>
                                                 <div class="flex justify-between">
                                                     <span class="text-gray-500">Outstanding:</span>
                                                     <span
-                                                        class="font-bold text-indigo-600">KES {{ number_format($loan->outstanding_amount, 0) }}</span>
+                                                        class="font-bold text-indigo-600">{{ number_format($loan->outstanding_amount, 0) }}</span>
                                                 </div>
                                                 @if($loan->amount_paid > 0)
                                                     <div class="flex justify-between">
                                                         <span class="text-gray-500">Received:</span>
                                                         <span
-                                                            class="text-green-600">KES {{ number_format($loan->amount_paid, 0) }}</span>
+                                                            class="text-green-600">{{ number_format($loan->amount_paid, 0) }}</span>
                                                     </div>
                                                 @endif
                                                 <div class="flex justify-between">
@@ -598,12 +598,12 @@
                                                         interest into principal and starts a fresh 30-day period.
                                                     </p>
                                                     <p>Current principal: <span
-                                                            class="font-medium text-gray-900">KES {{ number_format($loan->principal_amount, 0) }}</span>
+                                                            class="font-medium text-gray-900">{{ number_format($loan->principal_amount, 0) }}</span>
                                                     </p>
                                                     <p>New principal: <span
-                                                            class="font-medium text-gray-900">KES {{ number_format($preview['new_principal'], 0) }}</span>
+                                                            class="font-medium text-gray-900">{{ number_format($preview['new_principal'], 0) }}</span>
                                                     </p>
-                                                    <p>New expected interest: <span class="font-medium text-gray-900">KES {{ number_format($preview['new_expected_interest'], 0) }}</span>
+                                                    <p>New expected interest: <span class="font-medium text-gray-900">{{ number_format($preview['new_expected_interest'], 0) }}</span>
                                                     </p>
                                                     <p>New due date: <span
                                                             class="font-medium text-gray-900">{{ $preview['new_due_date']->format('M d, Y') }}</span>
@@ -778,10 +778,10 @@
                                                     @endif
                                                 </td>
                                                 <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
-                                                    KES {{ number_format($loan->original_principal, 0) }}</td>
+                                                    {{ number_format($loan->original_principal, 0) }}</td>
                                                 <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
                                                     @if($loan->interest_amount > 0)
-                                                        KES {{ number_format($loan->interest_amount, 0) }}
+                                                        {{ number_format($loan->interest_amount, 0) }}
                                                         ({{ number_format($loan->interest_rate, 1) }}%)
                                                     @else
                                                         -
@@ -795,15 +795,15 @@
                                                         </a>
                                                         @if($loan->referrer_deducted_before_deposit)
                                                             <span class="block text-xs text-blue-600">
-                                                                KES {{ number_format($loan->referrer_retained_amount, 0) }} kept by referrer
+                                                                {{ number_format($loan->referrer_retained_amount, 0) }} kept by referrer
                                                             </span>
                                                         @elseif($loan->interest_amount > 0 && $loan->referrer_share_percentage !== null)
                                                             @php $cut = round($loan->interest_amount * ($loan->referrer_share_percentage / 100), 2); @endphp
                                                             @if($loan->referrer_payout_id)
-                                                                <span class="block text-xs text-green-600">KES {{ number_format($cut, 0) }} paid out</span>
+                                                                <span class="block text-xs text-green-600">{{ number_format($cut, 0) }} paid out</span>
                                                             @else
                                                                 <span class="block text-xs text-amber-600">
-                                                                    KES {{ number_format($cut, 0) }} owed ({{ number_format($loan->referrer_share_percentage, 1) }}%)
+                                                                    {{ number_format($cut, 0) }} owed ({{ number_format($loan->referrer_share_percentage, 1) }}%)
                                                                 </span>
                                                             @endif
                                                         @endif
@@ -812,7 +812,7 @@
                                                     @endif
                                                 </td>
                                                 <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-green-600">
-                                                    KES {{ number_format($loan->amount_paid, 0) }}</td>
+                                                    {{ number_format($loan->amount_paid, 0) }}</td>
                                                 <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">{{ $loan->repaid_date ? $loan->repaid_date->format('M d, Y') : '-' }}</td>
                                                 <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
                                                     <a href="{{ route('loans-given.show', $loan->id) }}"
@@ -889,7 +889,7 @@
                         legend: {labels: {boxWidth: 12}},
                         tooltip: {
                             callbacks: {
-                                label: c => c.dataset.label + ': KES ' + Math.round(c.parsed.y).toLocaleString(),
+                                label: c => c.dataset.label + ': ' + Math.round(c.parsed.y).toLocaleString(),
                             },
                         },
                     },

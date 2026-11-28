@@ -33,19 +33,19 @@
                             <span class="block text-[10px] font-normal text-gray-400">{{ $r['loans'] }} disbursed</span>
                         </td>
                         <td class="px-4 py-2 text-right font-medium text-emerald-600">
-                            KES {{ number_format($r['interest'], 0) }}
+                            {{ number_format($r['interest'], 0) }}
                         </td>
                         <td class="px-4 py-2 text-right font-medium text-red-600">
-                            KES {{ number_format($r['costs'], 0) }}
+                            {{ number_format($r['costs'], 0) }}
                         </td>
                         <td class="px-4 py-2 text-right font-medium {{ ($r['cost_pct'] ?? 0) >= 9 ? 'text-red-600' : 'text-gray-700' }}">
                             {{ $r['cost_pct'] !== null ? number_format($r['cost_pct'], 1) . '%' : '—' }}
                         </td>
                         <td class="px-4 py-2 text-right font-semibold {{ $r['net'] >= 0 ? 'text-indigo-600' : 'text-red-600' }}">
-                            KES {{ number_format($r['net'], 0) }}
+                            {{ number_format($r['net'], 0) }}
                             @if($k === 'referred' && $r['referrer_cut'] > 0)
                                 <span class="block text-[10px] font-normal text-purple-600">
-        KES {{ number_format($r['net_after_cut'], 0) }} after referrer share
+        {{ number_format($r['net_after_cut'], 0) }} after referrer share
     </span>
                             @endif
                         </td>
@@ -63,13 +63,13 @@
                         All loans
                         <span class="block text-[10px] font-normal text-gray-400">{{ $tLoans }} disbursed</span>
                     </td>
-                    <td class="px-4 py-2 text-right text-emerald-700">KES {{ number_format($t['interest'], 0) }}</td>
-                    <td class="px-4 py-2 text-right text-red-700">KES {{ number_format($t['costs'], 0) }}</td>
+                    <td class="px-4 py-2 text-right text-emerald-700">{{ number_format($t['interest'], 0) }}</td>
+                    <td class="px-4 py-2 text-right text-red-700">{{ number_format($t['costs'], 0) }}</td>
                     <td class="px-4 py-2 text-right {{ ($t['cost_pct'] ?? 0) >= 9 ? 'text-red-700' : 'text-gray-900' }}">
                         {{ $t['cost_pct'] !== null ? number_format($t['cost_pct'], 1) . '%' : '—' }}
                     </td>
                     <td class="px-4 py-2 text-right {{ $tNet >= 0 ? 'text-indigo-700' : 'text-red-700' }}">
-                        KES {{ number_format($tNet, 0) }}
+                        {{ number_format($tNet, 0) }}
                     </td>
                 </tr>
                 </tfoot>

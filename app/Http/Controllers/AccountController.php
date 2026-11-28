@@ -784,7 +784,7 @@ class AccountController extends Controller
         $verb = $account->type === 'savings' ? 'deposited to' : 'topped up';
 
         return redirect()->route('accounts.show', $account)
-            ->with('success', "Account {$verb} successfully with KES " . number_format($request->amount, 0, '.', ','));
+            ->with('success', "Account {$verb} successfully with " . number_format($request->amount, 0, '.', ','));
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
@@ -839,7 +839,7 @@ class AccountController extends Controller
         $this->clearAccountCache($account->id);
 
         return redirect()->route('accounts.show', ['account' => $account, 'tab' => 'topups'])
-            ->with('success', 'Top-up of KES ' . number_format($transaction->amount, 0, '.', ',') . ' has been reversed.');
+            ->with('success', 'Top-up of ' . number_format($transaction->amount, 0, '.', ',') . ' has been reversed.');
     }
 
     // ── record interest form ──────────────────────────────────────────────────
@@ -943,7 +943,7 @@ class AccountController extends Controller
         $account->updateBalance();
         Cache::forget("account.{$account->id}.stats");
 
-        $formattedTotal = 'KES ' . number_format($request->amount, 0, '.', ',');
+        $formattedTotal = '' . number_format($request->amount, 0, '.', ',');
 
         $message = $totalDays === 1
             ? "Interest of {$formattedTotal} recorded for " . now()->format('M d, Y') . '!'
@@ -1011,9 +1011,9 @@ class AccountController extends Controller
         $this->clearAccountCache($fromAccount->id);
         $this->clearAccountCache($toAccount->id);
 
-        $message = 'Transfer of KES ' . number_format($transfer->amount, 0, '.', ',') . ' has been reversed.';
+        $message = 'Transfer of ' . number_format($transfer->amount, 0, '.', ',') . ' has been reversed.';
         if ($feeAmount > 0) {
-            $message .= ' Fee of KES ' . number_format($feeAmount, 2, '.', ',') . ' was also reversed.';
+            $message .= ' Fee of ' . number_format($feeAmount, 2, '.', ',') . ' was also reversed.';
         }
 
         return redirect()->route('accounts.show', ['account' => $account, 'tab' => 'transfers'])

@@ -46,7 +46,7 @@
 
                 <p class="font-bold text-3xl sm:text-4xl md:text-5xl {{ $transaction->category->type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }} mb-2 sm:mb-3">
                     {{ $transaction->category->type === 'income' ? '+' : '−' }}
-                    <span class="tracking-tight">KES {{ number_format($transaction->amount, 0, '.', ',') }}</span>
+                    <span class="tracking-tight">{{ number_format($transaction->amount, 0, '.', ',') }}</span>
                 </p>
 
                 @if($transaction->description)
@@ -114,7 +114,7 @@
                             <dd class="text-xs sm:text-sm">
                                 <a href="{{ route('transactions.show', $transaction->related_fee_transaction_id) }}"
                                    class="inline-flex items-center text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-300 font-semibold transition-colors">
-                                    KES {{ number_format($transaction->feeTransaction->amount ?? 0, 0, '.', ',') }}
+                                    {{ number_format($transaction->feeTransaction->amount ?? 0, 0, '.', ',') }}
                                     <svg class="w-3 h-3 sm:w-4 sm:h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                                     </svg>

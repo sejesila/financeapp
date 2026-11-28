@@ -145,7 +145,7 @@
                                     value="{{ $account->id }}"
                                     {{ ($prefillData['account_id'] ?? old('account_id')) == $account->id ? 'selected' : '' }}
                                 >
-                                    {{ $account->name }} (Balance: KES {{ number_format($account->current_balance, 0) }})
+                                    {{ $account->name }} (Balance: {{ number_format($account->current_balance, 0) }})
                                 </option>
                             @empty
                                 <option disabled>No active MPesa accounts available</option>
@@ -317,7 +317,7 @@
                     <div class="space-y-3 text-sm">
                         <div class="flex justify-between pb-3 border-b border-indigo-200">
                             <span class="text-gray-700">Loan Amount</span>
-                            <span class="font-semibold text-gray-900">KES <span id="ms_principal">0</span></span>
+                            <span class="font-semibold text-gray-900"><span id="ms_principal">0</span></span>
                         </div>
 
                         <div class="flex justify-between pb-3 border-b border-indigo-100">
@@ -325,7 +325,7 @@
                                 <p class="text-gray-700">Excise Duty (1.5%)</p>
                                 <p class="text-xs text-gray-500">Deducted upfront</p>
                             </div>
-                            <span class="font-semibold text-red-600">-KES <span id="ms_excise">0</span></span>
+                            <span class="font-semibold text-red-600">-<span id="ms_excise">0</span></span>
                         </div>
 
                         <div class="flex justify-between pb-3 border-b-2 border-indigo-200 bg-green-50 p-3 rounded">
@@ -333,7 +333,7 @@
                                 <p class="text-gray-700 font-semibold">Deposited to MPesa</p>
                                 <p class="text-xs text-gray-600">You receive</p>
                             </div>
-                            <span class="font-bold text-green-600 text-base">+KES <span id="ms_deposit">0</span></span>
+                            <span class="font-bold text-green-600 text-base">+<span id="ms_deposit">0</span></span>
                         </div>
 
                         <div class="flex justify-between pb-3 border-b border-indigo-100">
@@ -341,7 +341,7 @@
                                 <p class="text-gray-700">Facilitation Fee (7.5%)</p>
                                 <p class="text-xs text-gray-500">Of principal amount</p>
                             </div>
-                            <span class="font-semibold text-orange-600">+KES <span id="ms_facilitation">0</span></span>
+                            <span class="font-semibold text-orange-600">+<span id="ms_facilitation">0</span></span>
                         </div>
 
                         <div class="flex justify-between pb-3 border-b-2 border-indigo-300 bg-red-50 p-3 rounded">
@@ -349,7 +349,7 @@
                                 <p class="text-gray-700 font-semibold">Standard Repayment</p>
                                 <p class="text-xs text-gray-600">30-day term</p>
                             </div>
-                            <span class="font-bold text-red-600 text-base">KES <span id="ms_standard">0</span></span>
+                            <span class="font-bold text-red-600 text-base"><span id="ms_standard">0</span></span>
                         </div>
 
                         <div class="mt-4 pt-4 border-t-2 border-indigo-300">
@@ -357,19 +357,19 @@
 
                             <div class="flex justify-between pb-2 text-xs">
                                 <span class="text-gray-700">Facilitation Refund (24%)</span>
-                                <span class="text-green-600 font-semibold">-KES <span id="ms_refund">0</span></span>
+                                <span class="text-green-600 font-semibold">-<span id="ms_refund">0</span></span>
                             </div>
 
                             <div class="flex justify-between p-2 bg-green-50 rounded border border-green-200">
                                 <span class="text-gray-700 font-semibold">Early Repayment Total</span>
-                                <span class="font-bold text-green-600">KES <span id="ms_early">0</span></span>
+                                <span class="font-bold text-green-600"><span id="ms_early">0</span></span>
                             </div>
                         </div>
 
                         <div class="mt-4 pt-4 border-t-2 border-indigo-300 space-y-2">
                             <div class="flex justify-between text-xs">
                                 <span class="text-gray-600">Savings (Early)</span>
-                                <span class="text-green-600 font-semibold">KES <span id="ms_savings">0</span></span>
+                                <span class="text-green-600 font-semibold"><span id="ms_savings">0</span></span>
                             </div>
                         </div>
                     </div>
@@ -383,7 +383,7 @@
                     <div class="space-y-3 text-sm">
                         <div class="flex justify-between pb-3 border-b border-purple-200">
                             <span class="text-gray-700">Loan Amount</span>
-                            <span class="font-semibold text-gray-900">KES <span id="kcb_principal">0</span></span>
+                            <span class="font-semibold text-gray-900"><span id="kcb_principal">0</span></span>
                         </div>
 
                         <div class="flex justify-between pb-3 border-b-2 border-purple-200 bg-green-50 p-3 rounded">
@@ -391,7 +391,7 @@
                                 <p class="text-gray-700 font-semibold">Deposited to MPesa</p>
                                 <p class="text-xs text-gray-600">Full amount received</p>
                             </div>
-                            <span class="font-bold text-green-600 text-base">+KES <span id="kcb_deposit">0</span></span>
+                            <span class="font-bold text-green-600 text-base">+<span id="kcb_deposit">0</span></span>
                         </div>
 
                         <div class="flex justify-between pb-3 border-b border-purple-100">
@@ -399,7 +399,7 @@
                                 <p class="text-gray-700">Facility Fee (1.76%)</p>
                                 <p class="text-xs text-gray-500">Of principal amount</p>
                             </div>
-                            <span class="font-semibold text-orange-600">+KES <span id="kcb_facility">0</span></span>
+                            <span class="font-semibold text-orange-600">+<span id="kcb_facility">0</span></span>
                         </div>
 
                         <div class="flex justify-between pb-3 border-b border-purple-100">
@@ -407,7 +407,7 @@
                                 <p class="text-gray-700">Interest (7.05%)</p>
                                 <p class="text-xs text-gray-500">Of principal amount</p>
                             </div>
-                            <span class="font-semibold text-orange-600">+KES <span id="kcb_interest">0</span></span>
+                            <span class="font-semibold text-orange-600">+<span id="kcb_interest">0</span></span>
                         </div>
 
                         <div class="flex justify-between pb-3 border-b-2 border-purple-300 bg-red-50 p-3 rounded">
@@ -415,13 +415,13 @@
                                 <p class="text-gray-700 font-semibold">Total Repayment</p>
                                 <p class="text-xs text-gray-600">30-day term</p>
                             </div>
-                            <span class="font-bold text-red-600 text-base">KES <span id="kcb_total">0</span></span>
+                            <span class="font-bold text-red-600 text-base"><span id="kcb_total">0</span></span>
                         </div>
 
                         <div class="mt-4 pt-4 border-t-2 border-purple-300">
                             <p class="text-xs font-semibold text-gray-600 mb-3 uppercase">Early Repayment (Within 10 Days)</p>
                             <p class="text-xs text-gray-600 bg-purple-100 p-2 rounded">
-                                💰 Repay within 10 days to get the full facility fee (KES <span id="kcb_facility_refund">0</span>) refunded!
+                                💰 Repay within 10 days to get the full facility fee (<span id="kcb_facility_refund">0</span>) refunded!
                             </p>
                         </div>
                     </div>
@@ -434,7 +434,7 @@
                     <div class="space-y-3 text-sm">
                         <div class="flex justify-between pb-3 border-b border-amber-200">
                             <span class="text-gray-700">Loan Amount (Principal)</span>
-                            <span class="font-semibold text-gray-900">KES <span id="other_principal">0</span></span>
+                            <span class="font-semibold text-gray-900"><span id="other_principal">0</span></span>
                         </div>
 
                         <div class="flex justify-between pb-3 border-b-2 border-amber-200 bg-green-50 p-3 rounded">
@@ -442,7 +442,7 @@
                                 <p class="text-gray-700 font-semibold">Deposited to Account</p>
                                 <p class="text-xs text-gray-600">Full amount received</p>
                             </div>
-                            <span class="font-bold text-green-600 text-base">+KES <span id="other_deposit">0</span></span>
+                            <span class="font-bold text-green-600 text-base">+<span id="other_deposit">0</span></span>
                         </div>
 
                         <div class="flex justify-between pb-3 border-b border-amber-100">
@@ -450,7 +450,7 @@
                                 <p class="text-gray-700">Interest Amount</p>
                                 <p class="text-xs text-gray-500">Fixed interest (if any)</p>
                             </div>
-                            <span class="font-semibold text-orange-600">+KES <span id="other_interest">0</span></span>
+                            <span class="font-semibold text-orange-600">+<span id="other_interest">0</span></span>
                         </div>
 
                         <div class="flex justify-between pb-3 border-b-2 border-amber-300 bg-red-50 p-3 rounded">
@@ -458,7 +458,7 @@
                                 <p class="text-gray-700 font-semibold">Total Repayment</p>
                                 <p class="text-xs text-gray-600">Principal + Interest</p>
                             </div>
-                            <span class="font-bold text-red-600 text-base">KES <span id="other_total">0</span></span>
+                            <span class="font-bold text-red-600 text-base"><span id="other_total">0</span></span>
                         </div>
 
                         <div class="mt-4 pt-4 border-t-2 border-amber-300">
@@ -605,7 +605,7 @@
                 // Update note based on whether there's interest
                 const noteEl = document.getElementById('other_note');
                 if (interestAmount > 0) {
-                    noteEl.textContent = '💰 Interest-bearing loan - Total to repay: KES ' + formatNumber(totalRepayment);
+                    noteEl.textContent = '💰 Interest-bearing loan - Total to repay: ' + formatNumber(totalRepayment);
                 } else {
                     noteEl.textContent = '✨ Interest-free loan - Only repay principal amount';
                 }

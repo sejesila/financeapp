@@ -22,19 +22,19 @@
                     </p>
 
                     <p class="text-[10px] sm:text-xs leading-tight text-gray-500">
-                        Net interest KES {{ number_format($loanYield['net_interest'], 0) }}
-                        on avg KES {{ number_format($loanYield['avg_capital'], 0) }} out
+                        Net interest {{ number_format($loanYield['net_interest'], 0) }}
+                        on avg {{ number_format($loanYield['avg_capital'], 0) }} out
                     </p>
 
                     @if(($loanYield['write_offs'] ?? 0) > 0)
                         <p class="text-[10px] sm:text-xs leading-tight text-red-600 mt-0.5">
-                            Includes KES {{ number_format($loanYield['write_offs'], 0) }} written off.
+                            Includes {{ number_format($loanYield['write_offs'], 0) }} written off.
                         </p>
                     @endif
 
                     @if(($loanYield['at_risk'] ?? 0) > 0)
                         <p class="text-[10px] sm:text-xs leading-tight text-amber-600 mt-0.5">
-                            KES {{ number_format($loanYield['at_risk'], 0) }} in defaulted loans not deducted.
+                            {{ number_format($loanYield['at_risk'], 0) }} in defaulted loans not deducted.
                             If never recovered:
                             <span class="font-semibold">{{ number_format($loanYield['stress_return_pct'], 1) }}%</span>
                             (≈ {{ number_format($loanYield['stress_annualized_pct'], 0) }}% annualized).

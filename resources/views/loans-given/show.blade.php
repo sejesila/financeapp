@@ -52,9 +52,9 @@
                                 overdue (7+ days past due, uncollected). Rolling over capitalizes the expected
                                 interest into principal and starts a fresh 30-day period.
                             </p>
-                            <p>Current principal: <span class="font-medium text-gray-900">KES {{ number_format($loanGiven->principal_amount, 0) }}</span></p>
-                            <p>New principal: <span class="font-medium text-gray-900">KES {{ number_format($rolloverPreview['new_principal'], 0) }}</span></p>
-                            <p>New expected interest: <span class="font-medium text-gray-900">KES {{ number_format($rolloverPreview['new_expected_interest'], 0) }}</span></p>
+                            <p>Current principal: <span class="font-medium text-gray-900">{{ number_format($loanGiven->principal_amount, 0) }}</span></p>
+                            <p>New principal: <span class="font-medium text-gray-900">{{ number_format($rolloverPreview['new_principal'], 0) }}</span></p>
+                            <p>New expected interest: <span class="font-medium text-gray-900">{{ number_format($rolloverPreview['new_expected_interest'], 0) }}</span></p>
                             <p>New due date: <span class="font-medium text-gray-900">{{ $rolloverPreview['new_due_date']->format('M d, Y') }}</span></p>
                         </div>
                         <form method="POST" action="{{ route('loans-given.rollover', $loanGiven->id) }}">
@@ -149,15 +149,15 @@
                                 <div class="flex justify-between py-2 border-b border-gray-100">
                                     <dt class="text-sm font-medium text-gray-500">Principal</dt>
                                     <dd class="text-sm text-gray-900">
-                                        KES {{ number_format($loanGiven->original_principal, 0) }}</dd>
+                                        {{ number_format($loanGiven->original_principal, 0) }}</dd>
                                 </div>
                                 @if($loanGiven->capitalized_interest > 0)
                                     <div class="flex justify-between items-start py-2 border-b border-gray-100">
                                         <dt class="text-sm font-medium text-gray-500 shrink-0">Capitalized Interest</dt>
                                         <dd class="text-sm text-gray-600 text-right">
-                                            KES {{ number_format($loanGiven->capitalized_interest, 0) }}
+                                            {{ number_format($loanGiven->capitalized_interest, 0) }}
                                             <span class="block text-xs text-gray-400">
-                                                Rolled into principal — current principal KES {{ number_format($loanGiven->principal_amount, 0) }}
+                                                Rolled into principal — current principal {{ number_format($loanGiven->principal_amount, 0) }}
                                             </span>
                                         </dd>
                                     </div>
@@ -166,30 +166,30 @@
                                     <div class="flex justify-between py-2 border-b border-gray-100">
                                         <dt class="text-sm font-medium text-gray-500">Transaction Cost</dt>
                                         <dd class="text-sm text-gray-600">
-                                            KES {{ number_format($disbursementFee->amount, 0) }}
+                                            {{ number_format($disbursementFee->amount, 0) }}
                                             <span class="block text-xs text-gray-400">Recorded as an expense — not part of what's owed</span>
                                         </dd>
                                     </div>
                                 @endif
                                 {{-- FIX: added items-start on the row, shrink-0 on the dt, and
                                      text-right on the dd, so the long "Expected..." caption
-                                     doesn't force the KES value to sit jammed against the label
+                                     doesn't force the value to sit jammed against the label
                                      instead of flush right like every other row. --}}
                                 <div class="flex justify-between items-start py-2 border-b border-gray-100">
                                     <dt class="text-sm font-medium text-gray-500 shrink-0">Interest</dt>
                                     <dd class="text-sm text-gray-900 text-right">
                                         @if($loanGiven->status === 'paid')
                                             @if($loanGiven->interest_amount > 0)
-                                                KES {{ number_format($loanGiven->interest_amount, 0) }}
+                                                {{ number_format($loanGiven->interest_amount, 0) }}
                                                 ({{ number_format($loanGiven->interest_rate, 1) }}%)
                                             @else
                                                 <span class="text-gray-500">None — repaid at principal only</span>
                                             @endif
                                         @elseif($loanGiven->expected_interest_rate !== null)
-                                            KES {{ number_format($loanGiven->expected_interest_amount, 0) }}
+                                            {{ number_format($loanGiven->expected_interest_amount, 0) }}
                                             ({{ number_format($loanGiven->expected_interest_rate, 1) }}%)
                                             <span class="block text-xs text-gray-400">
-                                                Expected — total expected KES {{ number_format($loanGiven->principal_amount + $loanGiven->expected_interest_amount, 0) }}.
+                                                Expected — total expected {{ number_format($loanGiven->principal_amount + $loanGiven->expected_interest_amount, 0) }}.
                                                 Actual is still calculated when the loan is closed.
                                                 @if($loanGiven->rollover_count > 0)
                                                     Rolled over {{ $loanGiven->rollover_count }} time{{ $loanGiven->rollover_count > 1 ? 's' : '' }} so far.
@@ -209,7 +209,7 @@
                                             @php $interestSoFar = $loanGiven->payments->sum('interest_portion'); @endphp
                                             @if($interestSoFar > 0)
                                                 <span class="block text-xs text-green-600 mt-1">
-                                                    KES {{ number_format($interestSoFar, 0) }} already recognized so far (from rollover payments).
+                                                    {{ number_format($interestSoFar, 0) }} already recognized so far (from rollover payments).
                                                 </span>
                                             @endif
                                         @endif
@@ -220,10 +220,10 @@
                                         <dt class="text-sm font-medium text-gray-500">Referrer's Cut</dt>
                                         <dd class="text-sm text-gray-900">
                                             @if($loanGiven->referrer_deducted_before_deposit)
-                                                KES {{ number_format($loanGiven->referrer_retained_amount, 0) }}
+                                                {{ number_format($loanGiven->referrer_retained_amount, 0) }}
                                                 <span class="text-xs text-gray-500">(already kept before depositing — nothing owed)</span>
                                             @elseif($referrerPayout !== null)
-                                                KES {{ number_format($referrerPayout, 0) }}
+                                                {{ number_format($referrerPayout, 0) }}
                                                 <span class="text-xs text-gray-500">({{ number_format($loanGiven->referrer_share_percentage, 1) }}% of interest)</span>
                                             @else
                                                 <span class="text-gray-500">Nothing due — no interest was earned</span>
@@ -234,19 +234,19 @@
                                 <div class="flex justify-between py-2 border-b border-gray-100">
                                     <dt class="text-sm font-medium text-gray-500">Total Received</dt>
                                     <dd class="text-sm text-gray-900 font-medium">
-                                        KES {{ number_format($loanGiven->amount_paid, 0) }}</dd>
+                                        {{ number_format($loanGiven->amount_paid, 0) }}</dd>
                                 </div>
                                 <div class="flex justify-between py-2 border-b border-gray-100">
                                     <dt class="text-sm font-medium text-gray-500">Outstanding Principal</dt>
                                     <dd class="text-sm font-bold text-indigo-600">
-                                        KES {{ number_format($loanGiven->balance, 0) }}</dd>
+                                        {{ number_format($loanGiven->balance, 0) }}</dd>
                                 </div>
                                 @if($loanGiven->status === 'active' && $loanGiven->surplus_received > 0)
                                     <div class="flex justify-between py-2 border-b border-gray-100">
                                         <dt class="text-sm font-medium text-gray-500">Received Above Principal So Far
                                         </dt>
                                         <dd class="text-sm text-purple-600 font-medium">
-                                            KES {{ number_format($loanGiven->surplus_received, 0) }}</dd>
+                                            {{ number_format($loanGiven->surplus_received, 0) }}</dd>
                                     </div>
                                 @endif
 
@@ -255,7 +255,7 @@
                                     <div class="flex justify-between items-start py-2 border-b border-gray-100">
                                         <dt class="text-sm font-medium text-gray-500 shrink-0">Charged to Referrer</dt>
                                         <dd class="text-sm text-gray-900 text-right">
-                                            KES {{ number_format($recovery->amount, 0) }}
+                                            {{ number_format($recovery->amount, 0) }}
                                             <span class="block text-xs text-gray-400">
                                                 Deducted from {{ $loanGiven->referrer?->name }}'s commission at each payout
                                             </span>
@@ -264,12 +264,12 @@
                                     <div class="flex justify-between py-2 border-b border-gray-100">
                                         <dt class="text-sm font-medium text-gray-500">Recovered So Far</dt>
                                         <dd class="text-sm text-green-600 font-medium">
-                                            KES {{ number_format($recovery->recovered, 0) }}</dd>
+                                            {{ number_format($recovery->recovered, 0) }}</dd>
                                     </div>
                                     <div class="flex justify-between py-2 border-b border-gray-100">
                                         <dt class="text-sm font-medium text-gray-500">Still to Recover</dt>
                                         <dd class="text-sm font-bold {{ $recovery->outstanding > 0 ? 'text-amber-600' : 'text-gray-500' }}">
-                                            KES {{ number_format($recovery->outstanding, 0) }}
+                                            {{ number_format($recovery->outstanding, 0) }}
                                             @if($recovery->status === 'settled')
                                                 <span class="text-xs font-normal text-gray-400">(settled)</span>
                                             @endif
@@ -471,7 +471,7 @@
                                     <tr>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ $payment->payment_date->format('M d, Y') }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                            KES {{ number_format($payment->amount, 0) }}</td>
+                                            {{ number_format($payment->amount, 0) }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $payment->account->name ?? 'N/A' }}</td>
                                         <td class="px-6 py-4 text-sm text-gray-500">{{ $payment->notes ?? '-' }}</td>
                                     </tr>
@@ -483,7 +483,7 @@
                                         Total
                                     </th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                                        KES {{ number_format($loanGiven->payments->sum('amount'), 0) }}</th>
+                                        {{ number_format($loanGiven->payments->sum('amount'), 0) }}</th>
                                     <th colspan="2"></th>
                                 </tr>
                                 </tfoot>
@@ -511,15 +511,15 @@
                 </div>
                 <div class="text-sm text-gray-600 space-y-2 mb-4">
                     <p>Principal: <span
-                            class="font-medium text-gray-900">KES {{ number_format($loanGiven->original_principal, 0) }}</span>
+                            class="font-medium text-gray-900">{{ number_format($loanGiven->original_principal, 0) }}</span>
                     </p>
                     <p>Total received so far: <span
-                            class="font-medium text-gray-900">KES {{ number_format($loanGiven->amount_paid, 0) }}</span>
+                            class="font-medium text-gray-900">{{ number_format($loanGiven->amount_paid, 0) }}</span>
                     </p>
                     <p class="pt-2 border-t border-gray-100">
                         Closing now will mark this loan as paid and calculate interest as
                         <span
-                            class="font-medium text-gray-900">KES {{ number_format($loanGiven->surplus_received, 0) }}</span>
+                            class="font-medium text-gray-900">{{ number_format($loanGiven->surplus_received, 0) }}</span>
                         ({{ $loanGiven->original_principal > 0 ? number_format(($loanGiven->surplus_received / $loanGiven->original_principal) * 100, 1) : 0 }}
                         %).
                     </p>
@@ -528,14 +528,14 @@
                             Referrer <span class="font-medium text-gray-900">{{ $loanGiven->referrer->name }}</span>
                             will be owed
                             <span class="font-medium text-gray-900">
-                                KES {{ number_format($loanGiven->surplus_received * (($loanGiven->referrer_share_percentage ?? 0) / 100), 0) }}
+                                {{ number_format($loanGiven->surplus_received * (($loanGiven->referrer_share_percentage ?? 0) / 100), 0) }}
                             </span>
                             ({{ number_format($loanGiven->referrer_share_percentage ?? 0, 1) }}% of that interest).
                         </p>
                     @endif
                     @if($loanGiven->remaining_principal > 0)
                         <p class="text-amber-600">
-                            ⚠️ Note: KES {{ number_format($loanGiven->remaining_principal, 0) }} of principal hasn't
+                            ⚠️ Note: {{ number_format($loanGiven->remaining_principal, 0) }} of principal hasn't
                             been received yet — closing now treats the loan as settled anyway.
                         </p>
                     @endif
@@ -555,7 +555,7 @@
                                 <option value="">Select Account</option>
                                 @foreach($interestDestinationAccounts as $account)
                                     <option value="{{ $account->id }}">{{ $account->name }}
-                                        (KES {{ number_format($account->current_balance, 0) }})
+                                        ({{ number_format($account->current_balance, 0) }})
                                     </option>
                                 @endforeach
                             </select>
@@ -628,8 +628,8 @@
 
                         @if($recovery)
                             <p class="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-                                KES {{ number_format($recovery->amount, 0) }} of this write-off is charged to
-                                {{ $loanGiven->referrer?->name }} (KES {{ number_format($recovery->recovered, 0) }} recovered so far).
+                                {{ number_format($recovery->amount, 0) }} of this write-off is charged to
+                                {{ $loanGiven->referrer?->name }} ({{ number_format($recovery->recovered, 0) }} recovered so far).
                                 Moving the loan out of "Written Off" removes the charge, unless part of it has already
                                 been recovered from her commission — then the change is blocked.
                             </p>
@@ -642,7 +642,7 @@
                         <div x-show="status === 'written_off'" x-cloak
                              class="mb-4 border border-purple-200 bg-purple-50 rounded-lg p-4 space-y-3">
                             <p class="text-sm text-gray-800">
-                                KES {{ number_format($recoverable, 0) }} will be recovered from
+                                {{ number_format($recoverable, 0) }} will be recovered from
                                 {{ $loanGiven->referrer->name }}'s commission.
                             </p>
 

@@ -19,7 +19,7 @@
 
             <div class="bg-gradient-to-r from-slate-600 to-indigo-700 text-white p-4 sm:p-6 rounded-lg shadow-lg">
                 <p class="text-xs sm:text-sm font-semibold">🏦 Total Retirement Savings</p>
-                <p class="text-2xl sm:text-4xl font-bold mt-1">KES {{ number_format($total, 0, '.', ',') }}</p>
+                <p class="text-2xl sm:text-4xl font-bold mt-1">{{ number_format($total, 0, '.', ',') }}</p>
 {{--                <p class="text-xs mt-1 opacity-90">Across {{ $funds->count() }} {{ Str::plural('fund', $funds->count()) }}. </p>--}}
             </div>
 
@@ -30,10 +30,10 @@
                         <p class="text-xs uppercase tracking-wide text-gray-500">{{ $fund->type === 'nssf' ? 'NSSF' : 'Provident Fund' }}</p>
                         <h3 class="font-semibold text-gray-800 dark:text-gray-200">{{ $fund->name }}</h3>
                         <p class="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-2">
-                            KES {{ number_format($fund->balance(), 0, '.', ',') }}
+                            {{ number_format($fund->balance(), 0, '.', ',') }}
                         </p>
                         <p class="text-xs text-gray-500 mt-1">
-                            Opening KES {{ number_format($fund->opening_balance, 0) }}
+                            Opening {{ number_format($fund->opening_balance, 0) }}
                             @if($fund->opening_balance_date) as at {{ $fund->opening_balance_date->format('M d, Y') }} @endif
                         </p>
                     </a>

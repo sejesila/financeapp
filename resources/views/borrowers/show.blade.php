@@ -77,12 +77,12 @@
                     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
                         <div class="bg-gradient-to-br from-purple-50 to-purple-100 shadow-sm rounded-lg border border-purple-200 p-3 sm:p-4">
                             <p class="text-xs sm:text-sm font-medium text-gray-500">Interest Earned</p>
-                            <p class="text-base sm:text-lg font-semibold text-gray-900">KES {{ number_format($stats['interest_earned'], 0) }}</p>
+                            <p class="text-base sm:text-lg font-semibold text-gray-900">{{ number_format($stats['interest_earned'], 0) }}</p>
                             <p class="text-[10px] sm:text-xs text-gray-500">Avg rate {{ number_format($stats['avg_interest_rate'], 1) }}% (closed)</p>
                         </div>
                         <div class="bg-gradient-to-br from-blue-50 to-blue-100 shadow-sm rounded-lg border border-blue-200 p-3 sm:p-4">
                             <p class="text-xs sm:text-sm font-medium text-gray-500">Total Borrowed</p>
-                            <p class="text-base sm:text-lg font-semibold text-gray-900">KES {{ number_format($stats['total_borrowed'], 0) }}</p>
+                            <p class="text-base sm:text-lg font-semibold text-gray-900">{{ number_format($stats['total_borrowed'], 0) }}</p>
                             <p class="text-[10px] sm:text-xs text-gray-500">{{ $stats['loans_count'] }} loan{{ $stats['loans_count'] === 1 ? '' : 's' }}</p>
                         </div>
                         <div class="bg-gradient-to-br from-teal-50 to-teal-100 shadow-sm rounded-lg border border-teal-200 p-3 sm:p-4">
@@ -99,7 +99,7 @@
                         </div>
                         <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 shadow-sm rounded-lg border border-indigo-200 p-3 sm:p-4">
                             <p class="text-xs sm:text-sm font-medium text-gray-500">Outstanding</p>
-                            <p class="text-base sm:text-lg font-semibold text-gray-900">KES {{ number_format($stats['outstanding'], 0) }}</p>
+                            <p class="text-base sm:text-lg font-semibold text-gray-900">{{ number_format($stats['outstanding'], 0) }}</p>
                             <p class="text-[10px] sm:text-xs text-gray-500">{{ $stats['active_count'] }} active</p>
                         </div>
                         <div class="bg-gradient-to-br from-green-50 to-green-100 shadow-sm rounded-lg border border-green-200 p-3 sm:p-4">
@@ -120,7 +120,7 @@
                         <div class="bg-gradient-to-br from-red-50 to-red-100 shadow-sm rounded-lg border border-red-200 p-3 sm:p-4">
                             <p class="text-xs sm:text-sm font-medium text-gray-500">Defaulted / Written Off</p>
                             <p class="text-base sm:text-lg font-semibold text-gray-900">{{ $stats['bad_count'] }}</p>
-                            <p class="text-[10px] sm:text-xs text-gray-500">KES {{ number_format($stats['unrecovered'], 0) }} unrecovered</p>
+                            <p class="text-[10px] sm:text-xs text-gray-500">{{ number_format($stats['unrecovered'], 0) }} unrecovered</p>
                         </div>
                     </div>
 
@@ -148,7 +148,7 @@
                                     @endphp
                                     <tr class="hover:bg-gray-50">
                                         <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">{{ $loan->disbursed_date->format('M d, Y') }}</td>
-                                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">KES {{ number_format($loan->original_principal, 0) }}</td>
+                                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">{{ number_format($loan->original_principal, 0) }}</td>
                                         <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
                                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $statusStyles[$loan->status] ?? 'bg-gray-100 text-gray-700' }}">
                                                 {{ ucfirst(str_replace('_', ' ', $loan->status)) }}
@@ -159,9 +159,9 @@
                                         </td>
                                         <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
                                             @if($loan->status === 'paid' && $loan->interest_amount > 0)
-                                                KES {{ number_format($loan->interest_amount, 0) }} ({{ number_format($loan->interest_rate, 1) }}%)
+                                                {{ number_format($loan->interest_amount, 0) }} ({{ number_format($loan->interest_rate, 1) }}%)
                                             @elseif($loan->status === 'active' && $soFar > 0)
-                                                KES {{ number_format($soFar, 0) }} <span class="text-[10px] text-gray-400">(so far)</span>
+                                                {{ number_format($soFar, 0) }} <span class="text-[10px] text-gray-400">(so far)</span>
                                             @else
                                                 -
                                             @endif

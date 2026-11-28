@@ -31,10 +31,10 @@ class LoanController extends Controller implements HasMiddleware
     {
         $this->authorize('viewAny', Loan::class);
 
-        $filter    = $request->get('filter', 'active');
-        $period    = $request->get('period');
-        $startDate = $request->get('start_date');
-        $endDate   = $request->get('end_date');
+        $filter    = $request->input('filter', 'active');
+        $period    = $request->input('period');
+        $startDate = $request->input('start_date');
+        $endDate   = $request->input('end_date');
 
         $minYear = Loan::where('user_id', Auth::id())->min(DB::raw('YEAR(disbursed_date)')) ?? date('Y');
         $maxYear = date('Y');
@@ -229,17 +229,17 @@ class LoanController extends Controller implements HasMiddleware
             $depositAmount  = $breakdown['deposit_amount'];
             $totalRepayment = $breakdown['total_repayment'] ?? $breakdown['standard_repayment'];
 
-            $message = "Loan created successfully! KES " . number_format($depositAmount, 0) . " has been deposited to {$account->name}. ";
+            $message = "Loan created successfully! " . number_format($depositAmount, 0) . " has been deposited to {$account->name}. ";
 
             if ($loanType === 'other') {
                 $message .= $customInterestAmount > 0
-                    ? "Total repayment: KES " . number_format($totalRepayment, 0) . " (Principal: " . number_format($principalAmount, 0) . " + Interest: " . number_format($customInterestAmount, 0) . ")."
-                    : "Total repayment: KES " . number_format($totalRepayment, 0) . " (No interest).";
+                    ? "Total repayment: " . number_format($totalRepayment, 0) . " (Principal: " . number_format($principalAmount, 0) . " + Interest: " . number_format($customInterestAmount, 0) . ")."
+                    : "Total repayment: " . number_format($totalRepayment, 0) . " (No interest).";
                 if ($dueDate) {
                     $message .= " Due on " . Carbon::parse($dueDate)->format('M d, Y') . ".";
                 }
             } else {
-                $message .= "Total repayment: KES " . number_format($totalRepayment, 0) . ". ";
+                $message .= "Total repayment: " . number_format($totalRepayment, 0) . ". ";
                 $message .= "Due on " . Carbon::parse($dueDate)->format('M d, Y') . ".";
             }
 
@@ -354,8 +354,8 @@ class LoanController extends Controller implements HasMiddleware
             if ($paymentAccount->current_balance < $paymentAmount) {
                 throw new Exception(
                     "Insufficient balance in {$paymentAccount->name}. " .
-                    "Required: KES " . number_format($paymentAmount, 0) . ", " .
-                    "Available: KES " . number_format($paymentAccount->current_balance, 0)
+                    "Required: " . number_format($paymentAmount, 0) . ", " .
+                    "Available: " . number_format($paymentAccount->current_balance, 0)
                 );
             }
 
@@ -443,14 +443,14 @@ class LoanController extends Controller implements HasMiddleware
                 Account::find($loan->account_id)?->updateBalance();
             }
 
-            $successMessage = "Payment of KES " . number_format($paymentAmount, 0) . " recorded successfully from {$paymentAccount->name}!";
+            $successMessage = "Payment of " . number_format($paymentAmount, 0) . " recorded successfully from {$paymentAccount->name}!";
 
             if ($earlyRepaymentCredit > 0) {
                 $daysElapsed   = Carbon::parse($loan->disbursed_date)->diffInDays(Carbon::parse($paymentDate));
                 $creditAccount = Account::find($loan->account_id)->name ?? 'your account';
                 $successMessage .= $loanType === 'kcb_mpesa'
-                    ? " Early repayment cashback of KES " . number_format($earlyRepaymentCredit, 0) . " (facility fee refunded) credited to {$creditAccount} for repaying within {$daysElapsed} days!"
-                    : " Early repayment credit of KES " . number_format($earlyRepaymentCredit, 0) . " (20% of loan fees refunded) credited to {$creditAccount} for repaying within {$daysElapsed} days!";
+                    ? " Early repayment cashback of " . number_format($earlyRepaymentCredit, 0) . " (facility fee refunded) credited to {$creditAccount} for repaying within {$daysElapsed} days!"
+                    : " Early repayment credit of " . number_format($earlyRepaymentCredit, 0) . " (20% of loan fees refunded) credited to {$creditAccount} for repaying within {$daysElapsed} days!";
             }
 
             return redirect()->route('loans.show', $loan->id)->with('success', $successMessage);

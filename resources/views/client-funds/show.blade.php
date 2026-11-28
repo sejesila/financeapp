@@ -37,7 +37,7 @@
             @if(($borrowedTotal ?? 0) > 0)
                 <div class="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-400 p-3 sm:p-4 mb-4">
                     <p class="text-sm text-red-800 dark:text-red-300">
-                        🚩 KES {{ number_format($borrowedTotal, 0) }} of this fund's balance is
+                        🚩 {{ number_format($borrowedTotal, 0) }} of this fund's balance is
                         currently <strong>borrowed</strong> and not yet returned.
                     </p>
                 </div>
@@ -291,7 +291,7 @@
                         required
                     >
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Available: KES {{ number_format($clientFund->balance, 0, '.', ',') }}
+                        Available: {{ number_format($clientFund->balance, 0, '.', ',') }}
                     </p>
                 </div>
                 <div class="mb-3 sm:mb-4">
@@ -388,7 +388,7 @@
                             required
                         >
                         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            Available: KES {{ number_format($clientFund->balance, 0, '.', ',') }}
+                            Available: {{ number_format($clientFund->balance, 0, '.', ',') }}
                         </p>
                     </div>
 
@@ -449,7 +449,7 @@
                         required
                     >
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Available: KES {{ number_format($clientFund->balance, 0, '.', ',') }}
+                        Available: {{ number_format($clientFund->balance, 0, '.', ',') }}
                     </p>
                 </div>
 

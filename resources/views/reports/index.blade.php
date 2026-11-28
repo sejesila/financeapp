@@ -164,8 +164,8 @@
                 color="green">
                 @if($interestIncome['total'] > 0)
                     <p class="text-xs mt-1 text-gray-500">
-                        Savings: KES {{ number_format($interestIncome['savings_interest'], 0) }}
-                        &bull; Loans given: KES {{ number_format($interestIncome['loan_given_interest'], 0) }}
+                        Savings: {{ number_format($interestIncome['savings_interest'], 0) }}
+                        &bull; Loans given: {{ number_format($interestIncome['loan_given_interest'], 0) }}
                     </p>
                 @endif
                 @if($interestChange !== null)
@@ -178,9 +178,9 @@
         @if($referrerShareOwed > 0)
             <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                 Referrer share still owed on loans closed this period:
-                <strong>KES {{ number_format($referrerShareOwed) }}</strong>.
+                <strong>{{ number_format($referrerShareOwed) }}</strong>.
                 Net cash flow after it:
-                <strong>KES {{ number_format($netCashFlow - $referrerShareOwed) }}</strong>
+                <strong>{{ number_format($netCashFlow - $referrerShareOwed) }}</strong>
             </div>
         @endif
         {{-- Salary → Savings Rate --}}
@@ -198,7 +198,7 @@
                             <div class="min-w-0">
                                 <p class="text-sm font-medium">{{ $entry['salary_date'] }}</p>
                                 <p class="text-xs text-gray-500">
-                                    Salary: KES {{ number_format($entry['salary_amount'], 0) }}
+                                    Salary: {{ number_format($entry['salary_amount'], 0) }}
                                 </p>
                             </div>
                             <div class="sm:text-right">
@@ -207,7 +207,7 @@
                                     {{ $entry['savings_percentage'] }}% saved
                                 </p>
                                 <p class="text-xs text-gray-500">
-                                    KES {{ number_format($entry['saved_amount'], 0) }} moved
+                                    {{ number_format($entry['saved_amount'], 0) }} moved
                                 </p>
                             </div>
                         </div>

@@ -75,7 +75,7 @@
                                                 data-balance="{{ $account->current_balance }}"
                                                 data-fee-required="{{ $feeRequiredAccountIds->contains($account->id) ? '1' : '0' }}"
                                             {{ old('account_id') == $account->id ? 'selected' : '' }}>
-                                            {{ $account->name }} (KES {{ number_format($account->current_balance, 0) }})
+                                            {{ $account->name }} ({{ number_format($account->current_balance, 0) }})
                                         </option>
                                     @endforeach
                                 </select>
@@ -255,8 +255,8 @@
                     const totalLabel = total.toLocaleString('en-US', {maximumFractionDigits: 2});
                     const balanceLabel = balance.toLocaleString('en-US', {maximumFractionDigits: 2});
                     hint.textContent = fee > 0
-                        ? `⚠️ Principal + fee (KES ${totalLabel}) exceeds available balance (KES ${balanceLabel}). Can't record.`
-                        : `⚠️ Amount (KES ${totalLabel}) exceeds available balance (KES ${balanceLabel}). Can't record.`;
+                        ? `⚠️ Principal + fee (${totalLabel}) exceeds available balance (${balanceLabel}). Can't record.`
+                        : `⚠️ Amount (${totalLabel}) exceeds available balance (${balanceLabel}). Can't record.`;
                     hint.className = 'mt-1 text-xs text-red-600 font-medium';
                 } else {
                     hint.textContent = '';

@@ -230,7 +230,7 @@
             <span>
                 {{ $hiddenCount }} older {{ $hiddenCount === 1 ? 'entry' : 'entries' }} hidden (before {{ $since->format('M j, Y') }}).
                 @if($broughtForward !== null)
-                    Balance brought forward: <strong>KES {{ number_format($broughtForward, 0) }}</strong>.
+                    Balance brought forward: <strong>{{ number_format($broughtForward, 0) }}</strong>.
                 @endif
             </span>
             <a href="{{ request()->fullUrlWithQuery(['range' => 'all']) }}" class="font-medium underline">Show all data</a>

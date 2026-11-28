@@ -168,7 +168,7 @@
                             <div class="flex justify-between text-sm">
                                 <span class="text-gray-600 dark:text-gray-400 font-medium">Total amount</span>
                                 <span id="preview-amount" class="text-emerald-600 dark:text-emerald-400 font-semibold">
-                                    KES 0
+                                    0
                                 </span>
                             </div>
                             @if(isset($skippedDaysCount) && $skippedDaysCount > 0)
@@ -246,7 +246,7 @@
         const totalDays = {{ $totalDaysJs }};
 
         function formatKES(val) {
-            return 'KES ' + new Intl.NumberFormat('en-KE').format(Math.round(val * 100) / 100);
+            return '' + new Intl.NumberFormat('en-KE').format(Math.round(val * 100) / 100);
         }
 
         function updatePreview() {

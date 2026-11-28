@@ -444,7 +444,7 @@ readonly class TransferService
         // Rule: M-Pesa minimum withdrawal
         if ($from->type === 'mpesa' && $to->type === 'cash' && $amount < 50) {
             throw ValidationException::withMessages([
-                'amount' => 'Minimum M-Pesa withdrawal amount is KES 50.',
+                'amount' => 'Minimum M-Pesa withdrawal amount is 50.',
             ]);
         }
 

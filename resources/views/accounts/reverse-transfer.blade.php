@@ -23,7 +23,7 @@
                 <dl class="space-y-3 mb-6 text-sm">
                     <div class="flex justify-between">
                         <dt class="text-gray-500 dark:text-gray-400">Amount</dt>
-                        <dd class="font-semibold text-gray-900 dark:text-white">KES {{ number_format($transfer->amount, 0, '.', ',') }}</dd>
+                        <dd class="font-semibold text-gray-900 dark:text-white">{{ number_format($transfer->amount, 0, '.', ',') }}</dd>
                     </div>
                     <div class="flex justify-between">
                         <dt class="text-gray-500 dark:text-gray-400">From</dt>

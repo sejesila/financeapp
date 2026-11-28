@@ -71,7 +71,7 @@
                 {{-- ── Summary ── --}}
                 <div class="bg-gradient-to-r from-teal-500 to-emerald-600 text-white p-4 sm:p-6 rounded-lg shadow-lg">
                     <p class="text-xs sm:text-sm font-semibold">Net position (shares + deposits + wallet − loans)</p>
-                    <p class="text-3xl sm:text-4xl font-bold mt-1">KES {{ number_format($net, 0, '.', ',') }}</p>
+                    <p class="text-3xl sm:text-4xl font-bold mt-1">{{ number_format($net, 0, '.', ',') }}</p>
                     <p class="text-xs mt-1 opacity-90">Balances as at {{ $sacco->opening_date->format('M d, Y') }} plus
                         figures recorded below.</p>
                 </div>
@@ -87,7 +87,7 @@
                         <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3">
                             <p class="text-xs text-gray-500">{{ $l }}</p>
                             <p class="text-base font-bold text-gray-900 dark:text-white">
-                                KES {{ number_format($v, 0) }}</p>
+                                {{ number_format($v, 0) }}</p>
                         </div>
                     @endforeach
                 </div>
@@ -204,22 +204,22 @@
                                         @endif
                                     </p>
                                     <p class="text-xs text-gray-500">
-                                        KES {{ number_format($loan->principal, 0) }} at {{ $loan->annual_rate + 0 }}%
+                                        {{ number_format($loan->principal, 0) }} at {{ $loan->annual_rate + 0 }}%
                                         · {{ $loan->term_months }} months
-                                        · instalment KES {{ number_format($loan->instalment, 2) }}
+                                        · instalment {{ number_format($loan->instalment, 2) }}
                                     </p>
                                     @if($loan->fee > 0)
-                                        <p class="text-xs text-gray-500">Fees KES {{ number_format($loan->fee, 2) }}
+                                        <p class="text-xs text-gray-500">Fees {{ number_format($loan->fee, 2) }}
                                             added to the balance
                                             @if($loan->amount_received !== null)
-                                                · you received KES {{ number_format($loan->amount_received, 0) }} in full
+                                                · you received {{ number_format($loan->amount_received, 0) }} in full
                                             @endif
                                         </p>
                                     @endif
                                 </div>
                                 <div class="text-right">
                                     <p class="text-sm font-bold text-gray-900 dark:text-white">
-                                        KES {{ number_format($out, 2) }}</p>
+                                        {{ number_format($out, 2) }}</p>
                                     <p class="text-xs text-gray-500">{{ $loan->status === 'active' ? $loan->monthsLeft() . ' months left' : '' }}</p>
                                 </div>
                             </div>
@@ -267,9 +267,9 @@
                                             🔁 Refinance / top up
                                         </summary>
                                         <p class="text-xs text-gray-500 mt-2">
-                                            Your outstanding KES {{ number_format($out, 2) }} rolls into a new loan
+                                            Your outstanding {{ number_format($out, 2) }} rolls into a new loan
                                             together with the top-up.
-                                            Fees: 10% of the outstanding principal + 2% of the top-up + KES 200, added
+                                            Fees: 10% of the outstanding principal + 2% of the top-up + 200, added
                                             to the new balance. You receive the top-up in full.
                                         </p>
                                         <form method="POST" action="{{ route('sacco.loans.refinance', $loan) }}"
@@ -374,7 +374,7 @@
                                 a loan
                             </summary>
                             <p class="text-xs text-gray-500 mt-2">You receive the full amount. The one-off fee (2% of
-                                the amount + KES 200) is added to what you owe. Tick the box below for a loan that was
+                                the amount + 200) is added to what you owe. Tick the box below for a loan that was
                                 already running before you started tracking, so no fee is added.</p>
                             <form method="POST" action="{{ route('sacco.loans.store') }}" id="new-loan-form"
                                   class="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs text-gray-600 dark:text-gray-400">
@@ -448,7 +448,7 @@
                                 data-term="{{ max(1, $simLoan->monthsLeft()) }}"
                                 data-start="{{ $simNext }}"
                                 class="mt-3 text-xs text-teal-700 dark:text-teal-400 underline">
-                            Use my current loan (KES {{ number_format($simLoan->outstanding(), 2) }} left, {{ $simLoan->monthsLeft() }} months)
+                            Use my current loan ({{ number_format($simLoan->outstanding(), 2) }} left, {{ $simLoan->monthsLeft() }} months)
                         </button>
                     @endif
 
@@ -547,7 +547,7 @@
         <script>
             (function () {
                 const RATE = {{ $rate }};
-                const money = n => 'KES ' + n.toLocaleString('en-US', {
+                const money = n => '' + n.toLocaleString('en-US', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2
                 });
@@ -606,7 +606,7 @@
 
                 const r2 = n => Math.round(n * 100) / 100;
                 const num = n => n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                const money = n => 'KES ' + num(n);
+                const money = n => '' + num(n);
                 const monthLabel = (ym, i) => {
                     const [y, m] = (ym || '').split('-').map(Number);
                     if (!y || !m) return '';

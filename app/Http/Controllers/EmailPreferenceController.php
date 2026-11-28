@@ -101,8 +101,8 @@ class EmailPreferenceController extends Controller
     public function previewCustom(Request $request, ReportDataService $reportService)
     {
         $user      = Auth::user();
-        $startDate = Carbon::parse($request->get('start', now()->startOfMonth()));
-        $endDate   = Carbon::parse($request->get('end', now()->endOfMonth()));
+        $startDate = Carbon::parse($request->input('start', now()->startOfMonth()));
+        $endDate   = Carbon::parse($request->input('end', now()->endOfMonth()));
         $data      = $reportService->generateCustomReport($user, $startDate, $endDate);
 
         return Pdf::view('emails.pdf.monthly-report', compact('user', 'data'))

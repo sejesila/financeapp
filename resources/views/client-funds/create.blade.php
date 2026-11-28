@@ -158,7 +158,7 @@
                                     @elseif($account->type === 'bank') 🏦
                                     @elseif($account->type === 'savings') 💰
                                     @endif
-                                    {{ $account->name }} (KES {{ number_format($account->current_balance, 0, '.', ',') }})
+                                    {{ $account->name }} ({{ number_format($account->current_balance, 0, '.', ',') }})
                                 </option>
                             @endforeach
                         </select>

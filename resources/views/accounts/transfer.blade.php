@@ -140,7 +140,7 @@
 
                     <!-- Minimum withdrawal warning -->
                     <p x-show="feeType === 'withdrawal' && amount > 0 && amount < 50" class="text-red-500 text-sm mt-2">
-                        ⚠️ Minimum M-Pesa withdrawal amount is KES 50
+                        ⚠️ Minimum M-Pesa withdrawal amount is 50
                     </p>
                 </div>
 
@@ -196,7 +196,7 @@
                                 <option value="{{ $fund->id }}" data-account="{{ $accountId }}">
                                     Fund #{{ $fund->id }} —
                                     received {{ Carbon::parse($fund->received_date)->format('M d, Y') }} —
-                                    KES {{ number_format($fund->balance, 0, '.', ',') }}
+                                    {{ number_format($fund->balance, 0, '.', ',') }}
                                 </option>
                             @endforeach
                         @endforeach
@@ -252,7 +252,7 @@
 
                     <p x-show="feeType === 'atm' && !feeManuallyEdited"
                        class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Default: KES 33.00 flat + 15% excise duty = KES 37.95
+                        Default: 33.00 flat + 15% excise duty = 37.95
                     </p>
                     <p x-show="feeType === 'savings'"
                        class="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -279,11 +279,11 @@
                             Total Deduction from <span x-text="fromAccountName"></span>:
                         </span>
                         <span class="text-lg font-bold text-indigo-800 dark:text-indigo-200"
-                              x-text="'KES ' + totalDeduction.toLocaleString()"></span>
+                              x-text="'' + totalDeduction.toLocaleString()"></span>
                     </div>
                     <p class="text-xs text-indigo-600 dark:text-indigo-300 mt-1">
-                        Transfer: KES <span x-text="parseFloat(amount || 0).toLocaleString()"></span>
-                        + Fee: KES <span x-text="parseFloat(transactionFee || 0).toFixed(2)"></span>
+                        Transfer: <span x-text="parseFloat(amount || 0).toLocaleString()"></span>
+                        + Fee: <span x-text="parseFloat(transactionFee || 0).toFixed(2)"></span>
                     </p>
                 </div>
                 <div x-show="fromAccountType === 'referrer_float'" x-transition class="mb-4" x-data="{ on: false }">

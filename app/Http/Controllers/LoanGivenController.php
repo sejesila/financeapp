@@ -48,16 +48,16 @@ class LoanGivenController extends Controller implements HasMiddleware
         try {
             $this->authorize('viewAny', LoanGiven::class);
 
-            $filter = $request->get('filter', 'active');
-            $period = $request->get('period');
-            $startDate = $request->get('start_date');
-            $endDate = $request->get('end_date');
+            $filter     = $request->input('filter', 'active');
+            $period = $request->input('period');
+            $startDate = $request->input('start_date');
+            $endDate = $request->input('end_date');
 
             $minYear = LoanGiven::where('user_id', Auth::id())->min(DB::raw('YEAR(disbursed_date)')) ?? date('Y');
             $maxYear = date('Y');
 
-            $sort = $request->get('sort', 'date_desc');
-            $referrerId = $request->get('referrer_id');
+            $sort = $request->input('sort', 'date_desc');
+            $referrerId = $request->input('referrer_id');
 
             $activeLoansQuery = LoanGiven::with(['account', 'payments', 'referrer'])
                 ->where('user_id', Auth::id())
@@ -105,12 +105,12 @@ class LoanGivenController extends Controller implements HasMiddleware
             $paidLoans = $paidLoansQuery->orderBy('repaid_date', 'desc')->orderBy('updated_at', 'desc')->paginate(15)->withQueryString();
 
             // ── Stats period (independent of the paid-list "period" filter) ───
-            $statsPeriod = $request->get('stats_period', 'this_month');
+            $statsPeriod = $request->input('stats_period', 'this_month');
 
             [$statsStart, $statsEnd, $statsLabel] = LoanBookStatsService::resolvePeriod(
                 $statsPeriod,
-                $request->get('stats_start'),
-                $request->get('stats_end')
+                $request->input('stats_start'),
+                $request->input('stats_end')
             );
 
             $allLoans = LoanGiven::where('user_id', Auth::id())->get();
@@ -296,9 +296,9 @@ class LoanGivenController extends Controller implements HasMiddleware
             if (round($required * 100) > round((float)$account->current_balance * 100)) {
                 throw ValidationException::withMessages([
                     'principal_amount' => "Insufficient balance in {$account->name}. "
-                        . "Available: KES " . number_format($account->current_balance, 2) . ", "
-                        . "required: KES " . number_format($required, 2)
-                        . ($fee > 0 ? " (principal + KES " . number_format($fee, 2) . " fee)." : "."),
+                        . "Available: " . number_format($account->current_balance, 2) . ", "
+                        . "required: " . number_format($required, 2)
+                        . ($fee > 0 ? " (principal + " . number_format($fee, 2) . " fee)." : "."),
                 ]);
             }
 
@@ -337,13 +337,13 @@ class LoanGivenController extends Controller implements HasMiddleware
                 DB::commit();
                 $account->refresh();
 
-                $message = "Loan of KES " . number_format($principalAmount, 0) . " to {$validated['borrower_name']} recorded. "
+                $message = "Loan of " . number_format($principalAmount, 0) . " to {$validated['borrower_name']} recorded. "
                     . "Interest isn't set upfront — when you record repayments and close the loan out, "
                     . "the rate is calculated automatically from what actually comes back. "
                     . "Due on " . $dueDate->format('M d, Y') . ".";
 
                 if ($transaction->feeTransaction) {
-                    $message .= " Transaction fee of KES " . number_format($transaction->feeTransaction->amount, 0)
+                    $message .= " Transaction fee of " . number_format($transaction->feeTransaction->amount, 0)
                         . " recorded separately as an expense — it won't count toward what {$validated['borrower_name']} owes.";
                 }
 
@@ -352,8 +352,8 @@ class LoanGivenController extends Controller implements HasMiddleware
                 }
 
                 if ($expectedInterestRate !== null) {
-                    $message .= " Expected interest at " . number_format($expectedInterestRate, 1) . "%: KES "
-                        . number_format($expectedInterestAmount, 0) . " (total expected: KES "
+                    $message .= " Expected interest at " . number_format($expectedInterestRate, 1) . "%: "
+                        . number_format($expectedInterestAmount, 0) . " (total expected: "
                         . number_format($principalAmount + $expectedInterestAmount, 0) . ").";
                 }
 
@@ -700,24 +700,24 @@ class LoanGivenController extends Controller implements HasMiddleware
                     }
                 }
 
-                $successMessage = "Repayment of KES " . number_format($paymentAmount, 0) . " from {$loanGiven->borrower_name} recorded into {$paymentAccount->name}!";
+                $successMessage = "Repayment of " . number_format($paymentAmount, 0) . " from {$loanGiven->borrower_name} recorded into {$paymentAccount->name}!";
 
                 $commissionNote = '';
                 if ($loanGiven->referrer_id && (float)$payment->referrer_commission > 0) {
                     $commissionNote = $payment->referrer_commission_kept
-                        ? " Referrer kept KES " . number_format($payment->referrer_commission, 0) . " of this interest before depositing."
-                        : " Referrer commission on this interest: KES " . number_format($payment->referrer_commission, 0) . ".";
+                        ? " Referrer kept " . number_format($payment->referrer_commission, 0) . " of this interest before depositing."
+                        : " Referrer commission on this interest: " . number_format($payment->referrer_commission, 0) . ".";
                 }
 
                 if (!$closedNow) {
                     if ($interestPortion > 0) {
                         $principalPortion = $paymentAmount - $interestPortion;
-                        $successMessage .= " KES " . number_format($interestPortion, 0) . " recorded as interest now, "
-                            . "KES " . number_format($principalPortion, 0) . " reduced the principal — "
-                            . "KES " . number_format($loanGiven->balance, 0) . " remains outstanding."
+                        $successMessage .= " " . number_format($interestPortion, 0) . " recorded as interest now, "
+                            . "" . number_format($principalPortion, 0) . " reduced the principal — "
+                            . "" . number_format($loanGiven->balance, 0) . " remains outstanding."
                             . $commissionNote;
                     } else {
-                        $successMessage .= " KES " . number_format($loanGiven->balance, 0) . " remains outstanding.";
+                        $successMessage .= " " . number_format($loanGiven->balance, 0) . " remains outstanding.";
                     }
 
                     $successMessage .= " Due date moved to " . $loanGiven->due_date->format('M d, Y') . ".";
@@ -726,12 +726,12 @@ class LoanGivenController extends Controller implements HasMiddleware
                 if ($closedNow) {
                     $successMessage .= " Loan closed as fully repaid.";
                     if ($loanGiven->interest_amount > 0) {
-                        $successMessage .= " Interest earned: KES " . number_format($loanGiven->interest_amount, 0)
+                        $successMessage .= " Interest earned: " . number_format($loanGiven->interest_amount, 0)
                             . " (" . number_format($loanGiven->interest_rate, 1) . "%).";
 
                         if ($loanGiven->referrer_id) {
                             $totalCommission = (float)$loanGiven->payments()->sum('referrer_commission');
-                            $successMessage .= " Referrer commission across the loan: KES " . number_format($totalCommission, 0) . "."
+                            $successMessage .= " Referrer commission across the loan: " . number_format($totalCommission, 0) . "."
                                 . $commissionNote;
                         }
                     } else {
@@ -809,8 +809,8 @@ class LoanGivenController extends Controller implements HasMiddleware
         try {
             $this->authorize('viewAny', LoanGiven::class);
 
-            $status = $request->get('status', 'active'); // active | paid | all
-            $referrerId = $request->get('referrer_id');
+            $status = $request->input('status', 'active'); // active | paid | all
+            $referrerId = $request->input('referrer_id');
 
             $query = LoanGiven::with('referrer')
                 ->where('user_id', Auth::id());
@@ -908,12 +908,12 @@ class LoanGivenController extends Controller implements HasMiddleware
 
                 $message = "Loan with {$loanGiven->borrower_name} closed as fully repaid.";
                 if ($loanGiven->interest_amount > 0) {
-                    $message .= " Interest earned: KES " . number_format($loanGiven->interest_amount, 0)
+                    $message .= " Interest earned: " . number_format($loanGiven->interest_amount, 0)
                         . " (" . number_format($loanGiven->interest_rate, 1) . "%).";
 
                     if ($loanGiven->referrer_id) {
                         $totalCommission = (float)$loanGiven->payments()->sum('referrer_commission');
-                        $message .= " Referrer commission across the loan: KES " . number_format($totalCommission, 0) . ".";
+                        $message .= " Referrer commission across the loan: " . number_format($totalCommission, 0) . ".";
                     }
                 } else {
                     $message .= " No interest was received above principal.";
@@ -956,8 +956,8 @@ class LoanGivenController extends Controller implements HasMiddleware
 
             return back()->with('success',
                 "Loan for {$loanGiven->borrower_name} rolled over. "
-                . "New principal: KES " . number_format($loanGiven->principal_amount, 0)
-                . ", new expected interest: KES " . number_format($loanGiven->expected_interest_amount, 0)
+                . "New principal: " . number_format($loanGiven->principal_amount, 0)
+                . ", new expected interest: " . number_format($loanGiven->expected_interest_amount, 0)
                 . ", new due date: " . $loanGiven->due_date->format('M d, Y') . "."
             );
 
@@ -1097,7 +1097,7 @@ class LoanGivenController extends Controller implements HasMiddleware
                                 'amount'      => round($amount, 2),
                             ]
                         );
-                        $note = ' KES ' . number_format($amount, 0)
+                        $note = ' ' . number_format($amount, 0)
                             . ' will be deducted from ' . $loanGiven->referrer->name
                             . '\'s commission, now and from future payouts until covered.';
                     }
@@ -1280,7 +1280,7 @@ class LoanGivenController extends Controller implements HasMiddleware
 
             if ($payment->referrer_commission_kept) {
                 return back()->with('error',
-                    'The referrer already kept her share of this interest (KES '
+                    'The referrer already kept her share of this interest ('
                     . number_format($payment->referrer_commission, 0)
                     . ') before depositing. Reversing it here wouldn\'t get that money back, so it can no longer be reversed.'
                 );
@@ -1343,7 +1343,7 @@ class LoanGivenController extends Controller implements HasMiddleware
                 DB::commit();
 
                 return redirect()->route('loans-given.show', $loanGiven->id)
-                    ->with('success', 'Interest transaction of KES ' . number_format($interestAmount, 0) . ' has been reversed. The loan has been recalculated.');
+                    ->with('success', 'Interest transaction of ' . number_format($interestAmount, 0) . ' has been reversed. The loan has been recalculated.');
 
             } catch (Throwable $e) {
                 DB::rollBack();

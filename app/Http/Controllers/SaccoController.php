@@ -180,7 +180,7 @@ class SaccoController extends Controller
         $total   = (float) $data['amount'] + $charges;
 
         if ($total > $sacco->ledgerBalance('wallet')) {
-            return back()->withInput()->with('error', 'Not enough in the wallet. Available: KES '
+            return back()->withInput()->with('error', 'Not enough in the wallet. Available: '
                 . number_format($sacco->ledgerBalance('wallet'), 2) . '.');
         }
 
@@ -297,8 +297,8 @@ class SaccoController extends Controller
             ]);
         });
 
-        return back()->with('success', 'Loan refinanced. You receive KES ' . number_format($topup, 2)
-            . ' in full. Fees of KES ' . number_format($fee, 2) . ' are added to the new balance of KES ' . number_format($principal, 2) . '.');
+        return back()->with('success', 'Loan refinanced. You receive ' . number_format($topup, 2)
+            . ' in full. Fees of ' . number_format($fee, 2) . ' are added to the new balance of ' . number_format($principal, 2) . '.');
     }
 
     public function storeLoanPayment(Request $request, SaccoLoan $loan)
@@ -338,7 +338,7 @@ class SaccoController extends Controller
         $principal = round($amount - $interest, 2);
 
         if ($principal > $outstanding + 0.005) {
-            return back()->withInput()->with('error', 'That is more than the outstanding balance (KES '
+            return back()->withInput()->with('error', 'That is more than the outstanding balance ('
                 . number_format($outstanding, 2) . ' plus interest).');
         }
 

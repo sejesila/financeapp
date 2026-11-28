@@ -75,29 +75,29 @@
         <table>
             <tr>
                 <td class="label-cell">Opening Balance</td>
-                <td>KES {{ number_format($data['openingBalance'], 2) }}</td>
+                <td>{{ number_format($data['openingBalance'], 2) }}</td>
             </tr>
             @if($data['totalInflow'] > 0)
                 <tr>
                     <td class="label-cell">Total Inflows</td>
-                    <td class="amount-green">+ KES {{ number_format($data['totalInflow'], 2) }}</td>
+                    <td class="amount-green">+ {{ number_format($data['totalInflow'], 2) }}</td>
                 </tr>
             @endif
             @if($data['totalWithdrawal'] > 0)
                 <tr>
                     <td class="label-cell">Total Withdrawals</td>
-                    <td class="amount-red">(KES {{ number_format($data['totalWithdrawal'], 2) }})</td>
+                    <td class="amount-red">({{ number_format($data['totalWithdrawal'], 2) }})</td>
                 </tr>
             @endif
             @if($data['totalInterest'] > 0)
                 <tr>
                     <td class="label-cell">Net Interest Earned</td>
-                    <td class="amount-blue">KES {{ number_format($data['totalInterest'], 2) }}</td>
+                    <td class="amount-blue">{{ number_format($data['totalInterest'], 2) }}</td>
                 </tr>
             @endif
             <tr style="border-top: 1px solid #c7d4f0;">
                 <td class="label-cell"><strong>Closing Balance</strong></td>
-                <td class="amount-bold">KES {{ number_format($data['closingBalance'], 2) }}</td>
+                <td class="amount-bold">{{ number_format($data['closingBalance'], 2) }}</td>
             </tr>
         </table>
     </div>

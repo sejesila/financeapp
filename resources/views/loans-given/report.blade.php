@@ -104,8 +104,8 @@
                                     @foreach($loans as $loan)
                                         <tr class="odd:bg-white even:bg-gray-200">
                                             <td class="py-2 pr-4 font-medium text-gray-900">{{ $loan->borrower_name }}</td>
-                                            <td class="py-2 pr-4">KES {{ number_format($loan->balance, 0) }}</td>
-                                            <td class="py-2 pr-4">KES {{ number_format($loan->outstanding_amount, 0) }}</td>
+                                            <td class="py-2 pr-4">{{ number_format($loan->balance, 0) }}</td>
+                                            <td class="py-2 pr-4">{{ number_format($loan->outstanding_amount, 0) }}</td>
                                             <td class="py-2 pr-4">
                                                 {{ $loan->due_date ? $loan->due_date->format('M d, Y') : 'Not set' }}
                                                 @if($loan->due_date && $loan->status === 'active' && $loan->due_date->isPast())
@@ -113,18 +113,18 @@
                                                 @endif
                                             </td>
                                             <td class="py-2 pr-4 capitalize">{{ str_replace('_', ' ', $loan->status) }}</td>
-                                            <td class="py-2 pr-4">KES {{ number_format($loan->original_principal, 0) }}</td>
+                                            <td class="py-2 pr-4">{{ number_format($loan->original_principal, 0) }}</td>
                                         </tr>
                                     @endforeach
                                     </tbody>
                                     <tfoot>
                                     <tr class="text-xs text-gray-500 border-t border-gray-200">
                                         <td class="py-2 pr-4 font-medium">Subtotal</td>
-                                        <td class="py-2 pr-4 font-medium">KES {{ number_format($loans->sum('balance'), 0) }}</td>
-                                        <td class="py-2 pr-4 font-medium">KES {{ number_format($loans->sum('outstanding_amount'), 0) }}</td>
+                                        <td class="py-2 pr-4 font-medium">{{ number_format($loans->sum('balance'), 0) }}</td>
+                                        <td class="py-2 pr-4 font-medium">{{ number_format($loans->sum('outstanding_amount'), 0) }}</td>
                                         <td class="py-2 pr-4"></td>
                                         <td class="py-2 pr-4"></td>
-                                        <td class="py-2 pr-4 font-medium">KES {{ number_format($loans->sum(fn ($l) => $l->original_principal), 0) }}</td>
+                                        <td class="py-2 pr-4 font-medium">{{ number_format($loans->sum(fn ($l) => $l->original_principal), 0) }}</td>
                                     </tr>
                                     </tfoot>
                                 </table>
@@ -134,11 +134,11 @@
                         <div class="mt-6 pt-4 border-t-2 border-gray-300 flex justify-end gap-8 text-sm">
                             <div>
                                 <span class="text-gray-500">Total Principal:</span>
-                                <span class="font-semibold text-gray-900">KES {{ number_format($grandTotalPrincipal, 0) }}</span>
+                                <span class="font-semibold text-gray-900">{{ number_format($grandTotalPrincipal, 0) }}</span>
                             </div>
                             <div>
                                 <span class="text-gray-500">Total Outstanding:</span>
-                                <span class="font-semibold text-indigo-600">KES {{ number_format($grandTotalOutstanding, 0) }}</span>
+                                <span class="font-semibold text-indigo-600">{{ number_format($grandTotalOutstanding, 0) }}</span>
                             </div>
                         </div>
                     @endif
