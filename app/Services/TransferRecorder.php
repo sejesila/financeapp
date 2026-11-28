@@ -343,7 +343,7 @@ class TransferRecorder
             ]);
 
             if ($fee > 0) {
-                $feeCategory = $this->categories->findOrCreate($user, 'Transaction Fees', 'expense');
+                $feeCategory = $this->categories->findOrCreate($user, 'Loan Transaction Fees', 'expense');
 
                 Transaction::withoutGlobalScopes()->create([
                     'user_id'            => $user->id,
@@ -798,13 +798,46 @@ class TransferRecorder
         ], 201);
     }
 
+    /**
+     * Decide how much of a webhook transfer is client money.
+     *
+     * Into Etica: only what is still owed to clients (how far Etica falls
+     * short of everything owed) is flagged. Any remainder is split into a
+     * second, unflagged transfer so it counts as your own savings.
+     * Exception: an exact match to a fund received in the last 2 days is new
+     * client money passing through, so the whole amount is flagged.
+     *
+     * Other destinations: exact balance match, else mark for reconciliation.
+     *
+     * Must run before the accounts' updateBalance() calls, so the Etica
+     * balance read here does not yet include this transfer.
+     */
     private function attemptClientFundAutoMatch(Transfer $transfer, User $user, Account $fromAccount, float $amount): void
     {
-        $candidateFund = ClientFund::where('user_id', $user->id)
+        $sourceFunds = fn () => ClientFund::where('user_id', $user->id)
             ->where('account_id', $fromAccount->id)
-            ->where('balance', $amount)
-            ->whereNotIn('status', ['cancelled'])
-            ->first();
+            ->whereNotIn('status', ['cancelled']);
+
+        $candidateFund = $sourceFunds()->where('balance', $amount)->first();
+
+        $destination = Account::withoutGlobalScopes()->find($transfer->to_account_id);
+
+        $intoEtica = $destination
+            && $destination->type === 'savings'
+            && stripos($destination->name, 'etica') !== false;
+
+        if ($intoEtica) {
+            $isNewClientMoney = $candidateFund
+                && Carbon::parse($candidateFund->received_date)->gte(now()->subDays(2)->startOfDay());
+
+            if (! $isNewClientMoney) {
+                $linkedFund = $candidateFund
+                    ?? $sourceFunds()->where('balance', '>', 0)->orderBy('received_date')->first();
+
+                $this->flagOnlyAmountOwed($transfer, $user, $destination, $amount, $linkedFund?->id);
+                return;
+            }
+        }
 
         if ($candidateFund) {
             $transfer->update([
@@ -820,11 +853,7 @@ class TransferRecorder
             return;
         }
 
-        $hasOutstanding = ClientFund::where('user_id', $user->id)
-            ->where('account_id', $fromAccount->id)
-            ->where('balance', '>', 0)
-            ->whereNotIn('status', ['cancelled'])
-            ->exists();
+        $hasOutstanding = $sourceFunds()->where('balance', '>', 0)->exists();
 
         if ($hasOutstanding) {
             $transfer->update(['needs_reconciliation' => true]);
@@ -835,5 +864,59 @@ class TransferRecorder
                 'amount'           => $amount,
             ]);
         }
+    }
+
+    /**
+     * Flag only the part of an Etica deposit that covers money still owed to
+     * clients. $transfer keeps that part (and the SMS reference); the rest
+     * becomes a separate transfer that counts as your savings.
+     */
+    private function flagOnlyAmountOwed(
+        Transfer $transfer,
+        User     $user,
+        Account  $savingsAccount,
+        float    $amount,
+        ?int     $clientFundId,
+    ): void {
+        // Negative owned savings = Etica holds less than clients are owed.
+        $owned         = app(ReportDataService::class)->getOwnedSavingsBalance($user);
+        $clientPortion = round(min($amount, max(0, -$owned)), 2);
+
+        if ($clientPortion <= 0) {
+            return; // nothing owed — the whole deposit is yours
+        }
+
+        // Flagging $transfer makes the caller skip borrowed-fund repayment,
+        // so apply it here (no-op if nothing borrowed is outstanding).
+        app(BorrowedFundReturnService::class)->applyDepositAgainstBorrowed(
+            userId: $user->id,
+            accountId: $savingsAccount->id,
+            depositAmount: $amount,
+            date: Carbon::parse($transfer->date)->format('Y-m-d'),
+            transfer: $transfer,
+        );
+
+        $ownPortion = round($amount - $clientPortion, 2);
+
+        if ($ownPortion > 0) {
+            // Copy before flagging, so the new row stays unflagged.
+            $own = $transfer->replicate();
+            $own->amount = $ownPortion;
+            $own->mpesa_reference = null;
+            $own->save();
+        }
+
+        $transfer->update([
+            'amount'         => $clientPortion,
+            'is_client_fund' => true,
+            'client_fund_id' => $clientFundId,
+        ]);
+
+        Log::info('Webhook: Etica deposit allocated between client money owed and own savings', [
+            'transfer_id'    => $transfer->id,
+            'client_fund_id' => $clientFundId,
+            'client_portion' => $clientPortion,
+            'own_portion'    => $ownPortion,
+        ]);
     }
 }
