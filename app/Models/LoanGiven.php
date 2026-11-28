@@ -373,6 +373,18 @@ class LoanGiven extends Model
         return $this->belongsTo(Referrer::class);
     }
 
+    /** Write-off charge against the referrer, if any. */
+    public function referrerRecovery()
+    {
+        return $this->hasOne(ReferrerRecovery::class);
+    }
+
+    /** Money actually lent that hasn't come back. Excludes rolled-over interest. */
+    public function getUnrecoveredPrincipalAttribute(): float
+    {
+        return max(0, round($this->original_principal - (float) $this->principal_paid, 2));
+    }
+
     public function payout()
     {
         return $this->belongsTo(ReferrerPayout::class, 'referrer_payout_id');
