@@ -136,7 +136,9 @@
                         @endif
 
                         <form method="POST" action="{{ route('referrer-payouts.store', $referrer->id) }}"
-                              class="space-y-6">
+                              class="space-y-6"
+                              x-data="payoutForm(@js($payoutData))"
+                              x-effect="if (accountId && !eligible.some(a => a.id === accountId)) accountId = ''">
                             @csrf
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -144,7 +146,7 @@
                                     <label for="period_start" class="block text-sm font-medium text-gray-700">Period
                                         Start <span class="text-red-600">*</span></label>
                                     <input type="date" id="period_start" name="period_start"
-                                           value="{{ old('period_start') }}"
+                                           value="{{ old('period_start') }}" x-model="start"
                                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 @error('period_start') border-red-500 @enderror"
                                            required>
                                     @error('period_start')<p
@@ -155,32 +157,37 @@
                                     <label for="period_end" class="block text-sm font-medium text-gray-700">Period End
                                         <span class="text-red-600">*</span></label>
                                     <input type="date" id="period_end" name="period_end"
-                                           value="{{ old('period_end', now()->format('Y-m-d')) }}"
+                                           value="{{ old('period_end', now()->format('Y-m-d')) }}" x-model="end"
                                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 @error('period_end') border-red-500 @enderror"
                                            required>
                                     @error('period_end')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
                                 </div>
 
 
-                                <div x-data="{ accountId: '{{ old('account_id') }}', floatId: '{{ $floatAccount?->id }}' }">
+                                <div>
                                     <label for="account_id" class="block text-sm font-medium text-gray-700">Pay From
                                         Account <span class="text-red-600">*</span></label>
                                     <select id="account_id" name="account_id" x-model="accountId"
                                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 @error('account_id') border-red-500 @enderror"
                                             required>
                                         <option value="">Select Account</option>
-                                        @foreach($accounts as $account)
-                                            <option value="{{ $account->id }}" {{ old('account_id') == $account->id ? 'selected' : '' }}>
-                                                {{ $account->name }}
-                                                (KES {{ number_format($account->current_balance, 0) }})
-                                                @if($floatAccount && $floatAccount->id === $account->id) — her float @endif
-                                            </option>
-                                        @endforeach
+                                        <template x-for="a in eligible" :key="a.id">
+                                            <option :value="a.id" :selected="a.id === accountId"
+                                                    x-text="a.name + ' (KES ' + money(a.balance) + ')' + (a.isFloat ? ' — her float' : '')"></option>
+                                        </template>
                                     </select>
                                     @error('account_id')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
 
+                                    <p class="mt-1 text-xs text-gray-500">
+                                        Cash to pay for this period: KES <span x-text="money(netCents / 100)"></span>.
+                                        Only accounts that can cover it (plus any send fee) are listed.
+                                    </p>
+                                    <p class="mt-1 text-xs text-red-600" x-show="eligible.length === 0" x-cloak>
+                                        No account has enough. Top one up or choose a shorter period.
+                                    </p>
+
                                     @if($floatAccount)
-                                        <template x-if="accountId === floatId">
+                                        <template x-if="accountId === '{{ $floatAccount->id }}'">
                                             <div class="mt-2 bg-teal-50 border-l-4 border-teal-400 p-3">
                                                 <p class="text-xs text-teal-800">
                                                     Paying from {{ $referrer->name }}'s float (currently
@@ -236,4 +243,32 @@
             </div>
         </div>
     </div>
+
+    <script>
+        function payoutForm(data) {
+            return {
+                ...data,
+
+                // Cash due for the chosen dates, after write-off recovery (in cents).
+                get netCents() {
+                    const gross = this.payments
+                        .filter(p => (!this.start || p.date >= this.start) && (!this.end || p.date <= this.end))
+                        .reduce((sum, p) => sum + Math.round(p.cut * 100), 0);
+
+                    return gross - Math.min(gross, Math.round(this.recoveryOwed * 100));
+                },
+
+                get eligible() {
+                    const net = this.netCents;
+                    const fee = Math.round((this.fees[net] || 0) * 100);
+
+                    return this.accounts.filter(a => Math.round(a.balance * 100) >= net + (a.charges ? fee : 0));
+                },
+
+                money(value) {
+                    return Number(value).toLocaleString('en-US', { maximumFractionDigits: 0 });
+                },
+            };
+        }
+    </script>
 </x-app-layout>

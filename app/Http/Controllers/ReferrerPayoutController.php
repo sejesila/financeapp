@@ -54,16 +54,74 @@ class ReferrerPayoutController extends Controller
         $recoveryDeduction = round(min($totalCut, $recoveryOwed), 2);
         $netPayable        = round($totalCut - $recoveryDeduction, 2);
 
+        // Empty accounts are never offered.
         $accounts = Account::where('user_id', Auth::id())
             ->where('is_active', true)
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->filter(fn ($a) => (float) $a->current_balance > 0)
+            ->values();
 
         $floatAccount = $referrer->floatAccount;
 
+        // The form narrows the account list to those that can cover the chosen period.
+        $payoutData = [
+            'payments' => $unpaidPayments->map(fn ($p) => [
+                'date' => $p->payment_date->format('Y-m-d'),
+                'cut'  => (float) $p->referrer_commission,
+            ])->values(),
+            'accounts' => $accounts->map(fn ($a) => [
+                'id'      => (string) $a->id,
+                'name'    => $a->name,
+                'balance' => (float) $a->current_balance,
+                'charges' => $this->chargesPayoutFee($a),
+                'isFloat' => $floatAccount && $floatAccount->id === $a->id,
+            ])->values(),
+            'fees'         => (object) $this->payoutFeesByAmount($unpaidPayments, $recoveryOwed),
+            'recoveryOwed' => $recoveryOwed,
+            'start'        => (string) old('period_start', ''),
+            'end'          => (string) old('period_end', now()->format('Y-m-d')),
+            'accountId'    => (string) old('account_id', ''),
+        ];
+
         return view('referrer-payouts.create', compact(
-            'referrer', 'unpaidLoans', 'unpaidPayments', 'totalInterest', 'totalCut', 'accounts', 'floatAccount','recoveryOwed', 'recoveryDeduction', 'netPayable'
+            'referrer', 'unpaidLoans', 'unpaidPayments', 'totalInterest', 'totalCut', 'accounts', 'floatAccount','recoveryOwed', 'recoveryDeduction', 'netPayable', 'payoutData'
         ));
+    }
+
+    private function chargesPayoutFee(Account $account): bool
+    {
+        return in_array($account->type, ['mpesa', 'airtel_money']);
+    }
+
+    /**
+     * Send-money fee for every net amount a date range could produce,
+     * keyed by the amount in cents.
+     */
+    private function payoutFeesByAmount($payments, float $recoveryOwed): array
+    {
+        $daily = $payments
+            ->groupBy(fn ($p) => $p->payment_date->format('Y-m-d'))
+            ->sortKeys()
+            ->map(fn ($g) => (float) $g->sum('referrer_commission'))
+            ->values();
+
+        $fees = [];
+
+        foreach ($daily->keys() as $from) {
+            $gross = 0.0;
+
+            foreach ($daily->slice($from) as $amount) {
+                $gross = round($gross + $amount, 2);
+                $net   = round($gross - min($gross, $recoveryOwed), 2);
+
+                if ($net > 0) {
+                    $fees[(int) round($net * 100)] = (float) app(TransactionService::class)->mpesaSendMoneyFee($net);
+                }
+            }
+        }
+
+        return $fees;
     }
 
     public function store(Request $request, Referrer $referrer)
@@ -107,7 +165,7 @@ class ReferrerPayoutController extends Controller
         $effectiveSharePercentage = $totalInterest > 0
             ? round(($grossCommission / $totalInterest) * 100, 2) : 0;
 
-        $fee = ($amountPaid > 0 && in_array($account->type, ['mpesa', 'airtel_money']))
+        $fee = ($amountPaid > 0 && $this->chargesPayoutFee($account))
             ? app(TransactionService::class)->mpesaSendMoneyFee($amountPaid) : 0;
 
         if ($amountPaid > 0 && round((float) $account->current_balance, 2) < round($amountPaid + $fee, 2)) {
