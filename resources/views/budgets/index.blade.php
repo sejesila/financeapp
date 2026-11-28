@@ -2,6 +2,10 @@
     @php
         // Display-only short names. Keys must match the category name exactly.
         $shortNames = [
+            'Salary'                 => 'Main',
+            'Side Income'            => 'S.H',
+            'Loan Interest'          => 'L.I',
+            'Interest'               => 'E.I',
             'School Fees & Supplies' => 'Fees',
             'Referrer Commission'    => 'Commission',
             'Loan Transaction Fees'  => 'Loan Txn fees',
