@@ -636,35 +636,31 @@
                         @endif
                     </div>
 
-                    {{-- Charge the write-off to the referrer's commission. Only relevant when the loan has a referrer. --}}
+                    {{-- Written-off referred loans are always recovered from the referrer's commission. --}}
                     @if($loanGiven->referrer)
-                        <div x-show="status === 'written_off'" x-cloak x-data="{ charge: false }"
+                        @php $recoverable = round(min((float) $loanGiven->balance, (float) $loanGiven->original_principal), 2); @endphp
+                        <div x-show="status === 'written_off'" x-cloak
                              class="mb-4 border border-purple-200 bg-purple-50 rounded-lg p-4 space-y-3">
-                            <label class="flex items-start">
-                                <input type="checkbox" name="charge_referrer" value="1" x-model="charge"
-                                       :disabled="status !== 'written_off'"
-                                       class="mt-0.5 rounded border-gray-300 text-purple-600 shadow-sm focus:border-purple-300 focus:ring focus:ring-purple-200 focus:ring-opacity-50">
-                                <span class="ml-2 text-sm text-gray-800">
-                                    Charge this write-off to {{ $loanGiven->referrer->name }}
-                                </span>
-                            </label>
+                            <p class="text-sm text-gray-800">
+                                KES {{ number_format($recoverable, 0) }} will be recovered from
+                                {{ $loanGiven->referrer->name }}'s commission.
+                            </p>
 
-                            <div x-show="charge" x-cloak>
+                            <div>
                                 <label for="recovery_amount" class="block text-xs font-medium text-gray-700">
-                                    Amount to charge (KES)
+                                    Recover a smaller amount (optional, KES)
                                 </label>
-                                <input type="number" step="0.01" min="0.01" max="{{ $loanGiven->balance }}"
+                                <input type="number" step="0.01" min="0.01" max="{{ $recoverable }}"
                                        id="recovery_amount" name="recovery_amount"
-                                       placeholder="{{ number_format($loanGiven->balance, 2, '.', '') }}"
-                                       :disabled="status !== 'written_off' || !charge"
+                                       placeholder="{{ number_format($recoverable, 2, '.', '') }}"
+                                       :disabled="status !== 'written_off'"
                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-300 focus:ring focus:ring-purple-200 focus:ring-opacity-50">
                                 <p class="mt-1 text-xs text-gray-500">
-                                    Leave blank to charge the full unrecovered balance
-                                    (KES {{ number_format($loanGiven->balance, 0) }}).
+                                    Leave blank to recover the full unrecovered principal.
                                 </p>
                             </div>
 
-                            <p class="text-xs text-purple-800" x-show="charge" x-cloak>
+                            <p class="text-xs text-purple-800">
                                 The amount comes off her unpaid commission at her next payout. If her commission is
                                 less than what's owed, the remainder is carried forward and deducted from future
                                 commissions until it's covered.

@@ -1055,7 +1055,6 @@ class LoanGivenController extends Controller implements HasMiddleware
 
             $validated = $request->validate([
                 'status'          => 'required|in:defaulted,written_off,active',
-                'charge_referrer' => 'nullable|boolean',
                 'recovery_amount' => 'nullable|numeric|min:0.01',
             ]);
 
@@ -1066,7 +1065,7 @@ class LoanGivenController extends Controller implements HasMiddleware
             $wasWrittenOff = $loanGiven->status === 'written_off';
             $note = '';
 
-            DB::transaction(function () use ($validated, $loanGiven, $request, $wasWrittenOff, &$note) {
+            DB::transaction(function () use ($validated, $loanGiven, $wasWrittenOff, &$note) {
                 // Leaving written_off: drop the charge, unless commissions already paid it down.
                 if ($wasWrittenOff && $validated['status'] !== 'written_off') {
                     $rec = ReferrerRecovery::where('loan_given_id', $loanGiven->id)->first();
@@ -1081,11 +1080,12 @@ class LoanGivenController extends Controller implements HasMiddleware
                 $loanGiven->status = $validated['status'];
                 $loanGiven->save();
 
-                if ($validated['status'] === 'written_off'
-                    && $loanGiven->referrer_id
-                    && $request->boolean('charge_referrer')) {
+                // A written-off referred loan is always recovered from the referrer's commission.
+                if ($validated['status'] === 'written_off' && $loanGiven->referrer_id) {
 
-                    $loss   = (float)$loanGiven->balance; // unrecovered principal
+                    // Unrecovered principal: never more than was originally lent,
+                    // even if a rollover added interest to the balance.
+                    $loss   = round(min((float)$loanGiven->balance, (float)$loanGiven->original_principal), 2);
                     $amount = min($loss, (float)($validated['recovery_amount'] ?? $loss));
 
                     if ($amount > 0) {
